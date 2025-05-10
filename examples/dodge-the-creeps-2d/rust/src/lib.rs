@@ -4,6 +4,7 @@ use godot_bevy::prelude::{
     *,
 };
 
+pub mod macros;
 mod nodes;
 
 #[bevy_app]
