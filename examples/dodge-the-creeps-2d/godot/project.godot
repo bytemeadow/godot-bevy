@@ -11,8 +11,13 @@ config_version=5
 [application]
 
 config/name="breakout"
+run/main_scene="uid://crt73ja5heco1"
 config/features=PackedStringArray("4.4", "Mobile")
 config/icon="res://icon.svg"
+
+[autoload]
+
+BevyAppSingleton="*res://scenes/bevy_app_singleton.tscn"
 
 [display]
 

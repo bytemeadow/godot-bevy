@@ -25,6 +25,8 @@ impl IArea2D for Player {
       godot_print!("Player ready");
       let viewport = self.base().get_viewport_rect();
       self.screen_size = viewport.size;
+
+      self.base_mut().hide();
     }
 
     fn physics_process(&mut self, delta: f64) {
