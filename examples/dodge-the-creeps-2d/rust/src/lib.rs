@@ -4,6 +4,8 @@ use godot_bevy::prelude::{
     *,
 };
 
+mod nodes;
+
 #[bevy_app]
 fn build_app(app: &mut App) {
     app;
