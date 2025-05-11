@@ -4,7 +4,6 @@ use godot_bevy::prelude::{
     *,
 };
 
-mod macros;
 mod nodes;
 mod gameplay;
 

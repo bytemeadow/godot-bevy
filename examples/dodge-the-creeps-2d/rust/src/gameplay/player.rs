@@ -1,6 +1,10 @@
 use bevy::prelude::*;
 
-use godot::{builtin::Vector2, classes::ResourceLoader, global::godot_print};
+use godot::{
+    builtin::{StringName, Vector2},
+    classes::{AnimatedSprite2D, Input, ResourceLoader},
+    global::godot_print,
+};
 use godot_bevy::prelude::*;
 
 use crate::{nodes::player::Player as GodotPlayerNode, GameState};
@@ -39,11 +43,14 @@ impl Plugin for PlayerPlugin {
 
 #[derive(Debug, Component)]
 pub struct Player {
-    speed: f64,
+    speed: f32,
 }
 
 #[derive(Debug, Component)]
-pub struct PlayerInitialized;
+pub struct PlayerCreated;
+
+#[derive(Debug, Component)]
+pub struct PlayerSetUp;
 
 fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
     godot_print!("spawn_player");
@@ -57,11 +64,12 @@ fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
 
 fn player_on_ready(
     mut commands: Commands,
-    mut player: Query<(Entity, &mut GodotRef), (With<Player>, Without<PlayerInitialized>)>,
+    mut player: Query<(Entity, &mut Player, &mut GodotRef), (With<Player>, Without<PlayerCreated>)>,
 ) -> Result {
-    if let Ok((entity, mut player_gd)) = player.single_mut() {
+    if let Ok((entity, mut player, mut player_gd)) = player.single_mut() {
         let mut player_gd = player_gd.get::<GodotPlayerNode>();
-        player_gd.set_visible(false);
+        player_gd.hide();
+        player.speed = player_gd.bind().get_speed();
 
         // TODO: pull start position from scene
         // let mut start_position = PlayerStartPosition::from_node(player);
@@ -69,27 +77,74 @@ fn player_on_ready(
         player_gd.set_position(Vector2::new(240., 450.));
 
         // Mark as initialized so we don't do this again
-        commands.entity(entity).insert(PlayerInitialized);
+        commands.entity(entity).insert(PlayerCreated);
     }
 
     Ok(())
 }
 
 fn setup_player(
-    mut player: Query<&mut GodotRef, (With<Player>, With<PlayerInitialized>)>,
+    mut commands: Commands,
+    mut player: Query<(Entity, &mut GodotRef), (With<Player>, With<PlayerCreated>)>,
 ) -> Result {
-    if let Ok(mut player_gd) = player.single_mut() {
+    if let Ok((entity, mut player_gd)) = player.single_mut() {
         let mut player_gd = player_gd.get::<GodotPlayerNode>();
-        player_gd.set_visible(true);
+        player_gd.show();
+
+        // Mark as setup so we don't do this again
+        commands.entity(entity).insert(PlayerSetUp);
     }
 
     Ok(())
 }
 
 fn move_player(
-    mut player: Query<(&Player, &mut GodotRef), With<PlayerInitialized>>,
-    mut _system_delta: SystemDeltaTimer,
+    mut player: Query<(&Player, &mut GodotRef), (With<Player>, With<PlayerSetUp>)>,
+    mut system_delta: SystemDeltaTimer,
 ) -> Result {
-    godot_print!("move_player");
+    if let Ok((player, mut player_gd)) = player.single_mut() {
+        let mut player_gd = player_gd.get::<GodotPlayerNode>();
+
+        let mut velocity = Vector2::ZERO;
+
+        if Input::singleton().is_action_pressed("move_right") {
+            velocity.x += 1.0;
+        }
+
+        if Input::singleton().is_action_pressed("move_left") {
+            velocity.x -= 1.0;
+        }
+
+        if Input::singleton().is_action_pressed("move_down") {
+            velocity.y += 1.0;
+        }
+
+        if Input::singleton().is_action_pressed("move_up") {
+            velocity.y -= 1.0;
+        }
+
+        let mut sprite = player_gd.get_node_as::<AnimatedSprite2D>("AnimatedSprite2D");
+
+        if velocity.length() > 0.0 {
+            velocity = velocity.normalized() * player.speed;
+            sprite.play();
+
+            if velocity.x != 0.0 {
+                sprite.set_animation(&StringName::from("walk"));
+                sprite.set_flip_v(false);
+                sprite.set_flip_h(velocity.x < 0.0);
+            } else if velocity.y != 0.0 {
+                sprite.set_animation(&StringName::from("up"));
+                sprite.set_flip_v(velocity.y > 0.0);
+            }
+        } else {
+            sprite.stop();
+        }
+
+        // TODO: set with transforms via ECS?
+        let current_pos = player_gd.get_position();
+        player_gd.set_position(current_pos + (velocity * system_delta.delta_seconds()));
+    }
+
     Ok(())
 }
