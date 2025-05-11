@@ -1,3 +1,6 @@
 [gd_scene format=3 uid="uid://crt73ja5heco1"]
 
 [node name="Main" type="Node"]
+
+[node name="StartPosition" type="Marker2D" parent="."]
+position = Vector2(240, 450)
