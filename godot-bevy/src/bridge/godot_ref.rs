@@ -33,4 +33,8 @@ impl GodotRef {
             instance_id: reference.instance_id(),
         }
     }
+
+    pub fn instance_id(&self) -> InstanceId {
+        self.instance_id
+    }
 }
