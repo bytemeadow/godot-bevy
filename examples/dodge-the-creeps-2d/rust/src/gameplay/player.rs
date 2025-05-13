@@ -11,13 +11,13 @@ use crate::{nodes::player::Player as GodotPlayerNode, GameState};
 
 #[derive(Debug, Resource)]
 pub struct PlayerAssets {
-    player_scn: GodotResourceRef,
+    player_scn: GodotResourceHandle,
 }
 
 impl Default for PlayerAssets {
     fn default() -> Self {
         let mut resource_loader = ResourceLoader::singleton();
-        let player_scn = GodotResourceRef::new(resource_loader.load("scenes/player.tscn").unwrap());
+        let player_scn = GodotResourceHandle::new(resource_loader.load("scenes/player.tscn").unwrap());
 
         Self { player_scn }
     }
@@ -64,7 +64,7 @@ fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
 
 fn player_on_ready(
     mut commands: Commands,
-    mut player: Query<(Entity, &mut Player, &mut GodotRef), (With<Player>, Without<PlayerCreated>)>,
+    mut player: Query<(Entity, &mut Player, &mut GodotNodeHandle), (With<Player>, Without<PlayerCreated>)>,
 ) -> Result {
     if let Ok((entity, mut player, mut player_gd)) = player.single_mut() {
         let mut player_gd = player_gd.get::<GodotPlayerNode>();
@@ -85,7 +85,7 @@ fn player_on_ready(
 
 fn setup_player(
     mut commands: Commands,
-    mut player: Query<(Entity, &mut GodotRef), (With<Player>, With<PlayerCreated>)>,
+    mut player: Query<(Entity, &mut GodotNodeHandle), (With<Player>, With<PlayerCreated>)>,
 ) -> Result {
     if let Ok((entity, mut player_gd)) = player.single_mut() {
         let mut player_gd = player_gd.get::<GodotPlayerNode>();
@@ -99,7 +99,7 @@ fn setup_player(
 }
 
 fn move_player(
-    mut player: Query<(&Player, &mut GodotRef), (With<Player>, With<PlayerSetUp>)>,
+    mut player: Query<(&Player, &mut GodotNodeHandle), (With<Player>, With<PlayerSetUp>)>,
     mut system_delta: SystemDeltaTimer,
 ) -> Result {
     if let Ok((player, mut player_gd)) = player.single_mut() {

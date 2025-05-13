@@ -7,11 +7,11 @@ use godot::{
 use super::utils::{maybe_dec_ref, maybe_inc_ref, maybe_inc_ref_opt};
 
 #[derive(Debug, BevyResource)]
-pub struct GodotResourceRef {
+pub struct GodotResourceHandle {
     resource_id: InstanceId,
 }
 
-impl GodotResourceRef {
+impl GodotResourceHandle {
     pub fn get(&mut self) -> Gd<Resource> {
         self.try_get().unwrap()
     }
@@ -29,7 +29,7 @@ impl GodotResourceRef {
     }
 }
 
-impl Clone for GodotResourceRef {
+impl Clone for GodotResourceHandle {
     fn clone(&self) -> Self {
         maybe_inc_ref_opt::<Resource>(&mut Gd::try_from_instance_id(self.resource_id).ok());
 
@@ -39,7 +39,7 @@ impl Clone for GodotResourceRef {
     }
 }
 
-impl Drop for GodotResourceRef {
+impl Drop for GodotResourceHandle {
     fn drop(&mut self) {
         let mut gd = self.get();
         let is_last = maybe_dec_ref(&mut gd); // may drop
@@ -49,4 +49,4 @@ impl Drop for GodotResourceRef {
             }
         }
     }
-}
+} 

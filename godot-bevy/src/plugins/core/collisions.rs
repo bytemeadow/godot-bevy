@@ -3,7 +3,7 @@ use bevy::{
     ecs::{
         component::Component,
         entity::Entity,
-        event::{event_update_system, Event, EventReader, EventWriter, Events},
+        event::{event_update_system, Event, EventReader, EventWriter},
         schedule::IntoScheduleConfigs,
         system::{NonSendMut, Query},
     }, log::trace,
@@ -11,7 +11,7 @@ use bevy::{
 use godot::prelude::*;
 use std::sync::mpsc::Receiver;
 
-use crate::bridge::GodotRef;
+use crate::bridge::GodotNodeHandle;
 
 pub struct GodotCollisionsPlugin;
 
@@ -61,8 +61,8 @@ pub struct CollisionEvent {
 
 fn update_godot_collisions(
     mut events: EventReader<CollisionEvent>,
-    mut entities: Query<(&GodotRef, &mut Collisions)>,
-    all_entities: Query<(Entity, &GodotRef)>,
+    mut entities: Query<(&GodotNodeHandle, &mut Collisions)>,
+    all_entities: Query<(Entity, &GodotNodeHandle)>,
 ) {
     // godot_print!("update_godot_collisions");
     for (_, mut collisions) in entities.iter_mut() {

@@ -15,7 +15,7 @@ use godot::{
     classes::{Node2D, Node3D, PackedScene, ResourceLoader},
 };
 
-use crate::bridge::{GodotRef, GodotResourceRef};
+use crate::bridge::{GodotNodeHandle, GodotResourceHandle};
 
 use super::core::SceneTreeRef;
 
@@ -29,7 +29,7 @@ impl Plugin for PackedScenePlugin {
 /// A to-be-instanced-and-spawned Godot scene.
 ///
 /// [`GodotScene`]s that are spawned/inserted into the bevy world will be instanced from the provided
-/// handle/path and the instance will be added as an [`GodotRef`] in the next PostUpdateFlush set.
+/// handle/path and the instance will be added as an [`GodotNodeHandle`] in the next PostUpdateFlush set.
 /// (see [`spawn_scene`])
 #[derive(Debug, Component)]
 pub struct GodotScene {
@@ -39,7 +39,7 @@ pub struct GodotScene {
 
 #[derive(Debug)]
 enum GodotSceneResource {
-    Resource(GodotResourceRef),
+    Resource(GodotResourceHandle),
     Path(String),
 }
 
@@ -50,8 +50,8 @@ enum GodotSceneTransform {
 }
 
 impl GodotScene {
-    /// Instantiate the godot scene from an GodotRefResource.
-    pub fn from_resource(res: GodotResourceRef) -> Self {
+    /// Instantiate the godot scene from an GodotResourceHandle.
+    pub fn from_resource(res: GodotResourceHandle) -> Self {
         Self {
             resource: GodotSceneResource::Resource(res),
             transform: None,
@@ -155,7 +155,7 @@ fn spawn_scene(
 
         commands
             .entity(ent)
-            .insert(GodotRef::new(instance))
+            .insert(GodotNodeHandle::new(instance))
             .insert(GodotSceneSpawned);
     }
 }
