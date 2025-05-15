@@ -19,7 +19,9 @@ impl INode for CollisionWatcher {
     }
 }
 
+#[godot_api]
 impl CollisionWatcher {
+    #[func]
     pub fn collision_event(
         &self,
         target: Gd<Node>,

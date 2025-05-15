@@ -19,7 +19,9 @@ impl INode for SceneTreeWatcher {
     }
 }
 
+#[godot_api]
 impl SceneTreeWatcher {
+    #[func]
     pub fn scene_tree_event(&self, node: Gd<Node>, event_type: SceneTreeEventType) {
         if let Some(channel) = self.notification_channel.as_ref() {
             let _ = channel.send(SceneTreeEvent {

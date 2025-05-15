@@ -8,11 +8,7 @@ use bevy::{
     log::{debug, trace},
 };
 use godot::{
-    builtin::GString,
-    classes::{Engine, Node, Node2D, Node3D, SceneTree},
-    meta::ToGodot,
-    obj::{Gd, Inherits},
-    prelude::GodotConvert,
+    builtin::GString, classes::{Engine, Node, Node2D, Node3D, SceneTree}, meta::ToGodot, obj::{Gd, Inherits}, prelude::GodotConvert
 };
 
 use crate::{
@@ -107,31 +103,32 @@ pub enum SceneTreeEventType {
     NodeRenamed,
 }
 
-fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
-    let mut scene_tree = scene_tree.get();
-    let watcher = scene_tree
+fn connect_scene_tree(mut scene_tree: SceneTreeRef) {    
+    let mut scene_tree_gd = scene_tree.get();
+
+    let watcher = scene_tree_gd
         .get_root()
         .unwrap()
-        .get_node_as::<Node>("BevyApp/SceneTreeWatcher");
+        .get_node_as::<Node>("/root/BevyAppSingleton/SceneTreeWatcher");
 
-    scene_tree.connect(
+    scene_tree_gd.connect(
         "node_added",
         &watcher
-            .callable("node_added")
+            .callable("scene_tree_event")
             .bind(&[SceneTreeEventType::NodeAdded.to_variant()]),
     );
 
-    scene_tree.connect(
+    scene_tree_gd.connect(
         "node_removed",
         &watcher
-            .callable("node_removed")
+            .callable("scene_tree_event")
             .bind(&[SceneTreeEventType::NodeRemoved.to_variant()]),
     );
 
-    scene_tree.connect(
+    scene_tree_gd.connect(
         "node_renamed",
         &watcher
-            .callable("node_renamed")
+            .callable("scene_tree_event")
             .bind(&[SceneTreeEventType::NodeRenamed.to_variant()]),
     );
 }
@@ -180,7 +177,7 @@ fn create_scene_tree_entity(
         .get()
         .get_root()
         .unwrap()
-        .get_node_as::<Node>("/root/BevyApp/CollisionWatcher");
+        .get_node_as::<Node>("/root/BevyAppSingleton/CollisionWatcher");
 
     for event in events.into_iter() {
         trace!(target: "godot_scene_tree_events", event = ?event);
