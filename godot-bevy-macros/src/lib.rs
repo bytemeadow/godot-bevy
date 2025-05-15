@@ -1,10 +1,12 @@
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::{ItemFn, parse_macro_input};
+use proc_macro2::TokenStream as TokenStream2;
+use quote::{quote, quote_spanned};
+use syn::{parse_macro_input, Data, DeriveInput, Error, Field, Fields, LitStr, Result};
+use syn::spanned::Spanned;
 
 #[proc_macro_attribute]
 pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input_fn = parse_macro_input!(item as ItemFn);
+    let input_fn = parse_macro_input!(item as syn::ItemFn);
     let name = &input_fn.sig.ident;
     let expanded = quote! {
         struct BevyExtensionLibrary;
@@ -20,12 +22,153 @@ pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                 }
             }
-
         }
 
         #input_fn
-
     };
 
     expanded.into()
 }
+
+#[proc_macro_derive(NodeTreeView, attributes(node))]
+pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
+    let view = parse_macro_input!(item as DeriveInput);
+
+    let expanded = node_tree_view(view).unwrap_or_else(Error::into_compile_error);
+
+    TokenStream::from(expanded)
+}
+
+fn node_tree_view(input: DeriveInput) -> Result<TokenStream2> {
+    let item = &input.ident;
+    let data_struct = match &input.data {
+        Data::Struct(data_struct) => data_struct,
+        _ => {
+            return Err(Error::new_spanned(
+                input,
+                "NodeTreeView must be used on structs",
+            ))
+        }
+    };
+
+    if matches!(data_struct.fields, Fields::Unit) {
+        return Err(Error::new_spanned(
+            input,
+            "NodeTreeView must be used on structs with fields",
+        ));
+    }
+
+    let mut field_errors = vec![];
+    let field_exprs = data_struct
+        .fields
+        .iter()
+        .map(|field| match create_get_node_expr(field) {
+            Ok(expr) => {
+                if let Some(name) = &field.ident {
+                    quote! { #name : #expr, }
+                } else {
+                    quote! { #expr, }
+                }
+            }
+            Err(e) => {
+                field_errors.push(e);
+                TokenStream2::new()
+            }
+        })
+        .collect::<TokenStream2>();
+
+    if !field_errors.is_empty() {
+        let mut error = field_errors[0].clone();
+        error.extend(field_errors[1..].iter().cloned());
+
+        return Err(error);
+    }
+
+    let self_expr = if matches!(data_struct.fields, Fields::Named(_)) {
+        quote! { Self { #field_exprs } }
+    } else {
+        quote! { Self ( #field_exprs ) }
+    };
+
+    let node_tree_view = quote! { godot_bevy::prelude::NodeTreeView };
+    let inherits = quote! { godot::obj::Inherits };
+    let node = quote! { godot::classes::Node };
+    let gd = quote! { godot::obj::Gd };
+
+    let expanded = quote! {
+       impl #node_tree_view for #item {
+           fn from_node<T: #inherits<#node>>(node: #gd<T>) -> Self {
+               let node = node.upcast::<#node>();
+               #self_expr
+           }
+       }
+    };
+
+    Ok(expanded)
+}
+
+fn create_get_node_expr(field: &Field) -> Result<TokenStream2> {
+    let node_path: LitStr = field
+        .attrs
+        .iter()
+        .find_map(|attr| {
+            if attr.path().is_ident("node") {
+                attr.parse_args().ok()
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| {
+            Error::new_spanned(field, "NodeTreeView: every field must have a #[node(..)]")
+        })?;
+
+    let field_ty = &field.ty;
+    let span = field_ty.span();
+    
+    // Check if the type is GodotNodeHandle or Option<GodotNodeHandle>
+    let (is_optional, _inner_type) = match get_option_inner_type(field_ty) {
+        Some(inner) => (true, inner),
+        None => (false, field_ty),
+    };
+
+    // Create appropriate expression based on whether the field is optional
+    let expr = if is_optional {
+        quote_spanned! { span =>
+            {
+                let base_node = &node;
+                base_node.has_node(#node_path)
+                    .then(|| {
+                        let node_ref = base_node.get_node_as::<godot::classes::Node>(#node_path);
+                        godot_bevy::bridge::GodotNodeHandle::new(node_ref)
+                    })
+            }
+        }
+    } else {
+        quote_spanned! { span =>
+            {
+                let base_node = &node;
+                let node_ref = base_node.get_node_as::<godot::classes::Node>(#node_path);
+                godot_bevy::bridge::GodotNodeHandle::new(node_ref)
+            }
+        }
+    };
+
+    Ok(expr)
+}
+
+// Helper function to extract the inner type of an Option<T>
+fn get_option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
+    if let syn::Type::Path(type_path) = ty {
+        if type_path.path.segments.len() == 1 && type_path.path.segments[0].ident == "Option" {
+            if let syn::PathArguments::AngleBracketed(ref args) = type_path.path.segments[0].arguments {
+                if args.args.len() == 1 {
+                    if let syn::GenericArgument::Type(ref inner_type) = args.args[0] {
+                        return Some(inner_type);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+

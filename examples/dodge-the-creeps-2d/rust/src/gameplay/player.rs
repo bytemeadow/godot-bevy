@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use godot::{
     builtin::{StringName, Vector2},
-    classes::{AnimatedSprite2D, Input, ResourceLoader},
+    classes::{AnimatedSprite2D, Input, Node2D, ResourceLoader},
 };
 use godot_bevy::prelude::*;
 
@@ -60,6 +60,12 @@ fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
     ));
 }
 
+#[derive(NodeTreeView)]
+pub struct PlayerStartPosition(
+    #[node("/root/Main/StartPosition")]
+    GodotNodeHandle
+);
+
 fn player_on_ready(
     mut commands: Commands,
     mut player: Query<
@@ -72,10 +78,8 @@ fn player_on_ready(
         player_gd.hide();
         player.speed = player_gd.bind().get_speed();
 
-        // TODO: pull start position from scene
-        // let mut start_position = PlayerStartPosition::from_node(player);
-        // player_gd.set_position(start_position.0.get::<Node2D>().position());
-        player_gd.set_position(Vector2::new(240., 450.));
+        let mut start_position = PlayerStartPosition::from_node(player_gd.clone());
+        player_gd.set_position(start_position.0.get::<Node2D>().get_position());
 
         // Mark as initialized so we don't do this again
         commands.entity(entity).insert(PlayerCreated);
