@@ -37,4 +37,8 @@ impl GodotNodeHandle {
     pub fn instance_id(&self) -> InstanceId {
         self.instance_id
     }
+
+    pub fn from_instance_id(instance_id: InstanceId) -> Self {
+        Self { instance_id }
+    }
 } 

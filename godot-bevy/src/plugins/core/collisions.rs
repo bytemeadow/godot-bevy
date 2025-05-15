@@ -46,7 +46,8 @@ impl Collisions {
 pub struct CollisionEventReader(pub Receiver<CollisionEvent>);
 
 #[doc(hidden)]
-#[derive(/*ToVariant, FromVariant,*/ Debug)]
+#[derive(Debug, GodotConvert)]
+#[godot(via = GString)]
 pub enum CollisionEventType {
     Started,
     Ended,

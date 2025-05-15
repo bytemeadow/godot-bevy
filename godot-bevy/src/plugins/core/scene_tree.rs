@@ -1,19 +1,41 @@
-use std::marker::PhantomData;
+use std::{collections::HashMap, marker::PhantomData};
 
 use bevy::{
-    app::{App, Plugin},
-    ecs::system::{NonSendMut, SystemParam},
+    app::{App, First, Plugin, PreStartup, Startup},
+    ecs::{
+        component::Component, entity::Entity, event::{event_update_system, Event, EventReader, EventWriter}, name::Name, schedule::IntoScheduleConfigs, system::{Commands, NonSendMut, Query, SystemParam}
+    },
+    log::{debug, trace},
 };
 use godot::{
-    classes::{Engine, SceneTree},
-    obj::Gd,
+    builtin::GString,
+    classes::{Engine, Node, Node2D, Node3D, SceneTree},
+    meta::ToGodot,
+    obj::{Gd, Inherits},
+    prelude::GodotConvert,
+};
+
+use crate::{
+    bridge::GodotNodeHandle,
+    prelude::{CollisionEventType, Collisions, Transform2D, Transform3D},
 };
 
 pub struct GodotSceneTreePlugin;
 
 impl Plugin for GodotSceneTreePlugin {
     fn build(&self, app: &mut App) {
-        app.init_non_send_resource::<SceneTreeRefImpl>();
+        app.add_systems(PreStartup, initialize_scene_tree)
+            .add_systems(Startup, connect_scene_tree)
+            .add_systems(
+                First,
+                write_scene_tree_events.before(event_update_system),
+            )
+            .add_systems(
+                First,
+                read_scene_tree_events.before(event_update_system),
+            )
+            .add_event::<SceneTreeEvent>()
+            .init_non_send_resource::<SceneTreeRefImpl>();
     }
 }
 
@@ -46,4 +68,207 @@ impl Default for SceneTreeRefImpl {
     fn default() -> Self {
         Self(Self::get_ref())
     }
+}
+
+fn initialize_scene_tree(
+    mut commands: Commands,
+    mut scene_tree: SceneTreeRef,
+    mut entities: Query<(&mut GodotNodeHandle, Entity)>,
+) {
+    fn traverse(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
+        events.push(SceneTreeEvent {
+            node: GodotNodeHandle::from_instance_id(node.instance_id()),
+            event_type: SceneTreeEventType::NodeAdded,
+        });
+
+        for child in node.get_children().iter_shared() {
+            traverse(child, events);
+        }
+    }
+
+    let root = scene_tree.get().get_root().unwrap();
+    let mut events = vec![];
+    traverse(root.upcast(), &mut events);
+
+    create_scene_tree_entity(&mut commands, events, &mut scene_tree, &mut entities);
+}
+
+#[derive(Debug, Clone, Event)]
+pub struct SceneTreeEvent {
+    pub node: GodotNodeHandle,
+    pub event_type: SceneTreeEventType,
+}
+
+#[derive(Copy, Clone, Debug, GodotConvert)]
+#[godot(via = GString)]
+pub enum SceneTreeEventType {
+    NodeAdded,
+    NodeRemoved,
+    NodeRenamed,
+}
+
+fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
+    let mut scene_tree = scene_tree.get();
+    let watcher = scene_tree
+        .get_root()
+        .unwrap()
+        .get_node_as::<Node>("BevyApp/SceneTreeWatcher");
+
+    scene_tree.connect(
+        "node_added",
+        &watcher
+            .callable("node_added")
+            .bind(&[SceneTreeEventType::NodeAdded.to_variant()]),
+    );
+
+    scene_tree.connect(
+        "node_removed",
+        &watcher
+            .callable("node_removed")
+            .bind(&[SceneTreeEventType::NodeRemoved.to_variant()]),
+    );
+
+    scene_tree.connect(
+        "node_renamed",
+        &watcher
+            .callable("node_renamed")
+            .bind(&[SceneTreeEventType::NodeRenamed.to_variant()]),
+    );
+}
+
+#[derive(Component, Debug)]
+pub struct Groups {
+    groups: Vec<String>,
+}
+
+impl<T: Inherits<Node>> From<&Gd<T>> for Groups {
+    fn from(node: &Gd<T>) -> Self {
+        Groups {
+            groups: node
+                .clone()
+                .upcast::<Node>()
+                .get_groups()
+                .iter_shared()
+                .map(|variant| variant.to_string())
+                .collect(),
+        }
+    }
+}
+
+#[doc(hidden)]
+pub struct SceneTreeEventReader(pub std::sync::mpsc::Receiver<SceneTreeEvent>);
+
+fn write_scene_tree_events(
+    event_reader: NonSendMut<SceneTreeEventReader>,
+    mut event_writer: EventWriter<SceneTreeEvent>,
+) {
+    event_writer.write_batch(event_reader.0.try_iter());
+}
+
+fn create_scene_tree_entity(
+    commands: &mut Commands,
+    events: impl IntoIterator<Item = SceneTreeEvent>,
+    scene_tree: &mut SceneTreeRef,
+    entities: &mut Query<(&mut GodotNodeHandle, Entity)>,
+) {
+    let mut ent_mapping = entities
+        .iter()
+        .map(|(reference, ent)| (reference.instance_id(), ent))
+        .collect::<HashMap<_, _>>();
+    let scene_root = scene_tree.get().get_root().unwrap();
+    let collision_watcher = scene_tree
+        .get()
+        .get_root()
+        .unwrap()
+        .get_node_as::<Node>("/root/BevyApp/CollisionWatcher");
+
+    for event in events.into_iter() {
+        trace!(target: "godot_scene_tree_events", event = ?event);
+
+        let mut node = event.node.clone();
+        let ent = ent_mapping.get(&node.instance_id()).cloned();
+
+        match event.event_type {
+            SceneTreeEventType::NodeAdded => {
+                let mut ent = if let Some(ent) = ent {
+                    commands.entity(ent)
+                } else {
+                    commands.spawn_empty()
+                };
+
+                ent.insert(GodotNodeHandle::clone(&node))
+                    .insert(Name::from(node.get::<Node>().get_name().to_string()));
+
+                if let Some(node3d) = node.try_get::<Node3D>() {
+                    ent.insert(Transform3D::from(node3d.get_transform()));
+                }
+
+                if let Some(node2d) = node.try_get::<Node2D>() {
+                    // TODO: validate this is as expected
+                    let transform = node2d.get_transform();
+                    ent.insert(Transform2D(transform));
+                }
+
+                let mut node = node.get::<Node>();
+
+                if node.has_signal("body_entered") {
+                    debug!(target: "godot_scene_tree_collisions", body_id = node.instance_id().to_string(), "has body_entered signal");
+
+                    let node_clone = node.clone();
+
+                    node.connect(
+                        "body_entered",
+                        &collision_watcher.callable("collision_event").bind(&[
+                            node_clone.to_variant(),
+                            CollisionEventType::Started.to_variant(),
+                        ]),
+                    );
+
+                    node.connect(
+                        "body_exited",
+                        &collision_watcher.callable("collision_event").bind(&[
+                            node_clone.to_variant(),
+                            CollisionEventType::Ended.to_variant(),
+                        ]),
+                    );
+
+                    ent.insert(Collisions::default());
+                }
+
+                ent.insert(Groups::from(&node));
+
+                let ent = ent.id();
+                ent_mapping.insert(node.instance_id(), ent);
+
+                if node.instance_id() != scene_root.instance_id() {
+                    let parent = node.get_parent().unwrap().instance_id();
+                    commands
+                        .entity(*ent_mapping.get(&parent).unwrap())
+                        .add_children(&[ent]);
+                }
+            }
+            SceneTreeEventType::NodeRemoved => {
+                commands.entity(ent.unwrap()).despawn();
+            }
+            SceneTreeEventType::NodeRenamed => {
+                commands
+                    .entity(ent.unwrap())
+                    .insert(Name::from(node.get::<Node>().get_name().to_string()));
+            }
+        }
+    }
+}
+
+fn read_scene_tree_events(
+    mut commands: Commands,
+    mut scene_tree: SceneTreeRef,
+    mut event_reader: EventReader<SceneTreeEvent>,
+    mut entities: Query<(&mut GodotNodeHandle, Entity)>,
+) {
+    create_scene_tree_entity(
+        &mut commands,
+        event_reader.read().cloned(),
+        &mut scene_tree,
+        &mut entities,
+    );
 }
