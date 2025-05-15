@@ -1,8 +1,16 @@
+use bevy::app::{App, Last, Plugin, PreUpdate};
+use bevy::ecs::query::{Added, Changed, Or};
+use bevy::ecs::system::Query;
 use bevy::math::Vec3;
-use bevy::{ecs::component::Component, math::Quat};
 use bevy::prelude::Transform as BevyTransform;
+use bevy::{ecs::component::Component, math::Quat};
 use godot::builtin::{Basis, Quaternion, Vector3};
+use godot::classes::{Node2D, Node3D};
 use godot::prelude::Transform3D as GodotTransform3D;
+
+use crate::bridge::GodotNodeHandle;
+
+use super::SceneTreeRef;
 
 #[derive(Debug, Component, Default, Copy, Clone)]
 pub struct Transform3D {
@@ -41,10 +49,7 @@ impl Transform3D {
         let [tx, ty, tz] = transform.translation.to_array();
         let origin = Vector3::new(tx, ty, tz);
 
-        godot::prelude::Transform3D {
-            basis,
-            origin,
-        }
+        godot::prelude::Transform3D { basis, origin }
     }
 
     pub fn godot_to_bevy_transform(transform: godot::prelude::Transform3D) -> BevyTransform {
@@ -74,3 +79,85 @@ impl Transform3D {
 
 #[derive(Debug, Component, Clone, Copy)]
 pub struct Transform2D(pub godot::prelude::Transform2D);
+
+impl std::ops::Deref for Transform2D {
+    type Target = godot::prelude::Transform2D;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for Transform2D {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+pub struct GodotTransformsPlugin;
+
+impl Plugin for GodotTransformsPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Last, post_update_godot_transforms_3d)
+            .add_systems(PreUpdate, pre_update_godot_transforms_3d)
+            .add_systems(Last, post_update_godot_transforms_2d)
+            .add_systems(PreUpdate, pre_update_godot_transforms_2d);
+    }
+}
+
+fn post_update_godot_transforms_3d(
+    _scene_tree: SceneTreeRef,
+    mut entities: Query<
+        (&Transform3D, &mut GodotNodeHandle),
+        Or<(Added<Transform3D>, Changed<Transform3D>)>,
+    >,
+) {
+    for (transform, mut reference) in entities.iter_mut() {
+        let mut obj = reference.get::<Node3D>();
+
+        if obj.get_transform() != transform.get_godot() {
+            obj.set_transform(transform.get_godot());
+        }
+    }
+}
+
+fn pre_update_godot_transforms_3d(
+    _scene_tree: SceneTreeRef,
+    mut entities: Query<(&mut Transform3D, &mut GodotNodeHandle)>,
+) {
+    for (transform, mut reference) in entities.iter_mut() {
+        let mut obj = reference.get::<Node3D>();
+
+        if obj.get_transform() != transform.get_godot() {
+            obj.set_transform(transform.get_godot());
+        }
+    }
+}
+
+fn post_update_godot_transforms_2d(
+    _scene_tree: SceneTreeRef,
+    mut entities: Query<
+        (&Transform2D, &mut GodotNodeHandle),
+        Or<(Added<Transform2D>, Changed<Transform2D>)>,
+    >,
+) {
+    for (transform, mut reference) in entities.iter_mut() {
+        let mut obj = reference.get::<Node2D>();
+
+        if obj.get_transform() != transform.0 {
+            obj.set_transform(transform.0);
+        }
+    }
+}
+
+fn pre_update_godot_transforms_2d(
+    _scene_tree: SceneTreeRef,
+    mut entities: Query<(&mut Transform2D, &mut GodotNodeHandle)>,
+) {
+    for (transform, mut reference) in entities.iter_mut() {
+        let mut obj = reference.get::<Node2D>();
+
+        if obj.get_transform() != transform.0 {
+            obj.set_transform(transform.0);
+        }
+    }
+}

@@ -1,9 +1,12 @@
-use godot::prelude::*;
-use std::sync::mpsc::Sender;
 use godot::classes::Node;
 use godot::obj::Gd;
+use godot::prelude::*;
+use std::sync::mpsc::Sender;
 
-use crate::{bridge::GodotNodeHandle, plugins::core::{SceneTreeEvent, SceneTreeEventType}};
+use crate::{
+    bridge::GodotNodeHandle,
+    plugins::core::{SceneTreeEvent, SceneTreeEventType},
+};
 
 #[derive(GodotClass)]
 #[class(base=Node)]
@@ -15,7 +18,10 @@ pub struct SceneTreeWatcher {
 #[godot_api]
 impl INode for SceneTreeWatcher {
     fn init(base: Base<Node>) -> Self {
-        Self { base, notification_channel: None }
+        Self {
+            base,
+            notification_channel: None,
+        }
     }
 }
 

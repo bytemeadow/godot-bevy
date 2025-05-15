@@ -3,12 +3,21 @@ use std::{collections::HashMap, marker::PhantomData};
 use bevy::{
     app::{App, First, Plugin, PreStartup, Startup},
     ecs::{
-        component::Component, entity::Entity, event::{event_update_system, Event, EventReader, EventWriter}, name::Name, schedule::IntoScheduleConfigs, system::{Commands, NonSendMut, Query, SystemParam}
+        component::Component,
+        entity::Entity,
+        event::{Event, EventReader, EventWriter, event_update_system},
+        name::Name,
+        schedule::IntoScheduleConfigs,
+        system::{Commands, NonSendMut, Query, SystemParam},
     },
     log::{debug, trace},
 };
 use godot::{
-    builtin::GString, classes::{Engine, Node, Node2D, Node3D, SceneTree}, meta::ToGodot, obj::{Gd, Inherits}, prelude::GodotConvert
+    builtin::GString,
+    classes::{Engine, Node, Node2D, Node3D, SceneTree},
+    meta::ToGodot,
+    obj::{Gd, Inherits},
+    prelude::GodotConvert,
 };
 
 use crate::{
@@ -22,14 +31,8 @@ impl Plugin for GodotSceneTreePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(PreStartup, initialize_scene_tree)
             .add_systems(Startup, connect_scene_tree)
-            .add_systems(
-                First,
-                write_scene_tree_events.before(event_update_system),
-            )
-            .add_systems(
-                First,
-                read_scene_tree_events.before(event_update_system),
-            )
+            .add_systems(First, write_scene_tree_events.before(event_update_system))
+            .add_systems(First, read_scene_tree_events.before(event_update_system))
             .add_event::<SceneTreeEvent>()
             .init_non_send_resource::<SceneTreeRefImpl>();
     }
@@ -103,7 +106,7 @@ pub enum SceneTreeEventType {
     NodeRenamed,
 }
 
-fn connect_scene_tree(mut scene_tree: SceneTreeRef) {    
+fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
     let mut scene_tree_gd = scene_tree.get();
 
     let watcher = scene_tree_gd

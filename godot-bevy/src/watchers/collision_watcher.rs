@@ -1,7 +1,7 @@
-use godot::prelude::*;
-use std::sync::mpsc::Sender;
 use godot::classes::Node;
 use godot::obj::Gd;
+use godot::prelude::*;
+use std::sync::mpsc::Sender;
 
 use crate::plugins::core::{CollisionEvent, CollisionEventType};
 
@@ -15,7 +15,10 @@ pub struct CollisionWatcher {
 #[godot_api]
 impl INode for CollisionWatcher {
     fn init(base: Base<Node>) -> Self {
-        Self { base, notification_channel: None }
+        Self {
+            base,
+            notification_channel: None,
+        }
     }
 }
 
@@ -36,4 +39,4 @@ impl CollisionWatcher {
             });
         }
     }
-} 
+}

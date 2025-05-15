@@ -11,8 +11,12 @@ pub struct GodotNodeHandle {
 
 impl GodotNodeHandle {
     pub fn get<T: Inherits<Node>>(&mut self) -> Gd<T> {
-        self.try_get()
-            .unwrap_or_else(|| panic!("failed to get godot node handle as {}", std::any::type_name::<T>()))
+        self.try_get().unwrap_or_else(|| {
+            panic!(
+                "failed to get godot node handle as {}",
+                std::any::type_name::<T>()
+            )
+        })
     }
 
     /// # SAFETY
@@ -41,4 +45,4 @@ impl GodotNodeHandle {
     pub fn from_instance_id(instance_id: InstanceId) -> Self {
         Self { instance_id }
     }
-} 
+}

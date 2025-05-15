@@ -3,7 +3,6 @@ use bevy::prelude::*;
 use godot::{
     builtin::{StringName, Vector2},
     classes::{AnimatedSprite2D, Input, ResourceLoader},
-    global::godot_print,
 };
 use godot_bevy::prelude::*;
 
@@ -17,7 +16,8 @@ pub struct PlayerAssets {
 impl Default for PlayerAssets {
     fn default() -> Self {
         let mut resource_loader = ResourceLoader::singleton();
-        let player_scn = GodotResourceHandle::new(resource_loader.load("scenes/player.tscn").unwrap());
+        let player_scn =
+            GodotResourceHandle::new(resource_loader.load("scenes/player.tscn").unwrap());
 
         Self { player_scn }
     }
@@ -53,8 +53,6 @@ pub struct PlayerCreated;
 pub struct PlayerSetUp;
 
 fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
-    godot_print!("spawn_player");
-
     commands.spawn((
         GodotScene::from_resource(assets.player_scn.clone()),
         // This will be replaced by PlayerNode exported property
@@ -64,7 +62,10 @@ fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
 
 fn player_on_ready(
     mut commands: Commands,
-    mut player: Query<(Entity, &mut Player, &mut GodotNodeHandle), (With<Player>, Without<PlayerCreated>)>,
+    mut player: Query<
+        (Entity, &mut Player, &mut GodotNodeHandle),
+        (With<Player>, Without<PlayerCreated>),
+    >,
 ) -> Result {
     if let Ok((entity, mut player, mut player_gd)) = player.single_mut() {
         let mut player_gd = player_gd.get::<GodotPlayerNode>();
@@ -99,12 +100,15 @@ fn setup_player(
 }
 
 fn move_player(
-    mut player: Query<(&Player, &mut GodotNodeHandle), (With<Player>, With<PlayerSetUp>)>,
+    mut player: Query<
+        (&Player, &mut GodotNodeHandle, &mut Transform2D),
+        (With<Player>, With<PlayerSetUp>),
+    >,
     mut system_delta: SystemDeltaTimer,
 ) -> Result {
-    if let Ok((player, mut player_gd)) = player.single_mut() {
-        let mut player_gd = player_gd.get::<GodotPlayerNode>();
-
+    if let Ok((player, mut player_gd, mut transform)) = player.single_mut() {
+        let player_gd = player_gd.get::<GodotPlayerNode>();
+        let screen_size = player_gd.get_viewport_rect().size;
         let mut velocity = Vector2::ZERO;
 
         if Input::singleton().is_action_pressed("move_right") {
@@ -141,9 +145,9 @@ fn move_player(
             sprite.stop();
         }
 
-        // TODO: set with transforms via ECS?
-        let current_pos = player_gd.get_position();
-        player_gd.set_position(current_pos + (velocity * system_delta.delta_seconds()));
+        transform.origin += velocity * system_delta.delta_seconds();
+        transform.origin.x = f32::min(f32::max(0.0, transform.origin.x), screen_size.x);
+        transform.origin.y = f32::min(f32::max(0.0, transform.origin.y), screen_size.y);
     }
 
     Ok(())

@@ -3,10 +3,11 @@ use bevy::{
     ecs::{
         component::Component,
         entity::Entity,
-        event::{event_update_system, Event, EventReader, EventWriter},
+        event::{Event, EventReader, EventWriter, event_update_system},
         schedule::IntoScheduleConfigs,
         system::{NonSendMut, Query},
-    }, log::trace,
+    },
+    log::trace,
 };
 use godot::prelude::*;
 use std::sync::mpsc::Receiver;
@@ -65,7 +66,6 @@ fn update_godot_collisions(
     mut entities: Query<(&GodotNodeHandle, &mut Collisions)>,
     all_entities: Query<(Entity, &GodotNodeHandle)>,
 ) {
-    // godot_print!("update_godot_collisions");
     for (_, mut collisions) in entities.iter_mut() {
         collisions.recent_collisions = vec![];
     }

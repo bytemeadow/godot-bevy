@@ -4,7 +4,6 @@ pub mod app;
 pub mod bridge;
 pub mod plugins;
 pub mod prelude;
-pub mod utils;
 pub mod watchers;
 
 pub struct GodotPlugin;

@@ -4,6 +4,7 @@ use bevy::ecs::system::{ScheduleSystem, SystemParam};
 use bevy::prelude::*;
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
+use transforms::GodotTransformsPlugin;
 
 pub mod collisions;
 pub use collisions::*;
@@ -24,8 +25,8 @@ impl Plugin for GodotCorePlugin {
             .add_plugins(bevy::diagnostic::DiagnosticsPlugin)
             .add_plugins(bevy::time::TimePlugin)
             .add_plugins(GodotSceneTreePlugin)
-        // .add_plugins(GodotTransformsPlugin)
-        .add_plugins(GodotCollisionsPlugin);
+            .add_plugins(GodotTransformsPlugin)
+            .add_plugins(GodotCollisionsPlugin);
         // .add_plugins(GodotSignalsPlugin)
         // .add_plugins(GodotInputEventPlugin)
     }

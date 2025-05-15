@@ -49,4 +49,4 @@ impl Drop for GodotResourceHandle {
             }
         }
     }
-} 
+}
