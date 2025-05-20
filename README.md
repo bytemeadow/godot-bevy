@@ -42,7 +42,7 @@ fn my_system() {
 
 ### 2. Set up the Godot project
 
-Add the BevyAppSingleton autoload in your Godot project settings.
+Add a `BevyAppSingleton` autoload in your Godot project settings that has the `BevyApp` node.
 
 ### 3. Interact with Godot from Bevy
 
