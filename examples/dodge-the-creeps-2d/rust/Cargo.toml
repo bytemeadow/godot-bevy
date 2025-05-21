@@ -9,5 +9,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 bevy = { version = "0.16", default-features = false }
+fastrand = { version = "2.3.0" }
 godot = "0.2.4"
 godot-bevy = { path = "../../../godot-bevy" }

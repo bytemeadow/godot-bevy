@@ -96,3 +96,16 @@ impl<'w, 's> SystemDeltaTimer<'w, 's> {
         self.delta().as_secs_f64()
     }
 }
+
+pub trait FindEntityByNameExt<T> {
+    fn find_entity_by_name(self, name: &str) -> Option<T>;
+}
+
+impl<'a, T: 'a, U> FindEntityByNameExt<T> for U
+where
+    U: Iterator<Item = (&'a Name, T)>,
+{
+    fn find_entity_by_name(mut self, name: &str) -> Option<T> {
+        self.find_map(|(ent_name, t)| (ent_name.as_str() == name).then_some(t))
+    }
+}

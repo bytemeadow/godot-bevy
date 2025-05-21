@@ -1639,6 +1639,7 @@ name = "rust"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "fastrand",
  "godot",
  "godot-bevy",
 ]

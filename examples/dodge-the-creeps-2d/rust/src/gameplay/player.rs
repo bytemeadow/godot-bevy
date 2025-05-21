@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use godot::{
     builtin::{StringName, Vector2},
-    classes::{AnimatedSprite2D, Input, Node2D, ResourceLoader},
+    classes::{AnimatedSprite2D, Input, Node2D, ResourceLoader}, global::godot_print,
 };
 use godot_bevy::prelude::*;
 
@@ -159,6 +159,7 @@ fn check_player_death(
     mut next_state: ResMut<NextState<GameState>>,
 ) {
     if let Ok((mut player_ref, collisions)) = player.single_mut() {
+        godot_print!("Player collisions: {:?}", collisions.colliding());
         if collisions.colliding().is_empty() {
             return;
         }

@@ -6,7 +6,7 @@ use bevy::{
         system::NonSendMut,
     },
 };
-use godot::{builtin::{Variant, VariantArray}, classes::Node, meta::ToGodot, obj::{Gd, InstanceId}};
+use godot::{classes::Node, meta::ToGodot, obj::InstanceId};
 
 use crate::bridge::GodotNodeHandle;
 
@@ -23,39 +23,9 @@ impl Plugin for GodotSignalsPlugin {
 
 #[derive(Debug, Event)]
 pub struct GodotSignal {
-    name: String,
-    origin: GodotNodeHandle,
-    // Instead of storing Vec<Variant> directly, we'll store the signal information as serialized strings
-    // which are thread-safe
-    serialized_args: Vec<String>,
-}
-
-impl GodotSignal {
-    #[doc(hidden)]
-    pub fn new(name: impl ToString, origin: Gd<Node>, args: Vec<Variant>) -> Self {
-        // Convert each Variant to a string representation
-        let serialized_args = args.into_iter()
-            .map(|v| v.stringify().to_string())
-            .collect();
-        
-        Self {
-            name: name.to_string(),
-            origin: GodotNodeHandle::from_instance_id(origin.instance_id()),
-            serialized_args,
-        }
-    }
-    
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn origin(&self) -> GodotNodeHandle {
-        self.origin.clone()
-    }
-
-    pub fn serialized_args(&self) -> &[String] {
-        &self.serialized_args
-    }
+    pub name: String,
+    pub origin: InstanceId,
+    pub target: InstanceId,
 }
 
 #[doc(hidden)]
