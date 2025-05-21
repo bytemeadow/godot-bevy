@@ -4,9 +4,10 @@ use std::sync::{Mutex, mpsc::channel};
 
 use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
+use crate::watchers::signal_watcher::GodotSignalWatcher;
 use crate::{
     GodotPlugin,
-    plugins::core::{GodotPhysicsFrame, GodotVisualFrame},
+    plugins::core::{GodotPhysicsFrame, GodotVisualFrame, GodotSignalReader},
     prelude::*,
 };
 
@@ -49,6 +50,24 @@ impl BevyApp {
         self.base_mut().add_child(&collision_watcher);
         app.insert_non_send_resource(CollisionEventReader(receiver));
     }
+
+    fn register_signal_watcher(&mut self, app: &mut App) {
+        let (sender, receiver) = channel();
+        let mut signal_watcher = GodotSignalWatcher::new_alloc();
+        signal_watcher.bind_mut().notification_channel = Some(sender);
+        signal_watcher.set_name("GodotSignalWatcher");
+        self.base_mut().add_child(&signal_watcher);
+        app.insert_non_send_resource(GodotSignalReader(receiver));
+    }
+
+    fn register_godot_signal_watcher(&mut self, app: &mut App) {
+        let (sender, receiver) = channel();
+        let mut godot_signal_watcher = GodotSignalWatcher::new_alloc();
+        godot_signal_watcher.bind_mut().notification_channel = Some(sender);
+        godot_signal_watcher.set_name("GodotSignalWatcher");
+        self.base_mut().add_child(&godot_signal_watcher);
+        app.insert_non_send_resource(GodotSignalReader(receiver));
+    }
 }
 
 #[godot_api]
@@ -72,6 +91,8 @@ impl INode for BevyApp {
 
         self.register_scene_tree_watcher(&mut app);
         self.register_collision_watcher(&mut app);
+        self.register_signal_watcher(&mut app);
+        self.register_godot_signal_watcher(&mut app);
         self.app = Some(app);
     }
 

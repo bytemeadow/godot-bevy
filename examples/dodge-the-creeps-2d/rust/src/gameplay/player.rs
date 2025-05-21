@@ -35,7 +35,7 @@ impl Plugin for PlayerPlugin {
             )
             .add_systems(
                 Update,
-                (move_player.as_physics_system()/*, check_player_death */)
+                (move_player.as_physics_system(), check_player_death)
                     .run_if(in_state(GameState::InGame)),
             );
     }
@@ -61,10 +61,7 @@ fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
 }
 
 #[derive(NodeTreeView)]
-pub struct PlayerStartPosition(
-    #[node("/root/Main/StartPosition")]
-    GodotNodeHandle
-);
+pub struct PlayerStartPosition(#[node("/root/Main/StartPosition")] GodotNodeHandle);
 
 fn player_on_ready(
     mut commands: Commands,
@@ -155,4 +152,18 @@ fn move_player(
     }
 
     Ok(())
+}
+
+fn check_player_death(
+    mut player: Query<(&mut GodotNodeHandle, &Collisions), With<Player>>,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
+    if let Ok((mut player_ref, collisions)) = player.single_mut() {
+        if collisions.colliding().is_empty() {
+            return;
+        }
+
+        player_ref.get::<Node2D>().hide();
+        // next_state.set(GameState::GameOver);
+    }
 }

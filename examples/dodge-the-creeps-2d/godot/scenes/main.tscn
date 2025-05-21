@@ -1,6 +1,30 @@
-[gd_scene format=3 uid="uid://crt73ja5heco1"]
+[gd_scene load_steps=3 format=3 uid="uid://crt73ja5heco1"]
+
+[ext_resource type="PackedScene" uid="uid://b2hmdm0hehq3i" path="res://scenes/player.tscn" id="1_o5qli"]
+
+[sub_resource type="Curve2D" id="Curve2D_o5qli"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 480, 0, 0, 0, 0, 0, 480, 720, 0, 0, 0, 0, 0, 720, 0, 0, 0, 0, 0, 0)
+}
+point_count = 5
 
 [node name="Main" type="Node"]
 
 [node name="StartPosition" type="Marker2D" parent="."]
 position = Vector2(240, 450)
+
+[node name="Player" parent="." instance=ExtResource("1_o5qli")]
+
+[node name="MobTimer" type="Timer" parent="."]
+wait_time = 0.5
+
+[node name="ScoreTimer" type="Timer" parent="."]
+
+[node name="StartTimer" type="Timer" parent="."]
+wait_time = 2.0
+one_shot = true
+
+[node name="MobPath" type="Path2D" parent="."]
+curve = SubResource("Curve2D_o5qli")
+
+[node name="MobSpawnLocation" type="PathFollow2D" parent="MobPath"]

@@ -15,6 +15,9 @@ pub use scene_tree::*;
 pub mod transforms;
 pub use transforms::{Transform2D, Transform3D};
 
+pub mod signals;
+pub use signals::*;
+
 pub struct GodotCorePlugin;
 
 impl Plugin for GodotCorePlugin {
@@ -26,8 +29,8 @@ impl Plugin for GodotCorePlugin {
             .add_plugins(bevy::time::TimePlugin)
             .add_plugins(GodotSceneTreePlugin)
             .add_plugins(GodotTransformsPlugin)
-            .add_plugins(GodotCollisionsPlugin);
-        // .add_plugins(GodotSignalsPlugin)
+            .add_plugins(GodotCollisionsPlugin)
+            .add_plugins(GodotSignalsPlugin);
         // .add_plugins(GodotInputEventPlugin)
     }
 }
