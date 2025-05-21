@@ -55,17 +55,8 @@ impl BevyApp {
         let (sender, receiver) = channel();
         let mut signal_watcher = GodotSignalWatcher::new_alloc();
         signal_watcher.bind_mut().notification_channel = Some(sender);
-        signal_watcher.set_name("GodotSignalWatcher");
+        signal_watcher.set_name("SignalWatcher");
         self.base_mut().add_child(&signal_watcher);
-        app.insert_non_send_resource(GodotSignalReader(receiver));
-    }
-
-    fn register_godot_signal_watcher(&mut self, app: &mut App) {
-        let (sender, receiver) = channel();
-        let mut godot_signal_watcher = GodotSignalWatcher::new_alloc();
-        godot_signal_watcher.bind_mut().notification_channel = Some(sender);
-        godot_signal_watcher.set_name("GodotSignalWatcher");
-        self.base_mut().add_child(&godot_signal_watcher);
         app.insert_non_send_resource(GodotSignalReader(receiver));
     }
 }
@@ -92,7 +83,6 @@ impl INode for BevyApp {
         self.register_scene_tree_watcher(&mut app);
         self.register_collision_watcher(&mut app);
         self.register_signal_watcher(&mut app);
-        self.register_godot_signal_watcher(&mut app);
         self.app = Some(app);
     }
 

@@ -2,7 +2,8 @@ use bevy::prelude::*;
 
 use godot::{
     builtin::{StringName, Vector2},
-    classes::{AnimatedSprite2D, Input, Node2D, ResourceLoader}, global::godot_print,
+    classes::{AnimatedSprite2D, Input, Node2D, ResourceLoader},
+    global::godot_print,
 };
 use godot_bevy::prelude::*;
 
@@ -28,15 +29,19 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerAssets>()
-            .add_systems(OnEnter(GameState::InGame), spawn_player)
-            .add_systems(
-                Update,
-                (player_on_ready, setup_player.after(player_on_ready)),
-            )
+            .add_systems(OnEnter(GameState::MainMenu), spawn_player)
+            .add_systems(Update, player_on_ready)
             .add_systems(
                 Update,
                 (move_player.as_physics_system(), check_player_death)
                     .run_if(in_state(GameState::InGame)),
+            )
+            .add_systems(OnEnter(GameState::Countdown), setup_player)
+            .add_systems(
+                Update,
+                move_player
+                    .as_physics_system()
+                    .run_if(in_state(GameState::Countdown)),
             );
     }
 }
@@ -46,65 +51,54 @@ pub struct Player {
     speed: f32,
 }
 
-#[derive(Debug, Component)]
-pub struct PlayerCreated;
-
-#[derive(Debug, Component)]
-pub struct PlayerSetUp;
-
 fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
-    commands.spawn((
-        GodotScene::from_resource(assets.player_scn.clone()),
-        // This will be replaced by PlayerNode exported property
-        Player { speed: 0.0 },
-    ));
+    commands
+        .spawn_empty()
+        .insert(GodotScene::from_resource(assets.player_scn.clone()))
+        .insert(Player { speed: 0.0 });
 }
 
 #[derive(NodeTreeView)]
 pub struct PlayerStartPosition(#[node("/root/Main/StartPosition")] GodotNodeHandle);
 
 fn player_on_ready(
-    mut commands: Commands,
-    mut player: Query<
-        (Entity, &mut Player, &mut GodotNodeHandle),
-        (With<Player>, Without<PlayerCreated>),
-    >,
+    mut player: Query<(&mut Player, &mut GodotNodeHandle), Added<Player>>,
 ) -> Result {
-    if let Ok((entity, mut player, mut player_gd)) = player.single_mut() {
+    if let Ok((mut player, mut player_gd)) = player.single_mut() {
         let mut player_gd = player_gd.get::<GodotPlayerNode>();
         player_gd.hide();
         player.speed = player_gd.bind().get_speed();
 
         let mut start_position = PlayerStartPosition::from_node(player_gd.clone());
         player_gd.set_position(start_position.0.get::<Node2D>().get_position());
-
-        // Mark as initialized so we don't do this again
-        commands.entity(entity).insert(PlayerCreated);
     }
 
     Ok(())
 }
 
 fn setup_player(
-    mut commands: Commands,
-    mut player: Query<(Entity, &mut GodotNodeHandle), (With<Player>, With<PlayerCreated>)>,
+    mut player: Query<(&mut GodotNodeHandle, &mut Transform2D), With<Player>>,
+    mut entities: Query<(&Name, &mut GodotNodeHandle), Without<Player>>,
 ) -> Result {
-    if let Ok((entity, mut player_gd)) = player.single_mut() {
+    if let Ok((mut player_gd, mut transform)) = player.single_mut() {
+        godot_print!("Setting up player");
         let mut player_gd = player_gd.get::<GodotPlayerNode>();
         player_gd.show();
 
-        // Mark as setup so we don't do this again
-        commands.entity(entity).insert(PlayerSetUp);
+        let start_position = entities
+            .iter_mut()
+            .find_entity_by_name("StartPosition")
+            .unwrap()
+            .get::<Node2D>()
+            .get_position();
+        transform.origin = start_position;
     }
 
     Ok(())
 }
 
 fn move_player(
-    mut player: Query<
-        (&Player, &mut GodotNodeHandle, &mut Transform2D),
-        (With<Player>, With<PlayerSetUp>),
-    >,
+    mut player: Query<(&Player, &mut GodotNodeHandle, &mut Transform2D)>,
     mut system_delta: SystemDeltaTimer,
 ) -> Result {
     if let Ok((player, mut player_gd, mut transform)) = player.single_mut() {
@@ -159,7 +153,7 @@ fn check_player_death(
     mut next_state: ResMut<NextState<GameState>>,
 ) {
     if let Ok((mut player_ref, collisions)) = player.single_mut() {
-        godot_print!("Player collisions: {:?}", collisions.colliding());
+        // godot_print!("Player collisions: {:?}", collisions.colliding());
         if collisions.colliding().is_empty() {
             return;
         }

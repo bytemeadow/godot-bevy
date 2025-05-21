@@ -1,15 +1,18 @@
 use bevy::{
     app::{App, Plugin, Update},
     ecs::{
-        component::Component, name::Name, resource::Resource, schedule::IntoScheduleConfigs, system::{Commands, Query, Res, ResMut}
+        component::Component, name::Name, query::Added, resource::Resource, schedule::IntoScheduleConfigs, system::{Commands, Query, Res, ResMut}
     },
     state::condition::in_state,
     time::{Time, Timer, TimerMode},
 };
-use godot::{classes::{PathFollow2D, ResourceLoader}, builtin::Transform2D as GodotTransform2D};
+use godot::{
+    builtin::Transform2D as GodotTransform2D,
+    classes::{PathFollow2D, ResourceLoader},
+};
 use godot_bevy::{
     bridge::{GodotNodeHandle, GodotResourceHandle},
-    prelude::{FindEntityByNameExt, GodotScene, Transform2D},
+    prelude::{FindEntityByNameExt, GodotScene, SceneTreeRef, Transform2D},
 };
 use std::f32::consts::PI;
 
@@ -33,11 +36,14 @@ pub struct MobPlugin;
 
 impl Plugin for MobPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, spawn_mob.run_if(in_state(GameState::InGame)))
-            .insert_resource(MobSpawnTimer(Timer::from_seconds(
-                0.5,
-                TimerMode::Repeating,
-            )));
+        app.add_systems(
+            Update,
+            (spawn_mob, new_mob).run_if(in_state(GameState::InGame)),
+        )
+        .insert_resource(MobSpawnTimer(Timer::from_seconds(
+            0.5,
+            TimerMode::Repeating,
+        )));
     }
 }
 
@@ -81,4 +87,10 @@ fn spawn_mob(
         .insert(Mob { direction })
         .insert(Transform2D(transform))
         .insert(GodotScene::from_resource(assets.mob_scn.clone()));
+}
+
+fn new_mob(
+    mut entities: Query<(&Mob, &mut GodotNodeHandle), Added<Mob>>,
+    mut scene_tree: SceneTreeRef,
+) {
 }
