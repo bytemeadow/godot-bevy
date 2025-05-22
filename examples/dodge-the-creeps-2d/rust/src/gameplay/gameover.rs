@@ -12,7 +12,6 @@ use bevy::{
     time::{Time, Timer, TimerMode},
 };
 use godot::classes::Label;
-use godot_bevy::prelude::{NodeTreeView, SceneTreeRef};
 
 use crate::{main_menu::MenuAssets, GameState};
 

@@ -14,7 +14,7 @@ use bevy::{
 };
 use godot::{
     builtin::{Transform2D as GodotTransform2D, Vector2},
-    classes::{AnimatedSprite2D, Node, PathFollow2D, ResourceLoader, RigidBody2D},
+    classes::{AnimatedSprite2D, Node, PathFollow2D, ResourceLoader, RigidBody2D}, global::godot_print,
 };
 use godot_bevy::{
     bridge::{GodotNodeHandle, GodotResourceHandle},
@@ -113,6 +113,7 @@ fn new_mob(
     mut scene_tree: SceneTreeRef,
 ) {
     for (mob_data, mut mob) in entities.iter_mut() {
+        godot_print!("New mob");
         let mut mob = mob.get::<RigidBody2D>();
 
         let velocity = Vector2::new(fastrand::f32() * 100.0 + 150.0, 0.0);

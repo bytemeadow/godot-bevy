@@ -70,11 +70,9 @@ fn player_on_ready(
     mut player: Query<(Entity, &mut Player, &mut GodotNodeHandle), (With<Player>, Without<PlayerInitialized>)>,
 ) -> Result {
     if let Ok((entity, mut player_data, mut player)) = player.single_mut() {
-        godot_print!("Player added and found");
         let mut player = player.get::<GodotPlayerNode>();
         player.set_visible(false);
         player_data.speed = player.bind().get_speed();
-        godot_print!("Player speed: {}", player_data.speed);
 
         let mut start_position = PlayerStartPosition::from_node(player.clone());
         player.set_position(start_position.0.get::<Node2D>().get_position());
@@ -166,6 +164,8 @@ fn check_player_death(
         if collisions.colliding().is_empty() {
             return;
         }
+
+        godot_print!("Player death");
 
         player.get::<Node2D>().set_visible(false);
         next_state.set(GameState::GameOver);
