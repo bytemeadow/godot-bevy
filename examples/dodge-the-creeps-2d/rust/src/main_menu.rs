@@ -1,6 +1,6 @@
 use bevy::{
     app::{App, Plugin, Update},
-    ecs::{event::EventReader, schedule::IntoScheduleConfigs, system::ResMut},
+    ecs::{event::EventReader, schedule::IntoScheduleConfigs, system::ResMut, resource::Resource},
     state::{
         condition::in_state,
         state::{NextState, OnEnter, OnExit},
@@ -17,7 +17,8 @@ use crate::GameState;
 pub struct MainMenuPlugin;
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::MainMenu), connect_start_button)
+        app.init_resource::<StartButtonConnected>()
+            .add_systems(OnEnter(GameState::MainMenu), connect_start_button)
             .add_systems(
                 Update,
                 listen_for_start_button.run_if(in_state(GameState::MainMenu)),
@@ -26,6 +27,9 @@ impl Plugin for MainMenuPlugin {
             .add_systems(OnEnter(GameState::MainMenu), show_play_button);
     }
 }
+
+#[derive(Resource, Default)]
+struct StartButtonConnected(bool);
 
 #[derive(NodeTreeView)]
 pub struct MenuUi {
@@ -36,9 +40,12 @@ pub struct MenuUi {
     pub start_button: GodotNodeHandle,
 }
 
-fn connect_start_button(mut scene_tree: SceneTreeRef) {
-    let mut menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap());
-    connect_godot_signal(&mut menu_ui.start_button, "pressed", &mut scene_tree);
+fn connect_start_button(mut scene_tree: SceneTreeRef, mut connected: ResMut<StartButtonConnected>) {
+    if !connected.0 {
+        let mut menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap());
+        connect_godot_signal(&mut menu_ui.start_button, "pressed", &mut scene_tree);
+        connected.0 = true;
+    }
 }
 
 fn listen_for_start_button(
