@@ -5,6 +5,7 @@ pub mod bridge;
 pub mod node_tree_view;
 pub mod plugins;
 pub mod prelude;
+pub mod utils;
 pub mod watchers;
 
 pub struct GodotPlugin;

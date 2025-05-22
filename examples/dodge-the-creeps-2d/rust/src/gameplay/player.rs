@@ -66,7 +66,7 @@ fn player_on_ready(
 ) -> Result {
     if let Ok((mut player, mut player_gd)) = player.single_mut() {
         let mut player_gd = player_gd.get::<GodotPlayerNode>();
-        player_gd.hide();
+        player_gd.set_visible(false);
         player.speed = player_gd.bind().get_speed();
 
         let mut start_position = PlayerStartPosition::from_node(player_gd.clone());
@@ -83,7 +83,7 @@ fn setup_player(
     if let Ok((mut player_gd, mut transform)) = player.single_mut() {
         godot_print!("Setting up player");
         let mut player_gd = player_gd.get::<GodotPlayerNode>();
-        player_gd.show();
+        player_gd.set_visible(true);
 
         let start_position = entities
             .iter_mut()
@@ -153,12 +153,11 @@ fn check_player_death(
     mut next_state: ResMut<NextState<GameState>>,
 ) {
     if let Ok((mut player_ref, collisions)) = player.single_mut() {
-        // godot_print!("Player collisions: {:?}", collisions.colliding());
         if collisions.colliding().is_empty() {
             return;
         }
 
-        player_ref.get::<Node2D>().hide();
-        // next_state.set(GameState::GameOver);
+        player_ref.get::<Node2D>().set_visible(false);
+        next_state.set(GameState::GameOver);
     }
 }
