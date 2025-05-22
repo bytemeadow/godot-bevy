@@ -1,18 +1,26 @@
 use bevy::{
     app::{App, Plugin, Update},
     ecs::{
-        component::Component, name::Name, query::Added, resource::Resource, schedule::IntoScheduleConfigs, system::{Commands, Query, Res, ResMut}
+        component::Component,
+        event::EventReader,
+        name::Name,
+        query::Added,
+        resource::Resource,
+        schedule::IntoScheduleConfigs,
+        system::{Commands, Query, Res, ResMut},
     },
     state::condition::in_state,
     time::{Time, Timer, TimerMode},
 };
 use godot::{
-    builtin::Transform2D as GodotTransform2D,
-    classes::{PathFollow2D, ResourceLoader},
+    builtin::{Transform2D as GodotTransform2D, Vector2},
+    classes::{AnimatedSprite2D, Node, PathFollow2D, ResourceLoader, RigidBody2D},
 };
 use godot_bevy::{
     bridge::{GodotNodeHandle, GodotResourceHandle},
-    prelude::{FindEntityByNameExt, GodotScene, SceneTreeRef, Transform2D},
+    prelude::{
+        connect_godot_signal, FindEntityByNameExt, GodotScene, GodotSignal, NodeTreeView, SceneTreeRef, Transform2D
+    },
 };
 use std::f32::consts::PI;
 
@@ -36,14 +44,15 @@ pub struct MobPlugin;
 
 impl Plugin for MobPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (spawn_mob, new_mob).run_if(in_state(GameState::InGame)),
-        )
-        .insert_resource(MobSpawnTimer(Timer::from_seconds(
-            0.5,
-            TimerMode::Repeating,
-        )));
+        app.init_resource::<MobAssets>()
+            .add_systems(
+                Update,
+                (spawn_mob, new_mob, kill_mob).run_if(in_state(GameState::InGame)),
+            )
+            .insert_resource(MobSpawnTimer(Timer::from_seconds(
+                0.5,
+                TimerMode::Repeating,
+            )));
     }
 }
 
@@ -89,8 +98,54 @@ fn spawn_mob(
         .insert(GodotScene::from_resource(assets.mob_scn.clone()));
 }
 
+#[derive(NodeTreeView)]
+pub struct MobNodes {
+    #[node("AnimatedSprite2D")]
+    animated_sprite: GodotNodeHandle,
+
+    #[node("VisibleOnScreenNotifier2D")]
+    visibility_notifier: GodotNodeHandle,
+}
+
 fn new_mob(
     mut entities: Query<(&Mob, &mut GodotNodeHandle), Added<Mob>>,
     mut scene_tree: SceneTreeRef,
 ) {
+    for (mob_data, mut mob) in entities.iter_mut() {
+        let mut mob = mob.get::<RigidBody2D>();
+
+        let velocity = Vector2::new(fastrand::f32() * 100.0 + 150.0, 0.0);
+        mob.set_linear_velocity(velocity.rotated(mob_data.direction as f32));
+
+        let mut mob_nodes = MobNodes::from_node(mob);
+
+        let mut animated_sprite = mob_nodes.animated_sprite.get::<AnimatedSprite2D>();
+        animated_sprite.play();
+
+        let mob_types = animated_sprite
+            .get_sprite_frames()
+            .unwrap()
+            .get_animation_names();
+
+        let mob_type_index = fastrand::usize(0..mob_types.len());
+        animated_sprite.set_animation(mob_types[mob_type_index].arg());
+
+        connect_godot_signal(
+            &mut mob_nodes.visibility_notifier,
+            "screen_exited",
+            &mut scene_tree,
+        );
+    }
+}
+
+fn kill_mob(mut signals: EventReader<GodotSignal>) {
+    for signal in signals.read() {
+        if signal.name == "screen_exited" {
+            GodotNodeHandle::from_instance_id(signal.target)
+                .get::<Node>()
+                .get_parent()
+                .unwrap()
+                .queue_free();
+        }
+    }
 }
