@@ -51,7 +51,11 @@ pub struct Player {
     speed: f32,
 }
 
+#[derive(Debug, Component)]
+struct PlayerInitialized;
+
 fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
+    godot_print!("Spawning player");
     commands
         .spawn_empty()
         .insert(GodotScene::from_resource(assets.player_scn.clone()))
@@ -62,15 +66,21 @@ fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
 pub struct PlayerStartPosition(#[node("/root/Main/StartPosition")] GodotNodeHandle);
 
 fn player_on_ready(
-    mut player: Query<(&mut Player, &mut GodotNodeHandle), Added<Player>>,
+    mut commands: Commands,
+    mut player: Query<(Entity, &mut Player, &mut GodotNodeHandle), (With<Player>, Without<PlayerInitialized>)>,
 ) -> Result {
-    if let Ok((mut player_data, mut player)) = player.single_mut() {
+    if let Ok((entity, mut player_data, mut player)) = player.single_mut() {
+        godot_print!("Player added and found");
         let mut player = player.get::<GodotPlayerNode>();
         player.set_visible(false);
         player_data.speed = player.bind().get_speed();
+        godot_print!("Player speed: {}", player_data.speed);
 
         let mut start_position = PlayerStartPosition::from_node(player.clone());
         player.set_position(start_position.0.get::<Node2D>().get_position());
+        
+        // Mark as initialized
+        commands.entity(entity).insert(PlayerInitialized);
     }
 
     Ok(())
