@@ -77,18 +77,23 @@ fn spawn_mob(
         return;
     }
 
-    let mut mob_spawn_path_follow = entities
+    // Choose a random location on Path2D.
+    let mut mob_spawn_location = entities
         .iter_mut()
         .find_entity_by_name("MobSpawnLocation")
         .unwrap();
 
-    let mob_spawn_path_follow = mob_spawn_path_follow.get::<PathFollow2D>();
+    let mut mob_spawn_location = mob_spawn_location.get::<PathFollow2D>();
+    mob_spawn_location.set_progress_ratio(fastrand::f32());
 
-    let mut direction = mob_spawn_path_follow.get_rotation() + PI / 2.0;
+    // Set the mob's direction perpendicular to the path direction.
+    let mut direction = mob_spawn_location.get_rotation() + PI / 2.0;
+
+
+    // Add some randomness to the direction.
     direction += fastrand::f32() * PI / 2.0 - PI / 4.0;
 
-    let position = mob_spawn_path_follow.get_position();
-
+    let position = mob_spawn_location.get_position();
     let transform = GodotTransform2D::IDENTITY.translated(position);
     let transform = transform.rotated(direction as f32);
 
@@ -143,6 +148,7 @@ fn new_mob(
 fn kill_mob(mut signals: EventReader<GodotSignal>) {
     for signal in signals.read() {
         if signal.name == "screen_exited" {
+            godot_print!("Mob screen exited");
             GodotNodeHandle::from_instance_id(signal.target)
                 .get::<Node>()
                 .get_parent()

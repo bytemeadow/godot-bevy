@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use bevy::app::{App, Last, Plugin, PreUpdate};
 use bevy::ecs::query::{Added, Changed, Or};
 use bevy::ecs::system::Query;
@@ -7,6 +9,7 @@ use bevy::{ecs::component::Component, math::Quat};
 use godot::builtin::{Basis, Quaternion, Vector3};
 use godot::classes::{Node2D, Node3D};
 use godot::prelude::Transform3D as GodotTransform3D;
+use godot::builtin::Transform2D as GodotTransform2D;
 
 use crate::bridge::GodotNodeHandle;
 
@@ -18,48 +21,118 @@ pub struct Transform3D {
     godot: godot::prelude::Transform3D,
 }
 
+impl Transform3D {
+    pub fn as_bevy(&self) -> &bevy::prelude::Transform {
+        &self.bevy
+    }
+
+    pub fn as_bevy_mut(&mut self) -> TransformMutGuard<'_, BevyTransform> {
+        self.into()
+    }
+
+    pub fn as_godot(&self) -> &godot::prelude::Transform3D {
+        &self.godot
+    }
+
+    pub fn as_godot_mut(&mut self) -> TransformMutGuard<'_, GodotTransform3D> {
+        self.into()
+    }
+
+    fn update_godot(&mut self) {
+        self.godot = self.bevy.to_godot_transform();
+    }
+
+    fn update_bevy(&mut self) {
+        self.bevy = self.godot.to_bevy_transform();
+    }
+}
+
 impl From<BevyTransform> for Transform3D {
-    fn from(transform: BevyTransform) -> Self {
+    fn from(bevy: BevyTransform) -> Self {
         Self {
-            bevy: transform,
-            godot: Self::bevy_to_godot_transform(transform),
+            bevy,
+            godot: bevy.to_godot_transform(),
         }
     }
 }
 
 impl From<GodotTransform3D> for Transform3D {
-    fn from(transform: GodotTransform3D) -> Self {
+    fn from(godot: GodotTransform3D) -> Self {
         Self {
-            bevy: Self::godot_to_bevy_transform(transform),
-            godot: transform,
+            bevy: godot.to_bevy_transform(),
+            godot,
         }
     }
 }
 
-impl Transform3D {
-    pub fn bevy_to_godot_transform(transform: BevyTransform) -> godot::prelude::Transform3D {
-        let [x, y, z, w] = transform.rotation.to_array();
-        let quat = Quaternion::new(x, y, z, w);
+#[derive(Copy, Clone)]
+enum TransformRequested {
+    Bevy,
+    Godot,
+}
 
-        let [sx, sy, sz] = transform.scale.to_array();
-        let scale = Vector3::new(sx, sy, sz);
+pub struct TransformMutGuard<'a, T>(&'a mut Transform3D, TransformRequested, PhantomData<T>);
 
-        let basis = Basis::from_quaternion(quat).scaled(scale);
-
-        let [tx, ty, tz] = transform.translation.to_array();
-        let origin = Vector3::new(tx, ty, tz);
-
-        godot::prelude::Transform3D { basis, origin }
+impl<'a> std::ops::Deref for TransformMutGuard<'a, GodotTransform3D> {
+    type Target = GodotTransform3D;
+    fn deref(&self) -> &Self::Target {
+        &self.0.godot
     }
+}
 
-    pub fn godot_to_bevy_transform(transform: godot::prelude::Transform3D) -> BevyTransform {
-        let quat = transform.basis.get_quaternion();
+impl<'a> std::ops::DerefMut for TransformMutGuard<'a, GodotTransform3D> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0.godot
+    }
+}
+
+impl<'a> std::ops::Deref for TransformMutGuard<'a, BevyTransform> {
+    type Target = BevyTransform;
+    fn deref(&self) -> &Self::Target {
+        &self.0.bevy
+    }
+}
+
+impl<'a> std::ops::DerefMut for TransformMutGuard<'a, BevyTransform> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0.bevy
+    }
+}
+
+impl<'a> From<&'a mut Transform3D> for TransformMutGuard<'a, GodotTransform3D> {
+    fn from(transform: &'a mut Transform3D) -> Self {
+        TransformMutGuard(transform, TransformRequested::Godot, PhantomData)
+    }
+}
+
+impl<'a> From<&'a mut Transform3D> for TransformMutGuard<'a, BevyTransform> {
+    fn from(transform: &'a mut Transform3D) -> Self {
+        TransformMutGuard(transform, TransformRequested::Bevy, PhantomData)
+    }
+}
+
+impl<'a, T> Drop for TransformMutGuard<'a, T> {
+    fn drop(&mut self) {
+        match self.1 {
+            TransformRequested::Bevy => self.0.update_godot(),
+            TransformRequested::Godot => self.0.update_bevy(),
+        }
+    }
+}
+
+pub trait IntoBevyTransform {
+    fn to_bevy_transform(self) -> bevy::prelude::Transform;
+}
+
+impl IntoBevyTransform for godot::prelude::Transform3D  {
+    fn to_bevy_transform(self) -> bevy::prelude::Transform {
+        let quat = self.basis.get_quaternion();
         let quat = Quat::from_xyzw(quat.x, quat.y, quat.z, quat.w);
 
-        let scale = transform.basis.get_scale();
+        let scale = self.basis.get_scale();
         let scale = Vec3::new(scale.x, scale.y, scale.z);
 
-        let origin = Vec3::new(transform.origin.x, transform.origin.y, transform.origin.z);
+        let origin = Vec3::new(self.origin.x, self.origin.y, self.origin.z);
 
         bevy::prelude::Transform {
             rotation: quat,
@@ -67,13 +140,26 @@ impl Transform3D {
             scale,
         }
     }
+}
 
-    pub fn get_godot(&self) -> godot::prelude::Transform3D {
-        self.godot
-    }
+pub trait IntoGodotTransform {
+    fn to_godot_transform(self) -> godot::prelude::Transform3D;
+}
 
-    pub fn get_bevy(&self) -> BevyTransform {
-        self.bevy
+impl IntoGodotTransform for bevy::prelude::Transform {
+    fn to_godot_transform(self) -> godot::prelude::Transform3D {
+        let [x, y, z, w] = self.rotation.to_array();
+        let quat = Quaternion::new(x, y, z, w);
+
+        let [sx, sy, sz] = self.scale.to_array();
+        let scale = Vector3::new(sx, sy, sz);
+
+        let basis = Basis::from_quaternion(quat).scaled(scale);
+
+        let [tx, ty, tz] = self.translation.to_array();
+        let origin = Vector3::new(tx, ty, tz);
+
+        godot::prelude::Transform3D { basis, origin }
     }
 }
 
@@ -114,8 +200,8 @@ fn post_update_godot_transforms_3d(
     for (transform, mut reference) in entities.iter_mut() {
         let mut obj = reference.get::<Node3D>();
 
-        if obj.get_transform() != transform.get_godot() {
-            obj.set_transform(transform.get_godot());
+        if obj.get_transform() != *transform.as_godot() {
+            obj.set_transform(*transform.as_godot());
         }
     }
 }
@@ -124,11 +210,10 @@ fn pre_update_godot_transforms_3d(
     _scene_tree: SceneTreeRef,
     mut entities: Query<(&mut Transform3D, &mut GodotNodeHandle)>,
 ) {
-    for (transform, mut reference) in entities.iter_mut() {
-        let mut obj = reference.get::<Node3D>();
-
-        if obj.get_transform() != transform.get_godot() {
-            obj.set_transform(transform.get_godot());
+    for (mut transform, mut reference) in entities.iter_mut() {
+        let godot_transform = reference.get::<Node3D>().get_transform();
+        if *transform.as_godot() != godot_transform {
+            *transform.as_godot_mut() = godot_transform;
         }
     }
 }
@@ -143,8 +228,12 @@ fn post_update_godot_transforms_2d(
     for (transform, mut reference) in entities.iter_mut() {
         let mut obj = reference.get::<Node2D>();
 
-        if obj.get_transform() != transform.0 {
-            obj.set_transform(transform.0);
+        let mut obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
+        obj_transform = obj_transform.rotated(obj.get_rotation() as f32);
+        obj_transform = obj_transform.scaled(obj.get_scale());
+
+        if obj_transform != **transform {
+            obj.set_transform(**transform);
         }
     }
 }
@@ -153,11 +242,15 @@ fn pre_update_godot_transforms_2d(
     _scene_tree: SceneTreeRef,
     mut entities: Query<(&mut Transform2D, &mut GodotNodeHandle)>,
 ) {
-    for (transform, mut reference) in entities.iter_mut() {
-        let mut obj = reference.get::<Node2D>();
+    for (mut transform, mut reference) in entities.iter_mut() {
+        let obj = reference.get::<Node2D>();
 
-        if obj.get_transform() != transform.0 {
-            obj.set_transform(transform.0);
+        let mut obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
+        obj_transform = obj_transform.rotated(obj.get_rotation() as f32);
+        obj_transform = obj_transform.scaled(obj.get_scale());
+
+        if obj_transform != **transform {
+            **transform = obj_transform;
         }
     }
 }
