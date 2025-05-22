@@ -26,7 +26,6 @@ impl INode for GodotSignalWatcher {
 impl GodotSignalWatcher {
     #[func]
     pub fn event(&self, origin: Gd<Node>, target: Gd<Node>, signal_name: GString) {
-        godot_print!("Signal event: {} from {}", signal_name, target.get_path());
         if let Some(channel) = self.notification_channel.as_ref() {
             let _ = channel.send(GodotSignal {
                 name: signal_name.to_string(),

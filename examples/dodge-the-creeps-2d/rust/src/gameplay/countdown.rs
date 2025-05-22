@@ -11,10 +11,7 @@ use bevy::{
     },
     time::{Time, Timer, TimerMode},
 };
-use godot::{
-    classes::{Label, Node},
-    global::godot_print,
-};
+use godot::classes::{Label, Node};
 use godot_bevy::{bridge::GodotNodeHandle, prelude::Groups};
 
 use crate::{main_menu::MenuAssets, GameState};
@@ -37,7 +34,6 @@ impl Plugin for CountdownPlugin {
 pub struct CountdownTimer(Timer);
 
 fn setup_countdown(mut commands: Commands, menu_assets: Res<MenuAssets>) {
-    godot_print!("Setting up countdown");
     commands.insert_resource(CountdownTimer(Timer::from_seconds(1.0, TimerMode::Once)));
 
     if let Some(mut message_label) = menu_assets.message_label.clone() {

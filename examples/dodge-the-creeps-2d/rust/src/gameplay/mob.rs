@@ -14,7 +14,7 @@ use bevy::{
 };
 use godot::{
     builtin::{Transform2D as GodotTransform2D, Vector2},
-    classes::{AnimatedSprite2D, Node, PathFollow2D, ResourceLoader, RigidBody2D}, global::godot_print,
+    classes::{AnimatedSprite2D, Node, PathFollow2D, ResourceLoader, RigidBody2D},
 };
 use godot_bevy::{
     bridge::{GodotNodeHandle, GodotResourceHandle},
@@ -89,7 +89,6 @@ fn spawn_mob(
     // Set the mob's direction perpendicular to the path direction.
     let mut direction = mob_spawn_location.get_rotation() + PI / 2.0;
 
-
     // Add some randomness to the direction.
     direction += fastrand::f32() * PI / 2.0 - PI / 4.0;
 
@@ -118,7 +117,6 @@ fn new_mob(
     mut scene_tree: SceneTreeRef,
 ) {
     for (mob_data, mut mob) in entities.iter_mut() {
-        godot_print!("New mob");
         let mut mob = mob.get::<RigidBody2D>();
 
         let velocity = Vector2::new(fastrand::f32() * 100.0 + 150.0, 0.0);
@@ -148,7 +146,6 @@ fn new_mob(
 fn kill_mob(mut signals: EventReader<GodotSignal>) {
     for signal in signals.read() {
         if signal.name == "screen_exited" {
-            godot_print!("Mob screen exited");
             GodotNodeHandle::from_instance_id(signal.target)
                 .get::<Node>()
                 .get_parent()

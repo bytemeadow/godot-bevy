@@ -6,10 +6,10 @@ use bevy::ecs::system::Query;
 use bevy::math::Vec3;
 use bevy::prelude::Transform as BevyTransform;
 use bevy::{ecs::component::Component, math::Quat};
+use godot::builtin::Transform2D as GodotTransform2D;
 use godot::builtin::{Basis, Quaternion, Vector3};
 use godot::classes::{Node2D, Node3D};
 use godot::prelude::Transform3D as GodotTransform3D;
-use godot::builtin::Transform2D as GodotTransform2D;
 
 use crate::bridge::GodotNodeHandle;
 
@@ -124,7 +124,7 @@ pub trait IntoBevyTransform {
     fn to_bevy_transform(self) -> bevy::prelude::Transform;
 }
 
-impl IntoBevyTransform for godot::prelude::Transform3D  {
+impl IntoBevyTransform for godot::prelude::Transform3D {
     fn to_bevy_transform(self) -> bevy::prelude::Transform {
         let quat = self.basis.get_quaternion();
         let quat = Quat::from_xyzw(quat.x, quat.y, quat.z, quat.w);

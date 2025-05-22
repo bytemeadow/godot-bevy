@@ -3,7 +3,6 @@ use bevy::prelude::*;
 use godot::{
     builtin::{StringName, Vector2},
     classes::{AnimatedSprite2D, Input, Node2D, ResourceLoader},
-    global::godot_print,
 };
 use godot_bevy::prelude::*;
 
@@ -13,6 +12,9 @@ use crate::{nodes::player::Player as GodotPlayerNode, GameState};
 pub struct PlayerAssets {
     player_scn: GodotResourceHandle,
 }
+
+#[derive(Debug, Default, Resource)]
+struct PlayerSpawned(bool);
 
 impl Default for PlayerAssets {
     fn default() -> Self {
@@ -29,6 +31,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerAssets>()
+            .init_resource::<PlayerSpawned>()
             .add_systems(OnEnter(GameState::MainMenu), spawn_player)
             .add_systems(Update, player_on_ready)
             .add_systems(
@@ -54,12 +57,21 @@ pub struct Player {
 #[derive(Debug, Component)]
 struct PlayerInitialized;
 
-fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
-    godot_print!("Spawning player");
-    commands
-        .spawn_empty()
-        .insert(GodotScene::from_resource(assets.player_scn.clone()))
-        .insert(Player { speed: 0.0 });
+fn spawn_player(
+    mut commands: Commands,
+    assets: Res<PlayerAssets>,
+    mut player_spawned: ResMut<PlayerSpawned>,
+    existing_player: Query<Entity, With<Player>>,
+) {
+    // Only spawn if we haven't already spawned a player
+    if !player_spawned.0 && existing_player.is_empty() {
+        commands
+            .spawn_empty()
+            .insert(GodotScene::from_resource(assets.player_scn.clone()))
+            .insert(Player { speed: 0.0 });
+
+        player_spawned.0 = true;
+    }
 }
 
 #[derive(NodeTreeView)]
@@ -67,7 +79,10 @@ pub struct PlayerStartPosition(#[node("/root/Main/StartPosition")] GodotNodeHand
 
 fn player_on_ready(
     mut commands: Commands,
-    mut player: Query<(Entity, &mut Player, &mut GodotNodeHandle), (With<Player>, Without<PlayerInitialized>)>,
+    mut player: Query<
+        (Entity, &mut Player, &mut GodotNodeHandle),
+        (With<Player>, Without<PlayerInitialized>),
+    >,
 ) -> Result {
     if let Ok((entity, mut player_data, mut player)) = player.single_mut() {
         let mut player = player.get::<GodotPlayerNode>();
@@ -76,7 +91,7 @@ fn player_on_ready(
 
         let mut start_position = PlayerStartPosition::from_node(player.clone());
         player.set_position(start_position.0.get::<Node2D>().get_position());
-        
+
         // Mark as initialized
         commands.entity(entity).insert(PlayerInitialized);
     }
@@ -89,7 +104,6 @@ fn setup_player(
     mut entities: Query<(&Name, &mut GodotNodeHandle), Without<Player>>,
 ) -> Result {
     if let Ok((mut player, mut transform)) = player.single_mut() {
-        godot_print!("Setting up player");
         let mut player = player.get::<GodotPlayerNode>();
         player.set_visible(true);
 
@@ -164,8 +178,6 @@ fn check_player_death(
         if collisions.colliding().is_empty() {
             return;
         }
-
-        godot_print!("Player death");
 
         player.get::<Node2D>().set_visible(false);
         next_state.set(GameState::GameOver);
