@@ -14,8 +14,8 @@ use super::SceneTreeRef;
 
 #[derive(Debug, Component, Default, Copy, Clone)]
 pub struct Transform3D {
-    bevy: bevy::prelude::Transform,
-    godot: godot::prelude::Transform3D,
+    pub bevy: bevy::prelude::Transform,
+    pub godot: godot::prelude::Transform3D,
 }
 
 impl From<BevyTransform> for Transform3D {
