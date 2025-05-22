@@ -229,7 +229,7 @@ fn post_update_godot_transforms_2d(
         let mut obj = reference.get::<Node2D>();
 
         let mut obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
-        obj_transform = obj_transform.rotated(obj.get_rotation() as f32);
+        obj_transform = obj_transform.rotated(obj.get_rotation());
         obj_transform = obj_transform.scaled(obj.get_scale());
 
         if obj_transform != **transform {
@@ -246,7 +246,7 @@ fn pre_update_godot_transforms_2d(
         let obj = reference.get::<Node2D>();
 
         let mut obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
-        obj_transform = obj_transform.rotated(obj.get_rotation() as f32);
+        obj_transform = obj_transform.rotated(obj.get_rotation());
         obj_transform = obj_transform.scaled(obj.get_scale());
 
         if obj_transform != **transform {

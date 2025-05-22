@@ -33,21 +33,13 @@ impl Plugin for MainMenuPlugin {
 struct StartButtonConnected(bool);
 
 #[derive(Resource)]
+#[derive(Default)]
 pub struct MenuAssets {
     pub message_label: Option<GodotNodeHandle>,
     pub start_button: Option<GodotNodeHandle>,
     pub score_label: Option<GodotNodeHandle>,
 }
 
-impl Default for MenuAssets {
-    fn default() -> Self {
-        Self {
-            message_label: None,
-            start_button: None,
-            score_label: None,
-        }
-    }
-}
 
 #[derive(NodeTreeView)]
 pub struct MenuUi {

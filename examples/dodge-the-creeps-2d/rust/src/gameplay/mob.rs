@@ -94,7 +94,7 @@ fn spawn_mob(
 
     let position = mob_spawn_location.get_position();
     let transform = GodotTransform2D::IDENTITY.translated(position);
-    let transform = transform.rotated(direction as f32);
+    let transform = transform.rotated(direction);
 
     commands
         .spawn_empty()
@@ -120,7 +120,7 @@ fn new_mob(
         let mut mob = mob.get::<RigidBody2D>();
 
         let velocity = Vector2::new(fastrand::f32() * 100.0 + 150.0, 0.0);
-        mob.set_linear_velocity(velocity.rotated(mob_data.direction as f32));
+        mob.set_linear_velocity(velocity.rotated(mob_data.direction));
 
         let mut mob_nodes = MobNodes::from_node(mob);
 
