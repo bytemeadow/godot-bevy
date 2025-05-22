@@ -5,11 +5,13 @@ pub struct GameplayPlugin;
 pub mod countdown;
 pub mod mob;
 pub mod player;
+pub mod score;
 
 impl Plugin for GameplayPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(player::PlayerPlugin)
             .add_plugins(mob::MobPlugin)
-            .add_plugins(countdown::CountdownPlugin);
+            .add_plugins(countdown::CountdownPlugin)
+            .add_plugins(score::ScorePlugin);
     }
 }

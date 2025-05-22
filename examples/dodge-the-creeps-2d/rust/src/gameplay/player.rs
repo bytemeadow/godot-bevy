@@ -101,7 +101,10 @@ fn move_player(
     mut player: Query<(&Player, &mut GodotNodeHandle, &mut Transform2D)>,
     mut system_delta: SystemDeltaTimer,
 ) -> Result {
+    godot_print!("Moving player triggered");
     if let Ok((player, mut player_gd, mut transform)) = player.single_mut() {
+        godot_print!("Moving player");
+
         let player_gd = player_gd.get::<GodotPlayerNode>();
         let screen_size = player_gd.get_viewport_rect().size;
         let mut velocity = Vector2::ZERO;
