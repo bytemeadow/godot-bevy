@@ -64,13 +64,13 @@ pub struct PlayerStartPosition(#[node("/root/Main/StartPosition")] GodotNodeHand
 fn player_on_ready(
     mut player: Query<(&mut Player, &mut GodotNodeHandle), Added<Player>>,
 ) -> Result {
-    if let Ok((mut player, mut player_gd)) = player.single_mut() {
-        let mut player_gd = player_gd.get::<GodotPlayerNode>();
-        player_gd.set_visible(false);
-        player.speed = player_gd.bind().get_speed();
+    if let Ok((mut player_data, mut player)) = player.single_mut() {
+        let mut player = player.get::<GodotPlayerNode>();
+        player.set_visible(false);
+        player_data.speed = player.bind().get_speed();
 
-        let mut start_position = PlayerStartPosition::from_node(player_gd.clone());
-        player_gd.set_position(start_position.0.get::<Node2D>().get_position());
+        let mut start_position = PlayerStartPosition::from_node(player.clone());
+        player.set_position(start_position.0.get::<Node2D>().get_position());
     }
 
     Ok(())
@@ -80,10 +80,10 @@ fn setup_player(
     mut player: Query<(&mut GodotNodeHandle, &mut Transform2D), With<Player>>,
     mut entities: Query<(&Name, &mut GodotNodeHandle), Without<Player>>,
 ) -> Result {
-    if let Ok((mut player_gd, mut transform)) = player.single_mut() {
+    if let Ok((mut player, mut transform)) = player.single_mut() {
         godot_print!("Setting up player");
-        let mut player_gd = player_gd.get::<GodotPlayerNode>();
-        player_gd.set_visible(true);
+        let mut player = player.get::<GodotPlayerNode>();
+        player.set_visible(true);
 
         let start_position = entities
             .iter_mut()
@@ -101,9 +101,9 @@ fn move_player(
     mut player: Query<(&Player, &mut GodotNodeHandle, &mut Transform2D)>,
     mut system_delta: SystemDeltaTimer,
 ) -> Result {
-    if let Ok((player, mut player_gd, mut transform)) = player.single_mut() {
-        let player_gd = player_gd.get::<GodotPlayerNode>();
-        let screen_size = player_gd.get_viewport_rect().size;
+    if let Ok((player_data, mut player, mut transform)) = player.single_mut() {
+        let player = player.get::<GodotPlayerNode>();
+        let screen_size = player.get_viewport_rect().size;
         let mut velocity = Vector2::ZERO;
 
         if Input::singleton().is_action_pressed("move_right") {
@@ -122,10 +122,10 @@ fn move_player(
             velocity.y -= 1.0;
         }
 
-        let mut sprite = player_gd.get_node_as::<AnimatedSprite2D>("AnimatedSprite2D");
+        let mut sprite = player.get_node_as::<AnimatedSprite2D>("AnimatedSprite2D");
 
         if velocity.length() > 0.0 {
-            velocity = velocity.normalized() * player.speed;
+            velocity = velocity.normalized() * player_data.speed;
             sprite.play();
 
             if velocity.x != 0.0 {
@@ -152,12 +152,12 @@ fn check_player_death(
     mut player: Query<(&mut GodotNodeHandle, &Collisions), With<Player>>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
-    if let Ok((mut player_ref, collisions)) = player.single_mut() {
+    if let Ok((mut player, collisions)) = player.single_mut() {
         if collisions.colliding().is_empty() {
             return;
         }
 
-        player_ref.get::<Node2D>().set_visible(false);
+        player.get::<Node2D>().set_visible(false);
         next_state.set(GameState::GameOver);
     }
 }
