@@ -7,7 +7,7 @@ use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
 use crate::watchers::signal_watcher::GodotSignalWatcher;
 use crate::{
     GodotPlugin,
-    plugins::core::{GodotPhysicsFrame, GodotVisualFrame, GodotSignalReader},
+    plugins::core::{GodotPhysicsFrame, GodotSignalReader, GodotVisualFrame},
     prelude::*,
 };
 

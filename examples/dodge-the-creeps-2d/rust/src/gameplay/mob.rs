@@ -19,7 +19,8 @@ use godot::{
 use godot_bevy::{
     bridge::{GodotNodeHandle, GodotResourceHandle},
     prelude::{
-        connect_godot_signal, FindEntityByNameExt, GodotScene, GodotSignal, NodeTreeView, SceneTreeRef, Transform2D
+        connect_godot_signal, FindEntityByNameExt, GodotScene, GodotSignal, NodeTreeView,
+        SceneTreeRef, Transform2D,
     },
 };
 use std::f32::consts::PI;

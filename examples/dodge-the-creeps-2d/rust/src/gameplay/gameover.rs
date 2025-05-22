@@ -14,7 +14,7 @@ use bevy::{
 use godot::classes::Label;
 use godot_bevy::prelude::{NodeTreeView, SceneTreeRef};
 
-use crate::{main_menu::MenuUi, GameState};
+use crate::{main_menu::MenuAssets, GameState};
 
 pub struct GameoverPlugin;
 impl Plugin for GameoverPlugin {
@@ -30,18 +30,19 @@ impl Plugin for GameoverPlugin {
 #[derive(Resource)]
 pub struct GameoverTimer(Timer);
 
-fn setup_gameover(mut commands: Commands, mut scene_tree: SceneTreeRef) {
+fn setup_gameover(mut commands: Commands, menu_assets: Res<MenuAssets>) {
     commands.insert_resource(GameoverTimer(Timer::from_seconds(2.0, TimerMode::Once)));
 
-    let mut menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap());
-    menu_ui.message_label.get::<Label>().set_text("Game Over");
+    if let Some(mut message_label) = menu_assets.message_label.clone() {
+        message_label.get::<Label>().set_text("Game Over");
+    }
 }
 
 fn update_gameover_timer(
     mut timer: ResMut<GameoverTimer>,
     time: Res<Time>,
     mut next_state: ResMut<NextState<GameState>>,
-    mut scene_tree: SceneTreeRef,
+    menu_assets: Res<MenuAssets>,
 ) {
     timer.0.tick(time.delta());
     if !timer.0.just_finished() {
@@ -50,6 +51,7 @@ fn update_gameover_timer(
 
     next_state.set(GameState::MainMenu);
 
-    let mut menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap());
-    menu_ui.message_label.get::<Label>().set_text("Dodge the Creeps");
+    if let Some(mut message_label) = menu_assets.message_label.clone() {
+        message_label.get::<Label>().set_text("Dodge the Creeps");
+    }
 }

@@ -15,12 +15,9 @@ use godot::{
     classes::{Label, Node},
     global::godot_print,
 };
-use godot_bevy::{
-    bridge::GodotNodeHandle,
-    prelude::{Groups, NodeTreeView, SceneTreeRef},
-};
+use godot_bevy::{bridge::GodotNodeHandle, prelude::Groups};
 
-use crate::{main_menu::MenuUi, GameState};
+use crate::{main_menu::MenuAssets, GameState};
 
 pub struct CountdownPlugin;
 impl Plugin for CountdownPlugin {
@@ -39,26 +36,28 @@ impl Plugin for CountdownPlugin {
 #[derive(Resource)]
 pub struct CountdownTimer(Timer);
 
-fn setup_countdown(mut commands: Commands, mut scene_tree: SceneTreeRef) {
+fn setup_countdown(mut commands: Commands, menu_assets: Res<MenuAssets>) {
     godot_print!("Setting up countdown");
     commands.insert_resource(CountdownTimer(Timer::from_seconds(1.0, TimerMode::Once)));
 
-    let mut menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap());
-    menu_ui.message_label.get::<Label>().set_text("Get Ready");
+    if let Some(mut message_label) = menu_assets.message_label.clone() {
+        message_label.get::<Label>().set_text("Get Ready");
+    }
 }
 
 fn update_countdown(
     mut timer: ResMut<CountdownTimer>,
     time: Res<Time>,
     mut next_state: ResMut<NextState<GameState>>,
-    mut scene_tree: SceneTreeRef,
+    menu_assets: Res<MenuAssets>,
 ) {
     timer.0.tick(time.delta());
     if timer.0.just_finished() {
         next_state.set(GameState::InGame);
 
-        let mut menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap());
-        menu_ui.message_label.get::<Label>().set_text("");
+        if let Some(mut message_label) = menu_assets.message_label.clone() {
+            message_label.get::<Label>().set_text("");
+        }
     }
 }
 

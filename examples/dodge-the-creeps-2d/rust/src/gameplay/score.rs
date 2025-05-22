@@ -2,18 +2,16 @@ use bevy::{
     app::{App, Plugin, Update},
     ecs::{
         change_detection::DetectChanges,
-        name::Name,
         resource::Resource,
         schedule::IntoScheduleConfigs,
-        system::{Query, Res, ResMut},
+        system::{Res, ResMut},
     },
     state::{condition::in_state, state::OnEnter},
     time::{Time, Timer, TimerMode},
 };
 use godot::classes::Label;
-use godot_bevy::{bridge::GodotNodeHandle, prelude::FindEntityByNameExt};
 
-use crate::{GameState, Score};
+use crate::{main_menu::MenuAssets, GameState, Score};
 
 pub struct ScorePlugin;
 impl Plugin for ScorePlugin {
@@ -32,16 +30,11 @@ fn reset_score(mut score: ResMut<Score>) {
     score.0 = 0;
 }
 
-fn update_score_counter(score: Res<Score>, mut entities: Query<(&Name, &mut GodotNodeHandle)>) {
+fn update_score_counter(score: Res<Score>, menu_assets: Res<MenuAssets>) {
     if score.is_changed() {
-        let mut score_counter_label = entities
-            .iter_mut()
-            .find_entity_by_name("ScoreLabel")
-            .unwrap();
-
-        score_counter_label
-            .get::<Label>()
-            .set_text(&score.0.to_string());
+        if let Some(mut score_label) = menu_assets.score_label.clone() {
+            score_label.get::<Label>().set_text(&score.0.to_string());
+        }
     }
 }
 

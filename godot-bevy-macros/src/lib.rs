@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned};
-use syn::{parse_macro_input, Data, DeriveInput, Error, Field, Fields, LitStr, Result};
 use syn::spanned::Spanned;
+use syn::{Data, DeriveInput, Error, Field, Fields, LitStr, Result, parse_macro_input};
 
 #[proc_macro_attribute]
 pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -47,7 +47,7 @@ fn node_tree_view(input: DeriveInput) -> Result<TokenStream2> {
             return Err(Error::new_spanned(
                 input,
                 "NodeTreeView must be used on structs",
-            ))
+            ));
         }
     };
 
@@ -124,7 +124,7 @@ fn create_get_node_expr(field: &Field) -> Result<TokenStream2> {
 
     let field_ty = &field.ty;
     let span = field_ty.span();
-    
+
     // Check if the type is GodotNodeHandle or Option<GodotNodeHandle>
     let (is_optional, _inner_type) = match get_option_inner_type(field_ty) {
         Some(inner) => (true, inner),
@@ -160,7 +160,9 @@ fn create_get_node_expr(field: &Field) -> Result<TokenStream2> {
 fn get_option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
     if let syn::Type::Path(type_path) = ty {
         if type_path.path.segments.len() == 1 && type_path.path.segments[0].ident == "Option" {
-            if let syn::PathArguments::AngleBracketed(ref args) = type_path.path.segments[0].arguments {
+            if let syn::PathArguments::AngleBracketed(ref args) =
+                type_path.path.segments[0].arguments
+            {
                 if args.args.len() == 1 {
                     if let syn::GenericArgument::Type(ref inner_type) = args.args[0] {
                         return Some(inner_type);
@@ -171,4 +173,3 @@ fn get_option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
     }
     None
 }
-
