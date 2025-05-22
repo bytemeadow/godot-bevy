@@ -30,10 +30,10 @@ impl Plugin for MainMenuPlugin {
 #[derive(NodeTreeView)]
 pub struct MenuUi {
     #[node("/root/Main/HUD/Message")]
-    message_label: GodotNodeHandle,
+    pub message_label: GodotNodeHandle,
 
     #[node("/root/Main/HUD/StartButton")]
-    start_button: GodotNodeHandle,
+    pub start_button: GodotNodeHandle,
 }
 
 fn connect_start_button(mut scene_tree: SceneTreeRef) {

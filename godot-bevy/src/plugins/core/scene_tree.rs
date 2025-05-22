@@ -141,6 +141,12 @@ pub struct Groups {
     groups: Vec<String>,
 }
 
+impl Groups {
+    pub fn is(&self, group_name: &str) -> bool {
+        self.groups.iter().any(|name| name == group_name)
+    }
+}
+
 impl<T: Inherits<Node>> From<&Gd<T>> for Groups {
     fn from(node: &Gd<T>) -> Self {
         Groups {
