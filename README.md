@@ -42,10 +42,10 @@ Godot-Bevy provides a clean integration with Godot's frame timing:
 ### Usage Guidelines
 
 ```rust
-// General game logic - runs with visual frames
+// Game logic that must run once per render frame
 app.add_systems(Update, my_gameplay_system);
 
-// Deterministic physics - Bevy's built-in fixed timestep
+// Game logic - Bevy's built-in fixed timestep
 app.add_systems(FixedUpdate, my_physics_simulation);
 
 // Godot-specific physics - synchronized with Godot's physics
