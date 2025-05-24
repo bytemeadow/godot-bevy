@@ -265,8 +265,8 @@ jobs:
     - name: Export Godot project (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        cd examples/dodge-the-creeps-2d/godot
-        mkdir exports
+        Set-Location examples/dodge-the-creeps-2d/godot
+        New-Item -ItemType Directory -Force -Path exports
         & "${{ env.GODOT_PATH }}" --headless --export-release "Windows Desktop" exports/${{ matrix.export-name }}.exe
 
     - name: Upload Godot artifacts
@@ -274,7 +274,7 @@ jobs:
       with:
         name: godot-export-${{ matrix.os }}
         path: examples/dodge-the-creeps-2d/godot/exports/
-        if-no-files-found: warn
+        if-no-files-found: error
 
   release:
     name: Create Release
