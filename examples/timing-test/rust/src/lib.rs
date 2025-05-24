@@ -29,21 +29,15 @@ impl Plugin for TimingTestPlugin {
 }
 
 #[derive(Resource)]
+#[derive(Default)]
 struct ProcessCallCounter {
     physics_process_calls: u32,
     app_update_calls: u32,
 }
 
-impl Default for ProcessCallCounter {
-    fn default() -> Self {
-        Self {
-            physics_process_calls: 0,
-            app_update_calls: 0,
-        }
-    }
-}
 
 #[derive(Resource)]
+#[derive(Default)]
 struct TimingStats {
     update_runs: u32,
     physics_update_runs: u32,
@@ -51,16 +45,6 @@ struct TimingStats {
     first_schedule_runs: u32,
 }
 
-impl Default for TimingStats {
-    fn default() -> Self {
-        Self {
-            update_runs: 0,
-            physics_update_runs: 0,
-            fixed_update_runs: 0,
-            first_schedule_runs: 0,
-        }
-    }
-}
 
 fn setup_timing_test() {
     godot_print!("🚀 Timing Test Started!");
