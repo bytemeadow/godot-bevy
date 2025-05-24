@@ -91,31 +91,6 @@ godot-bevy is distributed under the terms of both the MIT license and the Apache
 See [LICENSE-APACHE](./LICENSE-APACHE) and [LICENSE-MIT](./LICENSE-MIT) for details. Opening a pull
 request is assumed to signal agreement with these licensing terms.
 
-## Development
-
-### Local Testing
-
-Use the provided build script to test your changes locally before pushing:
-
-```bash
-# For Unix/Linux/macOS
-./scripts/build-local.sh
-
-# For Windows (PowerShell)
-.\scripts\build-local.ps1
-```
-
-### CI/CD
-
-This project uses GitHub Actions for continuous integration. The CI automatically:
-
-- Builds Rust projects for Linux, macOS, and Windows
-- Runs tests, formatting, and linting checks
-- Exports Godot projects for all platforms
-- Creates releases with cross-platform binaries
-
-See [`.github/README.md`](.github/README.md) for detailed CI documentation.
-
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
