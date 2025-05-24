@@ -1,6 +1,6 @@
 use bevy::app::{App, Plugin};
-use bevy::ecs::schedule::{IntoScheduleConfigs, ScheduleConfigs};
-use bevy::ecs::system::{ScheduleSystem, SystemParam};
+use bevy::ecs::schedule::{Schedule, ScheduleLabel};
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
@@ -18,6 +18,11 @@ pub use transforms::{Transform2D, Transform3D};
 pub mod signals;
 pub use signals::*;
 
+/// Schedule that runs during Godot's physics_process at physics frame rate.
+/// Use this for movement, physics, and systems that need to sync with Godot's physics timing.
+#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct PhysicsUpdate;
+
 pub struct GodotCorePlugin;
 
 impl Plugin for GodotCorePlugin {
@@ -31,39 +36,11 @@ impl Plugin for GodotCorePlugin {
             .add_plugins(GodotTransformsPlugin)
             .add_plugins(GodotCollisionsPlugin)
             .add_plugins(GodotSignalsPlugin);
+
+        // Add the PhysicsUpdate schedule
+        app.add_schedule(Schedule::new(PhysicsUpdate));
+
         // .add_plugins(GodotInputEventPlugin)
-    }
-}
-
-/// Bevy Resource that is available when the app is updated through `process` callback
-#[derive(Resource)]
-pub struct GodotVisualFrame;
-
-/// Bevy Resource that is available when the app is updated through `physics_process` callback
-#[derive(Resource)]
-pub struct GodotPhysicsFrame;
-
-/// Adds `as_physics_system` that schedules a system only for the physics frame
-pub trait AsPhysicsSystem<Marker> {
-    #[allow(clippy::wrong_self_convention)]
-    fn as_physics_system(self) -> ScheduleConfigs<ScheduleSystem>;
-}
-
-impl<Marker, T: IntoScheduleConfigs<ScheduleSystem, Marker>> AsPhysicsSystem<Marker> for T {
-    fn as_physics_system(self) -> ScheduleConfigs<ScheduleSystem> {
-        self.run_if(resource_exists::<GodotPhysicsFrame>)
-    }
-}
-
-/// Adds `as_visual_system` that schedules a system only for the frame
-pub trait AsVisualSystem<Marker> {
-    #[allow(clippy::wrong_self_convention)]
-    fn as_visual_system(self) -> ScheduleConfigs<ScheduleSystem>;
-}
-
-impl<Marker, T: IntoScheduleConfigs<ScheduleSystem, Marker>> AsVisualSystem<Marker> for T {
-    fn as_visual_system(self) -> ScheduleConfigs<ScheduleSystem> {
-        self.run_if(resource_exists::<GodotVisualFrame>)
     }
 }
 

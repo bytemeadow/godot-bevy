@@ -7,7 +7,7 @@ use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
 use crate::watchers::signal_watcher::GodotSignalWatcher;
 use crate::{
     GodotPlugin,
-    plugins::core::{GodotPhysicsFrame, GodotSignalReader, GodotVisualFrame},
+    plugins::core::{GodotSignalReader, PhysicsUpdate},
     prelude::*,
 };
 
@@ -94,16 +94,15 @@ impl INode for BevyApp {
         }
 
         if let Some(app) = self.app.as_mut() {
-            app.insert_resource(GodotVisualFrame);
-
-            if let Err(e) = catch_unwind(AssertUnwindSafe(|| app.update())) {
+            if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
+                // Run the full Bevy update cycle - much simpler!
+                app.update();
+            })) {
                 self.app = None;
 
                 eprintln!("bevy app update panicked");
                 resume_unwind(e);
             }
-
-            app.world_mut().remove_resource::<GodotVisualFrame>();
         }
     }
 
@@ -115,16 +114,15 @@ impl INode for BevyApp {
         }
 
         if let Some(app) = self.app.as_mut() {
-            app.insert_resource(GodotPhysicsFrame);
-
-            if let Err(e) = catch_unwind(AssertUnwindSafe(|| app.update())) {
+            if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
+                // Run only our physics-specific schedule
+                app.world_mut().run_schedule(PhysicsUpdate);
+            })) {
                 self.app = None;
 
-                eprintln!("bevy app update panicked");
+                eprintln!("bevy app physics update panicked");
                 resume_unwind(e);
             }
-
-            app.world_mut().remove_resource::<GodotPhysicsFrame>();
         }
     }
 }

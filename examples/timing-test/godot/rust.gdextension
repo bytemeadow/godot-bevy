@@ -1,0 +1,13 @@
+[configuration]
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = 4.1
+
+[libraries]
+linux.debug.x86_64 = "res://../../../target/debug/librusttime.so"
+linux.release.x86_64 = "res://../../../target/release/librusttime.so"
+macos.debug.x86_64 = "res://../../../target/debug/librusttime.dylib"
+macos.release.x86_64 = "res://../../../target/release/librusttime.dylib"
+macos.debug.arm64 = "res://../../../target/debug/librusttime.dylib"
+macos.release.arm64 = "res://../../../target/release/librusttime.dylib"
+windows.debug.x86_64 = "res://../../../target/debug/rusttime.dll"
+windows.release.x86_64 = "res://../../../target/release/rusttime.dll"

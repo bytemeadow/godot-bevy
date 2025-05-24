@@ -18,12 +18,41 @@ _Special thanks to [Blaze](https://runblaze.dev) for their support of this proje
 
 ## Features
 
-- Seamlessly integrate Bevy ECS in Godot 4 projects
-- Use Bevy systems to control Godot nodes
-- Spawn Godot scenes from Bevy
-- Maintain clean separation between ECS logic and Godot's scene tree
-- Leverage the full power of Bevy's Rust-based ECS while using Godot's editor and rendering capabilities
-- Systems can be scheduled for the visual or physics frame
+- **Deep ECS Integration**: True Bevy ECS systems controlling Godot nodes, not just bindings
+- **Bidirectional Transform Sync**: Seamless Transform2D/3D synchronization between Bevy and Godot
+- **Godot Signals in ECS**: Listen to and respond to Godot signals from Bevy systems
+- **Collision Event Handling**: React to Godot collision events in your ECS systems
+- **Scene Tree Queries**: Query and manipulate Godot's scene tree from Bevy
+- **Resource Management**: Load and manage Godot resources (scenes, textures, etc.) from ECS
+- **Node Groups Integration**: Work with Godot node groups in your Bevy systems
+- **Smart Scheduling**: Physics-rate vs visual-rate system execution with proper timing
+
+## Timing and Schedules
+
+Godot-Bevy provides a clean integration with Godot's frame timing:
+
+- **Visual Frame (`_process`)**: Runs `app.update()` with all standard Bevy schedules
+  - `Update`, `FixedUpdate`, `PreUpdate`, `PostUpdate`, etc.
+  - Runs at Godot's visual framerate (typically 60-120 FPS)
+
+- **Physics Frame (`_physics_process`)**: Runs the `PhysicsUpdate` schedule only
+  - For systems that need to sync with Godot's physics timing
+  - Runs at Godot's physics tickrate (typically 60 Hz)
+
+### Usage Guidelines
+
+```rust
+// General game logic - runs with visual frames
+app.add_systems(Update, my_gameplay_system);
+
+// Deterministic physics - Bevy's built-in fixed timestep
+app.add_systems(FixedUpdate, my_physics_simulation);
+
+// Godot-specific physics - synchronized with Godot's physics
+app.add_systems(PhysicsUpdate, godot_movement_system);
+```
+
+**Note**: Systems in `PhysicsUpdate` should use `SystemDeltaTimer` for accurate delta time, while systems in standard schedules use `Res<Time>`.
 
 ## Installation
 
@@ -31,7 +60,7 @@ Add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-godot-bevy = "0.1.0"
+godot-bevy = "0.3.0"
 bevy = "0.16"
 godot = "0.2.4"
 ```
@@ -46,11 +75,39 @@ use godot_bevy::prelude::*;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_systems(Update, my_system);
+    app.add_systems(Update, handle_button_clicks)
+        .add_systems(PhysicsUpdate, move_player);
 }
 
-fn my_system() {
-    println!("Hello from Bevy!");
+// React to Godot UI signals in your ECS
+fn handle_button_clicks(mut events: EventReader<GodotSignal>) {
+    for signal in events.read() {
+        if signal.name == "pressed" {
+            println!("Button clicked! Entity: {:?}", signal.origin);
+        }
+    }
+}
+
+// Move player with physics timing
+fn move_player(
+    mut player: Query<(&Player, &mut Transform2D)>,
+    mut system_delta: SystemDeltaTimer,
+) {
+    if let Ok((player_data, mut transform)) = player.single_mut() {
+        let mut velocity = Vector2::ZERO;
+        
+        if Input::singleton().is_action_pressed("move_right") {
+            velocity.x += 1.0;
+        }
+        if Input::singleton().is_action_pressed("move_left") {
+            velocity.x -= 1.0;
+        }
+        
+        if velocity.length() > 0.0 {
+            velocity = velocity.normalized() * player_data.speed;
+            transform.origin += velocity * system_delta.delta_seconds();
+        }
+    }
 }
 ```
 
@@ -73,11 +130,18 @@ For detailed documentation and examples, see the [API documentation](https://doc
 
 ## Examples
 
-Check out the examples directory for complete sample projects.
+The `examples/` directory contains complete sample projects demonstrating different aspects of godot-bevy:
+
+- **`dodge-the-creeps-2d/`**: A complete 2D game showing ECS-driven gameplay, collision handling, and state management
+- **`timing-test/`**: Demonstrates the timing behavior and schedule execution patterns for debugging and understanding
+
+Each example includes both Rust code and a complete Godot project ready to run.
 
 ## Inspiration and Acknowledgements
 
-This library is inspired by and builds upon the work of [bevy_godot](https://github.com/rand0m-cloud/bevy_godot), which provided similar functionality for Godot 3. Godot-Bevy extends this concept to support Godot 4 and Bevy 0.16.
+This library is inspired by and builds upon the work of [bevy_godot](https://
+github.com/rand0m-cloud/bevy_godot), which provided similar functionality for 
+Godot 3. Godot-Bevy extends this concept to support Godot 4 and Bevy 0.16.
 
 ## Version Compatibility Matrix
 

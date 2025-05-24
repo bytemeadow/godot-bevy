@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="Dodge the Creeps 2D"
+config/name="Timing Test"
 run/main_scene="uid://crt73ja5heco1"
 config/features=PackedStringArray("4.4", "Mobile")
 config/icon="res://icon.svg"

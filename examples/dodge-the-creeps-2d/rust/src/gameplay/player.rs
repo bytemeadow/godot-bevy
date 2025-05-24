@@ -36,15 +36,16 @@ impl Plugin for PlayerPlugin {
             .add_systems(Update, player_on_ready)
             .add_systems(
                 Update,
-                (move_player.as_physics_system(), check_player_death)
-                    .run_if(in_state(GameState::InGame)),
+                check_player_death.run_if(in_state(GameState::InGame)),
+            )
+            .add_systems(
+                PhysicsUpdate,
+                move_player.run_if(in_state(GameState::InGame)),
             )
             .add_systems(OnEnter(GameState::Countdown), setup_player)
             .add_systems(
-                Update,
-                move_player
-                    .as_physics_system()
-                    .run_if(in_state(GameState::Countdown)),
+                PhysicsUpdate,
+                move_player.run_if(in_state(GameState::Countdown)),
             );
     }
 }

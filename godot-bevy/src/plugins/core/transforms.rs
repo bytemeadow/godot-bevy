@@ -10,6 +10,7 @@ use godot::builtin::Transform2D as GodotTransform2D;
 use godot::builtin::{Basis, Quaternion, Vector3};
 use godot::classes::{Node2D, Node3D};
 use godot::prelude::Transform3D as GodotTransform3D;
+use bevy::ecs::change_detection::DetectChanges;
 
 use crate::bridge::GodotNodeHandle;
 
@@ -243,6 +244,11 @@ fn pre_update_godot_transforms_2d(
     mut entities: Query<(&mut Transform2D, &mut GodotNodeHandle)>,
 ) {
     for (mut transform, mut reference) in entities.iter_mut() {
+        // Skip entities that were changed recently (e.g., by PhysicsUpdate systems)
+        if transform.is_changed() {
+            continue;
+        }
+        
         let obj = reference.get::<Node2D>();
 
         let mut obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
