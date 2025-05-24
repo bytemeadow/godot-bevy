@@ -274,7 +274,38 @@ jobs:
       run: |
         Set-Location examples/dodge-the-creeps-2d/godot
         New-Item -ItemType Directory -Force -Path exports
-        & "${{ env.GODOT_PATH }}" --headless --export-release "Windows Desktop" exports/${{ matrix.export-name }}.exe
+        
+        # Debug: Show current directory and files
+        Write-Host "Current directory contents:"
+        Get-ChildItem
+        
+        # Debug: Check if export preset exists
+        Write-Host "Export presets content:"
+        Get-Content export_presets.cfg | Select-String -Pattern "name=" -Context 1
+        
+        # Debug: Check Godot path and version
+        Write-Host "Godot path: ${{ env.GODOT_PATH }}"
+        & "${{ env.GODOT_PATH }}" --version
+        
+        # Debug: Check if Rust libraries are available
+        Write-Host "Rust libraries in target/release:"
+        Get-ChildItem ../../target/release/*rust* -ErrorAction SilentlyContinue
+        Write-Host "Rust libraries in target/debug:"
+        Get-ChildItem ../../target/debug/*rust* -ErrorAction SilentlyContinue
+        
+        # Debug: List available export templates
+        Write-Host "Available export templates:"
+        Get-ChildItem "$env:APPDATA\Godot\export_templates\4.4.stable" -ErrorAction SilentlyContinue
+        
+        # Run the export with more verbose output
+        Write-Host "Running export command..."
+        $exportResult = & "${{ env.GODOT_PATH }}" --headless --export-release "Windows Desktop" exports/${{ matrix.export-name }}.exe 2>&1
+        Write-Host "Export command output:"
+        Write-Host $exportResult
+        
+        # Debug: Show what files were created
+        Write-Host "Files in exports directory after export:"
+        Get-ChildItem exports -ErrorAction SilentlyContinue
 
     - name: Upload Godot artifacts
       uses: actions/upload-artifact@v4
