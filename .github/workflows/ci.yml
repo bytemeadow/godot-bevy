@@ -332,9 +332,27 @@ jobs:
         
         # Run the export with more verbose output
         Write-Host "Running export command..."
-        $exportResult = & "${{ env.GODOT_PATH }}" --headless --export-release "Windows Desktop" exports/${{ matrix.export-name }}.exe 2>&1
-        Write-Host "Export command output:"
-        Write-Host $exportResult
+        Write-Host "Command: ${{ env.GODOT_PATH }} --headless --export-release `"Windows Desktop`" exports/${{ matrix.export-name }}.exe"
+        Write-Host "Working directory: $(Get-Location)"
+        
+        # First, let's try listing the available export presets
+        Write-Host "Checking export presets with --export-pack dry run:"
+        & "${{ env.GODOT_PATH }}" --headless --export-pack "Windows Desktop" test.pck 2>&1 | Write-Host
+        
+        # Now run the actual export with detailed error capture
+        Write-Host "Running actual export:"
+        try {
+            $exportResult = & "${{ env.GODOT_PATH }}" --headless --export-release "Windows Desktop" exports/${{ matrix.export-name }}.exe 2>&1
+            Write-Host "Export command completed with exit code: $LASTEXITCODE"
+            Write-Host "Export command output:"
+            if ($exportResult) {
+                $exportResult | ForEach-Object { Write-Host $_ }
+            } else {
+                Write-Host "(No output from export command)"
+            }
+        } catch {
+            Write-Host "Export command failed with exception: $_"
+        }
         
         # Debug: Show what files were created
         Write-Host "Files in exports directory after export:"
