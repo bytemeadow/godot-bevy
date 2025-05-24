@@ -193,9 +193,10 @@ jobs:
     - name: Download Godot Export Templates (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        # Create directory with the exact name Godot expects
-        New-Item -ItemType Directory -Force -Path ~/.local/share/godot/export_templates/4.4.stable
-        Set-Location ~/.local/share/godot/export_templates/4.4.stable
+        # Create directory with the exact name Godot expects (Windows uses %APPDATA%)
+        $templatesPath = "$env:APPDATA\Godot\export_templates\4.4.stable"
+        New-Item -ItemType Directory -Force -Path $templatesPath
+        Set-Location $templatesPath
         curl -L -o templates.zip https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_export_templates.tpz
         powershell -command "Expand-Archive templates.zip ."
         Move-Item templates/* . -Force
@@ -224,11 +225,17 @@ jobs:
       run: |
         echo "GODOT_PATH=$(pwd)/godot-binary/${{ matrix.godot-binary }}" >> $env:GITHUB_ENV
 
-    - name: Import Godot project (Linux/Windows)
-      if: matrix.os != 'macos-latest'
+    - name: Import Godot project (Linux)
+      if: matrix.os == 'ubuntu-latest'
       run: |
         cd examples/dodge-the-creeps-2d/godot
         ${{ env.GODOT_PATH }} --headless --import --quit-after 10
+
+    - name: Import Godot project (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        Set-Location examples/dodge-the-creeps-2d/godot
+        & "${{ env.GODOT_PATH }}" --headless --import --quit-after 10
 
     - name: Configure project settings for macOS
       if: matrix.os == 'macos-latest'
