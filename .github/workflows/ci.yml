@@ -8,7 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  GODOT_VERSION: "4.4-stable"
+  GODOT_VERSION: "4.4"
 
 jobs:
   rust:
@@ -79,24 +79,6 @@ jobs:
     - name: Build example project
       run: cargo build --release --manifest-path examples/dodge-the-creeps-2d/rust/Cargo.toml
 
-    - name: Debug built files (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        Write-Host "Contents of target/release after build:"
-        Get-ChildItem target/release -ErrorAction SilentlyContinue
-        Write-Host "Looking for .dll files:"
-        Get-ChildItem target/release -Filter "*.dll" -ErrorAction SilentlyContinue
-        Write-Host "Looking for any rust files:"
-        Get-ChildItem target/release -Filter "*rust*" -ErrorAction SilentlyContinue
-
-    - name: Debug built files (Linux/macOS)
-      if: matrix.os != 'windows-latest'
-      run: |
-        echo "Contents of target/release after build:"
-        ls -la target/release/ || true
-        echo "Looking for rust library files:"
-        ls -la target/release/*rust* || true
-
     - name: Upload Rust artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -106,440 +88,83 @@ jobs:
           target/release/deps/*rust*${{ matrix.extension }}
         if-no-files-found: error
 
-  godot:
-    name: Build Godot Project (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+  godot-export:
+    name: Export Godot Project
+    runs-on: macos-latest
     needs: rust
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        include:
-          - os: ubuntu-latest
-            godot-binary: "Godot_v4.4-stable_linux.x86_64"
-            godot-template: "linux_release.x86_64"
-            export-name: "dodge-the-creeps-2d-linux"
-          - os: macos-latest
-            godot-binary: "Godot.app"
-            godot-template: "macos_release.zip"
-            export-name: "dodge-the-creeps-2d-macos"
-          - os: windows-latest
-            godot-binary: "Godot_v4.4-stable_win64.exe"
-            godot-template: "windows_release_x86_64.exe"
-            export-name: "dodge-the-creeps-2d-windows"
-
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Download Rust artifacts
+    - name: Install Godot
+      uses: CapsCollective/godot-actions/install-godot@v1.2
+      with:
+        godot-version: ${{ env.GODOT_VERSION }}
+        install-templates: true
+      id: install-godot
+
+    - name: Download all Rust artifacts
       uses: actions/download-artifact@v4
       with:
-        name: rust-libs-${{ matrix.os }}
-        path: target/release/
+        path: artifacts/
 
-    - name: Debug downloaded artifacts (Windows)
-      if: matrix.os == 'windows-latest'
+    - name: Setup Rust libraries for all platforms
+      working-directory: examples/dodge-the-creeps-2d
       run: |
-        Write-Host "=== ARTIFACT DOWNLOAD DEBUG ==="
-        Write-Host "Current working directory:"
-        Get-Location
-        Write-Host "Contents of entire workspace:"
-        Get-ChildItem -Recurse | Select-Object -First 20
-        Write-Host "Contents of target directory:"
-        Get-ChildItem target -Recurse -ErrorAction SilentlyContinue
-        Write-Host "Looking for .dll files anywhere:"
-        Get-ChildItem -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue
-        Write-Host "Looking for any rust files anywhere:"
-        Get-ChildItem -Recurse -Filter "*rust*" -ErrorAction SilentlyContinue
-
-    - name: Setup library paths for CI (Linux/macOS)
-      if: matrix.os != 'windows-latest'
-      run: |
-        # Debug: Show what files we downloaded
-        echo "Files in target/release:"
-        ls -la target/release/ || true
-        # Create debug directory and copy release libraries
-        mkdir -p target/debug
-        cp target/release/*rust* target/debug/ || true
-        # Ensure library files have correct permissions
-        chmod +x target/release/*rust* || true
-        chmod +x target/debug/*rust* || true
-        echo "Files in target/debug:"
-        ls -la target/debug/ || true
-
-    - name: Setup library paths for CI (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        # Debug: Show what files we downloaded
-        Write-Host "Files in target/release:"
-        Get-ChildItem target/release/ -ErrorAction SilentlyContinue
-        # Create debug directory and copy release libraries
-        New-Item -ItemType Directory -Force -Path target/debug
-        Copy-Item target/release/*rust* target/debug/ -ErrorAction SilentlyContinue
-        Write-Host "Files in target/debug:"
-        Get-ChildItem target/debug/ -ErrorAction SilentlyContinue
-
-    - name: Cache Godot binary
-      id: cache-godot
-      uses: actions/cache@v4
-      with:
-        path: godot-binary/
-        key: godot-${{ env.GODOT_VERSION }}-${{ matrix.os }}
-
-    - name: Download Godot (Linux)
-      if: matrix.os == 'ubuntu-latest' && steps.cache-godot.outputs.cache-hit != 'true'
-      run: |
-        mkdir -p godot-binary
-        cd godot-binary
-        wget https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_linux.x86_64.zip
-        unzip Godot_v${{ env.GODOT_VERSION }}_linux.x86_64.zip
-        chmod +x ${{ matrix.godot-binary }}
-
-    - name: Download Godot (macOS)
-      if: matrix.os == 'macos-latest' && steps.cache-godot.outputs.cache-hit != 'true'
-      run: |
-        mkdir -p godot-binary
-        cd godot-binary
-        wget https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_macos.universal.zip
-        unzip Godot_v${{ env.GODOT_VERSION }}_macos.universal.zip
-
-    - name: Download Godot (Windows)
-      if: matrix.os == 'windows-latest' && steps.cache-godot.outputs.cache-hit != 'true'
-      run: |
-        mkdir godot-binary
-        cd godot-binary
-        curl -L -o godot.zip https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_win64.exe.zip
-        powershell -command "Expand-Archive godot.zip ."
-
-    - name: Download Godot Export Templates (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        # Create directory with the exact name Godot expects
-        mkdir -p ~/.local/share/godot/export_templates/4.4.stable
-        cd ~/.local/share/godot/export_templates/4.4.stable
-        curl -L -o templates.zip https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_export_templates.tpz
-        unzip templates.zip
-        mv templates/* .
-        echo "Export templates directory contents:"
-        ls -la
-
-    - name: Download Godot Export Templates (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        # Create directory with the exact name Godot expects (Windows uses %APPDATA%)
-        $templatesPath = "$env:APPDATA\Godot\export_templates\4.4.stable"
-        New-Item -ItemType Directory -Force -Path $templatesPath
-        Set-Location $templatesPath
-        curl -L -o templates.zip https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_export_templates.tpz
-        powershell -command "Expand-Archive templates.zip ."
-        Move-Item templates/* . -Force
-        Write-Host "Export templates directory contents:"
-        Get-ChildItem
-
-    - name: Download Godot Export Templates (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        # Create directory with the exact name Godot expects
-        mkdir -p ~/Library/Application\ Support/Godot/export_templates/4.4.stable
-        cd ~/Library/Application\ Support/Godot/export_templates/4.4.stable
-        curl -L -o templates.zip https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_export_templates.tpz
-        unzip templates.zip
-        mv templates/* .
-        echo "Export templates directory contents:"
-        ls -la
-
-    - name: Setup Godot path (Linux/macOS)
-      if: matrix.os != 'windows-latest'
-      run: |
-        echo "GODOT_PATH=$(pwd)/godot-binary/${{ matrix.godot-binary }}" >> $GITHUB_ENV
-
-    - name: Setup Godot path (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        echo "GODOT_PATH=$(pwd)/godot-binary/${{ matrix.godot-binary }}" >> $env:GITHUB_ENV
-
-    - name: Import Godot project (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        cd examples/dodge-the-creeps-2d/godot
-        ${{ env.GODOT_PATH }} --headless --import --quit-after 10
-
-    - name: Import Godot project (Windows)
-      if: matrix.os == 'windows-latest'
-      run: |
-        Set-Location examples/dodge-the-creeps-2d/godot
-        # Clear any existing import cache that might have UID issues
-        if (Test-Path ".godot") {
-            Write-Host "Clearing existing .godot cache"
-            Remove-Item ".godot" -Recurse -Force -ErrorAction SilentlyContinue
-        }
-        Write-Host "Starting Godot import..."
-        & "${{ env.GODOT_PATH }}" --headless --import --quit-after 15 2>&1 | Write-Host
-        Write-Host "Import completed"
-
-    - name: Configure project settings for macOS
-      if: matrix.os == 'macos-latest'
-      run: |
-        cd examples/dodge-the-creeps-2d/godot
-        # Add ETC2 ASTC support to project settings
-        if ! grep -q "import_etc2_astc" project.godot; then
-          echo "" >> project.godot
-          echo "[rendering]" >> project.godot
-          echo "" >> project.godot
-          echo "textures/vram_compression/import_etc2_astc=true" >> project.godot
+        # Create target directories for all platforms
+        mkdir -p target/release target/debug
+        
+        # Copy Linux libraries
+        if [ -d "../../artifacts/rust-libs-ubuntu-latest" ]; then
+          cp ../../artifacts/rust-libs-ubuntu-latest/* target/release/ || true
+          cp ../../artifacts/rust-libs-ubuntu-latest/* target/debug/ || true
         fi
+        
+        # Copy macOS libraries  
+        if [ -d "../../artifacts/rust-libs-macos-latest" ]; then
+          cp ../../artifacts/rust-libs-macos-latest/* target/release/ || true
+          cp ../../artifacts/rust-libs-macos-latest/* target/debug/ || true
+        fi
+        
+        # Copy Windows libraries
+        if [ -d "../../artifacts/rust-libs-windows-latest" ]; then
+          cp ../../artifacts/rust-libs-windows-latest/* target/release/ || true
+          cp ../../artifacts/rust-libs-windows-latest/* target/debug/ || true
+        fi
+        
+        echo "Library files available:"
+        ls -la target/release/ || true
 
-    - name: Import Godot project (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        cd examples/dodge-the-creeps-2d/godot
-        ${{ env.GODOT_PATH }}/Contents/MacOS/Godot --headless --import --quit-after 10
+    - name: Open Godot editor for reimport
+      working-directory: examples/dodge-the-creeps-2d/godot
+      run: ${{ steps.install-godot.outputs.godot-executable }} --editor --headless --quit || true
 
-    - name: Export Godot project (Linux)
-      if: matrix.os == 'ubuntu-latest'
+    - name: Build Godot Project for all platforms
       run: |
         cd examples/dodge-the-creeps-2d/godot
         mkdir -p exports
-        ${{ env.GODOT_PATH }} --headless --export-release "Linux/X11" exports/${{ matrix.export-name }}
+        
+        # Export for Linux
+        ${{ steps.install-godot.outputs.godot-executable }} --headless --verbose --export-release "Linux/X11" exports/dodge-the-creeps-2d-linux
+        
+        # Export for Windows
+        ${{ steps.install-godot.outputs.godot-executable }} --headless --verbose --export-release "Windows Desktop" exports/dodge-the-creeps-2d-windows.exe
+        
+        # Export for macOS
+        ${{ steps.install-godot.outputs.godot-executable }} --headless --verbose --export-release "macOS" exports/dodge-the-creeps-2d-macos.app
 
-    - name: Export Godot project (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        cd examples/dodge-the-creeps-2d/godot
-        mkdir -p exports
-        ${{ env.GODOT_PATH }}/Contents/MacOS/Godot --headless --export-release "macOS" exports/${{ matrix.export-name }}.app
-
-    - name: Export Godot project (Windows)
-      if: matrix.os == 'windows-latest'
-      timeout-minutes: 10
-      run: |
-        Set-Location examples/dodge-the-creeps-2d/godot
-        New-Item -ItemType Directory -Force -Path exports
-        
-        # Debug: Show current directory and files
-        Write-Host "Current directory contents:"
-        Get-ChildItem
-        
-        # Debug: Check if export preset exists
-        Write-Host "Export presets content:"
-        Get-Content export_presets.cfg | Select-String -Pattern "name=" -Context 1
-        
-        # Debug: Check Godot path and version
-        Write-Host "Godot path: ${{ env.GODOT_PATH }}"
-        & "${{ env.GODOT_PATH }}" --version
-        
-        # Debug: Check if Rust libraries are available
-        Write-Host "Rust libraries in target/release:"
-        Get-ChildItem ../../../target/release/*rust* -ErrorAction SilentlyContinue
-        Write-Host "Rust libraries in target/debug:"
-        Get-ChildItem ../../../target/debug/*rust* -ErrorAction SilentlyContinue
-        
-        # Debug: List available export templates
-        Write-Host "Available export templates:"
-        Get-ChildItem "$env:APPDATA\Godot\export_templates\4.4.stable" -ErrorAction SilentlyContinue
-        
-        # Check specifically for Windows templates
-        Write-Host "Windows-specific export templates:"
-        Get-ChildItem "$env:APPDATA\Godot\export_templates\4.4.stable\windows_*" -ErrorAction SilentlyContinue
-        
-        # Export templates are installed, proceeding with export
-        
-        # Run the export with more verbose output
-        Write-Host "Running export command..."
-        Write-Host "Command: ${{ env.GODOT_PATH }} --headless --export-release `"Windows Desktop`" exports/${{ matrix.export-name }}.exe"
-        Write-Host "Working directory: $(Get-Location)"
-        
-        # Skip the problematic validation and focus on the core export
-        Write-Host "Skipping template validation due to hanging issue"
-        
-        # First, test if Godot binary actually works with simple commands
-        Write-Host "=== TESTING GODOT BINARY ==="
-        
-        # Test 1: Basic version check (we know this works)
-        Write-Host "Testing basic version command:"
-        try {
-            $versionOutput = & "${{ env.GODOT_PATH }}" --version 2>&1
-            Write-Host "Version output: $versionOutput"
-            Write-Host "Version exit code: $LASTEXITCODE"
-        } catch {
-            Write-Host "Version command failed: $_"
-        }
-        
-        # Test 2: Help command
-        Write-Host "Testing help command:"
-        try {
-            $helpOutput = & "${{ env.GODOT_PATH }}" --help 2>&1 | Select-Object -First 10
-            Write-Host "Help exit code: $LASTEXITCODE"
-            if ($helpOutput) {
-                $helpOutput | ForEach-Object { Write-Host "HELP: $_" }
-            } else {
-                Write-Host "No help output received"
-            }
-        } catch {
-            Write-Host "Help command failed: $_"
-        }
-        
-        # Test 3: Try to list export presets
-        Write-Host "=== TESTING EXPORT PRESET LISTING ==="
-        Write-Host "Attempting to list export presets:"
-        try {
-            Write-Host "Running command: & '${{ env.GODOT_PATH }}' --headless --export-release"
-            $presetsResult = & "${{ env.GODOT_PATH }}" --headless --export-release 2>&1
-            Write-Host "Presets command exit code: $LASTEXITCODE"
-            if ($presetsResult) {
-                Write-Host "Presets output received:"
-                $presetsResult | ForEach-Object { Write-Host "PRESET: $_" }
-            } else {
-                Write-Host "No presets output received"
-            }
-        } catch {
-            Write-Host "Failed to list presets: $_"
-            Write-Host "Exception details: $($_.Exception.Message)"
-        }
-        
-        # Check the export_presets.cfg content more thoroughly
-        Write-Host "=== EXPORT PRESETS FILE CONTENT ==="
-        Get-Content export_presets.cfg | Select-Object -First 50 | ForEach-Object { Write-Host "CFG: $_" }
-        
-        # Try export with different approaches to see what works
-        Write-Host "=== ATTEMPTING WINDOWS EXPORT WITH MULTIPLE METHODS ==="
-        
-        # Method 1: Basic export without verbose
-        Write-Host "Method 1: Basic export"
-        try {
-            Write-Host "Running: & '${{ env.GODOT_PATH }}' --headless --export-release 'Windows Desktop' 'exports/${{ matrix.export-name }}.exe'"
-            $exportResult1 = & "${{ env.GODOT_PATH }}" --headless --export-release "Windows Desktop" "exports/${{ matrix.export-name }}.exe" 2>&1
-            Write-Host "Method 1 exit code: $LASTEXITCODE"
-            if ($exportResult1) {
-                Write-Host "Method 1 output:"
-                $exportResult1 | ForEach-Object { Write-Host "OUT1: $_" }
-            } else {
-                Write-Host "Method 1: No output"
-            }
-        } catch {
-            Write-Host "Method 1 exception: $_"
-        }
-        
-        # Method 2: With verbose flag
-        Write-Host "Method 2: Verbose export"
-        try {
-            $exportResult2 = & "${{ env.GODOT_PATH }}" --headless --verbose --export-release "Windows Desktop" "exports/${{ matrix.export-name }}-verbose.exe" 2>&1
-            Write-Host "Method 2 exit code: $LASTEXITCODE"
-            if ($exportResult2) {
-                Write-Host "Method 2 output:"
-                $exportResult2 | ForEach-Object { Write-Host "OUT2: $_" }
-            } else {
-                Write-Host "Method 2: No output"
-            }
-        } catch {
-            Write-Host "Method 2 exception: $_"
-        }
-        
-        # Method 3: Try with timeout to see if it's hanging
-        Write-Host "Method 3: Export with timeout"
-        try {
-            $job = Start-Job -ScriptBlock {
-                param($godotPath)
-                & $godotPath --headless --export-release "Windows Desktop" "exports/test-timeout.exe" 2>&1
-            } -ArgumentList "${{ env.GODOT_PATH }}"
-            
-            $completed = Wait-Job $job -Timeout 60
-            if ($completed) {
-                $result3 = Receive-Job $job
-                Write-Host "Method 3 completed within timeout"
-                if ($result3) {
-                    $result3 | ForEach-Object { Write-Host "OUT3: $_" }
-                } else {
-                    Write-Host "Method 3: No output"
-                }
-            } else {
-                Write-Host "Method 3: Command timed out after 60 seconds"
-                Stop-Job $job
-            }
-            Remove-Job $job -Force
-        } catch {
-            Write-Host "Method 3 exception: $_"
-        }
-        
-        # Try alternative export preset names in case there's a mismatch
-        Write-Host "=== TRYING ALTERNATIVE PRESET NAMES ==="
-        $alternativeNames = @("Windows", "windows", "Windows Desktop", "win64", "PC")
-        foreach ($name in $alternativeNames) {
-            Write-Host "Trying preset name: '$name'"
-            try {
-                $altResult = & "${{ env.GODOT_PATH }}" --headless --export-release $name "exports/test-$name.exe" 2>&1
-                Write-Host "Result for '$name': exit code $LASTEXITCODE"
-                if ($altResult) {
-                    $altResult | Select-Object -First 5 | ForEach-Object { Write-Host "  $_" }
-                }
-            } catch {
-                Write-Host "Failed with '$name': $_"
-            }
-        }
-        
-        # Comprehensive file search - the export might be working but creating files elsewhere!
-        Write-Host "=== COMPREHENSIVE FILE SEARCH ==="
-        
-        # Check exports directory
-        Write-Host "Contents of exports directory:"
-        Get-ChildItem exports -ErrorAction SilentlyContinue | ForEach-Object {
-            Write-Host "  EXPORTS: $($_.Name) - $($_.Length) bytes"
-        }
-        
-        # Check current directory for any new files
-        Write-Host "All files in current directory (Godot project root):"
-        Get-ChildItem . -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*.exe" -or $_.Name -like "*dodge*" -or $_.Name -like "*creeps*" } | ForEach-Object {
-            Write-Host "  CURRENT: $($_.Name) - $($_.Length) bytes"
-        }
-        
-        # Search for any .exe files recursively in the entire project
-        Write-Host "Searching for ALL .exe files in project recursively:"
-        Get-ChildItem . -Recurse -File -Filter "*.exe" -ErrorAction SilentlyContinue | ForEach-Object {
-            Write-Host "  EXE: $($_.FullName) - $($_.Length) bytes"
-        }
-        
-        # Search for files with "dodge" or "creeps" in the name anywhere
-        Write-Host "Searching for any files containing 'dodge' or 'creeps':"
-        Get-ChildItem . -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*dodge*" -or $_.Name -like "*creeps*" } | ForEach-Object {
-            Write-Host "  MATCH: $($_.FullName) - $($_.Length) bytes"
-        }
-        
-        # Check if maybe it's using the export_path from the preset instead of our command line arg
-        Write-Host "Checking if file exists at preset export_path location:"
-        if (Test-Path "exports/dodge-the-creeps-2d-windows.exe") {
-            $presetFile = Get-Item "exports/dodge-the-creeps-2d-windows.exe"
-            Write-Host "  PRESET PATH: Found file at preset location - $($presetFile.Length) bytes"
-        } else {
-            Write-Host "  PRESET PATH: No file at preset location"
-        }
-        
-        # Check for any recently created files (within last 5 minutes)
-        Write-Host "Files created in the last 5 minutes anywhere in project:"
-        $fiveMinutesAgo = (Get-Date).AddMinutes(-5)
-        Get-ChildItem . -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.CreationTime -gt $fiveMinutesAgo } | ForEach-Object {
-            Write-Host "  RECENT: $($_.FullName) - Created: $($_.CreationTime) - $($_.Length) bytes"
-        }
-        
-        # Show current working directory to be absolutely sure
-        Write-Host "Current working directory: $(Get-Location)"
-        Write-Host "Full path: $(Resolve-Path .)"
-        
-        # Debug: Show what files were created
-        Write-Host "Files in exports directory after export:"
-        Get-ChildItem exports -ErrorAction SilentlyContinue
-
-    - name: Upload Godot artifacts
+    - name: Upload all exports
       uses: actions/upload-artifact@v4
       with:
-        name: godot-export-${{ matrix.os }}
+        name: godot-exports
         path: examples/dodge-the-creeps-2d/godot/exports/
         if-no-files-found: error
 
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [rust, godot]
+    needs: [rust, godot-export]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     
     steps:
