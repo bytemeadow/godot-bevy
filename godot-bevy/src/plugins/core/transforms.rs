@@ -3,10 +3,10 @@ use std::marker::PhantomData;
 use bevy::app::{App, Last, Plugin, PreUpdate};
 use bevy::ecs::query::{Added, Changed, Or};
 use bevy::ecs::system::Query;
-use bevy::math::Vec3;
+use bevy::math::{Vec2, Vec3};
 use bevy::prelude::Transform as BevyTransform;
 use bevy::{ecs::component::Component, math::Quat};
-use godot::builtin::Transform2D as GodotTransform2D;
+use godot::builtin::{Transform2D as GodotTransform2D, Vector2};
 use godot::builtin::{Basis, Quaternion, Vector3};
 use godot::classes::{Node2D, Node3D};
 use godot::prelude::Transform3D as GodotTransform3D;
@@ -22,11 +22,22 @@ pub struct Transform3D {
 }
 
 impl Transform3D {
+    pub const IDENTITY: Self = Self {
+        bevy: bevy::prelude::Transform::IDENTITY,
+        godot: godot::prelude::Transform3D::IDENTITY,
+    };
+
+    pub fn translated(mut self, translation: Vector3) -> Self {
+        self.godot = self.godot.translated(translation);
+        self.bevy.translation += Vec3::new(translation.x, translation.y, translation.z);
+        self
+    }
+
     pub fn as_bevy(&self) -> &bevy::prelude::Transform {
         &self.bevy
     }
 
-    pub fn as_bevy_mut(&mut self) -> TransformMutGuard<'_, BevyTransform> {
+    pub fn as_bevy_mut(&mut self) -> TransformMutGuard<'_, Transform3D, BevyTransform> {
         self.into()
     }
 
@@ -34,7 +45,7 @@ impl Transform3D {
         &self.godot
     }
 
-    pub fn as_godot_mut(&mut self) -> TransformMutGuard<'_, GodotTransform3D> {
+    pub fn as_godot_mut(&mut self) -> TransformMutGuard<'_, Transform3D, GodotTransform3D> {
         self.into()
     }
 
@@ -71,47 +82,47 @@ enum TransformRequested {
     Godot,
 }
 
-pub struct TransformMutGuard<'a, T>(&'a mut Transform3D, TransformRequested, PhantomData<T>);
+pub struct TransformMutGuard<'a, T, U>(&'a mut T, TransformRequested, PhantomData<U>);
 
-impl<'a> std::ops::Deref for TransformMutGuard<'a, GodotTransform3D> {
+impl<'a> std::ops::Deref for TransformMutGuard<'a, Transform3D, GodotTransform3D> {
     type Target = GodotTransform3D;
     fn deref(&self) -> &Self::Target {
         &self.0.godot
     }
 }
 
-impl<'a> std::ops::DerefMut for TransformMutGuard<'a, GodotTransform3D> {
+impl<'a> std::ops::DerefMut for TransformMutGuard<'a, Transform3D, GodotTransform3D> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0.godot
     }
 }
 
-impl<'a> std::ops::Deref for TransformMutGuard<'a, BevyTransform> {
+impl<'a> std::ops::Deref for TransformMutGuard<'a, Transform3D, BevyTransform> {
     type Target = BevyTransform;
     fn deref(&self) -> &Self::Target {
         &self.0.bevy
     }
 }
 
-impl<'a> std::ops::DerefMut for TransformMutGuard<'a, BevyTransform> {
+impl<'a> std::ops::DerefMut for TransformMutGuard<'a, Transform3D, BevyTransform> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0.bevy
     }
 }
 
-impl<'a> From<&'a mut Transform3D> for TransformMutGuard<'a, GodotTransform3D> {
+impl<'a> From<&'a mut Transform3D> for TransformMutGuard<'a, Transform3D, GodotTransform3D> {
     fn from(transform: &'a mut Transform3D) -> Self {
         TransformMutGuard(transform, TransformRequested::Godot, PhantomData)
     }
 }
 
-impl<'a> From<&'a mut Transform3D> for TransformMutGuard<'a, BevyTransform> {
+impl<'a> From<&'a mut Transform3D> for TransformMutGuard<'a, Transform3D, BevyTransform> {
     fn from(transform: &'a mut Transform3D) -> Self {
         TransformMutGuard(transform, TransformRequested::Bevy, PhantomData)
     }
 }
 
-impl<'a, T> Drop for TransformMutGuard<'a, T> {
+impl<'a, U> Drop for TransformMutGuard<'a, Transform3D, U> {
     fn drop(&mut self) {
         match self.1 {
             TransformRequested::Bevy => self.0.update_godot(),
@@ -163,19 +174,147 @@ impl IntoGodotTransform for bevy::prelude::Transform {
     }
 }
 
-#[derive(Debug, Component, Clone, Copy)]
-pub struct Transform2D(pub godot::prelude::Transform2D);
+pub trait IntoBevyTransform2D {
+    fn to_bevy_transform(self) -> bevy::prelude::Transform;
+}
 
-impl std::ops::Deref for Transform2D {
-    type Target = godot::prelude::Transform2D;
-    fn deref(&self) -> &Self::Target {
-        &self.0
+impl IntoBevyTransform2D for godot::prelude::Transform2D {
+    fn to_bevy_transform(self) -> bevy::prelude::Transform {
+        let translation = Vec3::new(self.origin.x, self.origin.y, 0.0);
+        let rotation = Quat::from_rotation_z(self.get_rotation());
+        let scale = Vec3::new(self.get_scale().x, self.get_scale().y, 1.0);
+
+        bevy::prelude::Transform {
+            translation,
+            rotation,
+            scale,
+        }
     }
 }
 
-impl std::ops::DerefMut for Transform2D {
+pub trait IntoGodotTransform2D {
+    fn to_godot_transform2d(self) -> godot::prelude::Transform2D;
+}
+
+impl IntoGodotTransform2D for bevy::prelude::Transform {
+    fn to_godot_transform2d(self) -> godot::prelude::Transform2D {
+        let origin = Vector2::new(self.translation.x, self.translation.y);
+        let rotation = self.rotation.to_euler(bevy::math::EulerRot::ZYX).0;
+        let scale = Vector2::new(self.scale.x, self.scale.y);
+
+        godot::prelude::Transform2D::IDENTITY
+            .translated(origin)
+            .rotated(rotation)
+            .scaled(scale)
+    }
+}
+
+#[derive(Debug, Component, Default, Copy, Clone)]
+pub struct Transform2D {
+    bevy: bevy::prelude::Transform,
+    godot: godot::prelude::Transform2D,
+}
+
+impl Transform2D {
+    pub const IDENTITY: Self = Self {
+        bevy: bevy::prelude::Transform::IDENTITY,
+        godot: godot::prelude::Transform2D::IDENTITY,
+    };
+
+    pub fn translated(mut self, translation: Vector2) -> Self {
+        self.godot = self.godot.translated(translation);
+        self.bevy.translation += Vec3::new(translation.x, translation.y, 0.0);
+        self
+    }
+
+    pub fn as_bevy(&self) -> &bevy::prelude::Transform {
+        &self.bevy
+    }
+
+    pub fn as_bevy_mut(&mut self) -> TransformMutGuard<'_, Transform2D, BevyTransform> {
+        self.into()
+    }
+
+    pub fn as_godot(&self) -> &godot::prelude::Transform2D {
+        &self.godot
+    }
+
+    pub fn as_godot_mut(&mut self) -> TransformMutGuard<'_, Transform2D, GodotTransform2D> {
+        self.into()
+    }
+
+    fn update_godot(&mut self) {
+        self.godot = self.bevy.to_godot_transform2d();
+    }
+
+    fn update_bevy(&mut self) {
+        self.bevy = self.godot.to_bevy_transform();
+    }
+}
+
+impl From<BevyTransform> for Transform2D {
+    fn from(bevy: BevyTransform) -> Self {
+        Self {
+            bevy,
+            godot: bevy.to_godot_transform2d(),
+        }
+    }
+}
+
+impl From<GodotTransform2D> for Transform2D {
+    fn from(godot: GodotTransform2D) -> Self {
+        Self {
+            bevy: godot.to_bevy_transform(),
+            godot,
+        }
+    }
+}
+
+// Transform2D guard implementations
+impl<'a> std::ops::Deref for TransformMutGuard<'a, Transform2D, GodotTransform2D> {
+    type Target = GodotTransform2D;
+    fn deref(&self) -> &Self::Target {
+        &self.0.godot
+    }
+}
+
+impl<'a> std::ops::DerefMut for TransformMutGuard<'a, Transform2D, GodotTransform2D> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.0.godot
+    }
+}
+
+impl<'a> std::ops::Deref for TransformMutGuard<'a, Transform2D, BevyTransform> {
+    type Target = BevyTransform;
+    fn deref(&self) -> &Self::Target {
+        &self.0.bevy
+    }
+}
+
+impl<'a> std::ops::DerefMut for TransformMutGuard<'a, Transform2D, BevyTransform> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0.bevy
+    }
+}
+
+impl<'a> From<&'a mut Transform2D> for TransformMutGuard<'a, Transform2D, GodotTransform2D> {
+    fn from(transform: &'a mut Transform2D) -> Self {
+        TransformMutGuard(transform, TransformRequested::Godot, PhantomData)
+    }
+}
+
+impl<'a> From<&'a mut Transform2D> for TransformMutGuard<'a, Transform2D, BevyTransform> {
+    fn from(transform: &'a mut Transform2D) -> Self {
+        TransformMutGuard(transform, TransformRequested::Bevy, PhantomData)
+    }
+}
+
+impl<'a, U> Drop for TransformMutGuard<'a, Transform2D, U> {
+    fn drop(&mut self) {
+        match self.1 {
+            TransformRequested::Bevy => self.0.update_godot(),
+            TransformRequested::Godot => self.0.update_bevy(),
+        }
     }
 }
 
@@ -228,12 +367,8 @@ fn post_update_godot_transforms_2d(
     for (transform, mut reference) in entities.iter_mut() {
         let mut obj = reference.get::<Node2D>();
 
-        let mut obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
-        obj_transform = obj_transform.rotated(obj.get_rotation());
-        obj_transform = obj_transform.scaled(obj.get_scale());
-
-        if obj_transform != **transform {
-            obj.set_transform(**transform);
+        if obj.get_transform() != *transform.as_godot() {
+            obj.set_transform(*transform.as_godot());
         }
     }
 }
@@ -243,14 +378,9 @@ fn pre_update_godot_transforms_2d(
     mut entities: Query<(&mut Transform2D, &mut GodotNodeHandle)>,
 ) {
     for (mut transform, mut reference) in entities.iter_mut() {
-        let obj = reference.get::<Node2D>();
-
-        let mut obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
-        obj_transform = obj_transform.rotated(obj.get_rotation());
-        obj_transform = obj_transform.scaled(obj.get_scale());
-
-        if obj_transform != **transform {
-            **transform = obj_transform;
+        let godot_transform = reference.get::<Node2D>().get_transform();
+        if *transform.as_godot() != godot_transform {
+            *transform.as_godot_mut() = godot_transform;
         }
     }
 }

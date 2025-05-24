@@ -136,15 +136,15 @@ fn spawn_scene(
             match transform {
                 GodotSceneTransform::Transform2D(transform) => {
                     match instance.clone().try_cast::<Node2D>().ok() {
-                        Some(mut node2d) => node2d.set_global_transform(*transform),
+                        Some(mut node2d) => node2d.set_global_transform(*transform.as_godot()),
                         None => tracing::error!(
-                            "attempted to spawn a scene with a transform on Node that did not inherit from Node3D, the transform was not set"
+                            "attempted to spawn a scene with a transform on Node that did not inherit from Node2D, the transform was not set"
                         ),
                     }
                 }
                 GodotSceneTransform::Transform3D(transform) => {
                     match instance.clone().try_cast::<Node3D>().ok() {
-                        Some(mut node3d) => node3d.set_global_transform(*transform),
+                        Some(mut node3d) => node3d.set_global_transform(*transform.as_godot()),
                         None => tracing::error!(
                             "attempted to spawn a scene with a transform on Node that did not inherit from Node3D, the transform was not set"
                         ),

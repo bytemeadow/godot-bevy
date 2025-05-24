@@ -113,7 +113,7 @@ fn setup_player(
             .unwrap()
             .get::<Node2D>()
             .get_position();
-        transform.origin = start_position;
+        transform.as_godot_mut().origin = start_position;
     }
 
     Ok(())
@@ -162,9 +162,9 @@ fn move_player(
             sprite.stop();
         }
 
-        transform.origin += velocity * system_delta.delta_seconds();
-        transform.origin.x = f32::min(f32::max(0.0, transform.origin.x), screen_size.x);
-        transform.origin.y = f32::min(f32::max(0.0, transform.origin.y), screen_size.y);
+        transform.as_godot_mut().origin += velocity * system_delta.delta_seconds();
+        transform.as_godot_mut().origin.x = f32::min(f32::max(0.0, transform.as_godot().origin.x), screen_size.x);
+        transform.as_godot_mut().origin.y = f32::min(f32::max(0.0, transform.as_godot().origin.y), screen_size.y);
     }
 
     Ok(())
