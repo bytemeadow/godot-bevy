@@ -140,10 +140,17 @@ jobs:
     - name: Debug downloaded artifacts (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        Write-Host "Contents of target/release after download:"
-        Get-ChildItem target/release -Recurse
-        Write-Host "Looking for .dll files specifically:"
-        Get-ChildItem target/release -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue
+        Write-Host "=== ARTIFACT DOWNLOAD DEBUG ==="
+        Write-Host "Current working directory:"
+        Get-Location
+        Write-Host "Contents of entire workspace:"
+        Get-ChildItem -Recurse | Select-Object -First 20
+        Write-Host "Contents of target directory:"
+        Get-ChildItem target -Recurse -ErrorAction SilentlyContinue
+        Write-Host "Looking for .dll files anywhere:"
+        Get-ChildItem -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue
+        Write-Host "Looking for any rust files anywhere:"
+        Get-ChildItem -Recurse -Filter "*rust*" -ErrorAction SilentlyContinue
 
     - name: Setup library paths for CI (Linux/macOS)
       if: matrix.os != 'windows-latest'
