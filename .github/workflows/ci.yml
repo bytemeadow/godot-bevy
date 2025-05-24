@@ -104,7 +104,7 @@ jobs:
         path: |
           target/release/*rust${{ matrix.extension }}
           target/release/deps/*rust*${{ matrix.extension }}
-        if-no-files-found: warn
+        if-no-files-found: error
 
   godot:
     name: Build Godot Project (${{ matrix.os }})
