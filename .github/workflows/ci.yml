@@ -169,10 +169,17 @@ jobs:
       run: |
         echo "GODOT_PATH=$(pwd)/godot-binary/${{ matrix.godot-binary }}" >> $env:GITHUB_ENV
 
-    - name: Import Godot project
+    - name: Import Godot project (Linux/Windows)
+      if: matrix.os != 'macos-latest'
       run: |
         cd examples/dodge-the-creeps-2d/godot
         ${{ env.GODOT_PATH }} --headless --import --quit-after 10
+
+    - name: Import Godot project (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd examples/dodge-the-creeps-2d/godot
+        ${{ env.GODOT_PATH }}/Contents/MacOS/Godot --headless --import --quit-after 10
 
     - name: Export Godot project (Linux)
       if: matrix.os == 'ubuntu-latest'
