@@ -181,20 +181,26 @@ jobs:
     - name: Download Godot Export Templates (Linux/Windows)
       if: matrix.os != 'macos-latest'
       run: |
-        mkdir -p ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}
-        cd ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}
+        # Create directory with the exact name Godot expects
+        mkdir -p ~/.local/share/godot/export_templates/4.4.stable
+        cd ~/.local/share/godot/export_templates/4.4.stable
         curl -L -o templates.zip https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_export_templates.tpz
         unzip templates.zip
         mv templates/* .
+        echo "Export templates directory contents:"
+        ls -la
 
     - name: Download Godot Export Templates (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        mkdir -p ~/Library/Application\ Support/Godot/export_templates/${{ env.GODOT_VERSION }}
-        cd ~/Library/Application\ Support/Godot/export_templates/${{ env.GODOT_VERSION }}
+        # Create directory with the exact name Godot expects
+        mkdir -p ~/Library/Application\ Support/Godot/export_templates/4.4.stable
+        cd ~/Library/Application\ Support/Godot/export_templates/4.4.stable
         curl -L -o templates.zip https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_export_templates.tpz
         unzip templates.zip
         mv templates/* .
+        echo "Export templates directory contents:"
+        ls -la
 
     - name: Setup Godot path (Linux/macOS)
       if: matrix.os != 'windows-latest'
@@ -211,6 +217,18 @@ jobs:
       run: |
         cd examples/dodge-the-creeps-2d/godot
         ${{ env.GODOT_PATH }} --headless --import --quit-after 10
+
+    - name: Configure project settings for macOS
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd examples/dodge-the-creeps-2d/godot
+        # Add ETC2 ASTC support to project settings
+        if ! grep -q "import_etc2_astc" project.godot; then
+          echo "" >> project.godot
+          echo "[rendering]" >> project.godot
+          echo "" >> project.godot
+          echo "textures/vram_compression/import_etc2_astc=true" >> project.godot
+        fi
 
     - name: Import Godot project (macOS)
       if: matrix.os == 'macos-latest'
