@@ -353,17 +353,52 @@ jobs:
         # Skip the problematic validation and focus on the core export
         Write-Host "Skipping template validation due to hanging issue"
         
-        # Try a simple export first
-        Write-Host "Attempting basic Windows export:"
+        # First, try listing all available export presets to see if "Windows Desktop" exists
+        Write-Host "=== DEBUGGING EXPORT PRESETS ==="
+        Write-Host "Listing all export presets in project:"
         try {
-            $exportResult = & "${{ env.GODOT_PATH }}" --headless --export-release "Windows Desktop" "exports/${{ matrix.export-name }}.exe" 2>&1
+            $presetsResult = & "${{ env.GODOT_PATH }}" --headless --export-release 2>&1
+            if ($presetsResult) {
+                $presetsResult | ForEach-Object { Write-Host "PRESET: $_" }
+            }
+        } catch {
+            Write-Host "Failed to list presets: $_"
+        }
+        
+        # Check the export_presets.cfg content more thoroughly
+        Write-Host "=== EXPORT PRESETS FILE CONTENT ==="
+        Get-Content export_presets.cfg | Select-Object -First 50 | ForEach-Object { Write-Host "CFG: $_" }
+        
+        # Try export with verbose flag and more detailed error capture
+        Write-Host "=== ATTEMPTING VERBOSE WINDOWS EXPORT ==="
+        try {
+            $exportResult = & "${{ env.GODOT_PATH }}" --headless --verbose --export-release "Windows Desktop" "exports/${{ matrix.export-name }}.exe" 2>&1
             Write-Host "Export completed with exit code: $LASTEXITCODE"
             if ($exportResult) {
-                Write-Host "Export output:"
-                $exportResult | ForEach-Object { Write-Host $_ }
+                Write-Host "=== EXPORT OUTPUT START ==="
+                $exportResult | ForEach-Object { Write-Host "OUT: $_" }
+                Write-Host "=== EXPORT OUTPUT END ==="
+            } else {
+                Write-Host "No output from export command"
             }
         } catch {
             Write-Host "Export failed with exception: $_"
+        }
+        
+        # Try alternative export preset names in case there's a mismatch
+        Write-Host "=== TRYING ALTERNATIVE PRESET NAMES ==="
+        $alternativeNames = @("Windows", "windows", "Windows Desktop", "win64", "PC")
+        foreach ($name in $alternativeNames) {
+            Write-Host "Trying preset name: '$name'"
+            try {
+                $altResult = & "${{ env.GODOT_PATH }}" --headless --export-release $name "exports/test-$name.exe" 2>&1
+                Write-Host "Result for '$name': exit code $LASTEXITCODE"
+                if ($altResult) {
+                    $altResult | Select-Object -First 5 | ForEach-Object { Write-Host "  $_" }
+                }
+            } catch {
+                Write-Host "Failed with '$name': $_"
+            }
         }
         
         # Check what was actually created
