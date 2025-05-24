@@ -162,11 +162,10 @@ fn move_player(
             sprite.stop();
         }
 
-        transform.as_godot_mut().origin += velocity * system_delta.delta_seconds();
-        transform.as_godot_mut().origin.x =
-            f32::min(f32::max(0.0, transform.as_godot().origin.x), screen_size.x);
-        transform.as_godot_mut().origin.y =
-            f32::min(f32::max(0.0, transform.as_godot().origin.y), screen_size.y);
+        let mut godot_transform = transform.as_godot_mut();
+        godot_transform.origin += velocity * system_delta.delta_seconds();
+        godot_transform.origin.x = f32::min(f32::max(0.0, godot_transform.origin.x), screen_size.x);
+        godot_transform.origin.y = f32::min(f32::max(0.0, godot_transform.origin.y), screen_size.y);
     }
 
     Ok(())
