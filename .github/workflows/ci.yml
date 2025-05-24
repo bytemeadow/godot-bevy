@@ -130,5 +130,3 @@ jobs:
         name: game-exports
         path: examples/dodge-the-creeps-2d/godot/exports/
         if-no-files-found: error
-
-
