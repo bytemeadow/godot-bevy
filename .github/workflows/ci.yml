@@ -110,6 +110,7 @@ jobs:
     name: Build Godot Project (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     needs: rust
+    timeout-minutes: 30
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -268,7 +269,14 @@ jobs:
       if: matrix.os == 'windows-latest'
       run: |
         Set-Location examples/dodge-the-creeps-2d/godot
-        & "${{ env.GODOT_PATH }}" --headless --import --quit-after 10
+        # Clear any existing import cache that might have UID issues
+        if (Test-Path ".godot") {
+            Write-Host "Clearing existing .godot cache"
+            Remove-Item ".godot" -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Write-Host "Starting Godot import..."
+        & "${{ env.GODOT_PATH }}" --headless --import --quit-after 15 2>&1 | Write-Host
+        Write-Host "Import completed"
 
     - name: Configure project settings for macOS
       if: matrix.os == 'macos-latest'
@@ -304,6 +312,7 @@ jobs:
 
     - name: Export Godot project (Windows)
       if: matrix.os == 'windows-latest'
+      timeout-minutes: 10
       run: |
         Set-Location examples/dodge-the-creeps-2d/godot
         New-Item -ItemType Directory -Force -Path exports
