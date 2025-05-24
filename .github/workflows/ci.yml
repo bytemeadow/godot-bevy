@@ -79,6 +79,24 @@ jobs:
     - name: Build example project
       run: cargo build --release --manifest-path examples/dodge-the-creeps-2d/rust/Cargo.toml
 
+    - name: Debug built files (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        Write-Host "Contents of target/release after build:"
+        Get-ChildItem target/release -ErrorAction SilentlyContinue
+        Write-Host "Looking for .dll files:"
+        Get-ChildItem target/release -Filter "*.dll" -ErrorAction SilentlyContinue
+        Write-Host "Looking for any rust files:"
+        Get-ChildItem target/release -Filter "*rust*" -ErrorAction SilentlyContinue
+
+    - name: Debug built files (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      run: |
+        echo "Contents of target/release after build:"
+        ls -la target/release/ || true
+        echo "Looking for rust library files:"
+        ls -la target/release/*rust* || true
+
     - name: Upload Rust artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -118,6 +136,14 @@ jobs:
       with:
         name: rust-libs-${{ matrix.os }}
         path: target/release/
+
+    - name: Debug downloaded artifacts (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        Write-Host "Contents of target/release after download:"
+        Get-ChildItem target/release -Recurse
+        Write-Host "Looking for .dll files specifically:"
+        Get-ChildItem target/release -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue
 
     - name: Setup library paths for CI (Linux/macOS)
       if: matrix.os != 'windows-latest'
