@@ -119,6 +119,20 @@ jobs:
         name: rust-libs-${{ matrix.os }}
         path: target/release/
 
+    - name: Setup library paths for CI
+      run: |
+        # Debug: Show what files we downloaded
+        echo "Files in target/release:"
+        ls -la target/release/ || true
+        # Create debug directory and copy release libraries
+        mkdir -p target/debug
+        cp target/release/*rust* target/debug/ || true
+        # Ensure library files have correct permissions
+        chmod +x target/release/*rust* || true
+        chmod +x target/debug/*rust* || true
+        echo "Files in target/debug:"
+        ls -la target/debug/ || true
+
     - name: Cache Godot binary
       id: cache-godot
       uses: actions/cache@v4
@@ -151,10 +165,20 @@ jobs:
         curl -L -o godot.zip https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_win64.exe.zip
         powershell -command "Expand-Archive godot.zip ."
 
-    - name: Download Godot Export Templates
+    - name: Download Godot Export Templates (Linux/Windows)
+      if: matrix.os != 'macos-latest'
       run: |
         mkdir -p ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}
         cd ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}
+        curl -L -o templates.zip https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_export_templates.tpz
+        unzip templates.zip
+        mv templates/* .
+
+    - name: Download Godot Export Templates (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        mkdir -p ~/Library/Application\ Support/Godot/export_templates/${{ env.GODOT_VERSION }}
+        cd ~/Library/Application\ Support/Godot/export_templates/${{ env.GODOT_VERSION }}
         curl -L -o templates.zip https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_export_templates.tpz
         unzip templates.zip
         mv templates/* .
