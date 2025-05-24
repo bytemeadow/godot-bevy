@@ -353,36 +353,113 @@ jobs:
         # Skip the problematic validation and focus on the core export
         Write-Host "Skipping template validation due to hanging issue"
         
-        # First, try listing all available export presets to see if "Windows Desktop" exists
-        Write-Host "=== DEBUGGING EXPORT PRESETS ==="
-        Write-Host "Listing all export presets in project:"
+        # First, test if Godot binary actually works with simple commands
+        Write-Host "=== TESTING GODOT BINARY ==="
+        
+        # Test 1: Basic version check (we know this works)
+        Write-Host "Testing basic version command:"
         try {
+            $versionOutput = & "${{ env.GODOT_PATH }}" --version 2>&1
+            Write-Host "Version output: $versionOutput"
+            Write-Host "Version exit code: $LASTEXITCODE"
+        } catch {
+            Write-Host "Version command failed: $_"
+        }
+        
+        # Test 2: Help command
+        Write-Host "Testing help command:"
+        try {
+            $helpOutput = & "${{ env.GODOT_PATH }}" --help 2>&1 | Select-Object -First 10
+            Write-Host "Help exit code: $LASTEXITCODE"
+            if ($helpOutput) {
+                $helpOutput | ForEach-Object { Write-Host "HELP: $_" }
+            } else {
+                Write-Host "No help output received"
+            }
+        } catch {
+            Write-Host "Help command failed: $_"
+        }
+        
+        # Test 3: Try to list export presets
+        Write-Host "=== TESTING EXPORT PRESET LISTING ==="
+        Write-Host "Attempting to list export presets:"
+        try {
+            Write-Host "Running command: & '${{ env.GODOT_PATH }}' --headless --export-release"
             $presetsResult = & "${{ env.GODOT_PATH }}" --headless --export-release 2>&1
+            Write-Host "Presets command exit code: $LASTEXITCODE"
             if ($presetsResult) {
+                Write-Host "Presets output received:"
                 $presetsResult | ForEach-Object { Write-Host "PRESET: $_" }
+            } else {
+                Write-Host "No presets output received"
             }
         } catch {
             Write-Host "Failed to list presets: $_"
+            Write-Host "Exception details: $($_.Exception.Message)"
         }
         
         # Check the export_presets.cfg content more thoroughly
         Write-Host "=== EXPORT PRESETS FILE CONTENT ==="
         Get-Content export_presets.cfg | Select-Object -First 50 | ForEach-Object { Write-Host "CFG: $_" }
         
-        # Try export with verbose flag and more detailed error capture
-        Write-Host "=== ATTEMPTING VERBOSE WINDOWS EXPORT ==="
+        # Try export with different approaches to see what works
+        Write-Host "=== ATTEMPTING WINDOWS EXPORT WITH MULTIPLE METHODS ==="
+        
+        # Method 1: Basic export without verbose
+        Write-Host "Method 1: Basic export"
         try {
-            $exportResult = & "${{ env.GODOT_PATH }}" --headless --verbose --export-release "Windows Desktop" "exports/${{ matrix.export-name }}.exe" 2>&1
-            Write-Host "Export completed with exit code: $LASTEXITCODE"
-            if ($exportResult) {
-                Write-Host "=== EXPORT OUTPUT START ==="
-                $exportResult | ForEach-Object { Write-Host "OUT: $_" }
-                Write-Host "=== EXPORT OUTPUT END ==="
+            Write-Host "Running: & '${{ env.GODOT_PATH }}' --headless --export-release 'Windows Desktop' 'exports/${{ matrix.export-name }}.exe'"
+            $exportResult1 = & "${{ env.GODOT_PATH }}" --headless --export-release "Windows Desktop" "exports/${{ matrix.export-name }}.exe" 2>&1
+            Write-Host "Method 1 exit code: $LASTEXITCODE"
+            if ($exportResult1) {
+                Write-Host "Method 1 output:"
+                $exportResult1 | ForEach-Object { Write-Host "OUT1: $_" }
             } else {
-                Write-Host "No output from export command"
+                Write-Host "Method 1: No output"
             }
         } catch {
-            Write-Host "Export failed with exception: $_"
+            Write-Host "Method 1 exception: $_"
+        }
+        
+        # Method 2: With verbose flag
+        Write-Host "Method 2: Verbose export"
+        try {
+            $exportResult2 = & "${{ env.GODOT_PATH }}" --headless --verbose --export-release "Windows Desktop" "exports/${{ matrix.export-name }}-verbose.exe" 2>&1
+            Write-Host "Method 2 exit code: $LASTEXITCODE"
+            if ($exportResult2) {
+                Write-Host "Method 2 output:"
+                $exportResult2 | ForEach-Object { Write-Host "OUT2: $_" }
+            } else {
+                Write-Host "Method 2: No output"
+            }
+        } catch {
+            Write-Host "Method 2 exception: $_"
+        }
+        
+        # Method 3: Try with timeout to see if it's hanging
+        Write-Host "Method 3: Export with timeout"
+        try {
+            $job = Start-Job -ScriptBlock {
+                param($godotPath)
+                & $godotPath --headless --export-release "Windows Desktop" "exports/test-timeout.exe" 2>&1
+            } -ArgumentList "${{ env.GODOT_PATH }}"
+            
+            $completed = Wait-Job $job -Timeout 60
+            if ($completed) {
+                $result3 = Receive-Job $job
+                Write-Host "Method 3 completed within timeout"
+                if ($result3) {
+                    $result3 | ForEach-Object { Write-Host "OUT3: $_" }
+                } else {
+                    Write-Host "Method 3: No output"
+                }
+            } else {
+                Write-Host "Method 3: Command timed out after 60 seconds"
+                Stop-Job $job
+            }
+            Remove-Job $job -Force
+        } catch {
+            Write-Host "Method 3 exception: $_"
         }
         
         # Try alternative export preset names in case there's a mismatch
@@ -401,17 +478,52 @@ jobs:
             }
         }
         
-        # Check what was actually created
-        Write-Host "Contents of exports directory after export attempt:"
+        # Comprehensive file search - the export might be working but creating files elsewhere!
+        Write-Host "=== COMPREHENSIVE FILE SEARCH ==="
+        
+        # Check exports directory
+        Write-Host "Contents of exports directory:"
         Get-ChildItem exports -ErrorAction SilentlyContinue | ForEach-Object {
-            Write-Host "  $($_.Name) - $($_.Length) bytes"
+            Write-Host "  EXPORTS: $($_.Name) - $($_.Length) bytes"
         }
         
-        # Check if any files were created in the current directory by mistake
-        Write-Host "Checking for any .exe files in current directory:"
-        Get-ChildItem *.exe -ErrorAction SilentlyContinue | ForEach-Object {
-            Write-Host "  Found: $($_.Name) - $($_.Length) bytes"
+        # Check current directory for any new files
+        Write-Host "All files in current directory (Godot project root):"
+        Get-ChildItem . -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*.exe" -or $_.Name -like "*dodge*" -or $_.Name -like "*creeps*" } | ForEach-Object {
+            Write-Host "  CURRENT: $($_.Name) - $($_.Length) bytes"
         }
+        
+        # Search for any .exe files recursively in the entire project
+        Write-Host "Searching for ALL .exe files in project recursively:"
+        Get-ChildItem . -Recurse -File -Filter "*.exe" -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "  EXE: $($_.FullName) - $($_.Length) bytes"
+        }
+        
+        # Search for files with "dodge" or "creeps" in the name anywhere
+        Write-Host "Searching for any files containing 'dodge' or 'creeps':"
+        Get-ChildItem . -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*dodge*" -or $_.Name -like "*creeps*" } | ForEach-Object {
+            Write-Host "  MATCH: $($_.FullName) - $($_.Length) bytes"
+        }
+        
+        # Check if maybe it's using the export_path from the preset instead of our command line arg
+        Write-Host "Checking if file exists at preset export_path location:"
+        if (Test-Path "exports/dodge-the-creeps-2d-windows.exe") {
+            $presetFile = Get-Item "exports/dodge-the-creeps-2d-windows.exe"
+            Write-Host "  PRESET PATH: Found file at preset location - $($presetFile.Length) bytes"
+        } else {
+            Write-Host "  PRESET PATH: No file at preset location"
+        }
+        
+        # Check for any recently created files (within last 5 minutes)
+        Write-Host "Files created in the last 5 minutes anywhere in project:"
+        $fiveMinutesAgo = (Get-Date).AddMinutes(-5)
+        Get-ChildItem . -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.CreationTime -gt $fiveMinutesAgo } | ForEach-Object {
+            Write-Host "  RECENT: $($_.FullName) - Created: $($_.CreationTime) - $($_.Length) bytes"
+        }
+        
+        # Show current working directory to be absolutely sure
+        Write-Host "Current working directory: $(Get-Location)"
+        Write-Host "Full path: $(Resolve-Path .)"
         
         # Debug: Show what files were created
         Write-Host "Files in exports directory after export:"
