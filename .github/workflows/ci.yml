@@ -119,7 +119,8 @@ jobs:
         name: rust-libs-${{ matrix.os }}
         path: target/release/
 
-    - name: Setup library paths for CI
+    - name: Setup library paths for CI (Linux/macOS)
+      if: matrix.os != 'windows-latest'
       run: |
         # Debug: Show what files we downloaded
         echo "Files in target/release:"
@@ -132,6 +133,18 @@ jobs:
         chmod +x target/debug/*rust* || true
         echo "Files in target/debug:"
         ls -la target/debug/ || true
+
+    - name: Setup library paths for CI (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Debug: Show what files we downloaded
+        Write-Host "Files in target/release:"
+        Get-ChildItem target/release/ -ErrorAction SilentlyContinue
+        # Create debug directory and copy release libraries
+        New-Item -ItemType Directory -Force -Path target/debug
+        Copy-Item target/release/*rust* target/debug/ -ErrorAction SilentlyContinue
+        Write-Host "Files in target/debug:"
+        Get-ChildItem target/debug/ -ErrorAction SilentlyContinue
 
     - name: Cache Godot binary
       id: cache-godot
