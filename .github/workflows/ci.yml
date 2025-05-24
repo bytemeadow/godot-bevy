@@ -16,7 +16,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [blaze/compute/ubuntu-latest, blaze/macos-latest, windows-latest]
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
@@ -79,7 +79,7 @@ jobs:
 
   godot-export:
     name: Export Godot Project
-    runs-on: macos-latest
+    runs-on: blaze/macos-latest
     needs: rust
     
     steps:
