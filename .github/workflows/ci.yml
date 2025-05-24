@@ -330,14 +330,38 @@ jobs:
         Write-Host "Available export templates:"
         Get-ChildItem "$env:APPDATA\Godot\export_templates\4.4.stable" -ErrorAction SilentlyContinue
         
+        # Check specifically for Windows templates
+        Write-Host "Windows-specific export templates:"
+        Get-ChildItem "$env:APPDATA\Godot\export_templates\4.4.stable\windows_*" -ErrorAction SilentlyContinue
+        
+        # Check if Godot can see the export templates
+        Write-Host "Testing Godot's template detection:"
+        & "${{ env.GODOT_PATH }}" --headless --validate-export-template "Windows Desktop" 2>&1 | Write-Host
+        
         # Run the export with more verbose output
         Write-Host "Running export command..."
         Write-Host "Command: ${{ env.GODOT_PATH }} --headless --export-release `"Windows Desktop`" exports/${{ matrix.export-name }}.exe"
         Write-Host "Working directory: $(Get-Location)"
         
         # First, let's try listing the available export presets
+        Write-Host "Listing all available export presets:"
+        & "${{ env.GODOT_PATH }}" --headless --export-release --help 2>&1 | Write-Host
+        
         Write-Host "Checking export presets with --export-pack dry run:"
         & "${{ env.GODOT_PATH }}" --headless --export-pack "Windows Desktop" test.pck 2>&1 | Write-Host
+        
+        # Check if the export pack was actually created
+        Write-Host "Checking if test.pck was created:"
+        if (Test-Path "test.pck") {
+            Write-Host "test.pck created successfully, size: $((Get-Item test.pck).Length) bytes"
+            Remove-Item "test.pck" -ErrorAction SilentlyContinue
+        } else {
+            Write-Host "test.pck was NOT created"
+        }
+        
+        # Try exporting with different Windows template variants
+        Write-Host "Trying specific Windows template export:"
+        & "${{ env.GODOT_PATH }}" --headless --verbose --export-release "Windows Desktop" "exports\test-specific.exe" 2>&1 | Write-Host
         
         # Check directory permissions and try different export approaches
         Write-Host "Checking exports directory permissions:"
