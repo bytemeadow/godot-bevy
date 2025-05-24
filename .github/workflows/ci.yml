@@ -322,9 +322,9 @@ jobs:
         
         # Debug: Check if Rust libraries are available
         Write-Host "Rust libraries in target/release:"
-        Get-ChildItem ../../target/release/*rust* -ErrorAction SilentlyContinue
+        Get-ChildItem ../../../target/release/*rust* -ErrorAction SilentlyContinue
         Write-Host "Rust libraries in target/debug:"
-        Get-ChildItem ../../target/debug/*rust* -ErrorAction SilentlyContinue
+        Get-ChildItem ../../../target/debug/*rust* -ErrorAction SilentlyContinue
         
         # Debug: List available export templates
         Write-Host "Available export templates:"
