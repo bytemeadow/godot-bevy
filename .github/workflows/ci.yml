@@ -1,0 +1,227 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  CARGO_TERM_COLOR: always
+  GODOT_VERSION: "4.4-stable"
+
+jobs:
+  rust:
+    name: Build Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            extension: .so
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            extension: .dylib
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            extension: .dll
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-registry-
+
+    - name: Cache cargo target
+      uses: actions/cache@v4
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-target-
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Install Linux dependencies
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+
+    - name: Run clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Run tests
+      run: cargo test --verbose
+
+    - name: Build workspace (debug)
+      run: cargo build --verbose
+
+    - name: Build workspace (release)
+      run: cargo build --release --verbose
+
+    - name: Build example project
+      run: cargo build --release --manifest-path examples/dodge-the-creeps-2d/rust/Cargo.toml
+
+    - name: Upload Rust artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: rust-libs-${{ matrix.os }}
+        path: |
+          target/release/librust${{ matrix.extension }}
+          target/release/deps/librust*${{ matrix.extension }}
+        if-no-files-found: warn
+
+  godot:
+    name: Build Godot Project (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: rust
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            godot-binary: "Godot_v4.4-stable_linux.x86_64"
+            godot-template: "linux_release.x86_64"
+            export-name: "dodge-the-creeps-2d-linux"
+          - os: macos-latest
+            godot-binary: "Godot.app"
+            godot-template: "macos_release.zip"
+            export-name: "dodge-the-creeps-2d-macos"
+          - os: windows-latest
+            godot-binary: "Godot_v4.4-stable_win64.exe"
+            godot-template: "windows_release_x86_64.exe"
+            export-name: "dodge-the-creeps-2d-windows"
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download Rust artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: rust-libs-${{ matrix.os }}
+        path: target/release/
+
+    - name: Cache Godot binary
+      id: cache-godot
+      uses: actions/cache@v4
+      with:
+        path: godot-binary/
+        key: godot-${{ env.GODOT_VERSION }}-${{ matrix.os }}
+
+    - name: Download Godot (Linux)
+      if: matrix.os == 'ubuntu-latest' && steps.cache-godot.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p godot-binary
+        cd godot-binary
+        wget https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_linux.x86_64.zip
+        unzip Godot_v${{ env.GODOT_VERSION }}_linux.x86_64.zip
+        chmod +x ${{ matrix.godot-binary }}
+
+    - name: Download Godot (macOS)
+      if: matrix.os == 'macos-latest' && steps.cache-godot.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p godot-binary
+        cd godot-binary
+        wget https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_macos.universal.zip
+        unzip Godot_v${{ env.GODOT_VERSION }}_macos.universal.zip
+
+    - name: Download Godot (Windows)
+      if: matrix.os == 'windows-latest' && steps.cache-godot.outputs.cache-hit != 'true'
+      run: |
+        mkdir godot-binary
+        cd godot-binary
+        curl -L -o godot.zip https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_win64.exe.zip
+        powershell -command "Expand-Archive godot.zip ."
+
+    - name: Download Godot Export Templates
+      run: |
+        mkdir -p ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}
+        cd ~/.local/share/godot/export_templates/${{ env.GODOT_VERSION }}
+        curl -L -o templates.zip https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_export_templates.tpz
+        unzip templates.zip
+        mv templates/* .
+
+    - name: Setup Godot path (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      run: |
+        echo "GODOT_PATH=$(pwd)/godot-binary/${{ matrix.godot-binary }}" >> $GITHUB_ENV
+
+    - name: Setup Godot path (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        echo "GODOT_PATH=$(pwd)/godot-binary/${{ matrix.godot-binary }}" >> $env:GITHUB_ENV
+
+    - name: Import Godot project
+      run: |
+        cd examples/dodge-the-creeps-2d/godot
+        ${{ env.GODOT_PATH }} --headless --import --quit-after 10
+
+    - name: Export Godot project (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        cd examples/dodge-the-creeps-2d/godot
+        mkdir -p exports
+        ${{ env.GODOT_PATH }} --headless --export-release "Linux/X11" exports/${{ matrix.export-name }}
+
+    - name: Export Godot project (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd examples/dodge-the-creeps-2d/godot
+        mkdir -p exports
+        ${{ env.GODOT_PATH }}/Contents/MacOS/Godot --headless --export-release "macOS" exports/${{ matrix.export-name }}.app
+
+    - name: Export Godot project (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        cd examples/dodge-the-creeps-2d/godot
+        mkdir exports
+        & "${{ env.GODOT_PATH }}" --headless --export-release "Windows Desktop" exports/${{ matrix.export-name }}.exe
+
+    - name: Upload Godot artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: godot-export-${{ matrix.os }}
+        path: examples/dodge-the-creeps-2d/godot/exports/
+        if-no-files-found: warn
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [rust, godot]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: artifacts/**/*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

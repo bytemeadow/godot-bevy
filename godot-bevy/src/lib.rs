@@ -1,3 +1,6 @@
+#![allow(clippy::type_complexity)]
+#![allow(clippy::needless_lifetimes)]
+
 use bevy::app::{App, Plugin};
 
 pub mod app;

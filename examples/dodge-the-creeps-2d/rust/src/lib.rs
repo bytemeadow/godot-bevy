@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use bevy::{prelude::*, state::app::StatesPlugin};
 use godot_bevy::prelude::{
     godot_prelude::{gdextension, ExtensionLibrary},
