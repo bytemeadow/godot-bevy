@@ -178,8 +178,8 @@ jobs:
         curl -L -o godot.zip https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_win64.exe.zip
         powershell -command "Expand-Archive godot.zip ."
 
-    - name: Download Godot Export Templates (Linux/Windows)
-      if: matrix.os != 'macos-latest'
+    - name: Download Godot Export Templates (Linux)
+      if: matrix.os == 'ubuntu-latest'
       run: |
         # Create directory with the exact name Godot expects
         mkdir -p ~/.local/share/godot/export_templates/4.4.stable
@@ -189,6 +189,18 @@ jobs:
         mv templates/* .
         echo "Export templates directory contents:"
         ls -la
+
+    - name: Download Godot Export Templates (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        # Create directory with the exact name Godot expects
+        New-Item -ItemType Directory -Force -Path ~/.local/share/godot/export_templates/4.4.stable
+        Set-Location ~/.local/share/godot/export_templates/4.4.stable
+        curl -L -o templates.zip https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}/Godot_v${{ env.GODOT_VERSION }}_export_templates.tpz
+        powershell -command "Expand-Archive templates.zip ."
+        Move-Item templates/* . -Force
+        Write-Host "Export templates directory contents:"
+        Get-ChildItem
 
     - name: Download Godot Export Templates (macOS)
       if: matrix.os == 'macos-latest'
