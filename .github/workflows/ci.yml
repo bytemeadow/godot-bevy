@@ -1,4 +1,4 @@
-name: CI
+name: ci
 
 on:
   push:
@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   rust:
-    name: Build Rust (${{ matrix.os }})
+    name: build / rust (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -83,7 +83,7 @@ jobs:
         if-no-files-found: error
 
   godot-export:
-    name: Export Godot Project
+    name: export / examples
     runs-on: blaze/macos-latest
     needs: rust
     
