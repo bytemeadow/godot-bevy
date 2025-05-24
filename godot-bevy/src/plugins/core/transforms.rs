@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 
 use bevy::app::{App, Last, Plugin, PreUpdate};
+use bevy::ecs::change_detection::DetectChanges;
 use bevy::ecs::query::{Added, Changed, Or};
 use bevy::ecs::system::Query;
 use bevy::math::Vec3;
@@ -10,7 +11,6 @@ use godot::builtin::Transform2D as GodotTransform2D;
 use godot::builtin::{Basis, Quaternion, Vector3};
 use godot::classes::{Node2D, Node3D};
 use godot::prelude::Transform3D as GodotTransform3D;
-use bevy::ecs::change_detection::DetectChanges;
 
 use crate::bridge::GodotNodeHandle;
 
@@ -248,7 +248,7 @@ fn pre_update_godot_transforms_2d(
         if transform.is_changed() {
             continue;
         }
-        
+
         let obj = reference.get::<Node2D>();
 
         let mut obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
