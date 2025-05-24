@@ -131,27 +131,4 @@ jobs:
         path: examples/dodge-the-creeps-2d/godot/exports/
         if-no-files-found: error
 
-  release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: [rust, godot-export]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
 
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts/
-
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: artifacts/**/*
-        draft: false
-        prerelease: false
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
