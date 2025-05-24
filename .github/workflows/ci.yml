@@ -334,77 +334,39 @@ jobs:
         Write-Host "Windows-specific export templates:"
         Get-ChildItem "$env:APPDATA\Godot\export_templates\4.4.stable\windows_*" -ErrorAction SilentlyContinue
         
-        # Check if Godot can see the export templates
-        Write-Host "Testing Godot's template detection:"
-        & "${{ env.GODOT_PATH }}" --headless --validate-export-template "Windows Desktop" 2>&1 | Write-Host
+        # Export templates are installed, proceeding with export
         
         # Run the export with more verbose output
         Write-Host "Running export command..."
         Write-Host "Command: ${{ env.GODOT_PATH }} --headless --export-release `"Windows Desktop`" exports/${{ matrix.export-name }}.exe"
         Write-Host "Working directory: $(Get-Location)"
         
-        # First, let's try listing the available export presets
-        Write-Host "Listing all available export presets:"
-        & "${{ env.GODOT_PATH }}" --headless --export-release --help 2>&1 | Write-Host
+        # Skip the problematic validation and focus on the core export
+        Write-Host "Skipping template validation due to hanging issue"
         
-        Write-Host "Checking export presets with --export-pack dry run:"
-        & "${{ env.GODOT_PATH }}" --headless --export-pack "Windows Desktop" test.pck 2>&1 | Write-Host
-        
-        # Check if the export pack was actually created
-        Write-Host "Checking if test.pck was created:"
-        if (Test-Path "test.pck") {
-            Write-Host "test.pck created successfully, size: $((Get-Item test.pck).Length) bytes"
-            Remove-Item "test.pck" -ErrorAction SilentlyContinue
-        } else {
-            Write-Host "test.pck was NOT created"
-        }
-        
-        # Try exporting with different Windows template variants
-        Write-Host "Trying specific Windows template export:"
-        & "${{ env.GODOT_PATH }}" --headless --verbose --export-release "Windows Desktop" "exports\test-specific.exe" 2>&1 | Write-Host
-        
-        # Check directory permissions and try different export approaches
-        Write-Host "Checking exports directory permissions:"
-        Write-Host "Directory exists: $(Test-Path exports)"
-        Write-Host "Can write to directory: $(Test-Path exports -PathType Container)"
-        Get-Acl exports | Format-Table -AutoSize
-        
-        # Try creating a test file in exports directory
+        # Try a simple export first
+        Write-Host "Attempting basic Windows export:"
         try {
-            "test" | Out-File -FilePath "exports/test.txt" -Encoding ASCII
-            Write-Host "Successfully created test file in exports directory"
-            Remove-Item "exports/test.txt" -ErrorAction SilentlyContinue
-        } catch {
-            Write-Host "Failed to create test file in exports directory: $_"
-        }
-        
-        # Try export with absolute path
-        $absoluteExportPath = "$(Get-Location)\exports\${{ matrix.export-name }}.exe"
-        Write-Host "Trying export with absolute path: $absoluteExportPath"
-        
-        try {
-            $exportResult = & "${{ env.GODOT_PATH }}" --headless --export-release "Windows Desktop" $absoluteExportPath 2>&1
-            Write-Host "Export command completed with exit code: $LASTEXITCODE"
-            Write-Host "Export command output:"
+            $exportResult = & "${{ env.GODOT_PATH }}" --headless --export-release "Windows Desktop" "exports/${{ matrix.export-name }}.exe" 2>&1
+            Write-Host "Export completed with exit code: $LASTEXITCODE"
             if ($exportResult) {
+                Write-Host "Export output:"
                 $exportResult | ForEach-Object { Write-Host $_ }
-            } else {
-                Write-Host "(No output from export command)"
             }
         } catch {
-            Write-Host "Export command failed with exception: $_"
+            Write-Host "Export failed with exception: $_"
         }
         
-        # Also try the debug export to see if that works
-        Write-Host "Trying debug export as fallback:"
-        try {
-            $debugResult = & "${{ env.GODOT_PATH }}" --headless --export-debug "Windows Desktop" "exports\${{ matrix.export-name }}-debug.exe" 2>&1
-            Write-Host "Debug export exit code: $LASTEXITCODE"
-            if ($debugResult) {
-                $debugResult | ForEach-Object { Write-Host $_ }
-            }
-        } catch {
-            Write-Host "Debug export failed: $_"
+        # Check what was actually created
+        Write-Host "Contents of exports directory after export attempt:"
+        Get-ChildItem exports -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "  $($_.Name) - $($_.Length) bytes"
+        }
+        
+        # Check if any files were created in the current directory by mistake
+        Write-Host "Checking for any .exe files in current directory:"
+        Get-ChildItem *.exe -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "  Found: $($_.Name) - $($_.Length) bytes"
         }
         
         # Debug: Show what files were created
