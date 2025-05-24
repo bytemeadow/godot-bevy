@@ -212,7 +212,7 @@ fn create_scene_tree_entity(
                 if let Some(node2d) = node.try_get::<Node2D>() {
                     // TODO: validate this is as expected
                     let transform = node2d.get_transform();
-                    ent.insert(Transform2D(transform));
+                    ent.insert(Transform2D::from(transform));
                 }
 
                 let mut node = node.get::<Node>();

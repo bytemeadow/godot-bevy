@@ -142,8 +142,34 @@ impl IntoBevyTransform for godot::prelude::Transform3D {
     }
 }
 
+impl IntoBevyTransform for godot::prelude::Transform2D {
+    fn to_bevy_transform(self) -> bevy::prelude::Transform {
+        // Extract 2D position
+        let translation = Vec3::new(self.origin.x, self.origin.y, 0.0);
+
+        // Extract 2D rotation (z-axis rotation from the 2D transform matrix)
+        let rotation_angle = self.a.y.atan2(self.a.x);
+        let rotation = Quat::from_rotation_z(rotation_angle);
+
+        // Extract 2D scale from the transform matrix
+        let scale_x = self.a.length();
+        let scale_y = self.b.length();
+        let scale = Vec3::new(scale_x, scale_y, 1.0);
+
+        bevy::prelude::Transform {
+            translation,
+            rotation,
+            scale,
+        }
+    }
+}
+
 pub trait IntoGodotTransform {
     fn to_godot_transform(self) -> godot::prelude::Transform3D;
+}
+
+pub trait IntoGodotTransform2D {
+    fn to_godot_transform_2d(self) -> godot::prelude::Transform2D;
 }
 
 impl IntoGodotTransform for bevy::prelude::Transform {
@@ -163,19 +189,129 @@ impl IntoGodotTransform for bevy::prelude::Transform {
     }
 }
 
-#[derive(Debug, Component, Clone, Copy)]
-pub struct Transform2D(pub godot::prelude::Transform2D);
+impl IntoGodotTransform2D for bevy::prelude::Transform {
+    fn to_godot_transform_2d(self) -> godot::prelude::Transform2D {
+        // Extract the Z rotation component from the quaternion
+        let (_, _, rotation_z) = self.rotation.to_euler(bevy::math::EulerRot::XYZ);
 
-impl std::ops::Deref for Transform2D {
-    type Target = godot::prelude::Transform2D;
-    fn deref(&self) -> &Self::Target {
-        &self.0
+        // Create 2D rotation matrix
+        let cos_rot = rotation_z.cos();
+        let sin_rot = rotation_z.sin();
+
+        // Apply scale to rotation matrix
+        let a = godot::builtin::Vector2::new(cos_rot * self.scale.x, sin_rot * self.scale.x);
+        let b = godot::builtin::Vector2::new(-sin_rot * self.scale.y, cos_rot * self.scale.y);
+        let origin = godot::builtin::Vector2::new(self.translation.x, self.translation.y);
+
+        godot::prelude::Transform2D { a, b, origin }
     }
 }
 
-impl std::ops::DerefMut for Transform2D {
+#[derive(Debug, Component, Clone, Copy)]
+pub struct Transform2D {
+    bevy: bevy::prelude::Transform,
+    godot: godot::prelude::Transform2D,
+}
+
+impl Transform2D {
+    pub fn as_bevy(&self) -> &bevy::prelude::Transform {
+        &self.bevy
+    }
+
+    pub fn as_bevy_mut(&mut self) -> Transform2DMutGuard<'_, BevyTransform> {
+        self.into()
+    }
+
+    pub fn as_godot(&self) -> &godot::prelude::Transform2D {
+        &self.godot
+    }
+
+    pub fn as_godot_mut(&mut self) -> Transform2DMutGuard<'_, GodotTransform2D> {
+        self.into()
+    }
+
+    fn update_godot(&mut self) {
+        self.godot = self.bevy.to_godot_transform_2d();
+    }
+
+    fn update_bevy(&mut self) {
+        self.bevy = self.godot.to_bevy_transform();
+    }
+}
+
+impl Default for Transform2D {
+    fn default() -> Self {
+        Self {
+            bevy: bevy::prelude::Transform::IDENTITY,
+            godot: godot::prelude::Transform2D::IDENTITY,
+        }
+    }
+}
+
+impl From<BevyTransform> for Transform2D {
+    fn from(bevy: BevyTransform) -> Self {
+        Self {
+            bevy,
+            godot: bevy.to_godot_transform_2d(),
+        }
+    }
+}
+
+impl From<GodotTransform2D> for Transform2D {
+    fn from(godot: GodotTransform2D) -> Self {
+        Self {
+            bevy: godot.to_bevy_transform(),
+            godot,
+        }
+    }
+}
+
+pub struct Transform2DMutGuard<'a, T>(&'a mut Transform2D, TransformRequested, PhantomData<T>);
+
+impl<'a> std::ops::Deref for Transform2DMutGuard<'a, GodotTransform2D> {
+    type Target = GodotTransform2D;
+    fn deref(&self) -> &Self::Target {
+        &self.0.godot
+    }
+}
+
+impl<'a> std::ops::DerefMut for Transform2DMutGuard<'a, GodotTransform2D> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.0.godot
+    }
+}
+
+impl<'a> std::ops::Deref for Transform2DMutGuard<'a, BevyTransform> {
+    type Target = BevyTransform;
+    fn deref(&self) -> &Self::Target {
+        &self.0.bevy
+    }
+}
+
+impl<'a> std::ops::DerefMut for Transform2DMutGuard<'a, BevyTransform> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0.bevy
+    }
+}
+
+impl<'a> From<&'a mut Transform2D> for Transform2DMutGuard<'a, GodotTransform2D> {
+    fn from(transform: &'a mut Transform2D) -> Self {
+        Transform2DMutGuard(transform, TransformRequested::Godot, PhantomData)
+    }
+}
+
+impl<'a> From<&'a mut Transform2D> for Transform2DMutGuard<'a, BevyTransform> {
+    fn from(transform: &'a mut Transform2D) -> Self {
+        Transform2DMutGuard(transform, TransformRequested::Bevy, PhantomData)
+    }
+}
+
+impl<'a, T> Drop for Transform2DMutGuard<'a, T> {
+    fn drop(&mut self) {
+        match self.1 {
+            TransformRequested::Bevy => self.0.update_godot(),
+            TransformRequested::Godot => self.0.update_bevy(),
+        }
     }
 }
 
@@ -232,8 +368,8 @@ fn post_update_godot_transforms_2d(
         obj_transform = obj_transform.rotated(obj.get_rotation());
         obj_transform = obj_transform.scaled(obj.get_scale());
 
-        if obj_transform != **transform {
-            obj.set_transform(**transform);
+        if obj_transform != *transform.as_godot() {
+            obj.set_transform(*transform.as_godot());
         }
     }
 }
@@ -249,8 +385,8 @@ fn pre_update_godot_transforms_2d(
         obj_transform = obj_transform.rotated(obj.get_rotation());
         obj_transform = obj_transform.scaled(obj.get_scale());
 
-        if obj_transform != **transform {
-            **transform = obj_transform;
+        if obj_transform != *transform.as_godot() {
+            *transform.as_godot_mut() = obj_transform;
         }
     }
 }

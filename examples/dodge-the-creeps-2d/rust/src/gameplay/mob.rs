@@ -99,7 +99,7 @@ fn spawn_mob(
     commands
         .spawn_empty()
         .insert(Mob { direction })
-        .insert(Transform2D(transform))
+        .insert(Transform2D::from(transform))
         .insert(GodotScene::from_resource(assets.mob_scn.clone()));
 }
 
