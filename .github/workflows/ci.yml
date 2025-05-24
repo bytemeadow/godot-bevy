@@ -110,31 +110,31 @@ jobs:
         path: artifacts/
 
     - name: Setup Rust libraries for all platforms
-      working-directory: examples/dodge-the-creeps-2d
       run: |
-        # Create target directories for all platforms
+        # Create target directories at workspace root (where rust.gdextension expects them)
         mkdir -p target/release target/debug
         
         # Copy Linux libraries
-        if [ -d "../../artifacts/rust-libs-ubuntu-latest" ]; then
-          cp ../../artifacts/rust-libs-ubuntu-latest/* target/release/ || true
-          cp ../../artifacts/rust-libs-ubuntu-latest/* target/debug/ || true
+        if [ -d "artifacts/rust-libs-ubuntu-latest" ]; then
+          cp artifacts/rust-libs-ubuntu-latest/* target/release/ || true
+          cp artifacts/rust-libs-ubuntu-latest/* target/debug/ || true
         fi
         
         # Copy macOS libraries  
-        if [ -d "../../artifacts/rust-libs-macos-latest" ]; then
-          cp ../../artifacts/rust-libs-macos-latest/* target/release/ || true
-          cp ../../artifacts/rust-libs-macos-latest/* target/debug/ || true
+        if [ -d "artifacts/rust-libs-macos-latest" ]; then
+          cp artifacts/rust-libs-macos-latest/* target/release/ || true
+          cp artifacts/rust-libs-macos-latest/* target/debug/ || true
         fi
         
         # Copy Windows libraries
-        if [ -d "../../artifacts/rust-libs-windows-latest" ]; then
-          cp ../../artifacts/rust-libs-windows-latest/* target/release/ || true
-          cp ../../artifacts/rust-libs-windows-latest/* target/debug/ || true
+        if [ -d "artifacts/rust-libs-windows-latest" ]; then
+          cp artifacts/rust-libs-windows-latest/* target/release/ || true
+          cp artifacts/rust-libs-windows-latest/* target/debug/ || true
         fi
         
-        echo "Library files available:"
+        echo "Library files available in workspace root:"
         ls -la target/release/ || true
+        ls -la target/debug/ || true
 
     - name: Open Godot editor for reimport
       working-directory: examples/dodge-the-creeps-2d/godot
