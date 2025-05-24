@@ -84,8 +84,8 @@ jobs:
       with:
         name: rust-libs-${{ matrix.os }}
         path: |
-          target/release/librust${{ matrix.extension }}
-          target/release/deps/librust*${{ matrix.extension }}
+          target/release/*rust${{ matrix.extension }}
+          target/release/deps/*rust*${{ matrix.extension }}
         if-no-files-found: warn
 
   godot:
