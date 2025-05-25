@@ -144,7 +144,7 @@ fn new_mob(
 }
 
 fn kill_mob(mut signals: EventReader<GodotSignal>) {
-    for (signal, _) in signals.read_with_id() {
+    for signal in signals.read() {
         if signal.name == "screen_exited" {
             signal
                 .target
