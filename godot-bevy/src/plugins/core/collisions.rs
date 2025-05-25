@@ -57,8 +57,8 @@ pub enum CollisionEventType {
 #[derive(Debug, Event)]
 pub struct CollisionEvent {
     pub event_type: CollisionEventType,
-    pub origin: InstanceId,
-    pub target: InstanceId,
+    pub origin: GodotNodeHandle,
+    pub target: GodotNodeHandle,
 }
 
 fn update_godot_collisions(
@@ -74,7 +74,7 @@ fn update_godot_collisions(
         trace!(target: "godot_collisions_update", event = ?event);
 
         let target = all_entities.iter().find_map(|(ent, reference)| {
-            if reference.instance_id() == event.target {
+            if reference.instance_id() == event.target.instance_id() {
                 Some(ent)
             } else {
                 None
@@ -82,7 +82,7 @@ fn update_godot_collisions(
         });
 
         let collisions = entities.iter_mut().find_map(|(reference, collisions)| {
-            if reference.instance_id() == event.origin {
+            if reference.instance_id() == event.origin.instance_id() {
                 Some(collisions)
             } else {
                 None

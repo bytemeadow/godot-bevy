@@ -6,7 +6,7 @@ use bevy::{
         system::NonSendMut,
     },
 };
-use godot::{classes::Node, meta::ToGodot, obj::InstanceId};
+use godot::{classes::Node, meta::ToGodot};
 
 use crate::bridge::GodotNodeHandle;
 
@@ -24,8 +24,8 @@ impl Plugin for GodotSignalsPlugin {
 #[derive(Debug, Event)]
 pub struct GodotSignal {
     pub name: String,
-    pub origin: InstanceId,
-    pub target: InstanceId,
+    pub origin: GodotNodeHandle,
+    pub target: GodotNodeHandle,
 }
 
 #[doc(hidden)]
