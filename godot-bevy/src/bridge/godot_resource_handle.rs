@@ -6,7 +6,7 @@ use godot::{
 
 use super::utils::{maybe_dec_ref, maybe_inc_ref, maybe_inc_ref_opt};
 
-#[derive(Debug, BevyResource)]
+#[derive(Debug, BevyResource, PartialEq, Eq)]
 pub struct GodotResourceHandle {
     resource_id: InstanceId,
 }

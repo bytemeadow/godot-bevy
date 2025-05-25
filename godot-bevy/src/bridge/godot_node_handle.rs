@@ -4,7 +4,7 @@ use godot::{
     obj::{Gd, Inherits, InstanceId},
 };
 
-#[derive(Debug, Component, Clone)]
+#[derive(Debug, Component, Clone, PartialEq, Eq)]
 pub struct GodotNodeHandle {
     instance_id: InstanceId,
 }

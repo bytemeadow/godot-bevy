@@ -74,7 +74,7 @@ fn update_godot_collisions(
         trace!(target: "godot_collisions_update", event = ?event);
 
         let target = all_entities.iter().find_map(|(ent, reference)| {
-            if reference.instance_id() == event.target.instance_id() {
+            if reference == &event.target {
                 Some(ent)
             } else {
                 None
@@ -82,7 +82,7 @@ fn update_godot_collisions(
         });
 
         let collisions = entities.iter_mut().find_map(|(reference, collisions)| {
-            if reference.instance_id() == event.origin.instance_id() {
+            if reference == &event.origin {
                 Some(collisions)
             } else {
                 None
