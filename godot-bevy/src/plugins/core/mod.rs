@@ -38,7 +38,8 @@ impl Plugin for GodotCorePlugin {
             .add_plugins(GodotSceneTreePlugin)
             .add_plugins(GodotTransformsPlugin)
             .add_plugins(GodotCollisionsPlugin)
-            .add_plugins(GodotSignalsPlugin);
+            .add_plugins(GodotSignalsPlugin)
+            .add_plugins(GodotInputEventPlugin);
 
         // Add the PhysicsUpdate schedule
         app.add_schedule(Schedule::new(PhysicsUpdate));

@@ -9,7 +9,7 @@ use bevy::{
 };
 use godot::{
     classes::{
-        InputEvent as GodotInputEvent, InputEventAction, InputEventKey, InputEventMouseButton, InputEventMouseMotion, InputEventScreenTouch
+        InputEvent as GodotInputEvent, InputEventKey, InputEventMouseButton, InputEventMouseMotion, InputEventScreenTouch
     }, global::Key, obj::Gd
 };
 
@@ -23,6 +23,10 @@ impl Plugin for GodotInputEventPlugin {
             .add_event::<MouseMotion>()
             .add_event::<TouchInput>()
             .add_event::<ActionInput>();
+        
+        // Initialize with a dummy channel - will be replaced when BevyApp sets up the watcher
+        let (_, receiver) = std::sync::mpsc::channel();
+        app.insert_non_send_resource(InputEventReader(receiver));
     }
 }
 
@@ -172,13 +176,38 @@ fn extract_input_events(
         });
     }
     
-    // Action input
-    else if let Ok(action_event) = input_event.clone().try_cast::<InputEventAction>() {
-        action_events.write(ActionInput {
-            action: action_event.get_action().to_string(),
-            pressed: action_event.is_pressed(),
-            strength: action_event.get_strength(),
-        });
+    // Action input - Check if this event matches any actions
+    // Note: InputEventAction is not emitted by the engine, so we need to check manually
+    check_action_events(&input_event, action_events);
+}
+
+fn check_action_events(
+    input_event: &Gd<GodotInputEvent>,
+    action_events: &mut EventWriter<ActionInput>,
+) {
+    use godot::classes::InputMap;
+    use godot::builtin::StringName;
+    
+    // Get all actions from the InputMap
+    let mut input_map = InputMap::singleton();
+    let actions = input_map.get_actions();
+    
+    // Check each action to see if this input event matches it
+    for action_variant in actions.iter_shared() {
+        let action_name = action_variant.to_string();
+        let action_string_name: StringName = action_name.as_str().into();
+        
+        // Check if this input event matches the action
+        if input_event.is_action(&action_string_name) {
+            let pressed = input_event.is_action_pressed(&action_string_name);
+            let strength = input_event.get_action_strength(&action_string_name);
+            
+            action_events.write(ActionInput {
+                action: action_name,
+                pressed,
+                strength,
+            });
+        }
     }
 }
 

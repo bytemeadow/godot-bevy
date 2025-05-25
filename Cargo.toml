@@ -8,7 +8,7 @@ categories = ["game-engines"]
 license = "MIT OR Apache-2.0"
 
 [workspace]
-members = [ "examples/dodge-the-creeps-2d/rust", "examples/timing-test/rust", "godot-bevy"]
+members = [ "godot-bevy", "examples/dodge-the-creeps-2d/rust", "examples/timing-test/rust", "examples/input-event-demo/rust" ]
 resolver = "2"
 
 [workspace.dependencies]

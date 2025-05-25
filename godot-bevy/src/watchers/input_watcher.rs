@@ -20,21 +20,22 @@ impl INode for GodotInputWatcher {
             notification_channel: None,
         }
     }
-}
 
-#[godot_api]
-impl GodotInputWatcher {
-    #[func]
-    pub fn unhandled_input(&self, input_event: Gd<InputEvent>) {
+    fn ready(&mut self) {
+        // Enable input processing for this node
+        self.base_mut().set_process_input(true);
+        self.base_mut().set_process_unhandled_input(true);
+    }
+
+    fn input(&mut self, event: Gd<InputEvent>) {
         if let Some(channel) = self.notification_channel.as_ref() {
-            let _ = channel.send((InputEventType::Unhandled, input_event));
+            let _ = channel.send((InputEventType::Normal, event));
         }
     }
 
-    #[func]
-    pub fn input(&self, input_event: Gd<InputEvent>) {
+    fn unhandled_input(&mut self, event: Gd<InputEvent>) {
         if let Some(channel) = self.notification_channel.as_ref() {
-            let _ = channel.send((InputEventType::Normal, input_event));
+            let _ = channel.send((InputEventType::Unhandled, event));
         }
     }
 }
