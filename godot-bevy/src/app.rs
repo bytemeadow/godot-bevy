@@ -3,12 +3,12 @@ use godot::prelude::*;
 use std::sync::{Mutex, mpsc::channel};
 
 use crate::watchers::collision_watcher::CollisionWatcher;
+use crate::watchers::input_watcher::GodotInputWatcher;
 use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
 use crate::watchers::signal_watcher::GodotSignalWatcher;
-use crate::watchers::input_watcher::GodotInputWatcher;
 use crate::{
     GodotPlugin,
-    plugins::core::{GodotSignalReader, PhysicsUpdate, InputEventReader},
+    plugins::core::{GodotSignalReader, InputEventReader, PhysicsUpdate},
     prelude::*,
 };
 

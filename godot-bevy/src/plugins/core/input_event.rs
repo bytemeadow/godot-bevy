@@ -9,8 +9,11 @@ use bevy::{
 };
 use godot::{
     classes::{
-        InputEvent as GodotInputEvent, InputEventKey, InputEventMouseButton, InputEventMouseMotion, InputEventScreenTouch
-    }, global::Key, obj::Gd
+        InputEvent as GodotInputEvent, InputEventKey, InputEventMouseButton, InputEventMouseMotion,
+        InputEventScreenTouch,
+    },
+    global::Key,
+    obj::Gd,
 };
 
 pub struct GodotInputEventPlugin;
@@ -23,7 +26,7 @@ impl Plugin for GodotInputEventPlugin {
             .add_event::<MouseMotion>()
             .add_event::<TouchInput>()
             .add_event::<ActionInput>();
-        
+
         // Initialize with a dummy channel - will be replaced when BevyApp sets up the watcher
         let (_, receiver) = std::sync::mpsc::channel();
         app.insert_non_send_resource(InputEventReader(receiver));
@@ -135,7 +138,7 @@ fn extract_input_events(
     action_events: &mut EventWriter<ActionInput>,
 ) {
     // Try to cast to specific input event types and extract data
-    
+
     // Keyboard input
     if let Ok(key_event) = input_event.clone().try_cast::<InputEventKey>() {
         keyboard_events.write(KeyboardInput {
@@ -145,7 +148,6 @@ fn extract_input_events(
             echo: key_event.is_echo(),
         });
     }
-    
     // Mouse button input
     else if let Ok(mouse_button_event) = input_event.clone().try_cast::<InputEventMouseButton>() {
         let position = mouse_button_event.get_position();
@@ -155,7 +157,6 @@ fn extract_input_events(
             position: Vec2::new(position.x, position.y),
         });
     }
-    
     // Mouse motion
     else if let Ok(mouse_motion_event) = input_event.clone().try_cast::<InputEventMouseMotion>() {
         let position = mouse_motion_event.get_position();
@@ -165,7 +166,6 @@ fn extract_input_events(
             position: Vec2::new(position.x, position.y),
         });
     }
-    
     // Touch input
     else if let Ok(touch_event) = input_event.clone().try_cast::<InputEventScreenTouch>() {
         let position = touch_event.get_position();
@@ -175,7 +175,7 @@ fn extract_input_events(
             pressed: touch_event.is_pressed(),
         });
     }
-    
+
     // Action input - Check if this event matches any actions
     // Note: InputEventAction is not emitted by the engine, so we need to check manually
     check_action_events(&input_event, action_events);
@@ -185,23 +185,23 @@ fn check_action_events(
     input_event: &Gd<GodotInputEvent>,
     action_events: &mut EventWriter<ActionInput>,
 ) {
-    use godot::classes::InputMap;
     use godot::builtin::StringName;
-    
+    use godot::classes::InputMap;
+
     // Get all actions from the InputMap
     let mut input_map = InputMap::singleton();
     let actions = input_map.get_actions();
-    
+
     // Check each action to see if this input event matches it
     for action_variant in actions.iter_shared() {
         let action_name = action_variant.to_string();
         let action_string_name: StringName = action_name.as_str().into();
-        
+
         // Check if this input event matches the action
         if input_event.is_action(&action_string_name) {
             let pressed = input_event.is_action_pressed(&action_string_name);
             let strength = input_event.get_action_strength(&action_string_name);
-            
+
             action_events.write(ActionInput {
                 action: action_name,
                 pressed,

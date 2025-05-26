@@ -36,7 +36,7 @@ fn handle_keyboard_input(mut keyboard_events: EventReader<KeyboardInput>) {
         let key_name = format!("{:?}", event.keycode);
         let state = if event.pressed { "pressed" } else { "released" };
         let echo_info = if event.echo { " (echo)" } else { "" };
-        
+
         godot_print!(
             "🎹 Keyboard: {} {} (physical: {:?}){}",
             key_name,
@@ -65,7 +65,7 @@ fn handle_mouse_button_input(mut mouse_button_events: EventReader<MouseButtonInp
     for event in mouse_button_events.read() {
         let button_name = format!("{:?}", event.button);
         let state = if event.pressed { "pressed" } else { "released" };
-        
+
         godot_print!(
             "🖱️  Mouse: {} {} at ({:.1}, {:.1})",
             button_name,
@@ -111,7 +111,7 @@ fn handle_mouse_motion(mut mouse_motion_events: EventReader<MouseMotion>) {
 fn handle_touch_input(mut touch_events: EventReader<GodotTouchInput>) {
     for event in touch_events.read() {
         let state = if event.pressed { "touched" } else { "released" };
-        
+
         godot_print!(
             "👆 Touch: finger {} {} at ({:.1}, {:.1})",
             event.finger_id,
@@ -131,7 +131,7 @@ fn handle_touch_input(mut touch_events: EventReader<GodotTouchInput>) {
 fn handle_action_input(mut action_events: EventReader<ActionInput>) {
     for event in action_events.read() {
         let state = if event.pressed { "pressed" } else { "released" };
-        
+
         godot_print!(
             "🎮 Action: '{}' {} (strength: {:.2})",
             event.action,
