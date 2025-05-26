@@ -2,6 +2,8 @@
 
 This example demonstrates the timing behavior of godot-bevy integration, showing how Bevy schedules run within Godot's frame callbacks.
 
+> 📖 **For detailed information about timing and schedules**, see [docs/TIMING_AND_SCHEDULES.md](../../docs/TIMING_AND_SCHEDULES.md)
+
 ## What This Example Tests
 
 This example helps you understand:
@@ -11,19 +13,7 @@ This example helps you understand:
 - **The relationship between visual frames and physics frames**
 - **How Bevy's FixedUpdate maintains consistent timing**
 
-## How It Works
-
-### Frame Execution
-- **Visual Frame (`_process`)**: Runs `app.update()` - the complete Bevy update cycle
-  - Includes: `First`, `PreUpdate`, `Update`, `FixedUpdate`, `PostUpdate`, `Last`
-  - Runs at Godot's visual framerate (typically 60-120 FPS)
-
-- **Physics Frame (`_physics_process`)**: Runs the `PhysicsUpdate` schedule only
-  - Custom schedule for Godot-specific physics systems
-  - Runs at project's physics ticks / second (default 60 Hz)
-  - **Important**: Executes independently of visual frames - can run between any visual frame schedules
-
-### What You'll See
+## What You'll See
 
 The example logs periodic messages showing:
 
@@ -75,7 +65,7 @@ This example is particularly useful for:
 - Understanding when to use each Bevy schedule
 - Debugging timing-related issues
 - Verifying frame rate expectations
-- Learning about fixed timestep vs variable timestep systems 
+- Learning about fixed timestep vs variable timestep systems
 
 ### Scheduling Relationships
 
