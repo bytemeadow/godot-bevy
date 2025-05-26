@@ -26,10 +26,6 @@ impl Plugin for GodotInputEventPlugin {
             .add_event::<MouseMotion>()
             .add_event::<TouchInput>()
             .add_event::<ActionInput>();
-
-        // Initialize with a dummy channel - will be replaced when BevyApp sets up the watcher
-        let (_, receiver) = std::sync::mpsc::channel();
-        app.insert_non_send_resource(InputEventReader(receiver));
     }
 }
 
