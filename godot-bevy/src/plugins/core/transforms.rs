@@ -352,7 +352,7 @@ fn pre_update_godot_transforms_3d(
         if transform.is_changed() {
             continue;
         }
-        
+
         let godot_transform = reference.get::<Node3D>().get_transform();
         if *transform.as_godot() != godot_transform {
             *transform.as_godot_mut() = godot_transform;
