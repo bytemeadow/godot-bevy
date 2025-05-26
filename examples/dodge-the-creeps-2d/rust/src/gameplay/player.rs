@@ -75,9 +75,6 @@ fn spawn_player(
     }
 }
 
-#[derive(NodeTreeView)]
-pub struct PlayerStartPosition(#[node("/root/Main/StartPosition")] GodotNodeHandle);
-
 fn player_on_ready(
     mut commands: Commands,
     mut player: Query<
@@ -89,9 +86,6 @@ fn player_on_ready(
         let mut player = player.get::<GodotPlayerNode>();
         player.set_visible(false);
         player_data.speed = player.bind().get_speed();
-
-        let mut start_position = PlayerStartPosition::from_node(player.clone());
-        player.set_position(start_position.0.get::<Node2D>().get_position());
 
         // Mark as initialized
         commands.entity(entity).insert(PlayerInitialized);
