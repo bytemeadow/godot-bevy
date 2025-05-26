@@ -38,6 +38,20 @@ Godot-Bevy provides a clean integration with Godot's frame timing:
 - **Physics Frame (`_physics_process`)**: Runs the `PhysicsUpdate` schedule only
   - For systems that need to sync with Godot's physics timing
   - Runs at Godot's physics tickrate (typically 60 Hz)
+  - **Scheduling**: `PhysicsUpdate` runs independently and can execute between any of the visual frame schedules (First, PreUpdate, Update, etc.). There are no strong ordering guarantees between physics frames and visual frames.
+
+### Data Flow and Synchronization
+
+**Transform Updates**: The library handles transform synchronization intelligently:
+- **PreUpdate**: Reads Godot transforms into Bevy components (unless recently changed by Bevy)
+- **Last**: Writes Bevy transform changes back to Godot nodes
+- **PhysicsUpdate**: Can modify transforms, which will be detected and synchronized in the next visual frame's `Last` schedule
+
+**Best Practices**:
+- ✅ **Safe**: Update transforms in `PhysicsUpdate`, read them in `Update` (next visual frame)
+- ✅ **Safe**: Update transforms in `Update`, read them in `PhysicsUpdate` (same or next physics frame)
+- ⚠️ **Avoid**: Modifying the same transform in both `PhysicsUpdate` and visual frame schedules simultaneously
+- ⚠️ **Avoid**: Expecting immediate synchronization within the same frame - changes propagate on the next frame cycle
 
 ### Usage Guidelines
 

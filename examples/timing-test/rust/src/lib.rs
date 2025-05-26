@@ -137,7 +137,7 @@ fn last_schedule_system(stats: Res<TimingStats>, time: Res<Time>) {
 fn physics_update_system(
     mut stats: ResMut<TimingStats>,
     mut counter: ResMut<ProcessCallCounter>,
-    time: Res<Time>,
+    mut system_delta: SystemDeltaTimer,
 ) {
     stats.physics_update_runs += 1;
     counter.physics_process_calls += 1;
@@ -149,7 +149,7 @@ fn physics_update_system(
             "⚡ PhysicsUpdate #{}: physics_process_calls: {}, Time: {:.2}s",
             stats.physics_update_runs,
             counter.physics_process_calls,
-            time.elapsed_secs()
+            system_delta.delta_seconds()
         );
     }
 }

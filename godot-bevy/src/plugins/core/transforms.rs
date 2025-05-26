@@ -348,6 +348,11 @@ fn pre_update_godot_transforms_3d(
     mut entities: Query<(&mut Transform3D, &mut GodotNodeHandle)>,
 ) {
     for (mut transform, mut reference) in entities.iter_mut() {
+        // Skip entities that were changed recently (e.g., by PhysicsUpdate systems)
+        if transform.is_changed() {
+            continue;
+        }
+        
         let godot_transform = reference.get::<Node3D>().get_transform();
         if *transform.as_godot() != godot_transform {
             *transform.as_godot_mut() = godot_transform;

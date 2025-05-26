@@ -21,6 +21,7 @@ This example helps you understand:
 - **Physics Frame (`_physics_process`)**: Runs the `PhysicsUpdate` schedule only
   - Custom schedule for Godot-specific physics systems
   - Runs at project's physics ticks / second (default 60 Hz)
+  - **Important**: Executes independently of visual frames - can run between any visual frame schedules
 
 ### What You'll See
 
@@ -75,3 +76,16 @@ This example is particularly useful for:
 - Debugging timing-related issues
 - Verifying frame rate expectations
 - Learning about fixed timestep vs variable timestep systems 
+
+### Scheduling Relationships
+
+**No Strong Ordering Guarantees**: `PhysicsUpdate` and the visual frame schedules (`First`, `PreUpdate`, `Update`, etc.) run independently. A physics frame might execute:
+- Before a visual frame starts
+- Between `PreUpdate` and `Update` 
+- After `Last` completes
+- Multiple times between visual frames (if physics rate > visual rate)
+
+**Data Synchronization**: Changes made in one schedule are visible in others, but with frame delays:
+- Transform changes in `PhysicsUpdate` → visible in next visual frame's `Update`
+- Transform changes in `Update` → visible in same or next `PhysicsUpdate`
+- The transform sync systems (`PreUpdate`/`Last`) handle the bidirectional synchronization
