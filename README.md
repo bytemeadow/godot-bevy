@@ -37,7 +37,7 @@ Add the following to your `Cargo.toml`:
 ```toml
 [dependencies]
 godot-bevy = "0.3.0"
-bevy = "0.16"
+bevy = { version = "0.16", default-features = false }
 godot = "0.2.4"
 ```
 
@@ -87,7 +87,7 @@ fn move_player(
 
 ### Project Setup
 
-1. **Add a `BevyAppSingleton` autoload** in your Godot project settings that has the `BevyApp` node
+1. **Add a `BevyAppSingleton` autoload** in your Godot project settings, which is a Godot scene containing a single root node of type BevyApp, which you can see examples of in `examples/`.
 2. **Interact with Godot from Bevy**:
 
 ```rust
@@ -119,6 +119,8 @@ Each example includes both Rust code and a complete Godot project ready to run.
 ## Inspiration and Acknowledgements
 
 This library is inspired by and builds upon the work of [bevy_godot](https://github.com/rand0m-cloud/bevy_godot), which provided similar functionality for Godot 3. `godot-bevy` extends this concept to support Godot 4 and Bevy 0.16.
+
+**Alternative**: If you're looking for a different approach to `godot-bevy`, check out [bevy_godot4](https://github.com/jrockett6/bevy_godot4). For a comparison of the differences between these libraries, see [Issue #2](https://github.com/dcvz/godot-bevy/issues/2).
 
 ## Version Compatibility Matrix
 
