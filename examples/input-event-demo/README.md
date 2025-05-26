@@ -222,13 +222,27 @@ fn build_app(app: &mut App) {
 use bevy::prelude::*;
 
 fn build_app(app: &mut App) {
-    app.add_systems(Update, simple_movement);
+    app.add_systems(Update, (
+        simple_movement,
+        handle_jump
+          .run_if(input_just_pressed(KeyCode::Space)),
+    ))
+    
 }
 
 fn simple_movement(keys: Res<ButtonInput<KeyCode>>) {
     // Use Bevy's built-in input - much simpler!
-    if keys.pressed(KeyCode::Space) {
-        println!("Jump!");
+    if keys.pressed(KeyCode::Left) {
+        // Move left
+    }
+    if keys.pressed(KeyCode::Right) {
+        // Move right 
+    }
+    if keys.pressed(KeyCode::Up) {
+        // Move up
+    }
+    if keys.pressed(KeyCode::Down) {
+        // Move down
     }
 }
 ```
