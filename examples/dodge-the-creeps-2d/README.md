@@ -17,6 +17,26 @@ Renderer: Compatibility
 
 ![Screenshot](screenshots/dodge.png)
 
+## Running This Example
+
+1. **Build**: `cargo build`
+2. **Run**: You can either:
+    1. Open the Godot project and run the scene
+    1. Run: `cargo run`. NOTE: This requires the Godot binary, which we attempt
+       to locate either through your environment's path or by searching common
+       locations. If this doesn't work, update your path to include Godot. If
+       this fails for other reasons, it may be because your version of Godot
+       is different than the one the example was built with, in that case,
+       try opening the Godot project first.
+3. **Interact**: Try different input methods:
+   - Use arrow keys (mapped to move_left, move_right, etc. actions)
+
+This example is particularly useful for:
+- Learn how to organize a godot-bevy project
+- Understanding basic game states: how to define and transition between them
+- Learning how to process input events in Bevy systems
+- Learn how to use bevy resources to keep a simple game score
+
 ## Copying
 
 `art/House In a Forest Loop.ogg` Copyright &copy; 2012 [HorrorPen](https://opengameart.org/users/horrorpen), [CC-BY 3.0: Attribution](http://creativecommons.org/licenses/by/3.0/). Source: https://opengameart.org/content/loop-house-in-a-forest
