@@ -11,6 +11,13 @@ Language: Rust
 
 Renderer: Compatibility
 
+## Audio
+
+This example uses [bevy_kira_audio](https://github.com/NiklasEi/bevy_kira_audio) for game audio. The audio system includes:
+- Background music that loops during gameplay
+- Game over sound effect
+- Uses `bevy::asset::AssetPlugin` for asset loading (required by Kira)
+
 ## Screenshots
 
 ![GIF from the documentation](https://docs.godotengine.org/en/latest/_images/dodge_preview.gif)
@@ -36,6 +43,7 @@ This example is particularly useful for:
 - Understanding basic game states: how to define and transition between them
 - Learning how to process input events in Bevy systems
 - Learn how to use bevy resources to keep a simple game score
+- Audio integration with bevy_kira_audio
 
 ## Copying
 
