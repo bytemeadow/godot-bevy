@@ -16,19 +16,22 @@ concurrency:
 
 jobs:
   rust:
-    name: build / rust (${{ matrix.os }})
+    name: build / rust (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [blaze/compute/ubuntu-latest, blaze/macos-latest, windows-latest]
         include:
           - os: blaze/compute/ubuntu-latest
+            platform: linux
             target: x86_64-unknown-linux-gnu
             extension: .so
           - os: blaze/macos-latest
+            platform: macos
             target: x86_64-apple-darwin
             extension: .dylib
           - os: windows-latest
+            platform: windows
             target: x86_64-pc-windows-msvc
             extension: .dll
 
@@ -54,7 +57,7 @@ jobs:
         components: rustfmt, clippy
 
     - name: Install Linux dependencies
-      if: matrix.os == 'ubuntu-latest'
+      if: runner.os == 'linux'
       run: |
         sudo apt-get update
         sudo apt-get install -y libasound2-dev libudev-dev pkg-config
