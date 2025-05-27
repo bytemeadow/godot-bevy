@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use bevy_kira_audio::prelude::*;
-use godot::global::godot_print;
 
 use crate::GameState;
 
@@ -25,7 +24,6 @@ pub struct GameAudio {
 }
 
 fn load_audio_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
-    godot_print!("Loading audio assets (startup)");
     let game_audio = GameAudio {
         background_music: Some(asset_server.load("sounds/House In a Forest Loop.ogg")),
         game_over_sound: Some(asset_server.load("sounds/gameover.wav")),
