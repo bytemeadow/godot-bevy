@@ -7,8 +7,13 @@ rust-version = "1.82"
 [lib]
 crate-type = ["cdylib"]
 
+[[bin]]
+path = "../../run_godot.rs"
+name = "input-event-demo"
+
 [dependencies]
 bevy = { version = "0.16", default-features = false }
 fastrand = { version = "2.3.0" }
 godot = "0.2.4"
 godot-bevy = { path = "../../../godot-bevy" }
+which = "7.0.3"
