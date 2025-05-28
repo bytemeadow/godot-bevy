@@ -1,4 +1,4 @@
-use bevy::app::{App, Plugin};
+use bevy::app::{App, Plugin, ScheduleRunnerPlugin};
 use bevy::ecs::schedule::{Schedule, ScheduleLabel};
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -30,7 +30,7 @@ pub struct GodotCorePlugin;
 
 impl Plugin for GodotCorePlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(MinimalPlugins)
+        app.add_plugins(MinimalPlugins.build().disable::<ScheduleRunnerPlugin>())
             .add_plugins(bevy::log::LogPlugin::default())
             .add_plugins(bevy::diagnostic::DiagnosticsPlugin)
             .add_plugins(GodotSceneTreePlugin)
