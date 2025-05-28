@@ -2,7 +2,9 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Error, Field, Fields, LitStr, Result, parse_macro_input, Attribute, Type};
+use syn::{
+    Attribute, Data, DeriveInput, Error, Field, Fields, LitStr, Result, Type, parse_macro_input,
+};
 
 #[proc_macro_attribute]
 pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -195,7 +197,7 @@ fn bevy_component(input: DeriveInput) -> Result<TokenStream2> {
 
     // Get the component name from attribute or default to <GodotStruct>Component
     let component_name = get_component_name(&input.attrs, godot_struct_name)?;
-    
+
     // Find exported fields that should be synced to Bevy
     let synced_fields = data_struct
         .fields
@@ -235,7 +237,10 @@ fn bevy_component(input: DeriveInput) -> Result<TokenStream2> {
         }
     });
 
-    let plugin_name = syn::Ident::new(&format!("{}AutoSyncPlugin", component_name), component_name.span());
+    let plugin_name = syn::Ident::new(
+        &format!("{}AutoSyncPlugin", component_name),
+        component_name.span(),
+    );
 
     let expanded = quote! {
         #[derive(bevy::prelude::Component, Debug, Clone)]
@@ -270,7 +275,7 @@ fn bevy_component(input: DeriveInput) -> Result<TokenStream2> {
         // Implement AutoSyncComponent trait for automatic syncing
         impl godot_bevy::prelude::AutoSyncComponent for #component_name {
             type GodotType = #godot_struct_name;
-            
+
             fn auto_sync(&mut self, godot_node: &mut godot_bevy::bridge::GodotNodeHandle) {
                 self.sync_from_godot(godot_node);
             }
@@ -314,21 +319,24 @@ fn get_component_name(attrs: &[Attribute], godot_struct_name: &syn::Ident) -> Re
             }
         }
     }
-    
+
     // Default: <GodotStruct>Component
     let component_name = format!("{}Component", godot_struct_name);
     Ok(syn::Ident::new(&component_name, godot_struct_name.span()))
 }
 
 fn has_export_attr(field: &Field) -> bool {
-    field.attrs.iter().any(|attr| attr.path().is_ident("export"))
+    field
+        .attrs
+        .iter()
+        .any(|attr| attr.path().is_ident("export"))
 }
 
 fn should_sync_field(field: &Field) -> bool {
     // If no #[sync] attribute is found, default to syncing all exported fields
     // If #[sync] is found, only sync those explicitly marked
     let has_sync_anywhere = field.attrs.iter().any(|attr| attr.path().is_ident("sync"));
-    
+
     if has_sync_anywhere {
         field.attrs.iter().any(|attr| attr.path().is_ident("sync"))
     } else {
@@ -345,9 +353,15 @@ fn get_field_default_value(ty: &Type) -> TokenStream2 {
         Type::Path(type_path) if type_path.path.is_ident("u32") => quote! { 0 },
         Type::Path(type_path) if type_path.path.is_ident("u64") => quote! { 0 },
         Type::Path(type_path) if type_path.path.is_ident("bool") => quote! { false },
-        Type::Path(type_path) if type_path.path.segments.last().unwrap().ident == "String" => quote! { String::new() },
-        Type::Path(type_path) if type_path.path.segments.last().unwrap().ident == "Vector2" => quote! { godot::builtin::Vector2::ZERO },
-        Type::Path(type_path) if type_path.path.segments.last().unwrap().ident == "Vector3" => quote! { godot::builtin::Vector3::ZERO },
+        Type::Path(type_path) if type_path.path.segments.last().unwrap().ident == "String" => {
+            quote! { String::new() }
+        }
+        Type::Path(type_path) if type_path.path.segments.last().unwrap().ident == "Vector2" => {
+            quote! { godot::builtin::Vector2::ZERO }
+        }
+        Type::Path(type_path) if type_path.path.segments.last().unwrap().ident == "Vector3" => {
+            quote! { godot::builtin::Vector3::ZERO }
+        }
         _ => quote! { Default::default() },
     }
 }

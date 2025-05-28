@@ -66,7 +66,7 @@ fn spawn_player(
     // Only spawn if we haven't already spawned a player
     if !player_spawned.0 && existing_player.is_empty() {
         commands.spawn(GodotSceneWithComponent::<Player>::from_resource(
-            assets.player_scn.clone()
+            assets.player_scn.clone(),
         ));
 
         player_spawned.0 = true;
@@ -80,7 +80,7 @@ fn player_on_ready(
     if let Ok((entity, mut player_handle)) = player.single_mut() {
         let mut player = player_handle.get::<GodotPlayerNode>();
         player.set_visible(false);
-        
+
         // Mark as initialized
         commands.entity(entity).insert(PlayerInitialized);
     }

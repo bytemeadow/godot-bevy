@@ -1,10 +1,10 @@
-use bevy::prelude::*;
 use crate::bridge::GodotNodeHandle;
+use bevy::prelude::*;
 
 /// Trait for components that can automatically sync from Godot nodes
 pub trait AutoSyncComponent: Component {
     type GodotType;
-    
+
     fn auto_sync(&mut self, godot_node: &mut GodotNodeHandle);
 }
 
@@ -22,11 +22,11 @@ impl<T: Component + Default> GodotSceneWithComponent<T> {
             component: T::default(),
         }
     }
-    
+
     pub fn from_resource(resource: crate::bridge::GodotResourceHandle) -> Self {
         Self {
             scene: crate::plugins::packed_scene::GodotScene::from_resource(resource),
             component: T::default(),
         }
     }
-} 
+}
