@@ -10,12 +10,12 @@ pub trait AutoSyncComponent: Component {
 
 /// Bundle that spawns a Godot scene and automatically syncs a component
 #[derive(Bundle)]
-pub struct GodotSceneWithComponent<T: Component + Default> {
+pub struct GodotSceneWithComponent<T: AutoSyncComponent + Default> {
     pub scene: crate::plugins::packed_scene::GodotScene,
     pub component: T,
 }
 
-impl<T: Component + Default> GodotSceneWithComponent<T> {
+impl<T: AutoSyncComponent + Default> GodotSceneWithComponent<T> {
     pub fn new(path: &str) -> Self {
         Self {
             scene: crate::plugins::packed_scene::GodotScene::from_path(path),

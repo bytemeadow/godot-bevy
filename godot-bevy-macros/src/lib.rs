@@ -311,7 +311,7 @@ fn bevy_component(input: DeriveInput) -> Result<TokenStream2> {
 }
 
 fn get_component_name(attrs: &[Attribute], godot_struct_name: &syn::Ident) -> Result<syn::Ident> {
-    // Look for #[bevy_component(name = "CustomName")]
+    // Look for #[bevy_component("CustomName")]
     for attr in attrs {
         if attr.path().is_ident("bevy_component") {
             if let Ok(name_lit) = attr.parse_args::<LitStr>() {
