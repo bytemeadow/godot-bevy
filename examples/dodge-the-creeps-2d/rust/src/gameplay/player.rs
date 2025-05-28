@@ -65,7 +65,6 @@ fn spawn_player(
 ) {
     // Only spawn if we haven't already spawned a player
     if !player_spawned.0 && existing_player.is_empty() {
-        // One-liner spawning with automatic syncing!
         commands.spawn(GodotSceneWithComponent::<Player>::from_resource(
             assets.player_scn.clone()
         ));
