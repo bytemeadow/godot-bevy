@@ -6,7 +6,10 @@ use godot::{
 };
 use godot_bevy::prelude::*;
 
-use crate::{nodes::player::Player as GodotPlayerNode, GameState};
+use crate::{nodes::player::PlayerNode as GodotPlayerNode, GameState};
+
+// Import the auto-generated Player component and auto-sync plugin from the Godot node
+use crate::nodes::player::{Player, PlayerAutoSyncPlugin};
 
 #[derive(Debug, Resource)]
 pub struct PlayerAssets {
@@ -32,6 +35,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerAssets>()
             .init_resource::<PlayerSpawned>()
+            .add_plugins(PlayerAutoSyncPlugin)
             .add_systems(OnEnter(GameState::MainMenu), spawn_player)
             .add_systems(Update, player_on_ready)
             .add_systems(
@@ -51,11 +55,6 @@ impl Plugin for PlayerPlugin {
 }
 
 #[derive(Debug, Component)]
-pub struct Player {
-    speed: f32,
-}
-
-#[derive(Debug, Component)]
 struct PlayerInitialized;
 
 fn spawn_player(
@@ -66,10 +65,10 @@ fn spawn_player(
 ) {
     // Only spawn if we haven't already spawned a player
     if !player_spawned.0 && existing_player.is_empty() {
-        commands
-            .spawn_empty()
-            .insert(GodotScene::from_resource(assets.player_scn.clone()))
-            .insert(Player { speed: 0.0 });
+        // One-liner spawning with automatic syncing!
+        commands.spawn(GodotSceneWithComponent::<Player>::from_resource(
+            assets.player_scn.clone()
+        ));
 
         player_spawned.0 = true;
     }
@@ -77,16 +76,12 @@ fn spawn_player(
 
 fn player_on_ready(
     mut commands: Commands,
-    mut player: Query<
-        (Entity, &mut Player, &mut GodotNodeHandle),
-        (With<Player>, Without<PlayerInitialized>),
-    >,
+    mut player: Query<(Entity, &mut GodotNodeHandle), (With<Player>, Without<PlayerInitialized>)>,
 ) -> Result {
-    if let Ok((entity, mut player_data, mut player)) = player.single_mut() {
-        let mut player = player.get::<GodotPlayerNode>();
+    if let Ok((entity, mut player_handle)) = player.single_mut() {
+        let mut player = player_handle.get::<GodotPlayerNode>();
         player.set_visible(false);
-        player_data.speed = player.bind().get_speed();
-
+        
         // Mark as initialized
         commands.entity(entity).insert(PlayerInitialized);
     }

@@ -10,6 +10,7 @@ pub mod plugins;
 pub mod prelude;
 pub mod utils;
 pub mod watchers;
+pub mod auto_sync;
 
 pub struct GodotPlugin;
 

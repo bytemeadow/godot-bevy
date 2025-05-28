@@ -19,6 +19,7 @@ _Special thanks to [Blaze](https://runblaze.dev) for their support of this proje
 ## Features
 
 - **Deep ECS Integration**: True Bevy ECS systems controlling Godot nodes, not just bindings
+- **Automatic Component Generation**: Use `#[derive(BevyComponent)]` to automatically generate Bevy components from Godot exported properties
 - **Bidirectional Transform Sync**: Seamless Transform2D/3D synchronization between Bevy and Godot
 - **Godot Signals in ECS**: Listen to and respond to Godot signals from Bevy systems
 - **Collision Event Handling**: React to Godot collision events in your ECS systems
@@ -102,6 +103,7 @@ fn spawn_godot_scene(mut commands: Commands) {
 ### Core Concepts
 - **[Timing and Schedules](docs/TIMING_AND_SCHEDULES.md)** - Understanding frame timing, schedule execution, and data synchronization
 - **[Input Systems](docs/INPUT_SYSTEMS.md)** - Choosing between Bevy's built-in input and Godot's bridged input system
+- **[Automatic Component Generation](docs/COMPONENT_GENERATION.md)** - Eliminate boilerplate with auto-generated Bevy components from Godot properties
 
 ### API Reference
 For detailed API documentation, see [docs.rs/godot-bevy](https://docs.rs/godot-bevy).

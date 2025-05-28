@@ -1,9 +1,11 @@
 use godot::classes::{Area2D, IArea2D};
 use godot::prelude::*;
+use godot_bevy::prelude::*;
 
-#[derive(GodotClass)]
+#[derive(GodotClass, BevyComponent)]
 #[class(base=Area2D)]
-pub struct Player {
+#[bevy_component("Player")]
+pub struct PlayerNode {
     base: Base<Area2D>,
     screen_size: Vector2,
     #[export]
@@ -11,7 +13,7 @@ pub struct Player {
 }
 
 #[godot_api]
-impl IArea2D for Player {
+impl IArea2D for PlayerNode {
     fn init(base: Base<Area2D>) -> Self {
         Self {
             base,
