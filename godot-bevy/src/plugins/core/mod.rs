@@ -41,8 +41,6 @@ impl Plugin for GodotCorePlugin {
 
         // Add the PhysicsUpdate schedule
         app.add_schedule(Schedule::new(PhysicsUpdate));
-
-        // .add_plugins(GodotInputEventPlugin)
     }
 }
 
