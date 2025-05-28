@@ -1,6 +1,6 @@
 # Automatic Component Generation
 
-The `#[derive(BevyComponent)]` macro automatically generates Bevy components from Godot exported properties, eliminating all boilerplate and providing a completely automatic syncing experience.
+The `#[derive(BevyComponent)]` macro automatically generates Bevy components from a `GodotClass` with exported properties, eliminating all boilerplate and providing a completely automatic syncing experience.
 
 ## Quick Start
 
