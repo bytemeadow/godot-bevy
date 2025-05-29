@@ -9,7 +9,7 @@ use super::assets::GodotResourceLoader;
 use super::core::SceneTreeRef;
 use crate::bridge::{GodotNodeHandle, GodotResourceHandle};
 
-/// Plugin that provides a Kira-like audio API using Godot's audio system.
+/// Plugin that provides a convenient audio API using Godot's audio system.
 pub struct GodotAudioPlugin;
 
 impl Plugin for GodotAudioPlugin {
@@ -21,7 +21,7 @@ impl Plugin for GodotAudioPlugin {
     }
 }
 
-/// Main audio manager - similar to Kira's AudioManager
+/// Main audio manager for playing sounds and music
 #[derive(Resource, Default)]
 pub struct AudioManager {
     one_shot_sounds: HashMap<SoundId, GodotNodeHandle>,
@@ -31,13 +31,13 @@ pub struct AudioManager {
     cached_assets: HashMap<String, GodotResourceHandle>,
 }
 
-/// Handle to a preloaded audio asset - similar to Kira's Handle<AudioSource>
+/// Handle to a preloaded audio asset
 #[derive(Debug, Clone)]
 pub struct AudioHandle {
     path: String,
 }
 
-/// Handle to a playing sound instance - similar to Kira's Handle<AudioInstance>
+/// Handle to a playing sound instance
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SoundId(u32);
 
@@ -56,7 +56,7 @@ enum SoundSource {
     Handle(AudioHandle),
 }
 
-/// Settings for playing a sound - similar to Kira's SoundSettings
+/// Settings for playing a sound
 #[derive(Debug, Clone)]
 pub struct SoundSettings {
     pub volume: f32,
@@ -96,7 +96,7 @@ impl SoundSettings {
 }
 
 impl AudioManager {
-    /// Load and cache an audio asset for efficient reuse - similar to Kira's asset loading
+    /// Load and cache an audio asset for efficient reuse
     /// Returns a handle that can be used for playing instances
     pub fn load(
         &mut self,
@@ -121,7 +121,7 @@ impl AudioManager {
         }
     }
 
-    /// Play a preloaded audio handle - similar to Kira's audio.play()
+    /// Play a preloaded audio handle
     pub fn play_handle(&mut self, handle: &AudioHandle) -> Result<SoundId, AudioError> {
         self.play_handle_with_settings(handle, SoundSettings::default())
     }
@@ -241,18 +241,28 @@ fn process_sound_queue(
             if queued.settings.looping {
                 // Try to enable looping on the stream - this works for AudioStreamOggVorbis and similar
                 // Note: Not all stream types support runtime loop changes
-                if let Some(mut ogg_stream) = audio_stream.clone().try_cast::<godot::classes::AudioStreamOggVorbis>().ok() {
+                if let Some(mut ogg_stream) = audio_stream
+                    .clone()
+                    .try_cast::<godot::classes::AudioStreamOggVorbis>()
+                    .ok()
+                {
                     ogg_stream.set_loop(true);
                     audio_stream = ogg_stream.upcast();
-                } else if let Some(mut wav_stream) = audio_stream.clone().try_cast::<godot::classes::AudioStreamWav>().ok() {
+                } else if let Some(mut wav_stream) = audio_stream
+                    .clone()
+                    .try_cast::<godot::classes::AudioStreamWav>()
+                    .ok()
+                {
                     wav_stream.set_loop_mode(godot::classes::audio_stream_wav::LoopMode::FORWARD);
                     audio_stream = wav_stream.upcast();
                 } else {
-                    warn!("Audio stream type doesn't support runtime loop configuration: {}", 
-                          match &queued.source {
-                              SoundSource::Path(path) => path,
-                              SoundSource::Handle(handle) => &handle.path,
-                          });
+                    warn!(
+                        "Audio stream type doesn't support runtime loop configuration: {}",
+                        match &queued.source {
+                            SoundSource::Path(path) => path,
+                            SoundSource::Handle(handle) => &handle.path,
+                        }
+                    );
                 }
             }
 
@@ -335,7 +345,7 @@ pub enum AudioError {
 // Re-export for backward compatibility and convenience
 pub use AudioManager as GodotAudio;
 
-/// Helper extension trait to make audio playing even more convenient
+/// Helper extension trait to make audio playing more convenient
 pub trait AudioManagerExt {
     /// Play a sound with just a path - most convenient method
     fn play_sound(&mut self, path: &str) -> Result<SoundId, AudioError>;

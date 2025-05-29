@@ -1,7 +1,6 @@
-use bevy::app::{App, Plugin, Startup, Update};
+use bevy::app::{App, Plugin, Startup};
 use bevy::ecs::system::{Res, ResMut};
 use bevy::prelude::*;
-use bevy::state::condition::in_state;
 use bevy::state::state::{OnEnter, OnExit};
 use godot_bevy::prelude::{AudioHandle, AudioManager, GodotResourceLoader, SoundId, SoundSettings};
 
@@ -16,8 +15,7 @@ impl Plugin for AudioPlugin {
             .add_systems(Startup, load_audio_assets)
             .add_systems(OnEnter(GameState::InGame), start_background_music)
             .add_systems(OnEnter(GameState::GameOver), play_game_over_sound)
-            .add_systems(OnExit(GameState::InGame), stop_background_music)
-            .add_systems(Update, check_music_loop.run_if(in_state(GameState::InGame)));
+            .add_systems(OnExit(GameState::InGame), stop_background_music);
     }
 }
 
@@ -102,17 +100,6 @@ fn play_game_over_sound(mut audio: ResMut<AudioManager>, game_audio: Res<GameAud
         match audio.play_with_settings("audio/gameover.wav", SoundSettings::new().volume(0.7)) {
             Ok(_) => info!("Played game over sound with direct loading"),
             Err(e) => warn!("Failed to play game over sound: {}", e),
-        }
-    }
-}
-
-/// System that ensures music keeps looping
-fn check_music_loop(mut audio: ResMut<AudioManager>, game_audio: Res<GameAudio>) {
-    if let Some(sound_id) = game_audio.background_music_instance {
-        // Check if the background music is still playing
-        if !audio.is_playing(sound_id) {
-            warn!("Background music stopped unexpectedly");
-            // Could restart it here if needed
         }
     }
 }
