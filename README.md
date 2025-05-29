@@ -148,38 +148,42 @@ The `GodotAssetsPlugin` provides the `GodotResourceAssetLoader` for seamless int
 
 ### Audio System
 
-The library provides a convenient audio API using Godot's audio engine that works identically in development, Godot editor, and exported games. **Now integrated with Bevy's asset system for async, non-blocking audio loading.**
+The library provides a convenient audio API using Godot's audio engine that works identically in development, Godot editor, and exported games. **Follows the bevy_kira_audio pattern** - asset loading through Bevy's AssetServer, playback through AudioManager.
 
 #### Key Features
-- **Async loading** - Non-blocking audio asset loading through Bevy's AssetServer
-- **Preloaded assets** - Load once, play multiple times for efficiency
-- **Direct play** - Convenient one-shot sound loading and playing
+- **Separation of concerns** - AssetServer handles loading, AudioManager handles playback
+- **bevy_asset_loader integration** - Works seamlessly with AssetCollection loading states
+- **Direct Handle<GodotResource> playback** - Clean, simple API
 - **Sound management** - Control playing sounds (stop, check status, etc.)
 - **Looping support** - Automatic loop configuration for background music
 - **Volume and pitch control** - Full audio parameter control
 
-#### Quick Start (Recommended)
+#### Quick Start (bevy_kira_audio Style)
 
 ```rust
+use bevy::prelude::*;
+use bevy_asset_loader::asset_collection::AssetCollection;
 use godot_bevy::prelude::*;
 
-fn audio_system(
-    mut audio: ResMut<AudioManager>,
-    asset_server: Res<AssetServer>,
-) {
-    // Preload assets for efficiency (async, non-blocking)
-    let music_handle = audio.load("audio/background.ogg", &asset_server);
-    let sound_id = audio.play_handle_with_settings(
-        &music_handle,
-        SoundSettings::new().volume(0.5).looped()
-    ).unwrap();
+// Define your audio assets with AssetCollection
+#[derive(AssetCollection, Resource)]
+struct GameAudio {
+    #[asset(path = "audio/background.ogg")]
+    background_music: Handle<GodotResource>,
     
-    // Direct play using asset server (convenient for occasional sounds)
-    audio.play_with_settings(
-        "audio/jump.wav", 
-        SoundSettings::new().volume(0.8),
-        &asset_server
-    ).unwrap();
+    #[asset(path = "audio/jump.wav")]
+    jump_sound: Handle<GodotResource>,
+}
+
+fn audio_system(mut audio: ResMut<AudioManager>, game_audio: Res<GameAudio>) {
+    // Play background music with settings
+    let sound_id = audio.play_with_settings(
+        game_audio.background_music.clone(),
+        SoundSettings::new().volume(0.5).looped()
+    );
+    
+    // Play sound effects
+    audio.play(game_audio.jump_sound.clone());
     
     // Control playing sounds
     if audio.is_playing(sound_id) {
@@ -190,56 +194,84 @@ fn audio_system(
 
 #### Audio Patterns
 
-**Preloaded Assets** (efficient for repeated sounds):
-```rust
-// Load once during startup (async)
-fn load_audio_assets(
-    mut audio: ResMut<AudioManager>,
-    asset_server: Res<AssetServer>,
-) {
-    let music_handle = audio.load("audio/background.ogg", &asset_server);
-    // Store handle in a resource for later use
-}
-
-// Play multiple times with no loading overhead
-fn play_background_music(mut audio: ResMut<AudioManager>, music_handle: Res<AudioHandle>) {
-    audio.play_handle_with_settings(&music_handle, SoundSettings::new().looped()).unwrap();
-}
-```
-
-**Direct Play** (convenient for one-offs):
-```rust
-fn play_sound_effects(mut audio: ResMut<AudioManager>, asset_server: Res<AssetServer>) {
-    // Simple one-shot sounds (loads async)
-    audio.play("audio/jump.wav", &asset_server).unwrap();
-    audio.play("audio/coin.ogg", &asset_server).unwrap();
-    
-    // With custom settings
-    audio.play_with_settings(
-        "audio/explosion.wav",
-        SoundSettings::new().volume(0.7).pitch(1.2),
-        &asset_server
-    ).unwrap();
-}
-```
-
-**Integration with bevy_asset_loader:**
+**AssetCollection Loading** (recommended):
 ```rust
 #[derive(AssetCollection, Resource)]
 struct GameAudio {
     #[asset(path = "audio/background.ogg")]
     background_music: Handle<GodotResource>,
-    #[asset(path = "audio/jump.wav")]
-    jump_sound: Handle<GodotResource>,
+    #[asset(path = "audio/gameover.wav")]
+    death_sound: Handle<GodotResource>,
 }
 
-fn play_from_collection(
+// Add to your loading state
+app.add_loading_state(
+    LoadingState::new(GameState::Loading)
+        .continue_to_state(GameState::Menu)
+        .load_collection::<GameAudio>()
+);
+```
+
+**Direct AssetServer Loading**:
+```rust
+fn load_audio_on_demand(asset_server: Res<AssetServer>) {
+    let music: Handle<GodotResource> = asset_server.load("audio/battle.ogg");
+    // Store handle somewhere for later use
+}
+```
+
+**Playback Examples**:
+```rust
+fn play_audio_examples(
     mut audio: ResMut<AudioManager>,
     game_audio: Res<GameAudio>,
 ) {
-    // Convert Bevy handles to audio handles
-    let music_handle = audio.load_from_handle("audio/background.ogg", game_audio.background_music.clone());
-    audio.play_handle_with_settings(&music_handle, SoundSettings::new().looped()).unwrap();
+    // Simple playback
+    audio.play(game_audio.jump_sound.clone());
+    
+    // With volume and looping
+    let music_id = audio.play_with_settings(
+        game_audio.background_music.clone(),
+        SoundSettings::new().volume(0.7).looped()
+    );
+    
+    // Sound management
+    if audio.is_playing(music_id) {
+        audio.stop(music_id).unwrap();
+    }
+    
+    // Stop all sounds
+    audio.stop_all();
+    
+    // Get stats
+    let (queue_len, playing_count) = audio.stats();
+    println!("Queue: {}, Playing: {}", queue_len, playing_count);
+}
+```
+
+**State Management**:
+```rust
+#[derive(Resource, Default)]
+struct GameAudioState {
+    background_music_instance: Option<SoundId>,
+}
+
+fn manage_background_music(
+    mut audio: ResMut<AudioManager>,
+    mut audio_state: ResMut<GameAudioState>,
+    game_audio: Res<GameAudio>,
+) {
+    // Start music
+    let sound_id = audio.play_with_settings(
+        game_audio.background_music.clone(),
+        SoundSettings::new().looped()
+    );
+    audio_state.background_music_instance = Some(sound_id);
+    
+    // Stop music later
+    if let Some(id) = audio_state.background_music_instance.take() {
+        audio.stop(id).unwrap();
+    }
 }
 ```
 

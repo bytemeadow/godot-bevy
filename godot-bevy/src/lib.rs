@@ -13,8 +13,8 @@ pub mod prelude {
     pub use crate::plugins::{
         assets::{GodotAssetsPlugin, GodotResource},
         audio::{
-            AudioError, AudioHandle, AudioManager, AudioManagerExt, GodotAudio, GodotAudioPlugin,
-            SoundId, SoundSettings,
+            AudioError, AudioManager, AudioManagerExt, GodotAudio, GodotAudioPlugin, SoundId,
+            SoundSettings,
         },
         core::{
             ActionInput, CollisionEventReader, CollisionEventType, Collisions, FindEntityByNameExt,

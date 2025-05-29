@@ -2,7 +2,7 @@
 
 use bevy::{prelude::*, state::app::StatesPlugin};
 use bevy_asset_loader::prelude::*;
-use gameplay::{mob::MobAssets, player::PlayerAssets};
+use gameplay::{audio::GameAudio, mob::MobAssets, player::PlayerAssets};
 use godot_bevy::prelude::{
     godot_prelude::{gdextension, ExtensionLibrary},
     *,
@@ -23,9 +23,11 @@ fn build_app(app: &mut App) {
             LoadingState::new(GameState::Loading)
                 .continue_to_state(GameState::MainMenu)
                 .load_collection::<PlayerAssets>()
-                .load_collection::<MobAssets>(),
+                .load_collection::<MobAssets>()
+                .load_collection::<GameAudio>(),
         )
         .init_resource::<Score>()
+        .init_resource::<gameplay::audio::GameAudioState>()
         .add_plugins(main_menu::MainMenuPlugin)
         .add_plugins(gameplay::GameplayPlugin);
 }

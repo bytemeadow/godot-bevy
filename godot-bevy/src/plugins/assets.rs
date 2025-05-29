@@ -33,7 +33,7 @@ use crate::bridge::GodotResourceHandle;
 ///     let audio: Handle<GodotResource> = asset_server.load("audio/music.ogg");
 ///     let texture: Handle<GodotResource> = asset_server.load("art/player.png");
 /// }
-/// 
+///
 /// fn use_loaded_assets(
 ///     mut assets: ResMut<Assets<GodotResource>>,
 ///     scene_handle: Res<Handle<GodotResource>>, // Your loaded handle
@@ -45,7 +45,7 @@ use crate::bridge::GodotResourceHandle;
 ///     }
 /// }
 /// ```
-/// 
+///
 /// **Benefits:**
 /// - Non-blocking: Won't freeze your game during loading
 /// - Integrates with Bevy's asset system (loading states, hot reloading, etc.)
