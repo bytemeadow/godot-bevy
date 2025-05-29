@@ -12,8 +12,8 @@ mod nodes;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
-    // Note: godot-bevy now provides a Kira-like audio API using AudioManager
-    // Example usage: audio.play("audio/sound.ogg").unwrap();
+    // Note: Asset loading with path verification bypass is now handled automatically
+    // by GodotCorePlugin, so Bevy's asset_server can load Godot resources from .pck files
 
     app.add_plugins(StatesPlugin)
         .init_state::<GameState>()

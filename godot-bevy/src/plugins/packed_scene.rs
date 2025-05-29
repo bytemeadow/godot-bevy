@@ -2,22 +2,24 @@ use std::str::FromStr;
 
 use bevy::{
     app::{App, Plugin, PostUpdate},
+    asset::{Assets, Handle},
     ecs::{
         component::Component,
         entity::Entity,
         query::Without,
-        system::{Commands, Query},
+        system::{Commands, Query, ResMut},
     },
     log::tracing,
 };
 use godot::{
-    builtin::{GString, Transform2D, Transform3D, Vector2, Vector3},
-    classes::{Node2D, Node3D, PackedScene, ResourceLoader},
+    builtin::GString,
+    classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader},
 };
 
 use crate::bridge::{GodotNodeHandle, GodotResourceHandle};
+use crate::plugins::assets::GodotResource;
 
-use super::core::SceneTreeRef;
+use super::core::{SceneTreeRef, Transform2D, Transform3D};
 
 pub struct PackedScenePlugin;
 impl Plugin for PackedScenePlugin {
@@ -34,27 +36,31 @@ impl Plugin for PackedScenePlugin {
 #[derive(Debug, Component)]
 pub struct GodotScene {
     resource: GodotSceneResource,
-    transform: Option<GodotSceneTransform>,
+    parent: Option<GodotNodeHandle>,
 }
 
 #[derive(Debug)]
 enum GodotSceneResource {
     Resource(GodotResourceHandle),
+    Handle(Handle<GodotResource>),
     Path(String),
 }
 
-#[derive(Debug)]
-enum GodotSceneTransform {
-    Transform2D(Transform2D),
-    Transform3D(Transform3D),
-}
-
 impl GodotScene {
-    /// Instantiate the godot scene from an GodotResourceHandle.
+    /// Instantiate the godot scene from a GodotResourceHandle.
     pub fn from_resource(res: GodotResourceHandle) -> Self {
         Self {
             resource: GodotSceneResource::Resource(res),
-            transform: None,
+            parent: None,
+        }
+    }
+
+    /// Instantiate the godot scene from a Bevy Handle<GodotResource>.
+    /// This is the preferred method when using Bevy's asset system.
+    pub fn from_handle(handle: Handle<GodotResource>) -> Self {
+        Self {
+            resource: GodotSceneResource::Handle(handle),
+            parent: None,
         }
     }
 
@@ -62,36 +68,12 @@ impl GodotScene {
     ///
     /// Note that this will call [`ResourceLoader`].load() - which is a blocking load.
     /// If you want "preload" functionality, you should load your resources into a Bevy [`Resource`]
-    /// and use from_resource().
+    /// and use from_handle() or from_resource().
     pub fn from_path(path: &str) -> Self {
         Self {
             resource: GodotSceneResource::Path(path.to_string()),
-            transform: None,
+            parent: None,
         }
-    }
-
-    pub fn with_transform3d(mut self, transform: Transform3D) -> Self {
-        self.transform = Some(GodotSceneTransform::Transform3D(transform));
-        self
-    }
-
-    pub fn with_transform2d(mut self, transform: Transform2D) -> Self {
-        self.transform = Some(GodotSceneTransform::Transform2D(transform));
-        self
-    }
-
-    pub fn with_translation3d(mut self, translation: Vector3) -> Self {
-        self.transform = Some(GodotSceneTransform::Transform3D(
-            Transform3D::IDENTITY.translated(translation),
-        ));
-        self
-    }
-
-    pub fn with_translation2d(mut self, translation: Vector2) -> Self {
-        self.transform = Some(GodotSceneTransform::Transform2D(
-            Transform2D::IDENTITY.translated(translation),
-        ));
-        self
     }
 }
 
@@ -100,56 +82,96 @@ struct GodotSceneSpawned;
 
 fn spawn_scene(
     mut commands: Commands,
-    mut new_scenes: Query<(&mut GodotScene, Entity), Without<GodotSceneSpawned>>,
+    mut new_scenes: Query<
+        (
+            &mut GodotScene,
+            Entity,
+            Option<&Transform2D>,
+            Option<&Transform3D>,
+        ),
+        Without<GodotSceneSpawned>,
+    >,
     mut scene_tree: SceneTreeRef,
+    mut assets: ResMut<Assets<GodotResource>>,
 ) {
-    for (mut scene, ent) in new_scenes.iter_mut() {
-        let packed_scene = match &mut scene.resource {
-            GodotSceneResource::Resource(res) => res.get(),
+    for (mut scene, ent, transform2d, transform3d) in new_scenes.iter_mut() {
+        let packed_scene = match &scene.resource {
+            GodotSceneResource::Resource(res) => {
+                let mut res_clone = res.clone();
+                match res_clone.try_get() {
+                    Some(resource) => resource,
+                    None => {
+                        tracing::error!("GodotResourceHandle resource was freed!");
+                        continue;
+                    }
+                }
+            }
+            GodotSceneResource::Handle(handle) => {
+                match assets.get_mut(handle) {
+                    Some(asset) => {
+                        let mut asset_handle = asset.handle().clone();
+                        match asset_handle.try_get() {
+                            Some(resource) => resource,
+                            None => {
+                                tracing::warn!(
+                                    "Asset handle resource was freed, will retry next frame"
+                                );
+                                continue;
+                            }
+                        }
+                    }
+                    None => {
+                        // Asset not ready yet, will retry next frame
+                        continue;
+                    }
+                }
+            }
             GodotSceneResource::Path(path) => ResourceLoader::singleton()
                 .load(&GString::from_str(path).expect("path to be a valid GString"))
                 .expect("packed scene to load"),
         };
 
-        let instance = packed_scene
-            .try_cast::<PackedScene>()
-            .expect("resource to be a packed scene")
-            .instantiate()
-            .unwrap();
+        let packed_scene_cast = packed_scene.clone().try_cast::<PackedScene>();
+        if packed_scene_cast.is_err() {
+            tracing::error!("Resource is not a PackedScene: {:?}", packed_scene);
+            continue;
+        }
 
-        match scene_tree
-            .get()
-            .get_root()
-            .unwrap()
-            .get_node_or_null("BevyAppSingleton")
-        {
-            Some(mut app) => app.add_child(&instance),
+        let packed_scene = packed_scene_cast.unwrap();
+
+        let instance = match packed_scene.instantiate() {
+            Some(instance) => instance,
             None => {
-                tracing::error!(
-                    "attempted to add a child to the BevyAppSingleton autoload, but the BevyAppSingleton autoload wasn't found"
-                );
-                return;
+                tracing::error!("Failed to instantiate PackedScene");
+                continue;
+            }
+        };
+
+        if let Some(transform) = transform2d {
+            match instance.clone().try_cast::<Node2D>().ok() {
+                Some(mut node2d) => node2d.set_global_transform(*transform.as_godot()),
+                None => tracing::error!(
+                    "attempted to spawn a scene with a transform on Node that did not inherit from Node2D, the transform was not set"
+                ),
             }
         }
 
-        if let Some(transform) = &scene.transform {
-            match transform {
-                GodotSceneTransform::Transform2D(transform) => {
-                    match instance.clone().try_cast::<Node2D>().ok() {
-                        Some(mut node2d) => node2d.set_global_transform(*transform),
-                        None => tracing::error!(
-                            "attempted to spawn a scene with a transform on Node that did not inherit from Node3D, the transform was not set"
-                        ),
-                    }
-                }
-                GodotSceneTransform::Transform3D(transform) => {
-                    match instance.clone().try_cast::<Node3D>().ok() {
-                        Some(mut node3d) => node3d.set_global_transform(*transform),
-                        None => tracing::error!(
-                            "attempted to spawn a scene with a transform on Node that did not inherit from Node3D, the transform was not set"
-                        ),
-                    }
-                }
+        if let Some(transform) = transform3d {
+            match instance.clone().try_cast::<Node3D>().ok() {
+                Some(mut node3d) => node3d.set_global_transform(*transform.as_godot()),
+                None => tracing::error!(
+                    "attempted to spawn a scene with a transform on Node that did not inherit from Node3D, the transform was not set"
+                ),
+            }
+        }
+
+        match &mut scene.parent {
+            Some(parent) => {
+                let mut parent = parent.get::<Node>();
+                parent.add_child(&instance);
+            }
+            None => {
+                scene_tree.get().get_root().unwrap().add_child(&instance);
             }
         }
 

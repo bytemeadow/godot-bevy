@@ -1,4 +1,8 @@
 use bevy::app::{App, Plugin, ScheduleRunnerPlugin};
+use bevy::asset::{
+    AssetMetaCheck, AssetPlugin,
+    io::{AssetSource, AssetSourceId},
+};
 use bevy::ecs::schedule::{Schedule, ScheduleLabel};
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -30,8 +34,19 @@ pub struct GodotCorePlugin;
 
 impl Plugin for GodotCorePlugin {
     fn build(&self, app: &mut App) {
+        // IMPORTANT: Register custom AssetReader BEFORE setting up AssetPlugin
+        app.register_asset_source(
+            AssetSourceId::Default,
+            AssetSource::build()
+                .with_reader(|| Box::new(crate::plugins::assets::GodotAssetReader::new())),
+        );
+
         app.add_plugins(MinimalPlugins.build().disable::<ScheduleRunnerPlugin>())
-            .add_plugins(bevy::asset::AssetPlugin::default())
+            // Configure AssetPlugin to bypass path verification for Godot resources
+            .add_plugins(AssetPlugin {
+                meta_check: AssetMetaCheck::Never,
+                ..default()
+            })
             .add_plugins(bevy::log::LogPlugin::default())
             .add_plugins(bevy::diagnostic::DiagnosticsPlugin)
             .add_plugins(GodotSceneTreePlugin)

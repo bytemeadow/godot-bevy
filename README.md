@@ -102,17 +102,23 @@ fn spawn_godot_scene(mut commands: Commands) {
 
 **The library provides unified asset loading that works consistently in both development and exported games**. While Godot packages assets differently when exporting (filesystem vs .pck files), `godot-bevy` abstracts this complexity away.
 
-Use the `GodotResourceLoader` for all asset loading needs:
+Use the `GodotResourceLoader` for reliable asset loading:
 
 ```rust
+use godot::classes::{AudioStream, ImageTexture, PackedScene};
+
 fn load_assets(godot_loader: Res<GodotResourceLoader>) {
     // Load any Godot resource type - works identically in development and exported games
-    if let Some(texture) = godot_loader.load::<ImageTexture>("art/player.png") {
-        // Use the texture...
+    if let Some(texture) = godot_loader.load_as::<ImageTexture>("art/player.png") {
+        // Use the texture directly...
     }
     
-    if let Some(audio) = godot_loader.load::<AudioStream>("audio/music.ogg") {
-        // Use the audio...
+    if let Some(audio) = godot_loader.load_as::<AudioStream>("audio/music.ogg") {
+        // Use the audio directly...
+    }
+    
+    if let Some(scene) = godot_loader.load_as::<PackedScene>("scenes/enemy.tscn") {
+        // Use the scene directly...
     }
     
     // Check if resources exist
@@ -123,10 +129,11 @@ fn load_assets(godot_loader: Res<GodotResourceLoader>) {
 ```
 
 **Key Benefits:**
-- Works identically in development and exported games
-- Supports all Godot resource types (textures, audio, scenes, etc.)
-- Provides `exists()` method for robust error handling
-- Leverages Godot's native resource system
+- **Works identically** in development and exported games
+- **Supports all Godot resource types** - Textures, audio, scenes, materials, etc.
+- **Proper error handling** - `exists()` method and Option types for robust code
+- **Thread-safe** - Loading happens on the main thread with proper Godot access
+- **Leverages Godot's native resource system** - Maximum compatibility with all Godot features
 
 The `GodotAssetsPlugin` provides the `GodotResourceLoader` resource for seamless integration with Godot's asset pipeline.
 
