@@ -4,10 +4,13 @@ use bevy::prelude::*;
 use godot::global::Key;
 use godot_bevy::prelude::{
     godot_prelude::{gdextension, godot_print, ExtensionLibrary},
-    input_event::{MouseButton as GodotMouseButton, TouchInput as GodotTouchInput},
     *,
 };
-// Import our custom input types to avoid conflicts with Bevy's built-in types
+
+// Import input event types directly to avoid naming conflicts
+use godot_bevy::plugins::core::input_event::{
+    ActionInput, KeyboardInput, MouseButton, MouseButtonInput, MouseMotion, TouchInput,
+};
 
 #[bevy_app]
 fn build_app(app: &mut App) {
@@ -76,16 +79,16 @@ fn handle_mouse_button_input(mut mouse_button_events: EventReader<MouseButtonInp
 
         // Special handling for different buttons
         match event.button {
-            GodotMouseButton::Left if event.pressed => {
+            MouseButton::Left if event.pressed => {
                 godot_print!("👆 Left click - Select/Attack!");
             }
-            GodotMouseButton::Right if event.pressed => {
+            MouseButton::Right if event.pressed => {
                 godot_print!("👉 Right click - Context menu!");
             }
-            GodotMouseButton::WheelUp => {
+            MouseButton::WheelUp => {
                 godot_print!("🔼 Scroll up - Zoom in!");
             }
-            GodotMouseButton::WheelDown => {
+            MouseButton::WheelDown => {
                 godot_print!("🔽 Scroll down - Zoom out!");
             }
             _ => {}
@@ -108,7 +111,7 @@ fn handle_mouse_motion(mut mouse_motion_events: EventReader<MouseMotion>) {
     }
 }
 
-fn handle_touch_input(mut touch_events: EventReader<GodotTouchInput>) {
+fn handle_touch_input(mut touch_events: EventReader<TouchInput>) {
     for event in touch_events.read() {
         let state = if event.pressed { "touched" } else { "released" };
 

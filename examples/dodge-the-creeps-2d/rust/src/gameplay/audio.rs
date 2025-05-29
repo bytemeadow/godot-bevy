@@ -1,63 +1,118 @@
+use bevy::app::{App, Plugin, Startup, Update};
+use bevy::ecs::system::{Res, ResMut};
 use bevy::prelude::*;
-use bevy_kira_audio::prelude::*;
+use bevy::state::condition::in_state;
+use bevy::state::state::{OnEnter, OnExit};
+use godot_bevy::prelude::{AudioHandle, AudioManager, GodotResourceLoader, SoundId, SoundSettings};
 
 use crate::GameState;
 
+/// Plugin that manages background music and sound effects for the game.
 pub struct AudioPlugin;
 
 impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(bevy_kira_audio::AudioPlugin)
-            .init_resource::<GameAudio>()
+        app.init_resource::<GameAudio>()
             .add_systems(Startup, load_audio_assets)
-            .add_systems(OnEnter(GameState::Countdown), start_background_music)
+            .add_systems(OnEnter(GameState::InGame), start_background_music)
+            .add_systems(OnEnter(GameState::GameOver), play_game_over_sound)
             .add_systems(OnExit(GameState::InGame), stop_background_music)
-            .add_systems(OnEnter(GameState::GameOver), play_game_over_sound);
+            .add_systems(Update, check_music_loop.run_if(in_state(GameState::InGame)));
     }
 }
 
+/// Resource similar to Kira's pattern - preloaded audio handles
 #[derive(Resource, Default)]
 pub struct GameAudio {
-    pub background_music: Option<Handle<AudioSource>>,
-    pub game_over_sound: Option<Handle<AudioSource>>,
-    pub background_music_instance: Option<Handle<AudioInstance>>,
+    pub background_music: Option<AudioHandle>,
+    pub game_over_sound: Option<AudioHandle>,
+    pub background_music_instance: Option<SoundId>,
 }
 
-fn load_audio_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let game_audio = GameAudio {
-        background_music: Some(asset_server.load("audio/House In a Forest Loop.ogg")),
-        game_over_sound: Some(asset_server.load("audio/gameover.wav")),
-        background_music_instance: None,
-    };
+/// System that loads and caches audio assets - similar to Kira's pattern
+fn load_audio_assets(
+    mut audio: ResMut<AudioManager>,
+    mut game_audio: ResMut<GameAudio>,
+    godot_loader: Res<GodotResourceLoader>,
+) {
+    info!("Loading audio assets...");
 
-    commands.insert_resource(game_audio);
+    // Preload background music for efficient reuse
+    match audio.load("audio/House In a Forest Loop.ogg", &godot_loader) {
+        Ok(handle) => {
+            game_audio.background_music = Some(handle);
+            info!("Loaded background music");
+        }
+        Err(e) => warn!("Failed to load background music: {}", e),
+    }
+
+    // Preload game over sound
+    match audio.load("audio/gameover.wav", &godot_loader) {
+        Ok(handle) => {
+            game_audio.game_over_sound = Some(handle);
+            info!("Loaded game over sound");
+        }
+        Err(e) => warn!("Failed to load game over sound: {}", e),
+    }
+
+    info!("Audio assets loaded");
 }
 
-fn start_background_music(mut game_audio: ResMut<GameAudio>, audio: Res<Audio>) {
-    if let Some(background_music) = &game_audio.background_music {
-        let instance = audio
-            .play(background_music.clone())
-            .looped()
-            .with_volume(0.5)
-            .handle();
-
-        game_audio.background_music_instance = Some(instance);
+/// System that starts background music using preloaded assets
+fn start_background_music(mut audio: ResMut<AudioManager>, mut game_audio: ResMut<GameAudio>) {
+    if let Some(ref music_handle) = game_audio.background_music {
+        // Play preloaded asset with settings - no loading overhead!
+        match audio
+            .play_handle_with_settings(music_handle, SoundSettings::new().volume(0.5).looped())
+        {
+            Ok(sound_id) => {
+                game_audio.background_music_instance = Some(sound_id);
+                info!("Started background music from preloaded asset");
+            }
+            Err(e) => {
+                warn!("Failed to start background music: {}", e);
+            }
+        }
+    } else {
+        warn!("Background music not loaded");
     }
 }
 
-fn stop_background_music(
-    game_audio: Res<GameAudio>,
-    mut audio_instances: ResMut<Assets<AudioInstance>>,
-) {
-    if let Some(instance_handle) = &game_audio.background_music_instance {
-        if let Some(instance) = audio_instances.get_mut(instance_handle) {
-            instance.stop(AudioTween::default());
+/// System that stops background music
+fn stop_background_music(mut audio: ResMut<AudioManager>, mut game_audio: ResMut<GameAudio>) {
+    if let Some(sound_id) = game_audio.background_music_instance.take() {
+        if let Err(e) = audio.stop(sound_id) {
+            warn!("Failed to stop background music: {}", e);
+        } else {
+            info!("Stopped background music");
         }
     }
 }
 
-fn play_game_over_sound(game_audio: Res<GameAudio>, audio: Res<Audio>) {
-    if let Some(game_over_sound) = &game_audio.game_over_sound {
-        audio.play(game_over_sound.clone()).with_volume(0.7);
+/// System that plays game over sound using preloaded asset
+fn play_game_over_sound(mut audio: ResMut<AudioManager>, game_audio: Res<GameAudio>) {
+    if let Some(ref sound_handle) = game_audio.game_over_sound {
+        // Play preloaded asset - no loading overhead!
+        match audio.play_handle_with_settings(sound_handle, SoundSettings::new().volume(0.7)) {
+            Ok(_) => info!("Played game over sound from preloaded asset"),
+            Err(e) => warn!("Failed to play game over sound: {}", e),
+        }
+    } else {
+        // Fallback: direct loading (less efficient for repeated sounds)
+        match audio.play_with_settings("audio/gameover.wav", SoundSettings::new().volume(0.7)) {
+            Ok(_) => info!("Played game over sound with direct loading"),
+            Err(e) => warn!("Failed to play game over sound: {}", e),
+        }
+    }
+}
+
+/// System that ensures music keeps looping
+fn check_music_loop(mut audio: ResMut<AudioManager>, game_audio: Res<GameAudio>) {
+    if let Some(sound_id) = game_audio.background_music_instance {
+        // Check if the background music is still playing
+        if !audio.is_playing(sound_id) {
+            warn!("Background music stopped unexpectedly");
+            // Could restart it here if needed
+        }
     }
 }

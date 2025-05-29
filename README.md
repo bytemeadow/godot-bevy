@@ -24,6 +24,7 @@ _Special thanks to [Blaze](https://runblaze.dev) for their support of this proje
 - **Collision Event Handling**: React to Godot collision events in your ECS systems
 - **Scene Tree Queries**: Query and manipulate Godot's scene tree from Bevy
 - **Resource Management**: Load and manage Godot resources (scenes, textures, etc.) from ECS
+- **Audio System**: Dual-mode audio with one-shot sound effects and persistent audio sources
 - **Node Groups Integration**: Work with Godot node groups in your Bevy systems
 - **Smart Scheduling**: Physics-rate vs visual-rate system execution with proper timing
 - **Godot Input Events**: Thread-safe Godot input events delivered as Bevy Events
@@ -99,22 +100,111 @@ fn spawn_godot_scene(mut commands: Commands) {
 
 ### Asset Management
 
-**Assets belong in your Godot project directory**, not in Rust's typical `assets/` folder. This design choice reflects `godot-bevy`'s philosophy as a Godot-centric library where Bevy serves as the ECS layer within Godot projects.
+**The library provides unified asset loading that works consistently in both development and exported games**. While Godot packages assets differently when exporting (filesystem vs .pck files), `godot-bevy` abstracts this complexity away.
 
-**Why Godot-based assets?**
-- **Consistent paths**: Asset paths work the same whether running via `cargo run` or the Godot Editor
-- **Export compatibility**: Games exported from Godot automatically include the correct assets
-- **Team workflows**: Artists and designers can work with assets directly in Godot without Rust knowledge
+Use the `GodotResourceLoader` for all asset loading needs:
 
 ```rust
-// Assets are loaded relative to the Godot project root
-fn load_audio_assets(asset_server: Res<AssetServer>) {
-    let music = asset_server.load("audio/background_music.ogg");
-    let sfx = asset_server.load("sounds/jump.wav");
+fn load_assets(godot_loader: Res<GodotResourceLoader>) {
+    // Load any Godot resource type - works identically in development and exported games
+    if let Some(texture) = godot_loader.load::<ImageTexture>("art/player.png") {
+        // Use the texture...
+    }
+    
+    if let Some(audio) = godot_loader.load::<AudioStream>("audio/music.ogg") {
+        // Use the audio...
+    }
+    
+    // Check if resources exist
+    if godot_loader.exists("scenes/enemy.tscn") {
+        // Resource is available
+    }
 }
 ```
 
-The `GodotAssetsPlugin` (included in `GodotPlugin`) automatically configures Bevy's asset server to use your Godot project directory as the root, ensuring seamless asset loading across all contexts.
+**Key Benefits:**
+- Works identically in development and exported games
+- Supports all Godot resource types (textures, audio, scenes, etc.)
+- Provides `exists()` method for robust error handling
+- Leverages Godot's native resource system
+
+The `GodotAssetsPlugin` provides the `GodotResourceLoader` resource for seamless integration with Godot's asset pipeline.
+
+### Audio System
+
+The library provides two approaches for audio management using Godot's audio capabilities:
+
+1. **GodotAudio Resource** - For one-shot sound effects (similar to bevy_kira_audio)
+2. **GodotAudioPlayer Component** - For persistent audio sources that need control over time
+
+Both approaches work in development and exported games by leveraging Godot's ResourceLoader.
+
+#### One-Shot Sound Effects
+
+Use the `GodotAudio` resource for fire-and-forget sound effects:
+
+```rust
+use godot_bevy::prelude::*;
+
+fn play_sound_effects(mut audio: ResMut<GodotAudio>) {
+    // Simple sound effect
+    audio.play("audio/jump.wav");
+    
+    // Sound effect with volume control
+    audio.play("audio/explosion.ogg")
+        .with_volume(0.8);
+    
+    // Sound effect with pitch control
+    audio.play("audio/powerup.wav")
+        .with_volume(0.6)
+        .with_pitch(1.2);
+}
+```
+
+#### Persistent Audio Sources
+
+Use the `GodotAudioPlayer` component for background music or other persistent audio:
+
+```rust
+use godot_bevy::prelude::*;
+
+#[derive(Component)]
+struct BackgroundMusic;
+
+fn setup_background_music(mut commands: Commands) {
+    commands.spawn((
+        BackgroundMusic,
+        GodotAudioPlayer::new(0.5).with_looping(true),
+        Name::new("Background Music"),
+    ));
+}
+
+fn start_music(
+    mut play_events: EventWriter<PlayAudioEvent>,
+    query: Query<Entity, With<BackgroundMusic>>,
+) {
+    for entity in query.iter() {
+        play_events.write(
+            PlayAudioEvent::new(entity, "audio/background.ogg")
+                .with_volume(0.5)
+                .with_looping(true)
+        );
+    }
+}
+
+fn control_music(mut query: Query<&mut GodotAudioPlayer, With<BackgroundMusic>>) {
+    for mut player in query.iter_mut() {
+        if player.is_playing() {
+            player.set_volume(0.3); // Fade down
+        }
+    }
+}
+```
+
+The audio system automatically handles:
+- Asset loading via Godot's ResourceLoader (works in exported games)
+- Cleanup of finished one-shot sounds
+- Thread-safe access via GodotNodeHandle abstraction
 
 ## Documentation
 
@@ -129,7 +219,7 @@ For detailed API documentation, see [docs.rs/godot-bevy](https://docs.rs/godot-b
 
 The `examples/` directory contains complete sample projects demonstrating different aspects of godot-bevy:
 
-- **[`dodge-the-creeps-2d/`](examples/dodge-the-creeps-2d/)**: A complete 2D game showing ECS-driven gameplay, collision handling, and state management
+- **[`dodge-the-creeps-2d/`](examples/dodge-the-creeps-2d/)**: A complete 2D game showing ECS-driven gameplay, collision handling, audio system, and state management
 - **[`timing-test/`](examples/timing-test/)**: Demonstrates the timing behavior and schedule execution patterns for debugging and understanding
 - **[`input-event-demo/`](examples/input-event-demo/)**: Shows the thread-safe input event system and cross-platform input handling
 

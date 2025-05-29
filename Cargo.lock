@@ -1220,6 +1220,7 @@ dependencies = [
  "godot",
  "godot-bevy-macros",
  "lazy_static",
+ "thiserror 2.0.12",
 ]
 
 [[package]]

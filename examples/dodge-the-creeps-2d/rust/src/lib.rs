@@ -12,6 +12,9 @@ mod nodes;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
+    // Note: godot-bevy now provides a Kira-like audio API using AudioManager
+    // Example usage: audio.play("audio/sound.ogg").unwrap();
+
     app.add_plugins(StatesPlugin)
         .init_state::<GameState>()
         .init_resource::<Score>()

@@ -7,7 +7,29 @@ pub mod app;
 pub mod bridge;
 pub mod node_tree_view;
 pub mod plugins;
-pub mod prelude;
+pub mod prelude {
+    pub use crate::bridge::*;
+    pub use crate::node_tree_view::NodeTreeView;
+    pub use crate::plugins::{
+        assets::{
+            GodotAssetsPlugin, GodotAudioStream, GodotPackedScene, GodotResourceLoader,
+            GodotTexture2D,
+        },
+        audio::{
+            AudioError, AudioHandle, AudioManager, AudioManagerExt, GodotAudio, GodotAudioPlugin,
+            SoundId, SoundSettings,
+        },
+        core::{
+            ActionInput, CollisionEventReader, CollisionEventType, Collisions, FindEntityByNameExt,
+            GodotCorePlugin, GodotSignal, Groups, KeyboardInput, MouseButtonInput, MouseMotion,
+            PhysicsUpdate, SceneTreeEventReader, SceneTreeRef, SystemDeltaTimer, Transform2D,
+            Transform3D, connect_godot_signal,
+        },
+        packed_scene::{GodotScene, PackedScenePlugin},
+    };
+    pub use godot::prelude as godot_prelude;
+    pub use godot_bevy_macros::*;
+}
 pub mod utils;
 pub mod watchers;
 
