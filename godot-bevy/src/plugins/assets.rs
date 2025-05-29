@@ -12,16 +12,19 @@ impl Plugin for GodotAssetsPlugin {
     fn build(&self, app: &mut App) {
         // Get the Godot project path
         let godot_project_path = get_godot_project_path();
-        
-        info!("Setting Bevy asset root to Godot project path: {:?}", godot_project_path);
-        
+
+        info!(
+            "Setting Bevy asset root to Godot project path: {:?}",
+            godot_project_path
+        );
+
         // Configure the asset plugin with the Godot project path
         // This needs to be added early in the plugin chain
         let asset_plugin = AssetPlugin {
             file_path: godot_project_path.to_string_lossy().to_string(),
             ..Default::default()
         };
-        
+
         app.add_plugins(asset_plugin);
     }
 }
@@ -31,11 +34,11 @@ impl Plugin for GodotAssetsPlugin {
 fn get_godot_project_path() -> PathBuf {
     // Try to get the project path from Godot's ProjectSettings
     let project_settings = ProjectSettings::singleton();
-    
+
     // Get the project file path (e.g., "res://project.godot")
     let project_file_path = project_settings.globalize_path("res://");
     let project_path = PathBuf::from(project_file_path.to_string());
-    
+
     // Convert to absolute path
     if project_path.is_absolute() {
         project_path
@@ -52,4 +55,4 @@ fn get_godot_project_path() -> PathBuf {
             })
             .to_path_buf()
     }
-} 
+}
