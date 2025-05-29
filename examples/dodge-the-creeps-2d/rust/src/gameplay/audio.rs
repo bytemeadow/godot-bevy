@@ -25,8 +25,8 @@ pub struct GameAudio {
 
 fn load_audio_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
     let game_audio = GameAudio {
-        background_music: Some(asset_server.load("sounds/House In a Forest Loop.ogg")),
-        game_over_sound: Some(asset_server.load("sounds/gameover.wav")),
+        background_music: Some(asset_server.load("audio/House In a Forest Loop.ogg")),
+        game_over_sound: Some(asset_server.load("audio/gameover.wav")),
         background_music_instance: None,
     };
 

@@ -1,6 +1,6 @@
 pub use crate::GodotPlugin;
 pub use crate::bridge::*;
-pub use crate::plugins::{core::*, packed_scene::*};
+pub use crate::plugins::{assets::*, core::*, packed_scene::*};
 
 pub use godot_bevy_macros::bevy_app;
 
