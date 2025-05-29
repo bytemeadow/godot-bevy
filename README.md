@@ -132,79 +132,77 @@ The `GodotAssetsPlugin` provides the `GodotResourceLoader` resource for seamless
 
 ### Audio System
 
-The library provides two approaches for audio management using Godot's audio capabilities:
+The library provides a convenient audio API using Godot's audio engine that works identically in development, Godot editor, and exported games.
 
-1. **GodotAudio Resource** - For one-shot sound effects (similar to bevy_kira_audio)
-2. **GodotAudioPlayer Component** - For persistent audio sources that need control over time
+#### Key Features
+- **Preloaded assets** - Load once, play multiple times for efficiency
+- **Direct play** - Convenient one-shot sound loading and playing
+- **Sound management** - Control playing sounds (stop, check status, etc.)
+- **Looping support** - Automatic loop configuration for background music
+- **Volume and pitch control** - Full audio parameter control
 
-Both approaches work in development and exported games by leveraging Godot's ResourceLoader.
-
-#### One-Shot Sound Effects
-
-Use the `GodotAudio` resource for fire-and-forget sound effects:
-
-```rust
-use godot_bevy::prelude::*;
-
-fn play_sound_effects(mut audio: ResMut<GodotAudio>) {
-    // Simple sound effect
-    audio.play("audio/jump.wav");
-    
-    // Sound effect with volume control
-    audio.play("audio/explosion.ogg")
-        .with_volume(0.8);
-    
-    // Sound effect with pitch control
-    audio.play("audio/powerup.wav")
-        .with_volume(0.6)
-        .with_pitch(1.2);
-}
-```
-
-#### Persistent Audio Sources
-
-Use the `GodotAudioPlayer` component for background music or other persistent audio:
+#### Quick Start
 
 ```rust
 use godot_bevy::prelude::*;
 
-#[derive(Component)]
-struct BackgroundMusic;
-
-fn setup_background_music(mut commands: Commands) {
-    commands.spawn((
-        BackgroundMusic,
-        GodotAudioPlayer::new(0.5).with_looping(true),
-        Name::new("Background Music"),
-    ));
-}
-
-fn start_music(
-    mut play_events: EventWriter<PlayAudioEvent>,
-    query: Query<Entity, With<BackgroundMusic>>,
+fn audio_system(
+    mut audio: ResMut<AudioManager>,
+    godot_loader: Res<GodotResourceLoader>,
 ) {
-    for entity in query.iter() {
-        play_events.write(
-            PlayAudioEvent::new(entity, "audio/background.ogg")
-                .with_volume(0.5)
-                .with_looping(true)
-        );
-    }
-}
-
-fn control_music(mut query: Query<&mut GodotAudioPlayer, With<BackgroundMusic>>) {
-    for mut player in query.iter_mut() {
-        if player.is_playing() {
-            player.set_volume(0.3); // Fade down
-        }
+    // Preload assets for efficiency (recommended for repeated sounds)
+    let music_handle = audio.load("audio/background.ogg", &godot_loader).unwrap();
+    let sound_id = audio.play_handle_with_settings(
+        &music_handle,
+        SoundSettings::new().volume(0.5).looped()
+    ).unwrap();
+    
+    // Direct play (convenient for occasional sounds)
+    audio.play_with_settings(
+        "audio/jump.wav", 
+        SoundSettings::new().volume(0.8)
+    ).unwrap();
+    
+    // Control playing sounds
+    if audio.is_playing(sound_id) {
+        audio.stop(sound_id).unwrap();
     }
 }
 ```
 
-The audio system automatically handles:
-- Asset loading via Godot's ResourceLoader (works in exported games)
-- Cleanup of finished one-shot sounds
-- Thread-safe access via GodotNodeHandle abstraction
+#### Audio Patterns
+
+**Preloaded Assets** (efficient for repeated sounds):
+```rust
+// Load once during startup
+fn load_audio_assets(
+    mut audio: ResMut<AudioManager>,
+    godot_loader: Res<GodotResourceLoader>,
+) {
+    let music_handle = audio.load("audio/background.ogg", &godot_loader).unwrap();
+    // Store handle in a resource for later use
+}
+
+// Play multiple times with no loading overhead
+fn play_background_music(mut audio: ResMut<AudioManager>, music_handle: Res<AudioHandle>) {
+    audio.play_handle_with_settings(&music_handle, SoundSettings::new().looped()).unwrap();
+}
+```
+
+**Direct Play** (convenient for one-offs):
+```rust
+fn play_sound_effects(mut audio: ResMut<AudioManager>) {
+    // Simple one-shot sounds
+    audio.play("audio/jump.wav").unwrap();
+    audio.play("audio/coin.ogg").unwrap();
+    
+    // With custom settings
+    audio.play_with_settings(
+        "audio/explosion.wav",
+        SoundSettings::new().volume(0.7).pitch(1.2)
+    ).unwrap();
+}
+```
 
 ## Documentation
 
