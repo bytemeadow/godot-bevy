@@ -11,7 +11,7 @@ pub mod prelude {
     pub use crate::bridge::*;
     pub use crate::node_tree_view::NodeTreeView;
     pub use crate::plugins::{
-        assets::{GodotAssetsPlugin, GodotResource, GodotResourceLoader},
+        assets::{GodotAssetsPlugin, GodotResource},
         audio::{
             AudioError, AudioHandle, AudioManager, AudioManagerExt, GodotAudio, GodotAudioPlugin,
             SoundId, SoundSettings,

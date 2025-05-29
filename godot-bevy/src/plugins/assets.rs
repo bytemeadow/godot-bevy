@@ -25,7 +25,7 @@ use crate::bridge::GodotResourceHandle;
 /// without additional configuration. The `GodotResourceAssetLoader` ignores Bevy's file reader
 /// and uses Godot's `ResourceLoader` directly for maximum compatibility.
 ///
-/// ## Recommended Usage (Async Asset Loading)
+/// ## Unified Asset Loading
 /// ```rust
 /// fn load_assets(asset_server: Res<AssetServer>) {
 ///     // Load any Godot resource through Bevy's asset system (async, non-blocking)
@@ -45,31 +45,20 @@ use crate::bridge::GodotResourceHandle;
 ///     }
 /// }
 /// ```
-///
-/// ## Alternative Usage (Synchronous Loading)
-/// For simpler use cases or when you need immediate access:
-/// ```rust
-/// fn load_assets_sync(godot_loader: Res<GodotResourceLoader>) {
-///     // Load any Godot resource type - works identically in development and exported games
-///     if let Some(texture) = godot_loader.load_as::<ImageTexture>("art/player.png") {
-///         // Use the texture directly...
-///     }
-/// }
-/// ```
 /// 
-/// **Benefits of Async Loading:**
+/// **Benefits:**
 /// - Non-blocking: Won't freeze your game during loading
 /// - Integrates with Bevy's asset system (loading states, hot reloading, etc.)
 /// - Better for large assets and batch loading
 /// - Works seamlessly with `bevy_asset_loader`
+/// - Unified system for all Godot resource types
 ///
 /// This works identically in development and exported builds, including with .pck files.
 pub struct GodotAssetsPlugin;
 
 impl Plugin for GodotAssetsPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<GodotResourceLoader>()
-            .init_asset::<GodotResource>()
+        app.init_asset::<GodotResource>()
             .init_asset_loader::<GodotResourceAssetLoader>();
     }
 }
@@ -118,41 +107,6 @@ impl AssetReader for GodotAssetReader {
     async fn is_directory<'a>(&'a self, _path: &'a Path) -> Result<bool, AssetReaderError> {
         // Always report as not a directory
         Ok(false)
-    }
-}
-
-/// Resource that provides a unified interface for loading Godot resources.
-/// This works in both development and exported contexts.
-#[derive(Resource, Default)]
-pub struct GodotResourceLoader;
-
-impl GodotResourceLoader {
-    /// Load a Godot resource from the given path.
-    /// Paths should be relative to the Godot project (e.g., "audio/sound.ogg").
-    /// This will automatically add the "res://" prefix if not present.
-    pub fn load(&self, path: &str) -> Option<Gd<GodotBaseResource>> {
-        let godot_path = if path.starts_with("res://") || path.starts_with("user://") {
-            path.to_string()
-        } else {
-            format!("res://{}", path)
-        };
-
-        let path_gstring = godot::builtin::GString::from(godot_path);
-        ResourceLoader::singleton().load(&path_gstring)
-    }
-
-    /// Load a Godot resource and cast it to the specified type.
-    /// Returns None if the resource doesn't exist or can't be cast to the target type.
-    pub fn load_as<T>(&self, path: &str) -> Option<Gd<T>>
-    where
-        T: godot::obj::GodotClass + godot::obj::Inherits<GodotBaseResource>,
-    {
-        self.load(path)?.try_cast().ok()
-    }
-
-    /// Check if a resource exists at the given path.
-    pub fn exists(&self, path: &str) -> bool {
-        self.load(path).is_some()
     }
 }
 

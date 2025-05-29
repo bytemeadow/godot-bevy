@@ -102,7 +102,7 @@ fn spawn_godot_scene(mut commands: Commands) {
 
 **The library provides unified asset loading that works consistently in both development and exported games**. While Godot packages assets differently when exporting (filesystem vs .pck files), `godot-bevy` abstracts this complexity away.
 
-#### Recommended: Async Asset Loading (Bevy AssetServer)
+#### Unified Asset Loading (Bevy AssetServer)
 
 Use Bevy's `AssetServer` with `GodotResourceAssetLoader` for modern, non-blocking asset loading:
 
@@ -135,49 +135,16 @@ fn use_loaded_assets(
 }
 ```
 
-#### Alternative: Synchronous Loading
-
-For simpler use cases or when you need immediate access:
-
-```rust
-use godot::classes::{AudioStream, ImageTexture, PackedScene};
-
-fn load_assets_sync(godot_loader: Res<GodotResourceLoader>) {
-    // Load any Godot resource type - works identically in development and exported games
-    if let Some(texture) = godot_loader.load_as::<ImageTexture>("art/player.png") {
-        // Use the texture directly...
-    }
-    
-    if let Some(audio) = godot_loader.load_as::<AudioStream>("audio/music.ogg") {
-        // Use the audio directly...
-    }
-    
-    if let Some(scene) = godot_loader.load_as::<PackedScene>("scenes/enemy.tscn") {
-        // Use the scene directly...
-    }
-    
-    // Check if resources exist
-    if godot_loader.exists("scenes/enemy.tscn") {
-        // Resource is available
-    }
-}
-```
-
 **Key Benefits:**
 - **Works identically** in development and exported games  
 - **Supports all Godot resource types** - Textures, audio, scenes, materials, etc.
-- **Proper error handling** - Asset states and Option types for robust code
-- **Thread-safe** - Async loading prevents frame drops
-- **Leverages Godot's native resource system** - Maximum compatibility with all Godot features
-- **Unified system** - One loader for all resource types (scenes, audio, textures, etc.)
+- **Non-blocking** - Async loading prevents frame drops
+- **Integrates with Bevy's asset system** - Loading states, hot reloading, etc.  
+- **Better for large assets** - Batch loading and background processing
+- **Works seamlessly with `bevy_asset_loader`** - Loading screens and state management
+- **Unified system** - One loader for all resource types
 
-**Why choose async loading?**
-- Non-blocking: Won't freeze your game during loading
-- Integrates with Bevy's asset system (loading states, hot reloading, etc.)  
-- Better for large assets and batch loading
-- Works seamlessly with `bevy_asset_loader`
-
-The `GodotAssetsPlugin` provides both `GodotResourceAssetLoader` and `GodotResourceLoader` for maximum flexibility.
+The `GodotAssetsPlugin` provides the `GodotResourceAssetLoader` for seamless integration with Godot's asset pipeline.
 
 ### Audio System
 
