@@ -97,6 +97,25 @@ fn spawn_godot_scene(mut commands: Commands) {
 }
 ```
 
+### Asset Management
+
+**Assets belong in your Godot project directory**, not in Rust's typical `assets/` folder. This design choice reflects `godot-bevy`'s philosophy as a Godot-centric library where Bevy serves as the ECS layer within Godot projects.
+
+**Why Godot-based assets?**
+- **Consistent paths**: Asset paths work the same whether running via `cargo run` or the Godot Editor
+- **Export compatibility**: Games exported from Godot automatically include the correct assets
+- **Team workflows**: Artists and designers can work with assets directly in Godot without Rust knowledge
+
+```rust
+// Assets are loaded relative to the Godot project root
+fn load_audio_assets(asset_server: Res<AssetServer>) {
+    let music = asset_server.load("audio/background_music.ogg");
+    let sfx = asset_server.load("sounds/jump.wav");
+}
+```
+
+The `GodotAssetsPlugin` (included in `GodotPlugin`) automatically configures Bevy's asset server to use your Godot project directory as the root, ensuring seamless asset loading across all contexts.
+
 ## Documentation
 
 ### Core Concepts
