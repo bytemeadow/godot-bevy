@@ -50,6 +50,12 @@ impl Plugin for GodotAssetsPlugin {
 /// without Bevy's asset system rejecting them for not existing on disk.
 pub struct GodotAssetReader;
 
+impl Default for GodotAssetReader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GodotAssetReader {
     pub fn new() -> Self {
         Self

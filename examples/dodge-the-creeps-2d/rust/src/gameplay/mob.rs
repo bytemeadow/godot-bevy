@@ -1,5 +1,6 @@
 use bevy::{
     app::{App, Plugin, Update},
+    asset::Handle,
     ecs::{
         component::Component,
         event::EventReader,
@@ -12,48 +13,40 @@ use bevy::{
     state::condition::in_state,
     time::{Time, Timer, TimerMode},
 };
+use bevy_asset_loader::asset_collection::AssetCollection;
 use godot::{
     builtin::{Transform2D as GodotTransform2D, Vector2},
-    classes::{AnimatedSprite2D, Node, PathFollow2D, ResourceLoader, RigidBody2D},
+    classes::{AnimatedSprite2D, Node, PathFollow2D, RigidBody2D},
 };
 use godot_bevy::{
-    bridge::{GodotNodeHandle, GodotResourceHandle},
+    bridge::GodotNodeHandle,
     prelude::{
-        connect_godot_signal, FindEntityByNameExt, GodotScene, GodotSignal, NodeTreeView,
-        SceneTreeRef, Transform2D,
+        connect_godot_signal, FindEntityByNameExt, GodotResource, GodotScene, GodotSignal,
+        NodeTreeView, SceneTreeRef, Transform2D,
     },
 };
 use std::f32::consts::PI;
 
 use crate::GameState;
 
-#[derive(Debug, Resource)]
+#[derive(AssetCollection, Resource, Debug)]
 pub struct MobAssets {
-    mob_scn: GodotResourceHandle,
-}
-
-impl Default for MobAssets {
-    fn default() -> Self {
-        let mut resource_loader = ResourceLoader::singleton();
-        let mob_scn = GodotResourceHandle::new(resource_loader.load("scenes/mob.tscn").unwrap());
-
-        Self { mob_scn }
-    }
+    #[asset(path = "scenes/mob.tscn")]
+    mob_scn: Handle<GodotResource>,
 }
 
 pub struct MobPlugin;
 
 impl Plugin for MobPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<MobAssets>()
-            .add_systems(
-                Update,
-                (spawn_mob, new_mob, kill_mob).run_if(in_state(GameState::InGame)),
-            )
-            .insert_resource(MobSpawnTimer(Timer::from_seconds(
-                0.5,
-                TimerMode::Repeating,
-            )));
+        app.add_systems(
+            Update,
+            (spawn_mob, new_mob, kill_mob).run_if(in_state(GameState::InGame)),
+        )
+        .insert_resource(MobSpawnTimer(Timer::from_seconds(
+            0.5,
+            TimerMode::Repeating,
+        )));
     }
 }
 
@@ -100,7 +93,7 @@ fn spawn_mob(
         .spawn_empty()
         .insert(Mob { direction })
         .insert(Transform2D::from(transform))
-        .insert(GodotScene::from_resource(assets.mob_scn.clone()));
+        .insert(GodotScene::from_handle(assets.mob_scn.clone()));
 }
 
 #[derive(NodeTreeView)]

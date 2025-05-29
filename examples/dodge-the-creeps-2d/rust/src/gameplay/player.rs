@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use bevy_asset_loader::asset_collection::AssetCollection;
 use godot::{
     builtin::{StringName, Vector2},
     classes::{AnimatedSprite2D, Input, Node2D},
@@ -8,39 +9,16 @@ use godot_bevy::prelude::*;
 
 use crate::{nodes::player::Player as GodotPlayerNode, GameState};
 
-/// Player assets loaded through Bevy's asset system
-/// This demonstrates real-world usage of loading Godot resources via Bevy
-#[derive(Debug, Resource)]
+#[derive(AssetCollection, Resource, Debug)]
 pub struct PlayerAssets {
+    #[asset(path = "scenes/player.tscn")]
     player_scene: Handle<GodotResource>,
-    #[allow(dead_code)]
-    loaded: bool,
 }
-
-impl PlayerAssets {
-    pub fn new(asset_server: &AssetServer) -> Self {
-        info!("Loading player assets through Bevy's asset system...");
-        Self {
-            player_scene: asset_server.load("scenes/player.tscn"),
-            loaded: false,
-        }
-    }
-
-    pub fn get_scene_handle(&self) -> &Handle<GodotResource> {
-        &self.player_scene
-    }
-}
-
-#[derive(Debug, Default, Resource)]
-struct PlayerSpawned(bool);
-
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PlayerSpawned>()
-            .add_systems(Startup, load_player_assets)
-            .add_systems(Update, spawn_player.run_if(in_state(GameState::MainMenu)))
+        app.add_systems(OnExit(GameState::Loading), spawn_player)
             .add_systems(Update, player_on_ready)
             .add_systems(
                 Update,
@@ -58,11 +36,6 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-fn load_player_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let assets = PlayerAssets::new(&asset_server);
-    commands.insert_resource(assets);
-}
-
 #[derive(Debug, Component)]
 pub struct Player {
     speed: f32,
@@ -71,39 +44,11 @@ pub struct Player {
 #[derive(Debug, Component)]
 struct PlayerInitialized;
 
-fn spawn_player(
-    mut commands: Commands,
-    player_assets: Option<Res<PlayerAssets>>,
-    asset_server: Res<AssetServer>,
-    mut player_spawned: ResMut<PlayerSpawned>,
-    existing_player: Query<Entity, With<Player>>,
-) {
-    // Only spawn if we haven't already spawned a player and assets are loaded
-    if !player_spawned.0 && existing_player.is_empty() {
-        if let Some(player_assets) = player_assets {
-            // Check if the asset is loaded
-            match asset_server.load_state(player_assets.get_scene_handle().id()) {
-                bevy::asset::LoadState::Loaded => {
-                    // Use the new from_handle method directly
-                    commands
-                        .spawn_empty()
-                        .insert(GodotScene::from_handle(
-                            player_assets.get_scene_handle().clone(),
-                        ))
-                        .insert(Player { speed: 0.0 });
-
-                    player_spawned.0 = true;
-                    info!("Player spawned using Bevy-loaded assets");
-                }
-                bevy::asset::LoadState::Failed(_) => {
-                    warn!("Failed to load player assets, cannot spawn player");
-                }
-                _ => {
-                    // Still loading, we'll try again next frame
-                }
-            }
-        }
-    }
+fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
+    commands
+        .spawn_empty()
+        .insert(GodotScene::from_handle(assets.player_scene.clone()))
+        .insert(Player { speed: 0.0 });
 }
 
 fn player_on_ready(

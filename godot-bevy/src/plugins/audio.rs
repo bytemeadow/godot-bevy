@@ -241,17 +241,15 @@ fn process_sound_queue(
             if queued.settings.looping {
                 // Try to enable looping on the stream - this works for AudioStreamOggVorbis and similar
                 // Note: Not all stream types support runtime loop changes
-                if let Some(mut ogg_stream) = audio_stream
+                if let Ok(mut ogg_stream) = audio_stream
                     .clone()
                     .try_cast::<godot::classes::AudioStreamOggVorbis>()
-                    .ok()
                 {
                     ogg_stream.set_loop(true);
                     audio_stream = ogg_stream.upcast();
-                } else if let Some(mut wav_stream) = audio_stream
+                } else if let Ok(mut wav_stream) = audio_stream
                     .clone()
                     .try_cast::<godot::classes::AudioStreamWav>()
-                    .ok()
                 {
                     wav_stream.set_loop_mode(godot::classes::audio_stream_wav::LoopMode::FORWARD);
                     audio_stream = wav_stream.upcast();
