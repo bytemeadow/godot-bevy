@@ -102,12 +102,47 @@ fn spawn_godot_scene(mut commands: Commands) {
 
 **The library provides unified asset loading that works consistently in both development and exported games**. While Godot packages assets differently when exporting (filesystem vs .pck files), `godot-bevy` abstracts this complexity away.
 
-Use the `GodotResourceLoader` for reliable asset loading:
+#### Recommended: Async Asset Loading (Bevy AssetServer)
+
+Use Bevy's `AssetServer` with `GodotResourceAssetLoader` for modern, non-blocking asset loading:
+
+```rust
+use bevy::asset::{AssetServer, Assets, Handle};
+use godot_bevy::prelude::*;
+
+fn load_assets(asset_server: Res<AssetServer>) {
+    // Load any Godot resource through Bevy's asset system (async, non-blocking)
+    let scene: Handle<GodotResource> = asset_server.load("scenes/player.tscn");
+    let audio: Handle<GodotResource> = asset_server.load("audio/music.ogg");
+    let texture: Handle<GodotResource> = asset_server.load("art/player.png");
+    
+    // Works with bevy_asset_loader for loading states
+}
+
+fn use_loaded_assets(
+    mut assets: ResMut<Assets<GodotResource>>,
+    scene_handle: Handle<GodotResource>, // Your loaded handle
+) {
+    if let Some(asset) = assets.get_mut(&scene_handle) {
+        // Cast to specific Godot types as needed
+        if let Some(scene) = asset.try_cast::<PackedScene>() {
+            // Use the scene...
+        }
+        if let Some(audio) = asset.try_cast::<AudioStream>() {
+            // Use the audio...
+        }
+    }
+}
+```
+
+#### Alternative: Synchronous Loading
+
+For simpler use cases or when you need immediate access:
 
 ```rust
 use godot::classes::{AudioStream, ImageTexture, PackedScene};
 
-fn load_assets(godot_loader: Res<GodotResourceLoader>) {
+fn load_assets_sync(godot_loader: Res<GodotResourceLoader>) {
     // Load any Godot resource type - works identically in development and exported games
     if let Some(texture) = godot_loader.load_as::<ImageTexture>("art/player.png") {
         // Use the texture directly...
@@ -129,45 +164,54 @@ fn load_assets(godot_loader: Res<GodotResourceLoader>) {
 ```
 
 **Key Benefits:**
-- **Works identically** in development and exported games
+- **Works identically** in development and exported games  
 - **Supports all Godot resource types** - Textures, audio, scenes, materials, etc.
-- **Proper error handling** - `exists()` method and Option types for robust code
-- **Thread-safe** - Loading happens on the main thread with proper Godot access
+- **Proper error handling** - Asset states and Option types for robust code
+- **Thread-safe** - Async loading prevents frame drops
 - **Leverages Godot's native resource system** - Maximum compatibility with all Godot features
+- **Unified system** - One loader for all resource types (scenes, audio, textures, etc.)
 
-The `GodotAssetsPlugin` provides the `GodotResourceLoader` resource for seamless integration with Godot's asset pipeline.
+**Why choose async loading?**
+- Non-blocking: Won't freeze your game during loading
+- Integrates with Bevy's asset system (loading states, hot reloading, etc.)  
+- Better for large assets and batch loading
+- Works seamlessly with `bevy_asset_loader`
+
+The `GodotAssetsPlugin` provides both `GodotResourceAssetLoader` and `GodotResourceLoader` for maximum flexibility.
 
 ### Audio System
 
-The library provides a convenient audio API using Godot's audio engine that works identically in development, Godot editor, and exported games.
+The library provides a convenient audio API using Godot's audio engine that works identically in development, Godot editor, and exported games. **Now integrated with Bevy's asset system for async, non-blocking audio loading.**
 
 #### Key Features
+- **Async loading** - Non-blocking audio asset loading through Bevy's AssetServer
 - **Preloaded assets** - Load once, play multiple times for efficiency
 - **Direct play** - Convenient one-shot sound loading and playing
 - **Sound management** - Control playing sounds (stop, check status, etc.)
 - **Looping support** - Automatic loop configuration for background music
 - **Volume and pitch control** - Full audio parameter control
 
-#### Quick Start
+#### Quick Start (Recommended)
 
 ```rust
 use godot_bevy::prelude::*;
 
 fn audio_system(
     mut audio: ResMut<AudioManager>,
-    godot_loader: Res<GodotResourceLoader>,
+    asset_server: Res<AssetServer>,
 ) {
-    // Preload assets for efficiency (recommended for repeated sounds)
-    let music_handle = audio.load("audio/background.ogg", &godot_loader).unwrap();
+    // Preload assets for efficiency (async, non-blocking)
+    let music_handle = audio.load("audio/background.ogg", &asset_server);
     let sound_id = audio.play_handle_with_settings(
         &music_handle,
         SoundSettings::new().volume(0.5).looped()
     ).unwrap();
     
-    // Direct play (convenient for occasional sounds)
+    // Direct play using asset server (convenient for occasional sounds)
     audio.play_with_settings(
         "audio/jump.wav", 
-        SoundSettings::new().volume(0.8)
+        SoundSettings::new().volume(0.8),
+        &asset_server
     ).unwrap();
     
     // Control playing sounds
@@ -181,12 +225,12 @@ fn audio_system(
 
 **Preloaded Assets** (efficient for repeated sounds):
 ```rust
-// Load once during startup
+// Load once during startup (async)
 fn load_audio_assets(
     mut audio: ResMut<AudioManager>,
-    godot_loader: Res<GodotResourceLoader>,
+    asset_server: Res<AssetServer>,
 ) {
-    let music_handle = audio.load("audio/background.ogg", &godot_loader).unwrap();
+    let music_handle = audio.load("audio/background.ogg", &asset_server);
     // Store handle in a resource for later use
 }
 
@@ -198,16 +242,37 @@ fn play_background_music(mut audio: ResMut<AudioManager>, music_handle: Res<Audi
 
 **Direct Play** (convenient for one-offs):
 ```rust
-fn play_sound_effects(mut audio: ResMut<AudioManager>) {
-    // Simple one-shot sounds
-    audio.play("audio/jump.wav").unwrap();
-    audio.play("audio/coin.ogg").unwrap();
+fn play_sound_effects(mut audio: ResMut<AudioManager>, asset_server: Res<AssetServer>) {
+    // Simple one-shot sounds (loads async)
+    audio.play("audio/jump.wav", &asset_server).unwrap();
+    audio.play("audio/coin.ogg", &asset_server).unwrap();
     
     // With custom settings
     audio.play_with_settings(
         "audio/explosion.wav",
-        SoundSettings::new().volume(0.7).pitch(1.2)
+        SoundSettings::new().volume(0.7).pitch(1.2),
+        &asset_server
     ).unwrap();
+}
+```
+
+**Integration with bevy_asset_loader:**
+```rust
+#[derive(AssetCollection, Resource)]
+struct GameAudio {
+    #[asset(path = "audio/background.ogg")]
+    background_music: Handle<GodotResource>,
+    #[asset(path = "audio/jump.wav")]
+    jump_sound: Handle<GodotResource>,
+}
+
+fn play_from_collection(
+    mut audio: ResMut<AudioManager>,
+    game_audio: Res<GameAudio>,
+) {
+    // Convert Bevy handles to audio handles
+    let music_handle = audio.load_from_handle("audio/background.ogg", game_audio.background_music.clone());
+    audio.play_handle_with_settings(&music_handle, SoundSettings::new().looped()).unwrap();
 }
 ```
 

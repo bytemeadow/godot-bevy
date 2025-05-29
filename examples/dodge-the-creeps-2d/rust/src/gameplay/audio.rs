@@ -1,8 +1,9 @@
 use bevy::app::{App, Plugin, Startup};
+use bevy::asset::AssetServer;
 use bevy::ecs::system::{Res, ResMut};
 use bevy::prelude::*;
 use bevy::state::state::{OnEnter, OnExit};
-use godot_bevy::prelude::{AudioHandle, AudioManager, GodotResourceLoader, SoundId, SoundSettings};
+use godot_bevy::prelude::{AudioHandle, AudioManager, SoundId, SoundSettings};
 
 use crate::GameState;
 
@@ -27,31 +28,23 @@ pub struct GameAudio {
     pub background_music_instance: Option<SoundId>,
 }
 
-/// System that loads and caches audio assets - similar to Kira's pattern
+/// System that loads and caches audio assets using Bevy's asset system
 fn load_audio_assets(
     mut audio: ResMut<AudioManager>,
     mut game_audio: ResMut<GameAudio>,
-    godot_loader: Res<GodotResourceLoader>,
+    asset_server: Res<AssetServer>,
 ) {
     info!("Loading audio assets...");
 
-    // Preload background music for efficient reuse
-    match audio.load("audio/House In a Forest Loop.ogg", &godot_loader) {
-        Ok(handle) => {
-            game_audio.background_music = Some(handle);
-            info!("Loaded background music");
-        }
-        Err(e) => warn!("Failed to load background music: {}", e),
-    }
+    // Preload background music for efficient reuse using Bevy's asset system
+    let background_handle = audio.load("audio/House In a Forest Loop.ogg", &asset_server);
+    game_audio.background_music = Some(background_handle);
+    info!("Loaded background music");
 
     // Preload game over sound
-    match audio.load("audio/gameover.wav", &godot_loader) {
-        Ok(handle) => {
-            game_audio.game_over_sound = Some(handle);
-            info!("Loaded game over sound");
-        }
-        Err(e) => warn!("Failed to load game over sound: {}", e),
-    }
+    let gameover_handle = audio.load("audio/gameover.wav", &asset_server);
+    game_audio.game_over_sound = Some(gameover_handle);
+    info!("Loaded game over sound");
 
     info!("Audio assets loaded");
 }
@@ -88,7 +81,11 @@ fn stop_background_music(mut audio: ResMut<AudioManager>, mut game_audio: ResMut
 }
 
 /// System that plays game over sound using preloaded asset
-fn play_game_over_sound(mut audio: ResMut<AudioManager>, game_audio: Res<GameAudio>) {
+fn play_game_over_sound(
+    mut audio: ResMut<AudioManager>, 
+    game_audio: Res<GameAudio>,
+    asset_server: Res<AssetServer>,
+) {
     if let Some(ref sound_handle) = game_audio.game_over_sound {
         // Play preloaded asset - no loading overhead!
         match audio.play_handle_with_settings(sound_handle, SoundSettings::new().volume(0.7)) {
@@ -96,9 +93,9 @@ fn play_game_over_sound(mut audio: ResMut<AudioManager>, game_audio: Res<GameAud
             Err(e) => warn!("Failed to play game over sound: {}", e),
         }
     } else {
-        // Fallback: direct loading (less efficient for repeated sounds)
-        match audio.play_with_settings("audio/gameover.wav", SoundSettings::new().volume(0.7)) {
-            Ok(_) => info!("Played game over sound with direct loading"),
+        // Fallback: direct loading using asset server (async)
+        match audio.play_with_settings("audio/gameover.wav", SoundSettings::new().volume(0.7), &asset_server) {
+            Ok(_) => info!("Played game over sound with async loading"),
             Err(e) => warn!("Failed to play game over sound: {}", e),
         }
     }

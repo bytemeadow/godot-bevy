@@ -25,15 +25,44 @@ use crate::bridge::GodotResourceHandle;
 /// without additional configuration. The `GodotResourceAssetLoader` ignores Bevy's file reader
 /// and uses Godot's `ResourceLoader` directly for maximum compatibility.
 ///
-/// ## Example Usage
+/// ## Recommended Usage (Async Asset Loading)
 /// ```rust
 /// fn load_assets(asset_server: Res<AssetServer>) {
-///     // Load any Godot resource through Bevy's asset system
+///     // Load any Godot resource through Bevy's asset system (async, non-blocking)
 ///     let scene: Handle<GodotResource> = asset_server.load("scenes/player.tscn");
 ///     let audio: Handle<GodotResource> = asset_server.load("audio/music.ogg");
 ///     let texture: Handle<GodotResource> = asset_server.load("art/player.png");
 /// }
+/// 
+/// fn use_loaded_assets(
+///     mut assets: ResMut<Assets<GodotResource>>,
+///     scene_handle: Res<Handle<GodotResource>>, // Your loaded handle
+/// ) {
+///     if let Some(asset) = assets.get_mut(&scene_handle) {
+///         if let Some(scene) = asset.try_cast::<PackedScene>() {
+///             // Use the scene...
+///         }
+///     }
+/// }
 /// ```
+///
+/// ## Alternative Usage (Synchronous Loading)
+/// For simpler use cases or when you need immediate access:
+/// ```rust
+/// fn load_assets_sync(godot_loader: Res<GodotResourceLoader>) {
+///     // Load any Godot resource type - works identically in development and exported games
+///     if let Some(texture) = godot_loader.load_as::<ImageTexture>("art/player.png") {
+///         // Use the texture directly...
+///     }
+/// }
+/// ```
+/// 
+/// **Benefits of Async Loading:**
+/// - Non-blocking: Won't freeze your game during loading
+/// - Integrates with Bevy's asset system (loading states, hot reloading, etc.)
+/// - Better for large assets and batch loading
+/// - Works seamlessly with `bevy_asset_loader`
+///
 /// This works identically in development and exported builds, including with .pck files.
 pub struct GodotAssetsPlugin;
 

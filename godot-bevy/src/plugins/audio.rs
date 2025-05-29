@@ -1,15 +1,18 @@
 use bevy::app::{App, Plugin, Update};
-use bevy::ecs::system::{Res, ResMut};
+use bevy::asset::{AssetServer, Assets, Handle};
+use bevy::ecs::system::ResMut;
 use bevy::prelude::*;
 use godot::classes::{AudioStream, AudioStreamPlayer};
 use godot::obj::NewAlloc;
 use std::collections::HashMap;
+use thiserror::Error;
 
-use super::assets::GodotResourceLoader;
+use super::assets::GodotResource;
 use super::core::SceneTreeRef;
-use crate::bridge::{GodotNodeHandle, GodotResourceHandle};
+use crate::bridge::GodotNodeHandle;
 
 /// Plugin that provides a convenient audio API using Godot's audio system.
+/// Now integrated with Bevy's asset system for async loading and better performance.
 pub struct GodotAudioPlugin;
 
 impl Plugin for GodotAudioPlugin {
@@ -27,14 +30,15 @@ pub struct AudioManager {
     one_shot_sounds: HashMap<SoundId, GodotNodeHandle>,
     next_id: u32,
     sound_queue: Vec<QueuedSound>,
-    /// Cache of preloaded audio assets using thread-safe handles
-    cached_assets: HashMap<String, GodotResourceHandle>,
+    /// Cache of preloaded audio assets using Bevy handles
+    cached_assets: HashMap<String, Handle<GodotResource>>,
 }
 
-/// Handle to a preloaded audio asset
+/// Handle to a preloaded audio asset - now using Bevy's asset system
 #[derive(Debug, Clone)]
 pub struct AudioHandle {
     path: String,
+    handle: Handle<GodotResource>,
 }
 
 /// Handle to a playing sound instance
@@ -96,29 +100,32 @@ impl SoundSettings {
 }
 
 impl AudioManager {
-    /// Load and cache an audio asset for efficient reuse
+    /// Load and cache an audio asset for efficient reuse using Bevy's asset system
     /// Returns a handle that can be used for playing instances
-    pub fn load(
-        &mut self,
-        path: &str,
-        godot_loader: &GodotResourceLoader,
-    ) -> Result<AudioHandle, AudioError> {
+    pub fn load(&mut self, path: &str, asset_server: &AssetServer) -> AudioHandle {
         let path = path.to_string();
 
         // Check if already cached
-        if self.cached_assets.contains_key(&path) {
-            return Ok(AudioHandle { path });
+        if let Some(handle) = self.cached_assets.get(&path) {
+            return AudioHandle {
+                path,
+                handle: handle.clone(),
+            };
         }
 
-        // Load and cache the asset
-        if let Some(audio_resource) = godot_loader.load(&path) {
-            let handle = GodotResourceHandle::new(audio_resource);
-            self.cached_assets.insert(path.clone(), handle);
-            info!("Loaded and cached audio: {}", path);
-            Ok(AudioHandle { path })
-        } else {
-            Err(AudioError::LoadError(path))
-        }
+        // Load through Bevy's asset system (async)
+        let handle: Handle<GodotResource> = asset_server.load(&path);
+        self.cached_assets.insert(path.clone(), handle.clone());
+        info!("Loading audio asset (async): {}", path);
+
+        AudioHandle { path, handle }
+    }
+
+    /// Load an audio asset from an existing Handle<GodotResource>
+    pub fn load_from_handle(&mut self, path: &str, handle: Handle<GodotResource>) -> AudioHandle {
+        let path = path.to_string();
+        self.cached_assets.insert(path.clone(), handle.clone());
+        AudioHandle { path, handle }
     }
 
     /// Play a preloaded audio handle
@@ -144,19 +151,26 @@ impl AudioManager {
         Ok(id)
     }
 
-    /// Play a sound file directly (loads every time) - convenient but less efficient for repeated sounds
-    pub fn play(&mut self, path: &str) -> Result<SoundId, AudioError> {
-        self.play_with_settings(path, SoundSettings::default())
+    /// Play a sound file directly using asset server (loads async) - convenient but less efficient for repeated sounds
+    pub fn play(&mut self, path: &str, asset_server: &AssetServer) -> Result<SoundId, AudioError> {
+        self.play_with_settings(path, SoundSettings::default(), asset_server)
     }
 
-    /// Play a sound file with custom settings (loads every time)
+    /// Play a sound file with custom settings using asset server (loads async)
     pub fn play_with_settings(
         &mut self,
         path: &str,
         settings: SoundSettings,
+        asset_server: &AssetServer,
     ) -> Result<SoundId, AudioError> {
         let id = SoundId(self.next_id);
         self.next_id += 1;
+
+        // If not cached, load it now
+        if !self.cached_assets.contains_key(path) {
+            let handle: Handle<GodotResource> = asset_server.load(path);
+            self.cached_assets.insert(path.to_string(), handle);
+        }
 
         self.sound_queue.push(QueuedSound {
             id,
@@ -198,22 +212,26 @@ impl AudioManager {
         false
     }
 
-    /// Clear the audio cache (useful for memory management)
-    pub fn clear_cache(&mut self) {
-        self.cached_assets.clear();
-        info!("Audio cache cleared");
+    /// Get the number of playing sounds
+    pub fn playing_count(&self) -> usize {
+        self.one_shot_sounds.len()
     }
 
-    /// Get cache statistics
+    /// Clear the internal cache - useful for memory management in long-running games
+    pub fn clear_cache(&mut self) {
+        self.cached_assets.clear();
+    }
+
+    /// Get stats about cached assets and playing sounds
     pub fn cache_stats(&self) -> (usize, usize) {
         (self.cached_assets.len(), self.one_shot_sounds.len())
     }
 }
 
-/// System that processes queued sounds
+/// System that processes queued sounds using Bevy's asset system
 fn process_sound_queue(
     mut audio_manager: ResMut<AudioManager>,
-    godot_loader: Res<GodotResourceLoader>,
+    mut assets: ResMut<Assets<GodotResource>>,
     mut scene_tree: SceneTreeRef,
 ) {
     // Take all queued sounds to process
@@ -222,15 +240,27 @@ fn process_sound_queue(
     for queued in queued_sounds {
         let audio_stream = match &queued.source {
             SoundSource::Path(path) => {
-                // Load directly from path (not cached)
-                godot_loader.load_as::<AudioStream>(path)
-            }
-            SoundSource::Handle(handle) => {
-                // Get from cache
-                if let Some(cached_handle) = audio_manager.cached_assets.get_mut(&handle.path) {
-                    cached_handle.get().try_cast::<AudioStream>().ok()
+                // Get from cache (should be loaded by now via asset server)
+                if let Some(handle) = audio_manager.cached_assets.get(path) {
+                    if let Some(asset) = assets.get_mut(handle) {
+                        asset.try_cast::<AudioStream>()
+                    } else {
+                        // Asset not ready yet, re-queue for next frame
+                        audio_manager.sound_queue.push(queued);
+                        continue;
+                    }
                 } else {
-                    warn!("Audio handle not found in cache: {}", handle.path);
+                    warn!("Audio path not found in cache: {}", path);
+                    continue;
+                }
+            }
+            SoundSource::Handle(audio_handle) => {
+                // Get from Bevy asset system
+                if let Some(asset) = assets.get_mut(&audio_handle.handle) {
+                    asset.try_cast::<AudioStream>()
+                } else {
+                    // Asset not ready yet, re-queue for next frame
+                    audio_manager.sound_queue.push(queued);
                     continue;
                 }
             }
@@ -282,104 +312,100 @@ fn process_sound_queue(
             let handle = GodotNodeHandle::new(player);
             audio_manager.one_shot_sounds.insert(queued.id, handle);
 
-            let source_info = match &queued.source {
-                SoundSource::Path(path) => format!("path: {}", path),
-                SoundSource::Handle(handle) => format!("cached: {}", handle.path),
-            };
-            info!(
-                "Started playing sound: {} (ID: {:?})",
-                source_info, queued.id
-            );
+            trace!("Started playing audio: {:?}", queued.id);
         } else {
-            let source_info = match &queued.source {
-                SoundSource::Path(path) => path.clone(),
-                SoundSource::Handle(handle) => handle.path.clone(),
-            };
-            warn!("Failed to load audio: {}", source_info);
+            warn!("Failed to get audio stream for queued sound");
         }
     }
 }
 
 /// System that cleans up finished sounds
 fn cleanup_finished_sounds(mut audio_manager: ResMut<AudioManager>) {
-    let before_count = audio_manager.one_shot_sounds.len();
+    let mut finished_sounds = Vec::new();
 
-    audio_manager.one_shot_sounds.retain(|id, handle| {
+    for (&sound_id, handle) in audio_manager.one_shot_sounds.iter_mut() {
         if let Some(player) = handle.try_get::<AudioStreamPlayer>() {
-            let is_playing = player.is_playing();
-            if !is_playing {
-                debug!("Sound finished: {:?}", id);
+            if !player.is_playing() {
+                finished_sounds.push(sound_id);
             }
-            is_playing
         } else {
-            false // Remove invalid handles
+            // Player was freed, consider it finished
+            finished_sounds.push(sound_id);
         }
-    });
+    }
 
-    let after_count = audio_manager.one_shot_sounds.len();
-    if before_count != after_count {
-        debug!("Cleaned up {} finished sounds", before_count - after_count);
+    for sound_id in finished_sounds {
+        audio_manager.one_shot_sounds.remove(&sound_id);
+        trace!("Cleaned up finished sound: {:?}", sound_id);
     }
 }
 
-/// Convert linear volume (0.0-1.0) to decibels.
+/// Convert linear volume (0.0-1.0) to decibels for Godot
 fn volume_to_db(volume: f32) -> f32 {
     if volume <= 0.0 {
-        -80.0 // Effectively muted
+        -80.0 // Silence
     } else {
         20.0 * volume.log10()
     }
 }
 
-/// Error type for audio operations
-#[derive(Debug, thiserror::Error)]
+/// Possible errors that can be produced by the audio manager
+#[derive(Debug, Error)]
 pub enum AudioError {
-    #[error("Failed to load audio file: {0}")]
-    LoadError(String),
     #[error("Sound not found: {0:?}")]
     SoundNotFound(SoundId),
 }
 
-// Re-export for backward compatibility and convenience
-pub use AudioManager as GodotAudio;
-
 /// Helper extension trait to make audio playing more convenient
 pub trait AudioManagerExt {
     /// Play a sound with just a path - most convenient method
-    fn play_sound(&mut self, path: &str) -> Result<SoundId, AudioError>;
+    fn play_sound(&mut self, path: &str, asset_server: &AssetServer) -> Result<SoundId, AudioError>;
 
     /// Play a sound with volume
-    fn play_sound_with_volume(&mut self, path: &str, volume: f32) -> Result<SoundId, AudioError>;
-
-    /// Play a looping sound
-    fn play_looping_sound(&mut self, path: &str) -> Result<SoundId, AudioError>;
-
-    /// Load an audio asset for reuse (requires GodotResourceLoader)
-    fn load_audio(
+    fn play_sound_with_volume(
         &mut self,
         path: &str,
-        loader: &GodotResourceLoader,
-    ) -> Result<AudioHandle, AudioError>;
+        volume: f32,
+        asset_server: &AssetServer,
+    ) -> Result<SoundId, AudioError>;
+
+    /// Play a looping sound
+    fn play_looping_sound(
+        &mut self,
+        path: &str,
+        asset_server: &AssetServer,
+    ) -> Result<SoundId, AudioError>;
+
+    /// Load an audio asset for reuse using AssetServer
+    fn load_audio(&mut self, path: &str, asset_server: &AssetServer) -> AudioHandle;
 }
 
 impl AudioManagerExt for AudioManager {
-    fn play_sound(&mut self, path: &str) -> Result<SoundId, AudioError> {
-        self.play(path)
+    fn play_sound(&mut self, path: &str, asset_server: &AssetServer) -> Result<SoundId, AudioError> {
+        self.play(path, asset_server)
     }
 
-    fn play_sound_with_volume(&mut self, path: &str, volume: f32) -> Result<SoundId, AudioError> {
-        self.play_with_settings(path, SoundSettings::new().volume(volume))
-    }
-
-    fn play_looping_sound(&mut self, path: &str) -> Result<SoundId, AudioError> {
-        self.play_with_settings(path, SoundSettings::new().looped())
-    }
-
-    fn load_audio(
+    fn play_sound_with_volume(
         &mut self,
         path: &str,
-        loader: &GodotResourceLoader,
-    ) -> Result<AudioHandle, AudioError> {
-        self.load(path, loader)
+        volume: f32,
+        asset_server: &AssetServer,
+    ) -> Result<SoundId, AudioError> {
+        self.play_with_settings(path, SoundSettings::new().volume(volume), asset_server)
+    }
+
+    fn play_looping_sound(
+        &mut self,
+        path: &str,
+        asset_server: &AssetServer,
+    ) -> Result<SoundId, AudioError> {
+        self.play_with_settings(path, SoundSettings::new().looped(), asset_server)
+    }
+
+    fn load_audio(&mut self, path: &str, asset_server: &AssetServer) -> AudioHandle {
+        self.load(path, asset_server)
     }
 }
+
+// Re-export for backward compatibility
+pub use AudioManager as GodotAudio;
