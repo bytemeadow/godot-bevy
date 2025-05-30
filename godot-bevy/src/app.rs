@@ -2,7 +2,6 @@ use bevy::app::App;
 use godot::prelude::*;
 use std::sync::{Mutex, mpsc::channel};
 
-use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
 use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
 use crate::watchers::signal_watcher::GodotSignalWatcher;
@@ -41,15 +40,6 @@ impl BevyApp {
         scene_tree_watcher.set_name("SceneTreeWatcher");
         self.base_mut().add_child(&scene_tree_watcher);
         app.insert_non_send_resource(SceneTreeEventReader(receiver));
-    }
-
-    fn register_collision_watcher(&mut self, app: &mut App) {
-        let (sender, receiver) = channel();
-        let mut collision_watcher = CollisionWatcher::new_alloc();
-        collision_watcher.bind_mut().notification_channel = Some(sender);
-        collision_watcher.set_name("CollisionWatcher");
-        self.base_mut().add_child(&collision_watcher);
-        app.insert_non_send_resource(CollisionEventReader(receiver));
     }
 
     fn register_signal_watcher(&mut self, app: &mut App) {
@@ -91,7 +81,6 @@ impl INode for BevyApp {
         (BEVY_INIT_FUNC.lock().unwrap().as_mut().unwrap())(&mut app);
 
         self.register_scene_tree_watcher(&mut app);
-        self.register_collision_watcher(&mut app);
         self.register_signal_watcher(&mut app);
         self.register_input_event_watcher(&mut app);
         self.app = Some(app);

@@ -22,7 +22,7 @@ use godot::{
 
 use crate::{
     bridge::GodotNodeHandle,
-    prelude::{CollisionEventType, Collisions, Transform2D, Transform3D},
+    prelude::{Collisions, Transform2D, Transform3D},
 };
 
 pub struct GodotSceneTreePlugin;
@@ -182,11 +182,6 @@ fn create_scene_tree_entity(
         .map(|(reference, ent)| (reference.instance_id(), ent))
         .collect::<HashMap<_, _>>();
     let scene_root = scene_tree.get().get_root().unwrap();
-    let collision_watcher = scene_tree
-        .get()
-        .get_root()
-        .unwrap()
-        .get_node_as::<Node>("/root/BevyAppSingleton/CollisionWatcher");
 
     for event in events.into_iter() {
         trace!(target: "godot_scene_tree_events", event = ?event);
@@ -220,21 +215,27 @@ fn create_scene_tree_entity(
                 if node.has_signal("body_entered") {
                     debug!(target: "godot_scene_tree_collisions", body_id = node.instance_id().to_string(), "has body_entered signal");
 
+                    let signal_watcher = scene_tree
+                        .get()
+                        .get_root()
+                        .unwrap()
+                        .get_node_as::<Node>("/root/BevyAppSingleton/SignalWatcher");
+
                     let node_clone = node.clone();
 
                     node.connect(
                         "body_entered",
-                        &collision_watcher.callable("collision_event").bind(&[
+                        &signal_watcher.callable("collision_event").bind(&[
                             node_clone.to_variant(),
-                            CollisionEventType::Started.to_variant(),
+                            "body_entered".to_variant(),
                         ]),
                     );
 
                     node.connect(
                         "body_exited",
-                        &collision_watcher.callable("collision_event").bind(&[
+                        &signal_watcher.callable("collision_event").bind(&[
                             node_clone.to_variant(),
-                            CollisionEventType::Ended.to_variant(),
+                            "body_exited".to_variant(),
                         ]),
                     );
 

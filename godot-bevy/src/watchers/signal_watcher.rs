@@ -35,4 +35,15 @@ impl GodotSignalWatcher {
             });
         }
     }
+
+    #[func]
+    pub fn collision_event(&self, target: Gd<Node>, origin: Gd<Node>, signal_name: GString) {
+        if let Some(channel) = self.notification_channel.as_ref() {
+            let _ = channel.send(GodotSignal {
+                name: signal_name.to_string(),
+                origin: GodotNodeHandle::from_instance_id(origin.instance_id()),
+                target: GodotNodeHandle::from_instance_id(target.instance_id()),
+            });
+        }
+    }
 }
