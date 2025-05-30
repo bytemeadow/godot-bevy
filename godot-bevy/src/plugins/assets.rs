@@ -27,6 +27,11 @@ use crate::bridge::GodotResourceHandle;
 ///
 /// ## Unified Asset Loading
 /// ```rust
+/// use bevy::prelude::*;
+/// use bevy::asset::{AssetServer, Assets, Handle};
+/// use godot::classes::PackedScene;
+/// use godot_bevy::prelude::*;
+///
 /// fn load_assets(asset_server: Res<AssetServer>) {
 ///     // Load any Godot resource through Bevy's asset system (async, non-blocking)
 ///     let scene: Handle<GodotResource> = asset_server.load("scenes/player.tscn");
@@ -34,11 +39,16 @@ use crate::bridge::GodotResourceHandle;
 ///     let texture: Handle<GodotResource> = asset_server.load("art/player.png");
 /// }
 ///
+/// #[derive(Resource)]
+/// struct MyAssets {
+///     scene: Handle<GodotResource>,
+/// }
+///
 /// fn use_loaded_assets(
 ///     mut assets: ResMut<Assets<GodotResource>>,
-///     scene_handle: Res<Handle<GodotResource>>, // Your loaded handle
+///     my_assets: Res<MyAssets>, // Your loaded handles
 /// ) {
-///     if let Some(asset) = assets.get_mut(&scene_handle) {
+///     if let Some(asset) = assets.get_mut(&my_assets.scene) {
 ///         if let Some(scene) = asset.try_cast::<PackedScene>() {
 ///             // Use the scene...
 ///         }
