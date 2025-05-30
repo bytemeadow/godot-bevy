@@ -14,12 +14,16 @@ use std::marker::PhantomData;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChannelId(pub &'static str);
 
-/// Internal state for a channel (volume, pitch, etc.)
+
 #[derive(Debug, Clone)]
 pub(crate) struct ChannelState {
+    #[allow(dead_code)]
     pub volume: f32,
+    #[allow(dead_code)]
     pub pitch: f32,
+    #[allow(dead_code)]
     pub paused: bool,
+    #[allow(dead_code)]
     pub panning: f32, // For 2D/non-positional audio
 }
 
@@ -171,7 +175,7 @@ impl<'a, T: AudioChannelMarker> PlayAudioCommand<'a, T> {
         channel: &'a AudioChannel<T>,
     ) -> Self {
         let sound_id = SoundId::next();
-
+        
         Self {
             channel_id,
             handle,
