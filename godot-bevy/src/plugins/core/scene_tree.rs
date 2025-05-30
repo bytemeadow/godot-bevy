@@ -212,8 +212,18 @@ fn create_scene_tree_entity(
 
                 let mut node = node.get::<Node>();
 
-                if node.has_signal("body_entered") {
-                    debug!(target: "godot_scene_tree_collisions", body_id = node.instance_id().to_string(), "has body_entered signal");
+                // Check for any collision-related signals and connect them
+                let collision_signals =
+                    ["body_entered", "body_exited", "area_entered", "area_exited"];
+
+                let has_collision_signals = collision_signals
+                    .iter()
+                    .any(|&signal| node.has_signal(signal));
+
+                if has_collision_signals {
+                    debug!(target: "godot_scene_tree_collisions", 
+                           node_id = node.instance_id().to_string(), 
+                           "has collision signals");
 
                     let signal_watcher = scene_tree
                         .get()
@@ -223,21 +233,17 @@ fn create_scene_tree_entity(
 
                     let node_clone = node.clone();
 
-                    node.connect(
-                        "body_entered",
-                        &signal_watcher.callable("collision_event").bind(&[
-                            node_clone.to_variant(),
-                            "body_entered".to_variant(),
-                        ]),
-                    );
-
-                    node.connect(
-                        "body_exited",
-                        &signal_watcher.callable("collision_event").bind(&[
-                            node_clone.to_variant(),
-                            "body_exited".to_variant(),
-                        ]),
-                    );
+                    // Connect all available collision signals
+                    for signal_name in collision_signals {
+                        if node.has_signal(signal_name) {
+                            node.connect(
+                                signal_name,
+                                &signal_watcher
+                                    .callable("collision_event")
+                                    .bind(&[node_clone.to_variant(), signal_name.to_variant()]),
+                            );
+                        }
+                    }
 
                     ent.insert(Collisions::default());
                 }

@@ -17,10 +17,9 @@ pub mod prelude {
             SoundSettings,
         },
         core::{
-            ActionInput, Collisions, FindEntityByNameExt,
-            GodotCorePlugin, GodotSignal, Groups, KeyboardInput, MouseButtonInput, MouseMotion,
-            PhysicsUpdate, SceneTreeEventReader, SceneTreeRef, SystemDeltaTimer, Transform2D,
-            Transform3D, connect_godot_signal,
+            ActionInput, Collisions, FindEntityByNameExt, GodotCorePlugin, GodotSignal, Groups,
+            KeyboardInput, MouseButtonInput, MouseMotion, PhysicsUpdate, SceneTreeEventReader,
+            SceneTreeRef, SystemDeltaTimer, Transform2D, Transform3D, connect_godot_signal,
         },
         packed_scene::{GodotScene, PackedScenePlugin},
     };
