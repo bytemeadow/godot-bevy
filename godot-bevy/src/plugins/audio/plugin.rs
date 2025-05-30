@@ -90,15 +90,21 @@ fn process_channel_commands<T: AudioChannelMarker>(
                     .collect();
 
                 if let Some(tween) = tween {
-                    // Implement fade-out tweening
+                    // Implement fade-out tweening with real current volumes
                     for sound_id in sound_ids {
-                        // For simplicity, assume current volume is 1.0
-                        // In a more sophisticated implementation, we'd track current volumes
-                        let current_volume = 1.0;
+                        // Get the actual current volume instead of assuming 1.0
+                        let current_volume = audio_output
+                            .current_volumes
+                            .get(&sound_id)
+                            .copied()
+                            .unwrap_or(1.0);
                         let fade_out_tween =
                             ActiveTween::new_fade_out(current_volume, tween.clone());
                         audio_output.active_tweens.insert(sound_id, fade_out_tween);
-                        trace!("Started fade-out for sound: {:?}", sound_id);
+                        trace!(
+                            "Started fade-out from volume {} for sound: {:?}",
+                            current_volume, sound_id
+                        );
                     }
                 } else {
                     // Immediate stop
@@ -220,6 +226,16 @@ fn process_play_command(
         output
             .sound_to_channel
             .insert(play_cmd.sound_id, play_cmd.channel_id);
+
+        // Track initial volume (either fade-in start volume or target volume)
+        let initial_volume = if fade_in_tween.is_some() {
+            0.0
+        } else {
+            initial_settings.volume
+        };
+        output
+            .current_volumes
+            .insert(play_cmd.sound_id, initial_volume);
 
         // Set up fade-in tween if needed
         if let Some((target_volume, fade_in)) = fade_in_tween {
@@ -358,6 +374,7 @@ fn cleanup_finished_sounds(mut audio_output: ResMut<AudioOutput>) {
         audio_output.playing_sounds.remove(&sound_id);
         audio_output.sound_to_channel.remove(&sound_id);
         audio_output.active_tweens.remove(&sound_id);
+        audio_output.current_volumes.remove(&sound_id); // Clean up volume tracking
         trace!("Cleaned up finished sound: {:?}", sound_id);
     }
 }
@@ -406,6 +423,9 @@ fn update_audio_tweens(mut audio_output: ResMut<AudioOutput>, time: Res<Time>) {
             } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer3D>() {
                 player.set_volume_db(volume_db);
             }
+
+            // Track current volume for accurate fade-outs
+            audio_output.current_volumes.insert(sound_id, volume);
         }
     }
 

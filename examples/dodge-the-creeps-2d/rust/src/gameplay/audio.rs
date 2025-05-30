@@ -2,7 +2,7 @@ use bevy::app::{App, Plugin};
 use bevy::prelude::*;
 use bevy::state::state::{OnEnter, OnExit};
 use bevy_asset_loader::asset_collection::AssetCollection;
-use godot_bevy::prelude::{AudioApp, AudioChannel, AudioChannelMarker, AudioTween, GodotResource};
+use godot_bevy::prelude::{AudioApp, AudioChannel, AudioChannelMarker, GodotResource};
 
 use crate::GameState;
 

@@ -11,7 +11,7 @@ use std::time::Duration;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SoundId(pub(crate) u32);
 
-/// Individual channel output handling
+/// Manages audio output and tracks playing sounds
 #[derive(Resource, Default)]
 pub struct AudioOutput {
     pub(crate) playing_sounds: HashMap<SoundId, GodotNodeHandle>,
@@ -19,6 +19,8 @@ pub struct AudioOutput {
     pub(crate) sound_to_channel: HashMap<SoundId, ChannelId>,
     pub(crate) next_sound_id: u32,
     pub(crate) active_tweens: HashMap<SoundId, ActiveTween>,
+    /// Track current volume for each sound for accurate fade-outs
+    pub(crate) current_volumes: HashMap<SoundId, f32>,
 }
 
 /// Tracks an active tween for a specific sound
@@ -60,9 +62,12 @@ impl AudioOutput {
 
     /// Set volume for a specific sound (direct execution)
     pub fn set_sound_volume(&mut self, sound_id: SoundId, volume: f32) {
+        let clamped_volume = volume.clamp(0.0, 1.0);
         if let Some(handle) = self.playing_sounds.get_mut(&sound_id) {
-            set_audio_player_volume(handle, volume.clamp(0.0, 1.0));
-            trace!("Set volume to {} for sound: {:?}", volume, sound_id);
+            set_audio_player_volume(handle, clamped_volume);
+            // Track the current volume for accurate fade-outs
+            self.current_volumes.insert(sound_id, clamped_volume);
+            trace!("Set volume to {} for sound: {:?}", clamped_volume, sound_id);
         }
     }
 
@@ -95,6 +100,7 @@ impl AudioOutput {
         if let Some(mut handle) = self.playing_sounds.remove(&sound_id) {
             stop_audio_player(&mut handle);
             self.sound_to_channel.remove(&sound_id);
+            self.current_volumes.remove(&sound_id); // Clean up volume tracking
             trace!("Stopped sound: {:?}", sound_id);
         }
     }
