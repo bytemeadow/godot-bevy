@@ -1,4 +1,3 @@
-use bevy::ecs::resource::Resource as BevyResource;
 use godot::{
     classes::{Resource, class_macros::sys},
     obj::{Gd, InstanceId},
@@ -11,7 +10,7 @@ use super::utils::{maybe_dec_ref, maybe_inc_ref, maybe_inc_ref_opt};
 ///
 /// Uses Godot's reference counting system to prevent premature garbage collection
 /// while still allowing the resource to be freed when no longer needed.
-#[derive(Debug, BevyResource, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct GodotResourceHandle {
     resource_id: InstanceId,
 }

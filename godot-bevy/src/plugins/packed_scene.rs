@@ -16,7 +16,7 @@ use godot::{
     classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader},
 };
 
-use crate::bridge::{GodotNodeHandle, GodotResourceHandle};
+use crate::bridge::GodotNodeHandle;
 use crate::plugins::assets::GodotResource;
 
 use super::core::{SceneTreeRef, Transform2D, Transform3D};
@@ -41,20 +41,11 @@ pub struct GodotScene {
 
 #[derive(Debug)]
 enum GodotSceneResource {
-    Resource(GodotResourceHandle),
     Handle(Handle<GodotResource>),
     Path(String),
 }
 
 impl GodotScene {
-    /// Instantiate the godot scene from a GodotResourceHandle.
-    pub fn from_resource(res: GodotResourceHandle) -> Self {
-        Self {
-            resource: GodotSceneResource::Resource(res),
-            parent: None,
-        }
-    }
-
     /// Instantiate the godot scene from a Bevy Handle<GodotResource>.
     /// This is the preferred method when using Bevy's asset system.
     pub fn from_handle(handle: Handle<GodotResource>) -> Self {
@@ -67,8 +58,8 @@ impl GodotScene {
     /// Instantiate the godot scene from the given path.
     ///
     /// Note that this will call [`ResourceLoader`].load() - which is a blocking load.
-    /// If you want "preload" functionality, you should load your resources into a Bevy [`Resource`]
-    /// and use from_handle() or from_resource().
+    /// If you want async loading, you should load your resources through Bevy's AssetServer
+    /// and use from_handle().
     pub fn from_path(path: &str) -> Self {
         Self {
             resource: GodotSceneResource::Path(path.to_string()),
@@ -96,36 +87,11 @@ fn spawn_scene(
 ) {
     for (mut scene, ent, transform2d, transform3d) in new_scenes.iter_mut() {
         let packed_scene = match &scene.resource {
-            GodotSceneResource::Resource(res) => {
-                let mut res_clone = res.clone();
-                match res_clone.try_get() {
-                    Some(resource) => resource,
-                    None => {
-                        tracing::error!("GodotResourceHandle resource was freed!");
-                        continue;
-                    }
-                }
-            }
-            GodotSceneResource::Handle(handle) => {
-                match assets.get_mut(handle) {
-                    Some(asset) => {
-                        let mut asset_handle = asset.handle().clone();
-                        match asset_handle.try_get() {
-                            Some(resource) => resource,
-                            None => {
-                                tracing::warn!(
-                                    "Asset handle resource was freed, will retry next frame"
-                                );
-                                continue;
-                            }
-                        }
-                    }
-                    None => {
-                        // Asset not ready yet, will retry next frame
-                        continue;
-                    }
-                }
-            }
+            GodotSceneResource::Handle(handle) => assets
+                .get_mut(handle)
+                .expect("packed scene to exist in assets")
+                .get()
+                .clone(),
             GodotSceneResource::Path(path) => ResourceLoader::singleton()
                 .load(&GString::from_str(path).expect("path to be a valid GString"))
                 .expect("packed scene to load"),
