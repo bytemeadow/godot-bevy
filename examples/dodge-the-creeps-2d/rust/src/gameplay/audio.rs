@@ -2,7 +2,7 @@ use bevy::app::{App, Plugin};
 use bevy::prelude::*;
 use bevy::state::state::{OnEnter, OnExit};
 use bevy_asset_loader::asset_collection::AssetCollection;
-use godot_bevy::prelude::{AudioApp, AudioChannel, AudioChannelMarker, GodotResource};
+use godot_bevy::prelude::{AudioApp, AudioChannel, AudioChannelMarker, AudioTween, GodotResource};
 
 use crate::GameState;
 
@@ -53,9 +53,10 @@ fn start_background_music(
     music_channel
         .play(game_audio.background_music.clone())
         .volume(0.5)
-        .looped();
+        .looped()
+        .fade_in(std::time::Duration::from_secs(3));
 
-    info!("Started background music using new clean API");
+    info!("Started background music with 3-second fade-in!");
 }
 
 /// System that stops background music

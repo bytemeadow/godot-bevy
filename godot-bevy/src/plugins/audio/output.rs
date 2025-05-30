@@ -1,10 +1,11 @@
 //! Audio output management and sound tracking
 
 use crate::bridge::GodotNodeHandle;
-use crate::plugins::audio::ChannelId;
+use crate::plugins::audio::{AudioTween, ChannelId};
 use bevy::prelude::*;
 use godot::classes::{AudioStreamPlayer, AudioStreamPlayer2D, AudioStreamPlayer3D};
 use std::collections::HashMap;
+use std::time::Duration;
 
 /// Handle to a playing sound instance
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -17,6 +18,26 @@ pub struct AudioOutput {
     // Track which sounds belong to which channels
     pub(crate) sound_to_channel: HashMap<SoundId, ChannelId>,
     pub(crate) next_sound_id: u32,
+    pub(crate) active_tweens: HashMap<SoundId, ActiveTween>,
+}
+
+/// Tracks an active tween for a specific sound
+#[derive(Debug, Clone)]
+pub struct ActiveTween {
+    pub tween_type: TweenType,
+    pub start_value: f32,
+    pub target_value: f32,
+    pub duration: Duration,
+    pub elapsed: Duration,
+    pub easing: super::AudioEasing,
+}
+
+/// Type of tween being applied
+#[derive(Debug, Clone)]
+pub enum TweenType {
+    Volume,
+    Pitch,
+    FadeOut, // Special case for fade-out to remove sound when complete
 }
 
 impl AudioOutput {
@@ -139,5 +160,79 @@ fn stop_audio_player(handle: &mut GodotNodeHandle) {
         player.stop();
     } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer3D>() {
         player.stop();
+    }
+}
+
+impl ActiveTween {
+    pub fn new_fade_in(target_volume: f32, tween: AudioTween) -> Self {
+        Self {
+            tween_type: TweenType::Volume,
+            start_value: 0.0,
+            target_value: target_volume,
+            duration: tween.duration,
+            elapsed: Duration::ZERO,
+            easing: tween.easing,
+        }
+    }
+
+    pub fn new_fade_out(current_volume: f32, tween: AudioTween) -> Self {
+        Self {
+            tween_type: TweenType::FadeOut,
+            start_value: current_volume,
+            target_value: 0.0,
+            duration: tween.duration,
+            elapsed: Duration::ZERO,
+            easing: tween.easing,
+        }
+    }
+
+    pub fn new_volume(start: f32, target: f32, tween: AudioTween) -> Self {
+        Self {
+            tween_type: TweenType::Volume,
+            start_value: start,
+            target_value: target,
+            duration: tween.duration,
+            elapsed: Duration::ZERO,
+            easing: tween.easing,
+        }
+    }
+
+    pub fn new_pitch(start: f32, target: f32, tween: AudioTween) -> Self {
+        Self {
+            tween_type: TweenType::Pitch,
+            start_value: start,
+            target_value: target,
+            duration: tween.duration,
+            elapsed: Duration::ZERO,
+            easing: tween.easing,
+        }
+    }
+
+    /// Update the tween and return the current interpolated value
+    pub fn update(&mut self, delta: Duration) -> f32 {
+        self.elapsed += delta;
+        let progress = (self.elapsed.as_secs_f32() / self.duration.as_secs_f32()).clamp(0.0, 1.0);
+
+        // Apply easing
+        let eased_progress = match self.easing {
+            super::AudioEasing::Linear => progress,
+            super::AudioEasing::EaseIn => progress * progress,
+            super::AudioEasing::EaseOut => 1.0 - (1.0 - progress) * (1.0 - progress),
+            super::AudioEasing::EaseInOut => {
+                if progress < 0.5 {
+                    2.0 * progress * progress
+                } else {
+                    1.0 - 2.0 * (1.0 - progress) * (1.0 - progress)
+                }
+            }
+        };
+
+        // Interpolate between start and target
+        self.start_value + (self.target_value - self.start_value) * eased_progress
+    }
+
+    /// Check if the tween is complete
+    pub fn is_complete(&self) -> bool {
+        self.elapsed >= self.duration
     }
 }

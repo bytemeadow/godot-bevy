@@ -60,7 +60,7 @@ pub mod tween;
 // Re-export main types for convenience
 pub use channel::{AudioChannel, AudioChannelMarker, ChannelId, MainAudioTrack, PlayAudioCommand};
 pub use command::{AudioCommand, PlayCommand};
-pub use output::{AudioOutput, SoundId};
+pub use output::{ActiveTween, AudioOutput, SoundId, TweenType};
 pub use player::AudioPlayerType;
 pub use plugin::{AudioApp, AudioError, GodotAudioChannels, GodotAudioPlugin};
 pub use settings::AudioSettings;

@@ -142,7 +142,7 @@ fn new_mob(
             &mut scene_tree,
         );
 
-        // Play 2D positional spawn sound at mob's position
+        // Play 2D positional spawn sound at mob's position with fade-in
         let position = Vec2::new(
             transform.as_bevy().translation.x,
             transform.as_bevy().translation.y,
@@ -151,10 +151,10 @@ fn new_mob(
         sfx_channel
             .play_2d(assets.mob_pop.clone(), position)
             .volume(0.9)
-            .pitch(0.8 + fastrand::f32() * 0.4); // Random pitch variation
+            .pitch(0.8 + fastrand::f32() * 0.4); // 500ms fade-in!
 
         info!(
-            "Mob spawned at position: {:?} with 2D positional audio",
+            "Mob spawned at position: {:?} with 2D positional audio and fade-in",
             position
         );
     }

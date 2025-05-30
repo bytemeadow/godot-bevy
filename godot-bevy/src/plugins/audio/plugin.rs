@@ -3,8 +3,8 @@
 use crate::bridge::GodotNodeHandle;
 use crate::plugins::assets::GodotResource;
 use crate::plugins::audio::{
-    AudioChannel, AudioChannelMarker, AudioCommand, AudioOutput, AudioPlayerType, AudioSettings,
-    ChannelId, ChannelState, MainAudioTrack, PlayCommand, SoundId,
+    ActiveTween, AudioChannel, AudioChannelMarker, AudioCommand, AudioOutput, AudioPlayerType,
+    AudioSettings, ChannelId, ChannelState, MainAudioTrack, PlayCommand, SoundId, TweenType,
 };
 use crate::plugins::core::SceneTreeRef;
 use bevy::app::{App, Plugin, Update};
@@ -25,7 +25,7 @@ impl Plugin for GodotAudioPlugin {
         app.init_resource::<GodotAudioChannels>()
             .init_resource::<AudioOutput>()
             .add_audio_channel::<MainAudioTrack>()
-            .add_systems(Update, cleanup_finished_sounds);
+            .add_systems(Update, (cleanup_finished_sounds, update_audio_tweens));
     }
 }
 
@@ -89,14 +89,24 @@ fn process_channel_commands<T: AudioChannelMarker>(
                     .map(|(sound_id, _)| *sound_id)
                     .collect();
 
-                for sound_id in sound_ids {
-                    audio_output.stop_sound(sound_id);
+                if let Some(tween) = tween {
+                    // Implement fade-out tweening
+                    for sound_id in sound_ids {
+                        // For simplicity, assume current volume is 1.0
+                        // In a more sophisticated implementation, we'd track current volumes
+                        let current_volume = 1.0;
+                        let fade_out_tween =
+                            ActiveTween::new_fade_out(current_volume, tween.clone());
+                        audio_output.active_tweens.insert(sound_id, fade_out_tween);
+                        trace!("Started fade-out for sound: {:?}", sound_id);
+                    }
+                } else {
+                    // Immediate stop
+                    for sound_id in sound_ids {
+                        audio_output.stop_sound(sound_id);
+                    }
                 }
-
-                if let Some(_tween) = tween {
-                    // TODO: Implement fade-out tweening
-                }
-                trace!("Stopped all sounds in channel: {:?}", channel_id);
+                trace!("Processed stop command for channel: {:?}", channel_id);
             }
             AudioCommand::Pause(channel_id, _tween) => {
                 apply_to_channel_sounds(&mut audio_output, channel_id, |output, sound_id| {
@@ -174,14 +184,25 @@ fn process_play_command(
     // Configure looping if requested
     let audio_stream = configure_looping(audio_stream, play_cmd.settings.looping);
 
+    // Check if fade-in is needed
+    let (initial_volume, fade_in_tween) = if let Some(fade_in) = &play_cmd.settings.fade_in {
+        (0.0, Some((play_cmd.settings.volume, fade_in.clone())))
+    } else {
+        (play_cmd.settings.volume, None)
+    };
+
+    // Create settings with initial volume for fade-in
+    let mut initial_settings = play_cmd.settings.clone();
+    initial_settings.volume = initial_volume;
+
     // Create appropriate player based on type
     let player_handle = match play_cmd.player_type {
-        AudioPlayerType::NonPositional => create_audio_player(audio_stream, &play_cmd.settings),
+        AudioPlayerType::NonPositional => create_audio_player(audio_stream, &initial_settings),
         AudioPlayerType::Spatial2D { position } => {
-            create_audio_player_2d(audio_stream, &play_cmd.settings, position)
+            create_audio_player_2d(audio_stream, &initial_settings, position)
         }
         AudioPlayerType::Spatial3D { position } => {
-            create_audio_player_3d(audio_stream, &play_cmd.settings, position)
+            create_audio_player_3d(audio_stream, &initial_settings, position)
         }
     };
 
@@ -199,6 +220,14 @@ fn process_play_command(
         output
             .sound_to_channel
             .insert(play_cmd.sound_id, play_cmd.channel_id);
+
+        // Set up fade-in tween if needed
+        if let Some((target_volume, fade_in)) = fade_in_tween {
+            let tween = ActiveTween::new_fade_in(target_volume, fade_in);
+            output.active_tweens.insert(play_cmd.sound_id, tween);
+            trace!("Started fade-in for sound: {:?}", play_cmd.sound_id);
+        }
+
         trace!(
             "Started playing audio: {:?} in channel: {:?}",
             play_cmd.sound_id, play_cmd.channel_id
@@ -328,7 +357,80 @@ fn cleanup_finished_sounds(mut audio_output: ResMut<AudioOutput>) {
     for sound_id in finished_sounds {
         audio_output.playing_sounds.remove(&sound_id);
         audio_output.sound_to_channel.remove(&sound_id);
+        audio_output.active_tweens.remove(&sound_id);
         trace!("Cleaned up finished sound: {:?}", sound_id);
+    }
+}
+
+/// System that updates active audio tweens
+fn update_audio_tweens(mut audio_output: ResMut<AudioOutput>, time: Res<Time>) {
+    let delta = time.delta();
+    let mut completed_tweens = Vec::new();
+    let mut sounds_to_stop = Vec::new();
+    let mut volume_updates = Vec::new();
+    let mut pitch_updates = Vec::new();
+
+    // First pass: update tweens and collect parameter changes
+    for (&sound_id, tween) in audio_output.active_tweens.iter_mut() {
+        let current_value = tween.update(delta);
+
+        match tween.tween_type {
+            TweenType::Volume | TweenType::FadeOut => {
+                volume_updates.push((sound_id, current_value));
+            }
+            TweenType::Pitch => {
+                pitch_updates.push((sound_id, current_value));
+            }
+        }
+
+        // Check if tween is complete
+        if tween.is_complete() {
+            completed_tweens.push(sound_id);
+
+            // If this was a fade-out, mark sound for removal
+            if matches!(tween.tween_type, TweenType::FadeOut) {
+                sounds_to_stop.push(sound_id);
+            }
+        }
+    }
+
+    // Second pass: apply parameter changes to audio players
+    for (sound_id, volume) in volume_updates {
+        if let Some(handle) = audio_output.playing_sounds.get_mut(&sound_id) {
+            let volume_db = volume_to_db(volume);
+
+            if let Some(mut player) = handle.try_get::<AudioStreamPlayer>() {
+                player.set_volume_db(volume_db);
+            } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer2D>() {
+                player.set_volume_db(volume_db);
+            } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer3D>() {
+                player.set_volume_db(volume_db);
+            }
+        }
+    }
+
+    for (sound_id, pitch) in pitch_updates {
+        if let Some(handle) = audio_output.playing_sounds.get_mut(&sound_id) {
+            if let Some(mut player) = handle.try_get::<AudioStreamPlayer>() {
+                player.set_pitch_scale(pitch);
+            } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer2D>() {
+                player.set_pitch_scale(pitch);
+            } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer3D>() {
+                player.set_pitch_scale(pitch);
+            }
+        }
+    }
+
+    // Remove completed tweens
+    for sound_id in completed_tweens {
+        audio_output.active_tweens.remove(&sound_id);
+        trace!("Completed tween for sound: {:?}", sound_id);
+    }
+
+    // Stop sounds that finished fading out
+    for sound_id in sounds_to_stop {
+        audio_output.stop_sound(sound_id);
+        trace!("Stopped sound after fade-out: {:?}", sound_id);
     }
 }
 
@@ -338,6 +440,15 @@ fn volume_to_db(volume: f32) -> f32 {
         -80.0 // Silence
     } else {
         20.0 * volume.log10()
+    }
+}
+
+/// Convert decibels back to linear volume (0.0-1.0)
+fn db_to_volume(db: f32) -> f32 {
+    if db <= -80.0 {
+        0.0 // Silence
+    } else {
+        10.0_f32.powf(db / 20.0)
     }
 }
 
