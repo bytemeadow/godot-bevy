@@ -39,23 +39,6 @@ pub struct PlayAudioCommand<'a> {
 }
 
 impl<'a> PlayAudioCommand<'a> {
-    pub(crate) fn new(
-        channel_id: ChannelId,
-        handle: Handle<GodotResource>,
-        player_type: AudioPlayerType,
-        audio_manager: &'a mut super::GodotAudioChannels,
-        output: &'a mut super::AudioOutput,
-    ) -> Self {
-        Self {
-            channel_id,
-            handle,
-            player_type,
-            settings: AudioSettings::default(),
-            audio_manager,
-            output,
-        }
-    }
-
     /// Set the volume (0.0 to 1.0)
     pub fn volume(mut self, volume: f32) -> Self {
         self.settings.volume = volume.clamp(0.0, 1.0);
