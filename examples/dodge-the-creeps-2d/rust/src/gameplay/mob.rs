@@ -10,6 +10,8 @@ use bevy::{
         schedule::IntoScheduleConfigs,
         system::{Commands, Query, Res, ResMut},
     },
+    log::info,
+    math::Vec2,
     state::condition::in_state,
     time::{Time, Timer, TimerMode},
 };
@@ -22,12 +24,13 @@ use godot_bevy::{
     bridge::GodotNodeHandle,
     prelude::{
         connect_godot_signal, FindEntityByNameExt, GodotResource, GodotScene, GodotSignal,
-        NodeTreeView, SceneTreeRef, Transform2D,
+        NodeTreeView, SceneTreeRef, Transform2D, AudioChannel,
     },
 };
 use std::f32::consts::PI;
 
 use crate::GameState;
+use crate::gameplay::audio::{GameAudio, GameSfxChannel};
 
 #[derive(AssetCollection, Resource, Debug)]
 pub struct MobAssets {
@@ -106,10 +109,12 @@ pub struct MobNodes {
 }
 
 fn new_mob(
-    mut entities: Query<(&Mob, &mut GodotNodeHandle), Added<Mob>>,
+    mut entities: Query<(&Mob, &Transform2D, &mut GodotNodeHandle), Added<Mob>>,
     mut scene_tree: SceneTreeRef,
+    sfx_channel: Res<AudioChannel<GameSfxChannel>>,
+    game_audio: Res<GameAudio>,
 ) {
-    for (mob_data, mut mob) in entities.iter_mut() {
+    for (mob_data, transform, mut mob) in entities.iter_mut() {
         let mut mob = mob.get::<RigidBody2D>();
 
         let velocity = Vector2::new(fastrand::f32() * 100.0 + 150.0, 0.0);
@@ -133,6 +138,19 @@ fn new_mob(
             "screen_exited",
             &mut scene_tree,
         );
+
+        // Play 2D positional spawn sound at mob's position
+        let position = Vec2::new(
+            transform.as_bevy().translation.x,
+            transform.as_bevy().translation.y,
+        );
+        
+        sfx_channel
+            .play_2d(game_audio.mob_pop.clone(), position)
+            .volume(0.9)
+            .pitch(0.8 + fastrand::f32() * 0.4); // Random pitch variation
+        
+        info!("Mob spawned at position: {:?} with 2D positional audio", position);
     }
 }
 
