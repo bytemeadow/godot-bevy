@@ -23,7 +23,7 @@ _Special thanks to [Blaze](https://runblaze.dev) for their support of this proje
 - **Godot Signals in ECS**: Listen to and respond to Godot signals from Bevy systems
 - **Collision Event Handling**: React to Godot collision events in your ECS systems
 - **Scene Tree Queries**: Query and manipulate Godot's scene tree from Bevy
-- **Resource Management**: Load and manage Godot resources (scenes, textures, etc.) from ECS
+- **Resource Management**: Load and manage Godot resources (scenes, textures, etc.) from ECS via AssetServer
 - **Audio System**: Dual-mode audio with one-shot sound effects and persistent audio sources
 - **Node Groups Integration**: Work with Godot node groups in your Bevy systems
 - **Smart Scheduling**: Physics-rate vs visual-rate system execution with proper timing
@@ -119,9 +119,9 @@ fn spawn_godot_scene(mut commands: Commands) {
 
 **The library provides unified asset loading that works consistently in both development and exported games**. While Godot packages assets differently when exporting (filesystem vs .pck files), `godot-bevy` abstracts this complexity away.
 
-#### Unified Asset Loading (Bevy AssetServer)
+#### Quick Start
 
-Use Bevy's `AssetServer` with `GodotResourceAssetLoader` for modern, non-blocking asset loading:
+Use Bevy's `AssetServer`  for modern, non-blocking asset loading:
 
 ```rust
 use bevy::asset::{AssetServer, Assets, Handle};
@@ -152,61 +152,11 @@ fn use_loaded_assets(
 }
 ```
 
-**Key Benefits:**
-- **Works identically** in development and exported games  
-- **Supports all Godot resource types** - Textures, audio, scenes, etc.
-- **Non-blocking** - Async loading prevents frame drops
-- **Integrates with Bevy's asset system** - Loading states, etc.  
-- **Works seamlessly with `bevy_asset_loader`** - Loading screens and state management
-
-The `GodotAssetsPlugin` provides the `GodotResourceAssetLoader` for seamless integration with Godot's asset pipeline.
-
 ### Audio System
 
 The library provides a convenient audio API using Godot's audio engine
 
-#### Key Features
-- **bevy_asset_loader integration** - Works seamlessly with AssetCollection loading states
-- **Direct Handle<GodotResource> playback** - Clean, simple API
-- **Sound management** - Control playing sounds (stop, check status, etc.)
-- **Looping support** - Automatic loop configuration for background music
-- **Volume and pitch control** - Full audio parameter control
-
 #### Quick Start
-
-```rust
-use bevy::prelude::*;
-use bevy_asset_loader::asset_collection::AssetCollection;
-use godot_bevy::prelude::*;
-
-// Define your audio assets with AssetCollection
-#[derive(AssetCollection, Resource)]
-struct GameAudio {
-    #[asset(path = "audio/background.ogg")]
-    background_music: Handle<GodotResource>,
-    
-    #[asset(path = "audio/jump.wav")]
-    jump_sound: Handle<GodotResource>,
-}
-
-fn audio_system(mut audio: ResMut<AudioManager>, game_audio: Res<GameAudio>) {
-    // Play background music with settings
-    let sound_id = audio.play_with_settings(
-        game_audio.background_music.clone(),
-        SoundSettings::new().volume(0.5).looped()
-    );
-    
-    // Play sound effects
-    audio.play(game_audio.jump_sound.clone());
-    
-    // Control playing sounds
-    if audio.is_playing(sound_id) {
-        audio.stop(sound_id).unwrap();
-    }
-}
-```
-
-#### Audio Patterns
 
 **AssetCollection Loading** (recommended):
 ```rust

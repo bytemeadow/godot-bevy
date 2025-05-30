@@ -18,7 +18,7 @@ impl Plugin for AudioPlugin {
     }
 }
 
-/// Audio assets loaded via bevy_asset_loader - follows bevy_kira_audio pattern
+/// Audio assets loaded via bevy_asset_loader
 #[derive(AssetCollection, Resource, Debug)]
 pub struct GameAudio {
     #[asset(path = "audio/House In a Forest Loop.ogg")]
