@@ -101,17 +101,84 @@ fn move_player(
         }
     }
 }
-```
 
-### Project Setup
+### Node Queries
 
-1. **Add a `BevyAppSingleton` autoload** in your Godot project settings, which is a Godot scene containing a single root node of type BevyApp, which you can see examples of in `examples/`.
-2. **Interact with Godot from Bevy**:
+One of godot-bevy's most powerful features is the ability to **query and interact with Godot nodes directly through Bevy's ECS**. Every Godot node becomes a Bevy entity that you can query, modify, and control.
+
+#### Querying
 
 ```rust
-fn spawn_godot_scene(mut commands: Commands) {
-    commands.spawn(GodotScene::from_path("res://my_scene.tscn")
-        .with_translation3d(Vector3::new(0.0, 1.0, 0.0)));
+use godot::classes::{Label, Button, Area2D, Node2D};
+use godot_bevy::prelude::*;
+
+// Query nodes with your custom components, then cast to specific Godot types
+fn update_player_ui(
+    mut player: Query<&mut GodotNodeHandle, With<Player>>,
+    player_health: Query<&Health, With<Player>>,
+) -> Result {
+    if let (Ok(mut player_handle), Ok(health)) = (player.single_mut(), player_health.get_single()) {
+        // Cast the handle to your custom Godot class
+        let player_node = player_handle.get::<MyPlayerNode>();
+        
+        // Or cast to built-in Godot classes
+        let area2d = player_handle.get::<Area2D>();
+        let overlapping_bodies = area2d.get_overlapping_bodies().len();
+        
+        if overlapping_bodies > 0 {
+            println!("Player is colliding with {} bodies", overlapping_bodies);
+        }
+    }
+    
+    Ok(())
+}
+```
+
+#### Working with Node Groups and Entity Queries
+
+```rust
+// Query entities and check Godot node groups
+fn handle_enemy_groups(
+    mut commands: Commands, 
+    entities: Query<(Entity, &mut GodotNodeHandle)>
+) -> Result {
+    for (entity, mut node_handle) in entities.iter() {
+        let node = node_handle.get::<Node>();
+        
+        // Check if node is in a specific Godot group
+        if node.is_in_group("enemies".into()) {
+            // Add ECS components based on node groups
+            commands.entity(entity).insert(Enemy { health: 100 });
+        }
+    }
+    
+    Ok(())
+}
+```
+
+#### Finding Nodes by Name
+
+```rust
+// Use a helper trait to find entities by node name
+fn setup_start_position(
+    mut player: Query<&mut Transform2D, With<Player>>,
+    entities: Query<(&Name, &mut GodotNodeHandle)>,
+) -> Result {
+    if let Ok(mut transform) = player.single_mut() {
+        // Find the start position node by name
+        let start_pos_handle = entities
+            .iter()
+            .find_entity_by_name("StartPosition")
+            .unwrap();
+            
+        let start_node = start_pos_handle.get::<Node2D>();
+        let position = start_node.get_position();
+        
+        // Set player position from Godot node
+        transform.as_godot_mut().origin = position;
+    }
+    
+    Ok(())
 }
 ```
 
