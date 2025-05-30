@@ -5,6 +5,9 @@ pub mod audio;
 pub mod core;
 pub mod packed_scene;
 
+// Re-export for convenience
+pub use audio::GodotAudioPlugin;
+
 pub struct DefaultGodotPlugin;
 
 impl Plugin for DefaultGodotPlugin {

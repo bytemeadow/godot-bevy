@@ -1,0 +1,244 @@
+//! Audio channel management and typed channels
+
+use crate::plugins::assets::GodotResource;
+use crate::plugins::audio::{AudioCommand, AudioPlayerType, AudioSettings, SoundId, AudioTween, PlayCommand};
+use bevy::asset::Handle;
+use bevy::prelude::*;
+use parking_lot::RwLock;
+use std::collections::VecDeque;
+use std::marker::PhantomData;
+
+/// Channel identifier for tracking which sounds belong to which channels
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ChannelId(pub &'static str);
+
+/// Internal state for a channel (volume, pitch, etc.)
+#[derive(Debug, Clone)]
+pub(crate) struct ChannelState {
+    pub volume: f32,
+    pub pitch: f32,
+    pub paused: bool,
+    pub panning: f32, // For 2D/non-positional audio
+}
+
+impl Default for ChannelState {
+    fn default() -> Self {
+        Self {
+            volume: 1.0,
+            pitch: 1.0,
+            paused: false,
+            panning: 0.0,
+        }
+    }
+}
+
+/// Trait that audio channel marker types must implement
+pub trait AudioChannelMarker: Resource {
+    const CHANNEL_NAME: &'static str;
+}
+
+/// Typed audio channel resource - each channel type gets its own instance
+#[derive(Resource)]
+pub struct AudioChannel<T: AudioChannelMarker> {
+    pub(crate) channel_id: ChannelId,
+    pub(crate) commands: RwLock<VecDeque<AudioCommand>>, // Internal command queue like bevy_kira_audio
+    _marker: PhantomData<T>,
+}
+
+impl<T: AudioChannelMarker> AudioChannel<T> {
+    pub fn new(channel_id: ChannelId) -> Self {
+        Self {
+            channel_id,
+            commands: RwLock::new(VecDeque::new()),
+            _marker: PhantomData,
+        }
+    }
+
+    /// Get the channel ID
+    pub fn id(&self) -> &ChannelId {
+        &self.channel_id
+    }
+
+    /// Queue a command for this channel (internal method)
+    fn queue_command(&self, command: AudioCommand) {
+        self.commands.write().push_back(command);
+    }
+
+    /// Play audio with configurable settings - returns a fluent builder
+    /// Note: This now uses the internal command queue like bevy_kira_audio
+    pub fn play(&self, handle: Handle<GodotResource>) -> PlayAudioCommand<T> {
+        PlayAudioCommand::new(self.channel_id.clone(), handle, AudioPlayerType::NonPositional, self)
+    }
+
+    /// Play 2D positional audio
+    pub fn play_2d(&self, handle: Handle<GodotResource>, position: Vec2) -> PlayAudioCommand<T> {
+        PlayAudioCommand::new(
+            self.channel_id.clone(),
+            handle,
+            AudioPlayerType::Spatial2D { position },
+            self,
+        )
+    }
+
+    /// Play 3D positional audio
+    pub fn play_3d(&self, handle: Handle<GodotResource>, position: Vec3) -> PlayAudioCommand<T> {
+        PlayAudioCommand::new(
+            self.channel_id.clone(),
+            handle,
+            AudioPlayerType::Spatial3D { position },
+            self,
+        )
+    }
+
+    /// Stop all sounds in this channel
+    pub fn stop(&self) {
+        self.queue_command(AudioCommand::Stop(self.channel_id.clone(), None));
+    }
+
+    /// Stop all sounds with fade-out
+    pub fn stop_with_fade(&self, fade_out: AudioTween) {
+        self.queue_command(AudioCommand::Stop(self.channel_id.clone(), Some(fade_out)));
+    }
+
+    /// Pause all sounds in this channel
+    pub fn pause(&self) {
+        self.queue_command(AudioCommand::Pause(self.channel_id.clone(), None));
+    }
+
+    /// Resume all sounds in this channel
+    pub fn resume(&self) {
+        self.queue_command(AudioCommand::Resume(self.channel_id.clone(), None));
+    }
+
+    /// Set volume for all sounds in this channel
+    pub fn set_volume(&self, volume: f32) {
+        self.queue_command(AudioCommand::SetVolume(
+            self.channel_id.clone(),
+            volume.clamp(0.0, 1.0),
+            None,
+        ));
+    }
+
+    /// Set volume with fade transition
+    pub fn set_volume_with_fade(&self, volume: f32, tween: AudioTween) {
+        self.queue_command(AudioCommand::SetVolume(
+            self.channel_id.clone(),
+            volume.clamp(0.0, 1.0),
+            Some(tween),
+        ));
+    }
+
+    /// Set pitch for all sounds in this channel
+    pub fn set_pitch(&self, pitch: f32) {
+        self.queue_command(AudioCommand::SetPitch(
+            self.channel_id.clone(),
+            pitch.clamp(0.1, 4.0),
+            None,
+        ));
+    }
+
+    /// Set panning for all sounds in this channel (non-positional only)
+    pub fn set_panning(&self, panning: f32) {
+        self.queue_command(AudioCommand::SetPanning(
+            self.channel_id.clone(),
+            panning.clamp(-1.0, 1.0),
+            None,
+        ));
+    }
+}
+
+/// Fluent builder for playing audio with configurable settings
+/// Now works with the internal command queue like bevy_kira_audio
+pub struct PlayAudioCommand<'a, T: AudioChannelMarker> {
+    channel_id: ChannelId,
+    handle: Handle<GodotResource>,
+    player_type: AudioPlayerType,
+    settings: AudioSettings,
+    channel: &'a AudioChannel<T>,
+}
+
+impl<'a, T: AudioChannelMarker> PlayAudioCommand<'a, T> {
+    pub(crate) fn new(
+        channel_id: ChannelId,
+        handle: Handle<GodotResource>,
+        player_type: AudioPlayerType,
+        channel: &'a AudioChannel<T>,
+    ) -> Self {
+        Self {
+            channel_id,
+            handle,
+            player_type,
+            settings: AudioSettings::default(),
+            channel,
+        }
+    }
+
+    /// Set the volume (0.0 to 1.0)
+    pub fn volume(mut self, volume: f32) -> Self {
+        self.settings.volume = volume.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Set the pitch/playback rate (0.1 to 4.0)
+    pub fn pitch(mut self, pitch: f32) -> Self {
+        self.settings.pitch = pitch.clamp(0.1, 4.0);
+        self
+    }
+
+    /// Enable looping
+    pub fn looped(mut self) -> Self {
+        self.settings.looping = true;
+        self
+    }
+
+    /// Set fade-in duration with linear easing
+    pub fn fade_in(mut self, duration: std::time::Duration) -> Self {
+        self.settings.fade_in = Some(AudioTween::linear(duration));
+        self
+    }
+
+    /// Set fade-in with custom easing
+    pub fn fade_in_with_easing(mut self, tween: AudioTween) -> Self {
+        self.settings.fade_in = Some(tween);
+        self
+    }
+
+    /// Start playback from specific position (in seconds)
+    pub fn start_from(mut self, position: f32) -> Self {
+        self.settings.start_position = position.max(0.0);
+        self
+    }
+
+    /// Set panning for non-positional audio (-1.0 left, 0.0 center, 1.0 right)
+    pub fn panning(mut self, panning: f32) -> Self {
+        self.settings.panning = Some(panning.clamp(-1.0, 1.0));
+        self
+    }
+}
+
+// Auto-queue the command when the builder is dropped (like bevy_kira_audio)
+impl<T: AudioChannelMarker> Drop for PlayAudioCommand<'_, T> {
+    fn drop(&mut self) {
+        // Generate a unique sound ID
+        static NEXT_SOUND_ID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let sound_id = SoundId(NEXT_SOUND_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
+
+        let command = AudioCommand::Play(PlayCommand {
+            channel_id: self.channel_id.clone(),
+            handle: self.handle.clone(),
+            player_type: self.player_type.clone(),
+            settings: self.settings.clone(),
+            sound_id,
+        });
+
+        self.channel.queue_command(command);
+    }
+}
+
+/// Default main audio track  
+#[derive(Resource)]
+pub struct MainAudioTrack;
+
+impl AudioChannelMarker for MainAudioTrack {
+    const CHANNEL_NAME: &'static str = "main";
+} 

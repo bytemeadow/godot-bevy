@@ -1,9 +1,10 @@
 use bevy::app::{App, Plugin};
-use bevy::ecs::system::ResMut;
 use bevy::prelude::*;
 use bevy::state::state::{OnEnter, OnExit};
 use bevy_asset_loader::asset_collection::AssetCollection;
-use godot_bevy::prelude::{AudioManager, GodotResource, SoundId, SoundSettings};
+use godot_bevy::prelude::{
+    AudioApp, AudioChannel, AudioChannelMarker, GodotResource,
+};
 
 use crate::GameState;
 
@@ -12,10 +13,28 @@ pub struct AudioPlugin;
 
 impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::InGame), start_background_music)
+        app.add_audio_channel::<GameMusicChannel>()
+            .add_audio_channel::<GameSfxChannel>()
+            .add_systems(OnEnter(GameState::InGame), start_background_music)
             .add_systems(OnEnter(GameState::GameOver), play_game_over_sound)
             .add_systems(OnExit(GameState::InGame), stop_background_music);
     }
+}
+
+/// Audio channel for game music
+#[derive(Resource)]
+pub struct GameMusicChannel;
+
+impl AudioChannelMarker for GameMusicChannel {
+    const CHANNEL_NAME: &'static str = "game_music";
+}
+
+/// Audio channel for game sound effects
+#[derive(Resource)]
+pub struct GameSfxChannel;
+
+impl AudioChannelMarker for GameSfxChannel {
+    const CHANNEL_NAME: &'static str = "game_sfx";
 }
 
 /// Audio assets loaded via bevy_asset_loader
@@ -28,46 +47,38 @@ pub struct GameAudio {
     pub game_over_sound: Handle<GodotResource>,
 }
 
-/// Resource to track playing instances
-#[derive(Resource, Default)]
-pub struct GameAudioState {
-    pub background_music_instance: Option<SoundId>,
-}
-
-/// System that starts background music using AssetCollection
+/// System that starts background music using the new channel API
 fn start_background_music(
-    mut audio: ResMut<AudioManager>,
-    mut audio_state: ResMut<GameAudioState>,
+    music_channel: Res<AudioChannel<GameMusicChannel>>,
     game_audio: Res<GameAudio>,
 ) {
-    // Play background music with settings - clean and simple!
-    let sound_id = audio.play_with_settings(
-        game_audio.background_music.clone(),
-        SoundSettings::new().volume(0.5).looped(),
-    );
+    // Play background music with settings using the new fluent API (no manual parameters!)
+    music_channel
+        .play(game_audio.background_music.clone())
+        .volume(0.5)
+        .looped();
 
-    audio_state.background_music_instance = Some(sound_id);
-    info!("Started background music from AssetCollection");
+    info!("Started background music using new clean API");
 }
 
 /// System that stops background music
-fn stop_background_music(mut audio: ResMut<AudioManager>, mut audio_state: ResMut<GameAudioState>) {
-    if let Some(sound_id) = audio_state.background_music_instance.take() {
-        if let Err(e) = audio.stop(sound_id) {
-            warn!("Failed to stop background music: {}", e);
-        } else {
-            info!("Stopped background music");
-        }
-    }
+fn stop_background_music(
+    music_channel: Res<AudioChannel<GameMusicChannel>>,
+) {
+    // Stop all sounds in the music channel
+    music_channel.stop();
+    info!("Stopped background music");
 }
 
-/// System that plays game over sound using AssetCollection
-fn play_game_over_sound(mut audio: ResMut<AudioManager>, game_audio: Res<GameAudio>) {
-    // Play game over sound - direct and clean!
-    let _sound_id = audio.play_with_settings(
-        game_audio.game_over_sound.clone(),
-        SoundSettings::new().volume(0.7),
-    );
+/// System that plays game over sound using the new channel API
+fn play_game_over_sound(
+    sfx_channel: Res<AudioChannel<GameSfxChannel>>,
+    game_audio: Res<GameAudio>,
+) {
+    // Play game over sound using the new fluent API (no manual parameters!)
+    sfx_channel
+        .play(game_audio.game_over_sound.clone())
+        .volume(0.7);
 
-    info!("Played game over sound from AssetCollection");
+    info!("Played game over sound using new clean API");
 }

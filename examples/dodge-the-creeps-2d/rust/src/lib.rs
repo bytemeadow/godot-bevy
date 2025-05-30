@@ -27,7 +27,6 @@ fn build_app(app: &mut App) {
                 .load_collection::<GameAudio>(),
         )
         .init_resource::<Score>()
-        .init_resource::<gameplay::audio::GameAudioState>()
         .add_plugins(main_menu::MainMenuPlugin)
         .add_plugins(gameplay::GameplayPlugin);
 }
