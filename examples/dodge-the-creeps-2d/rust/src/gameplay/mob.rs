@@ -151,7 +151,7 @@ fn new_mob(
         sfx_channel
             .play_2d(assets.mob_pop.clone(), position)
             .volume(0.9)
-            .pitch(0.8 + fastrand::f32() * 0.4); // 500ms fade-in!
+            .pitch(0.8 + fastrand::f32() * 0.4);
 
         info!(
             "Mob spawned at position: {:?} with 2D positional audio and fade-in",

@@ -159,6 +159,7 @@ pub struct PlayAudioCommand<'a, T: AudioChannelMarker> {
     handle: Handle<GodotResource>,
     player_type: AudioPlayerType,
     settings: AudioSettings,
+    sound_id: SoundId,
     channel: &'a AudioChannel<T>,
 }
 
@@ -169,11 +170,14 @@ impl<'a, T: AudioChannelMarker> PlayAudioCommand<'a, T> {
         player_type: AudioPlayerType,
         channel: &'a AudioChannel<T>,
     ) -> Self {
+        let sound_id = SoundId::next();
+        
         Self {
             channel_id,
             handle,
             player_type,
             settings: AudioSettings::default(),
+            sound_id,
             channel,
         }
     }
@@ -224,16 +228,12 @@ impl<'a, T: AudioChannelMarker> PlayAudioCommand<'a, T> {
 // Auto-queue the command when the builder is dropped
 impl<T: AudioChannelMarker> Drop for PlayAudioCommand<'_, T> {
     fn drop(&mut self) {
-        // Generate a unique sound ID
-        static NEXT_SOUND_ID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-        let sound_id = SoundId(NEXT_SOUND_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
-
         let command = AudioCommand::Play(PlayCommand {
             channel_id: self.channel_id,
             handle: self.handle.clone(),
             player_type: self.player_type.clone(),
             settings: self.settings.clone(),
-            sound_id,
+            sound_id: self.sound_id,
         });
 
         self.channel.queue_command(command);

@@ -83,8 +83,7 @@ impl<'a> PlayAudioCommand<'a> {
 
     /// Execute the play command and return a sound ID for later control
     pub fn play(self) -> SoundId {
-        let sound_id = SoundId(self.output.next_sound_id);
-        self.output.next_sound_id += 1;
+        let sound_id = SoundId::next();
 
         let command = AudioCommand::Play(PlayCommand {
             channel_id: self.channel_id,

@@ -6,21 +6,27 @@ use bevy::prelude::*;
 use godot::classes::{AudioStreamPlayer, AudioStreamPlayer2D, AudioStreamPlayer3D};
 use std::collections::HashMap;
 use std::time::Duration;
+use std::sync::atomic::{AtomicU32, Ordering};
 
-/// Handle to a playing sound instance
+/// Unique identifier for a sound instance
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SoundId(pub(crate) u32);
+
+impl SoundId {
+    pub(crate) fn next() -> Self {
+        static NEXT_ID: AtomicU32 = AtomicU32::new(0);
+        Self(NEXT_ID.fetch_add(1, Ordering::Relaxed))
+    }
+}
 
 /// Manages audio output and tracks playing sounds
 #[derive(Resource, Default)]
 pub struct AudioOutput {
     pub(crate) playing_sounds: HashMap<SoundId, GodotNodeHandle>,
-    // Track which sounds belong to which channels
     pub(crate) sound_to_channel: HashMap<SoundId, ChannelId>,
-    pub(crate) next_sound_id: u32,
-    pub(crate) active_tweens: HashMap<SoundId, ActiveTween>,
     /// Track current volume for each sound for accurate fade-outs
     pub(crate) current_volumes: HashMap<SoundId, f32>,
+    pub(crate) active_tweens: HashMap<SoundId, ActiveTween>,
 }
 
 /// Tracks an active tween for a specific sound
