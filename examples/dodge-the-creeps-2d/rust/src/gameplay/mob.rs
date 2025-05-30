@@ -23,19 +23,22 @@ use godot::{
 use godot_bevy::{
     bridge::GodotNodeHandle,
     prelude::{
-        connect_godot_signal, FindEntityByNameExt, GodotResource, GodotScene, GodotSignal,
-        NodeTreeView, SceneTreeRef, Transform2D, AudioChannel,
+        connect_godot_signal, AudioChannel, FindEntityByNameExt, GodotResource, GodotScene,
+        GodotSignal, NodeTreeView, SceneTreeRef, Transform2D,
     },
 };
 use std::f32::consts::PI;
 
+use crate::gameplay::audio::GameSfxChannel;
 use crate::GameState;
-use crate::gameplay::audio::{GameAudio, GameSfxChannel};
 
 #[derive(AssetCollection, Resource, Debug)]
 pub struct MobAssets {
     #[asset(path = "scenes/mob.tscn")]
     mob_scn: Handle<GodotResource>,
+
+    #[asset(path = "audio/plop.ogg")]
+    pub mob_pop: Handle<GodotResource>,
 }
 
 pub struct MobPlugin;
@@ -112,7 +115,7 @@ fn new_mob(
     mut entities: Query<(&Mob, &Transform2D, &mut GodotNodeHandle), Added<Mob>>,
     mut scene_tree: SceneTreeRef,
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
-    game_audio: Res<GameAudio>,
+    assets: Res<MobAssets>,
 ) {
     for (mob_data, transform, mut mob) in entities.iter_mut() {
         let mut mob = mob.get::<RigidBody2D>();
@@ -144,13 +147,16 @@ fn new_mob(
             transform.as_bevy().translation.x,
             transform.as_bevy().translation.y,
         );
-        
+
         sfx_channel
-            .play_2d(game_audio.mob_pop.clone(), position)
+            .play_2d(assets.mob_pop.clone(), position)
             .volume(0.9)
             .pitch(0.8 + fastrand::f32() * 0.4); // Random pitch variation
-        
-        info!("Mob spawned at position: {:?} with 2D positional audio", position);
+
+        info!(
+            "Mob spawned at position: {:?} with 2D positional audio",
+            position
+        );
     }
 }
 

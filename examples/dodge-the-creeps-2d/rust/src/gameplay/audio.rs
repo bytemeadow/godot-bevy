@@ -43,9 +43,6 @@ pub struct GameAudio {
 
     #[asset(path = "audio/gameover.wav")]
     pub game_over_sound: Handle<GodotResource>,
-    
-    #[asset(path = "audio/plop.ogg")]
-    pub mob_pop: Handle<GodotResource>,
 }
 
 /// System that starts background music
