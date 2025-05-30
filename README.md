@@ -29,7 +29,7 @@ _Special thanks to [Blaze](https://runblaze.dev) for their support of this proje
 - **Smart Scheduling**: Physics-rate vs visual-rate system execution with proper timing
 - **Godot Input Events**: Thread-safe Godot input events delivered as Bevy Events
 
-## Who's using godot-bevy?
+## Projects Using `godot-bevy`
 
 We'd love to showcase projects built with godot-bevy! If you're using this library in your game or project, please consider adding it to our [showcase](docs/SHOWCASE.md).
 
