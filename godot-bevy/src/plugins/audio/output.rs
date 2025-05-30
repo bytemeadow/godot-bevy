@@ -140,4 +140,4 @@ fn stop_audio_player(handle: &mut GodotNodeHandle) {
     } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer3D>() {
         player.stop();
     }
-} 
+}

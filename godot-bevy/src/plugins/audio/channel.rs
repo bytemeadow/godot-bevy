@@ -1,7 +1,9 @@
 //! Audio channel management and typed channels
 
 use crate::plugins::assets::GodotResource;
-use crate::plugins::audio::{AudioCommand, AudioPlayerType, AudioSettings, SoundId, AudioTween, PlayCommand};
+use crate::plugins::audio::{
+    AudioCommand, AudioPlayerType, AudioSettings, AudioTween, PlayCommand, SoundId,
+};
 use bevy::asset::Handle;
 use bevy::prelude::*;
 use parking_lot::RwLock;
@@ -67,13 +69,18 @@ impl<T: AudioChannelMarker> AudioChannel<T> {
     /// Play audio with configurable settings - returns a fluent builder
     /// Note: This now uses the internal command queue like bevy_kira_audio
     pub fn play(&self, handle: Handle<GodotResource>) -> PlayAudioCommand<T> {
-        PlayAudioCommand::new(self.channel_id.clone(), handle, AudioPlayerType::NonPositional, self)
+        PlayAudioCommand::new(
+            self.channel_id,
+            handle,
+            AudioPlayerType::NonPositional,
+            self,
+        )
     }
 
     /// Play 2D positional audio
     pub fn play_2d(&self, handle: Handle<GodotResource>, position: Vec2) -> PlayAudioCommand<T> {
         PlayAudioCommand::new(
-            self.channel_id.clone(),
+            self.channel_id,
             handle,
             AudioPlayerType::Spatial2D { position },
             self,
@@ -83,7 +90,7 @@ impl<T: AudioChannelMarker> AudioChannel<T> {
     /// Play 3D positional audio
     pub fn play_3d(&self, handle: Handle<GodotResource>, position: Vec3) -> PlayAudioCommand<T> {
         PlayAudioCommand::new(
-            self.channel_id.clone(),
+            self.channel_id,
             handle,
             AudioPlayerType::Spatial3D { position },
             self,
@@ -92,28 +99,28 @@ impl<T: AudioChannelMarker> AudioChannel<T> {
 
     /// Stop all sounds in this channel
     pub fn stop(&self) {
-        self.queue_command(AudioCommand::Stop(self.channel_id.clone(), None));
+        self.queue_command(AudioCommand::Stop(self.channel_id, None));
     }
 
     /// Stop all sounds with fade-out
     pub fn stop_with_fade(&self, fade_out: AudioTween) {
-        self.queue_command(AudioCommand::Stop(self.channel_id.clone(), Some(fade_out)));
+        self.queue_command(AudioCommand::Stop(self.channel_id, Some(fade_out)));
     }
 
     /// Pause all sounds in this channel
     pub fn pause(&self) {
-        self.queue_command(AudioCommand::Pause(self.channel_id.clone(), None));
+        self.queue_command(AudioCommand::Pause(self.channel_id, None));
     }
 
     /// Resume all sounds in this channel
     pub fn resume(&self) {
-        self.queue_command(AudioCommand::Resume(self.channel_id.clone(), None));
+        self.queue_command(AudioCommand::Resume(self.channel_id, None));
     }
 
     /// Set volume for all sounds in this channel
     pub fn set_volume(&self, volume: f32) {
         self.queue_command(AudioCommand::SetVolume(
-            self.channel_id.clone(),
+            self.channel_id,
             volume.clamp(0.0, 1.0),
             None,
         ));
@@ -122,7 +129,7 @@ impl<T: AudioChannelMarker> AudioChannel<T> {
     /// Set volume with fade transition
     pub fn set_volume_with_fade(&self, volume: f32, tween: AudioTween) {
         self.queue_command(AudioCommand::SetVolume(
-            self.channel_id.clone(),
+            self.channel_id,
             volume.clamp(0.0, 1.0),
             Some(tween),
         ));
@@ -131,7 +138,7 @@ impl<T: AudioChannelMarker> AudioChannel<T> {
     /// Set pitch for all sounds in this channel
     pub fn set_pitch(&self, pitch: f32) {
         self.queue_command(AudioCommand::SetPitch(
-            self.channel_id.clone(),
+            self.channel_id,
             pitch.clamp(0.1, 4.0),
             None,
         ));
@@ -140,7 +147,7 @@ impl<T: AudioChannelMarker> AudioChannel<T> {
     /// Set panning for all sounds in this channel (non-positional only)
     pub fn set_panning(&self, panning: f32) {
         self.queue_command(AudioCommand::SetPanning(
-            self.channel_id.clone(),
+            self.channel_id,
             panning.clamp(-1.0, 1.0),
             None,
         ));
@@ -224,7 +231,7 @@ impl<T: AudioChannelMarker> Drop for PlayAudioCommand<'_, T> {
         let sound_id = SoundId(NEXT_SOUND_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
 
         let command = AudioCommand::Play(PlayCommand {
-            channel_id: self.channel_id.clone(),
+            channel_id: self.channel_id,
             handle: self.handle.clone(),
             player_type: self.player_type.clone(),
             settings: self.settings.clone(),
@@ -241,4 +248,4 @@ pub struct MainAudioTrack;
 
 impl AudioChannelMarker for MainAudioTrack {
     const CHANNEL_NAME: &'static str = "main";
-} 
+}

@@ -3,12 +3,12 @@
 use crate::bridge::GodotNodeHandle;
 use crate::plugins::assets::GodotResource;
 use crate::plugins::audio::{
-    AudioCommand, AudioSettings, AudioTween, AudioPlayerType, ChannelId, ChannelState, 
-    PlayCommand, SoundId, AudioOutput, MainAudioTrack, AudioChannel, AudioChannelMarker
+    AudioChannel, AudioChannelMarker, AudioCommand, AudioOutput, AudioPlayerType, AudioSettings,
+    ChannelId, ChannelState, MainAudioTrack, PlayCommand, SoundId,
 };
 use crate::plugins::core::SceneTreeRef;
 use bevy::app::{App, Plugin, Update};
-use bevy::asset::{Assets, Handle};
+use bevy::asset::Assets;
 use bevy::ecs::system::ResMut;
 use bevy::prelude::*;
 use godot::classes::{AudioStream, AudioStreamPlayer, AudioStreamPlayer2D, AudioStreamPlayer3D};
@@ -25,10 +25,7 @@ impl Plugin for GodotAudioPlugin {
         app.init_resource::<GodotAudioChannels>()
             .init_resource::<AudioOutput>()
             .add_audio_channel::<MainAudioTrack>()
-            .add_systems(
-                Update,
-                cleanup_finished_sounds,
-            );
+            .add_systems(Update, cleanup_finished_sounds);
     }
 }
 
@@ -47,19 +44,18 @@ pub trait AudioApp {
 impl AudioApp for App {
     fn add_audio_channel<T: AudioChannelMarker>(&mut self) -> &mut Self {
         let channel_id = ChannelId(T::CHANNEL_NAME);
-        
+
         // Auto-register a dedicated system for this channel type (like bevy_kira_audio)
-        self.add_systems(
-            Update,
-            process_channel_commands::<T>
-        );
-        
-        self.insert_resource(AudioChannel::<T>::new(channel_id.clone()));
-        
+        self.add_systems(Update, process_channel_commands::<T>);
+
+        self.insert_resource(AudioChannel::<T>::new(channel_id));
+
         // Initialize channel state in the global manager
-        self.world_mut().resource_mut::<GodotAudioChannels>()
-            .channels.insert(channel_id, ChannelState::default());
-        
+        self.world_mut()
+            .resource_mut::<GodotAudioChannels>()
+            .channels
+            .insert(channel_id, ChannelState::default());
+
         self
     }
 }
@@ -76,7 +72,8 @@ fn process_channel_commands<T: AudioChannelMarker>(
     while let Some(command) = commands.pop_front() {
         match command {
             AudioCommand::Play(play_cmd) => {
-                let sound_id = process_play_command(play_cmd, &mut assets, &mut scene_tree, &mut audio_output);
+                let sound_id =
+                    process_play_command(play_cmd, &mut assets, &mut scene_tree, &mut audio_output);
                 if sound_id.is_none() {
                     // Asset not ready, re-queue for next frame
                     // Note: We need to re-create the command since play_cmd was consumed
@@ -176,12 +173,10 @@ fn process_play_command(
 
     // Configure looping if requested
     let audio_stream = configure_looping(audio_stream, play_cmd.settings.looping);
-    
+
     // Create appropriate player based on type
     let player_handle = match play_cmd.player_type {
-        AudioPlayerType::NonPositional => {
-            create_audio_player(audio_stream, &play_cmd.settings)
-        }
+        AudioPlayerType::NonPositional => create_audio_player(audio_stream, &play_cmd.settings),
         AudioPlayerType::Spatial2D { position } => {
             create_audio_player_2d(audio_stream, &play_cmd.settings, position)
         }
@@ -196,13 +191,18 @@ fn process_play_command(
             let node = handle.get::<godot::classes::Node>();
             root.add_child(&node);
         }
-        
+
         // Now that the node is in the scene tree, start playback
         start_audio_playback(&mut handle);
-        
+
         output.playing_sounds.insert(play_cmd.sound_id, handle);
-        output.sound_to_channel.insert(play_cmd.sound_id, play_cmd.channel_id);
-        trace!("Started playing audio: {:?} in channel: {:?}", play_cmd.sound_id, play_cmd.channel_id);
+        output
+            .sound_to_channel
+            .insert(play_cmd.sound_id, play_cmd.channel_id);
+        trace!(
+            "Started playing audio: {:?} in channel: {:?}",
+            play_cmd.sound_id, play_cmd.channel_id
+        );
         Some(play_cmd.sound_id)
     } else {
         None
@@ -217,16 +217,18 @@ fn create_audio_player(
     player.set_stream(&audio_stream);
     player.set_volume_db(volume_to_db(settings.volume));
     player.set_pitch_scale(settings.pitch);
-    
+
     if let Some(panning) = settings.panning {
         // Convert from -1.0..1.0 to 0.0..1.0 for Godot
         let _godot_panning = (panning + 1.0) / 2.0;
         let bus_name: godot::builtin::StringName = "Master".into();
         player.set_bus(&bus_name);
     }
-    
+
     // Don't play yet - need to add to scene tree first
-    Some(GodotNodeHandle::new(player.upcast::<godot::classes::Node>()))
+    Some(GodotNodeHandle::new(
+        player.upcast::<godot::classes::Node>(),
+    ))
 }
 
 fn create_audio_player_2d(
@@ -239,9 +241,11 @@ fn create_audio_player_2d(
     player.set_volume_db(volume_to_db(settings.volume));
     player.set_pitch_scale(settings.pitch);
     player.set_position(godot::prelude::Vector2::new(position.x, position.y));
-    
+
     // Don't play yet - need to add to scene tree first
-    Some(GodotNodeHandle::new(player.upcast::<godot::classes::Node>()))
+    Some(GodotNodeHandle::new(
+        player.upcast::<godot::classes::Node>(),
+    ))
 }
 
 fn create_audio_player_3d(
@@ -253,10 +257,14 @@ fn create_audio_player_3d(
     player.set_stream(&audio_stream);
     player.set_volume_db(volume_to_db(settings.volume));
     player.set_pitch_scale(settings.pitch);
-    player.set_position(godot::prelude::Vector3::new(position.x, position.y, position.z));
-    
+    player.set_position(godot::prelude::Vector3::new(
+        position.x, position.y, position.z,
+    ));
+
     // Don't play yet - need to add to scene tree first
-    Some(GodotNodeHandle::new(player.upcast::<godot::classes::Node>()))
+    Some(GodotNodeHandle::new(
+        player.upcast::<godot::classes::Node>(),
+    ))
 }
 
 fn configure_looping(
@@ -348,4 +356,4 @@ pub enum AudioError {
     SoundNotFound(SoundId),
     #[error("Channel not found: {0:?}")]
     ChannelNotFound(ChannelId),
-} 
+}

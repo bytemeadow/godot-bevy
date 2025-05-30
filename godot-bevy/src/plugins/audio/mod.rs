@@ -58,11 +58,11 @@ pub mod settings;
 pub mod tween;
 
 // Re-export main types for convenience
-pub use command::{AudioCommand, PlayCommand};
 pub use channel::{AudioChannel, AudioChannelMarker, ChannelId, MainAudioTrack, PlayAudioCommand};
+pub use command::{AudioCommand, PlayCommand};
 pub use output::{AudioOutput, SoundId};
 pub use player::AudioPlayerType;
-pub use plugin::{AudioApp, AudioError, GodotAudioPlugin, GodotAudioChannels};
+pub use plugin::{AudioApp, AudioError, GodotAudioChannels, GodotAudioPlugin};
 pub use settings::AudioSettings;
 pub use tween::{AudioEasing, AudioTween};
 
@@ -70,4 +70,4 @@ pub use tween::{AudioEasing, AudioTween};
 pub(crate) use channel::ChannelState;
 
 /// Main audio channel type alias for convenience
-pub type Audio = AudioChannel<MainAudioTrack>; 
+pub type Audio = AudioChannel<MainAudioTrack>;

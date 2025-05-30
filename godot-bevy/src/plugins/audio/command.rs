@@ -1,7 +1,7 @@
 //! Audio command system for deferred execution
 
 use crate::plugins::assets::GodotResource;
-use crate::plugins::audio::{AudioSettings, AudioTween, AudioPlayerType, SoundId, ChannelId};
+use crate::plugins::audio::{AudioPlayerType, AudioSettings, AudioTween, ChannelId, SoundId};
 use bevy::asset::Handle;
 use std::time::Duration;
 
@@ -114,4 +114,4 @@ impl<'a> PlayAudioCommand<'a> {
         self.audio_manager.command_queue.push(command);
         sound_id
     }
-} 
+}

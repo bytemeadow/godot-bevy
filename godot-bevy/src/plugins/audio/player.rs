@@ -11,4 +11,4 @@ pub enum AudioPlayerType {
     Spatial2D { position: Vec2 },
     /// 3D positional audio (AudioStreamPlayer3D)
     Spatial3D { position: Vec3 },
-} 
+}

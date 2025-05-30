@@ -13,10 +13,9 @@ pub mod prelude {
     pub use crate::plugins::{
         assets::{GodotAssetsPlugin, GodotResource},
         audio::{
-            Audio, AudioApp, AudioChannel, AudioChannelMarker, AudioError, AudioEasing, 
-            AudioOutput, AudioPlayerType, AudioSettings, AudioTween, 
-            GodotAudioChannels, GodotAudioPlugin, MainAudioTrack, PlayAudioCommand, 
-            SoundId,
+            Audio, AudioApp, AudioChannel, AudioChannelMarker, AudioEasing, AudioError,
+            AudioOutput, AudioPlayerType, AudioSettings, AudioTween, GodotAudioChannels,
+            GodotAudioPlugin, MainAudioTrack, PlayAudioCommand, SoundId,
         },
         core::{
             ActionInput, Collisions, FindEntityByNameExt, GodotCorePlugin, GodotSignal, Groups,

@@ -23,7 +23,7 @@ impl AudioTween {
     pub fn new(duration: Duration, easing: AudioEasing) -> Self {
         Self { duration, easing }
     }
-    
+
     /// Create a new linear tween with the given duration
     pub fn linear(duration: Duration) -> Self {
         Self::new(duration, AudioEasing::Linear)
@@ -40,4 +40,4 @@ impl Default for AudioTween {
     fn default() -> Self {
         Self::new(Duration::from_millis(10), AudioEasing::Linear)
     }
-} 
+}

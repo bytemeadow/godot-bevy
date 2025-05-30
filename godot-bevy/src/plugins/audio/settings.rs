@@ -24,4 +24,4 @@ impl Default for AudioSettings {
             panning: None,
         }
     }
-} 
+}

@@ -2,9 +2,7 @@ use bevy::app::{App, Plugin};
 use bevy::prelude::*;
 use bevy::state::state::{OnEnter, OnExit};
 use bevy_asset_loader::asset_collection::AssetCollection;
-use godot_bevy::prelude::{
-    AudioApp, AudioChannel, AudioChannelMarker, GodotResource,
-};
+use godot_bevy::prelude::{AudioApp, AudioChannel, AudioChannelMarker, GodotResource};
 
 use crate::GameState;
 
@@ -47,12 +45,11 @@ pub struct GameAudio {
     pub game_over_sound: Handle<GodotResource>,
 }
 
-/// System that starts background music using the new channel API
+/// System that starts background music
 fn start_background_music(
     music_channel: Res<AudioChannel<GameMusicChannel>>,
     game_audio: Res<GameAudio>,
 ) {
-    // Play background music with settings using the new fluent API (no manual parameters!)
     music_channel
         .play(game_audio.background_music.clone())
         .volume(0.5)
@@ -62,20 +59,16 @@ fn start_background_music(
 }
 
 /// System that stops background music
-fn stop_background_music(
-    music_channel: Res<AudioChannel<GameMusicChannel>>,
-) {
-    // Stop all sounds in the music channel
+fn stop_background_music(music_channel: Res<AudioChannel<GameMusicChannel>>) {
     music_channel.stop();
     info!("Stopped background music");
 }
 
-/// System that plays game over sound using the new channel API
+/// System that plays game over sound
 fn play_game_over_sound(
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
     game_audio: Res<GameAudio>,
 ) {
-    // Play game over sound using the new fluent API (no manual parameters!)
     sfx_channel
         .play(game_audio.game_over_sound.clone())
         .volume(0.7);
