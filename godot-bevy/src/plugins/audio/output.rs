@@ -35,7 +35,7 @@ impl AudioOutput {
         self.sound_to_channel.get(&sound_id).copied()
     }
 
-    // ===== DIRECT INDIVIDUAL SOUND CONTROL (Kira-style) =====
+    // ===== DIRECT INDIVIDUAL SOUND CONTROL =====
 
     /// Set volume for a specific sound (direct execution)
     pub fn set_sound_volume(&mut self, sound_id: SoundId, volume: f32) {

@@ -45,7 +45,7 @@ impl AudioApp for App {
     fn add_audio_channel<T: AudioChannelMarker>(&mut self) -> &mut Self {
         let channel_id = ChannelId(T::CHANNEL_NAME);
 
-        // Auto-register a dedicated system for this channel type (like bevy_kira_audio)
+        // Auto-register a dedicated system for this channel type
         self.add_systems(Update, process_channel_commands::<T>);
 
         self.insert_resource(AudioChannel::<T>::new(channel_id));
@@ -60,7 +60,7 @@ impl AudioApp for App {
     }
 }
 
-/// Dedicated system for processing commands from a specific channel type (like bevy_kira_audio)
+/// Dedicated system for processing commands from a specific channel type
 fn process_channel_commands<T: AudioChannelMarker>(
     channel: Res<AudioChannel<T>>,
     mut audio_output: ResMut<AudioOutput>,

@@ -43,7 +43,7 @@ pub trait AudioChannelMarker: Resource {
 #[derive(Resource)]
 pub struct AudioChannel<T: AudioChannelMarker> {
     pub(crate) channel_id: ChannelId,
-    pub(crate) commands: RwLock<VecDeque<AudioCommand>>, // Internal command queue like bevy_kira_audio
+    pub(crate) commands: RwLock<VecDeque<AudioCommand>>,
     _marker: PhantomData<T>,
 }
 
@@ -67,7 +67,6 @@ impl<T: AudioChannelMarker> AudioChannel<T> {
     }
 
     /// Play audio with configurable settings - returns a fluent builder
-    /// Note: This now uses the internal command queue like bevy_kira_audio
     pub fn play(&self, handle: Handle<GodotResource>) -> PlayAudioCommand<T> {
         PlayAudioCommand::new(
             self.channel_id,
@@ -155,7 +154,6 @@ impl<T: AudioChannelMarker> AudioChannel<T> {
 }
 
 /// Fluent builder for playing audio with configurable settings
-/// Now works with the internal command queue like bevy_kira_audio
 pub struct PlayAudioCommand<'a, T: AudioChannelMarker> {
     channel_id: ChannelId,
     handle: Handle<GodotResource>,
@@ -223,7 +221,7 @@ impl<'a, T: AudioChannelMarker> PlayAudioCommand<'a, T> {
     }
 }
 
-// Auto-queue the command when the builder is dropped (like bevy_kira_audio)
+// Auto-queue the command when the builder is dropped
 impl<T: AudioChannelMarker> Drop for PlayAudioCommand<'_, T> {
     fn drop(&mut self) {
         // Generate a unique sound ID
