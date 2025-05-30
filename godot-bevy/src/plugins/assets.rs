@@ -272,11 +272,10 @@ impl AssetLoader for GodotResourceAssetLoader {
 
     fn extensions(&self) -> &[&str] {
         &[
-            // Scenes
-            "tscn", "scn", // Resources
-            "res", "tres", // Images
-            "jpg", "jpeg", "png", // Audio
-            "wav", "mp3", "ogg", "aac",
+            "tscn", "scn", // Scenes
+            "res", "tres", // Resources
+            "jpg", "jpeg", "png", // Images
+            "wav", "mp3", "ogg", "aac", // Audio
         ]
     }
 }
