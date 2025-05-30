@@ -25,7 +25,6 @@ impl Plugin for GodotAudioPlugin {
 }
 
 /// Main audio manager for playing sounds and music.
-/// Follows the bevy_kira_audio pattern - focuses purely on playback, not loading.
 #[derive(Resource, Default)]
 pub struct AudioManager {
     playing_sounds: HashMap<SoundId, GodotNodeHandle>,

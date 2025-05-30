@@ -29,6 +29,23 @@ _Special thanks to [Blaze](https://runblaze.dev) for their support of this proje
 - **Smart Scheduling**: Physics-rate vs visual-rate system execution with proper timing
 - **Godot Input Events**: Thread-safe Godot input events delivered as Bevy Events
 
+## Recommended Workflow
+
+**godot-bevy is a library for Godot developers who want to leverage Bevy's powerful ECS system within their Godot projects.** This is not a Godot plugin for Bevy users, but rather a way to bring the best of both worlds together with Godot as the foundation.
+
+### Recommended Workflow
+
+We encourage a **Godot-first approach** where you:
+
+- **Design scenes and nodes in Godot** - Use Godot's excellent scene editor, node system, and visual tools for level design, UI, and content creation
+- **Manage assets in Godot** - Import textures, audio, 3D models, and configure them using Godot's import system and project settings  
+- **Use Bevy ECS for logic** - Write your game systems, components, and logic using Bevy's high-performance, data-oriented ECS
+- **Consume Godot resources from ECS** - Load and use Godot-managed assets seamlessly within your Bevy systems
+
+This approach gives you the **visual authoring power of Godot** combined with the **performance and architectural benefits of Bevy's ECS**, while maintaining a single source of truth for your game's content and configuration.
+
+The library handles all the complex bridging between these two paradigms, so you can focus on building your game rather than managing integration details.
+
 ## Quick Start
 
 ### Installation
@@ -137,28 +154,25 @@ fn use_loaded_assets(
 
 **Key Benefits:**
 - **Works identically** in development and exported games  
-- **Supports all Godot resource types** - Textures, audio, scenes, materials, etc.
+- **Supports all Godot resource types** - Textures, audio, scenes, etc.
 - **Non-blocking** - Async loading prevents frame drops
-- **Integrates with Bevy's asset system** - Loading states, hot reloading, etc.  
-- **Better for large assets** - Batch loading and background processing
+- **Integrates with Bevy's asset system** - Loading states, etc.  
 - **Works seamlessly with `bevy_asset_loader`** - Loading screens and state management
-- **Unified system** - One loader for all resource types
 
 The `GodotAssetsPlugin` provides the `GodotResourceAssetLoader` for seamless integration with Godot's asset pipeline.
 
 ### Audio System
 
-The library provides a convenient audio API using Godot's audio engine that works identically in development, Godot editor, and exported games. **Follows the bevy_kira_audio pattern** - asset loading through Bevy's AssetServer, playback through AudioManager.
+The library provides a convenient audio API using Godot's audio engine
 
 #### Key Features
-- **Separation of concerns** - AssetServer handles loading, AudioManager handles playback
 - **bevy_asset_loader integration** - Works seamlessly with AssetCollection loading states
 - **Direct Handle<GodotResource> playback** - Clean, simple API
 - **Sound management** - Control playing sounds (stop, check status, etc.)
 - **Looping support** - Automatic loop configuration for background music
 - **Volume and pitch control** - Full audio parameter control
 
-#### Quick Start (bevy_kira_audio Style)
+#### Quick Start
 
 ```rust
 use bevy::prelude::*;
@@ -217,61 +231,6 @@ app.add_loading_state(
 fn load_audio_on_demand(asset_server: Res<AssetServer>) {
     let music: Handle<GodotResource> = asset_server.load("audio/battle.ogg");
     // Store handle somewhere for later use
-}
-```
-
-**Playback Examples**:
-```rust
-fn play_audio_examples(
-    mut audio: ResMut<AudioManager>,
-    game_audio: Res<GameAudio>,
-) {
-    // Simple playback
-    audio.play(game_audio.jump_sound.clone());
-    
-    // With volume and looping
-    let music_id = audio.play_with_settings(
-        game_audio.background_music.clone(),
-        SoundSettings::new().volume(0.7).looped()
-    );
-    
-    // Sound management
-    if audio.is_playing(music_id) {
-        audio.stop(music_id).unwrap();
-    }
-    
-    // Stop all sounds
-    audio.stop_all();
-    
-    // Get stats
-    let (queue_len, playing_count) = audio.stats();
-    println!("Queue: {}, Playing: {}", queue_len, playing_count);
-}
-```
-
-**State Management**:
-```rust
-#[derive(Resource, Default)]
-struct GameAudioState {
-    background_music_instance: Option<SoundId>,
-}
-
-fn manage_background_music(
-    mut audio: ResMut<AudioManager>,
-    mut audio_state: ResMut<GameAudioState>,
-    game_audio: Res<GameAudio>,
-) {
-    // Start music
-    let sound_id = audio.play_with_settings(
-        game_audio.background_music.clone(),
-        SoundSettings::new().looped()
-    );
-    audio_state.background_music_instance = Some(sound_id);
-    
-    // Stop music later
-    if let Some(id) = audio_state.background_music_instance.take() {
-        audio.stop(id).unwrap();
-    }
 }
 ```
 

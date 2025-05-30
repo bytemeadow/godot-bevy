@@ -36,7 +36,6 @@ This example is particularly useful for:
 - Understanding basic game states: how to define and transition between them
 - Learning how to process input events in Bevy systems
 - Learn how to use bevy resources to keep a simple game score
-- Audio integration with bevy_kira_audio
 
 ## Copying
 
