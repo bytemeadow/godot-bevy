@@ -39,8 +39,6 @@ We'd love to showcase projects built with godot-bevy! If you're using this libra
 
 **godot-bevy is a library for Godot developers who want to leverage Bevy's powerful ECS system within their Godot projects.** This is not a Godot plugin for Bevy users, but rather a way to bring the best of both worlds together with Godot as the foundation.
 
-### Recommended Workflow
-
 We encourage a **Godot-first approach** where you:
 
 - **Design scenes and nodes in Godot** - Use Godot's excellent scene editor, node system, and visual tools for level design, UI, and content creation
