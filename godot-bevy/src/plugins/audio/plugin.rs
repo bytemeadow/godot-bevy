@@ -443,15 +443,6 @@ fn volume_to_db(volume: f32) -> f32 {
     }
 }
 
-/// Convert decibels back to linear volume (0.0-1.0)
-fn db_to_volume(db: f32) -> f32 {
-    if db <= -80.0 {
-        0.0 // Silence
-    } else {
-        10.0_f32.powf(db / 20.0)
-    }
-}
-
 /// Simplified GodotAudioChannels - most functionality moved to per-channel systems
 impl GodotAudioChannels {
     /// Get stats about the audio system
