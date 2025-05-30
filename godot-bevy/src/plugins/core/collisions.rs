@@ -10,6 +10,21 @@ use crate::bridge::GodotNodeHandle;
 
 pub struct GodotCollisionsPlugin;
 
+// Collision signal constants
+pub const BODY_ENTERED: &str = "body_entered";
+pub const BODY_EXITED: &str = "body_exited";
+pub const AREA_ENTERED: &str = "area_entered";
+pub const AREA_EXITED: &str = "area_exited";
+
+/// All collision signals that indicate collision start
+pub const COLLISION_START_SIGNALS: &[&str] = &[BODY_ENTERED, AREA_ENTERED];
+
+/// All collision signals that indicate collision end
+pub const COLLISION_END_SIGNALS: &[&str] = &[BODY_EXITED, AREA_EXITED];
+
+/// All collision signals (both start and end)
+pub const ALL_COLLISION_SIGNALS: &[&str] = &[BODY_ENTERED, BODY_EXITED, AREA_ENTERED, AREA_EXITED];
+
 impl Plugin for GodotCollisionsPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(PreUpdate, update_godot_collisions);
@@ -52,14 +67,13 @@ fn update_godot_collisions(
 
     // Process collision signals
     for signal in signal_events.read() {
-        let (event_type, origin, target) = match signal.name.as_str() {
-            "body_entered" | "area_entered" => {
-                (CollisionEventType::Started, &signal.origin, &signal.target)
-            }
-            "body_exited" | "area_exited" => {
-                (CollisionEventType::Ended, &signal.origin, &signal.target)
-            }
-            _ => continue, // Skip non-collision signals
+        let signal_name = signal.name.as_str();
+        let (event_type, origin, target) = if COLLISION_START_SIGNALS.contains(&signal_name) {
+            (CollisionEventType::Started, &signal.origin, &signal.target)
+        } else if COLLISION_END_SIGNALS.contains(&signal_name) {
+            (CollisionEventType::Ended, &signal.origin, &signal.target)
+        } else {
+            continue; // Skip non-collision signals
         };
 
         trace!(target: "godot_collisions_update", signal = ?signal, event_type = ?event_type);

@@ -25,6 +25,8 @@ use crate::{
     prelude::{Collisions, Transform2D, Transform3D},
 };
 
+use super::collisions::ALL_COLLISION_SIGNALS;
+
 pub struct GodotSceneTreePlugin;
 
 impl Plugin for GodotSceneTreePlugin {
@@ -213,10 +215,7 @@ fn create_scene_tree_entity(
                 let mut node = node.get::<Node>();
 
                 // Check for any collision-related signals and connect them
-                let collision_signals =
-                    ["body_entered", "body_exited", "area_entered", "area_exited"];
-
-                let has_collision_signals = collision_signals
+                let has_collision_signals = ALL_COLLISION_SIGNALS
                     .iter()
                     .any(|&signal| node.has_signal(signal));
 
@@ -234,7 +233,7 @@ fn create_scene_tree_entity(
                     let node_clone = node.clone();
 
                     // Connect all available collision signals
-                    for signal_name in collision_signals {
+                    for &signal_name in ALL_COLLISION_SIGNALS {
                         if node.has_signal(signal_name) {
                             node.connect(
                                 signal_name,
