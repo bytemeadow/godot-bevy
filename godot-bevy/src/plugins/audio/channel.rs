@@ -171,7 +171,7 @@ impl<'a, T: AudioChannelMarker> PlayAudioCommand<'a, T> {
         channel: &'a AudioChannel<T>,
     ) -> Self {
         let sound_id = SoundId::next();
-        
+
         Self {
             channel_id,
             handle,
