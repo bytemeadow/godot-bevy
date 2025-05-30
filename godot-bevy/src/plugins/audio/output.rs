@@ -223,6 +223,12 @@ impl ActiveTween {
     /// Update the tween and return the current interpolated value
     pub fn update(&mut self, delta: Duration) -> f32 {
         self.elapsed += delta;
+
+        // Handle zero duration case - return target value immediately
+        if self.duration.as_secs_f32() == 0.0 {
+            return self.target_value;
+        }
+
         let progress = (self.elapsed.as_secs_f32() / self.duration.as_secs_f32()).clamp(0.0, 1.0);
 
         // Apply easing
