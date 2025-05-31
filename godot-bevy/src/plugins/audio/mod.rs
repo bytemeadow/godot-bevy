@@ -12,27 +12,21 @@
 //!     background_music: Res<AudioChannel<BackgroundMusic>>,
 //!     sound_effects: Res<AudioChannel<SoundEffects>>,
 //!     asset_server: Res<AssetServer>,
-//!     mut audio_manager: ResMut<GodotAudioChannels>,
-//!     mut audio_output: ResMut<AudioOutput>,
 //! ) {
 //!     // Play background music
 //!     background_music
-//!         .play(asset_server.load("music/background.ogg"), &mut audio_manager, &mut audio_output)
+//!         .play(asset_server.load("music/background.ogg"))
 //!         .volume(0.8)
-//!         .looped()
-//!         .play();
+//!         .looped();
 //!
 //!     // Play a sound effect at a specific 2D position
 //!     sound_effects
 //!         .play_2d(
 //!             asset_server.load("sounds/jump.wav"),
 //!             Vec2::new(100.0, 50.0),
-//!             &mut audio_manager,
-//!             &mut audio_output,
 //!         )
 //!         .volume(0.6)
-//!         .pitch(1.2)
-//!         .play();
+//!         .pitch(1.2);
 //! }
 //!
 //! // Define custom audio channels
