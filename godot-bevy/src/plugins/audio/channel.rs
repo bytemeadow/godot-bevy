@@ -14,7 +14,6 @@ use std::marker::PhantomData;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChannelId(pub &'static str);
 
-
 #[derive(Debug, Clone)]
 pub(crate) struct ChannelState {
     #[allow(dead_code)]
@@ -175,7 +174,7 @@ impl<'a, T: AudioChannelMarker> PlayAudioCommand<'a, T> {
         channel: &'a AudioChannel<T>,
     ) -> Self {
         let sound_id = SoundId::next();
-        
+
         Self {
             channel_id,
             handle,
