@@ -15,6 +15,6 @@ name = "dodge_the_creeps"
 bevy = { version = "0.16.0", default-features = false }
 bevy_asset_loader = "0.23.0"
 fastrand = { version = "2.3.0" }
-godot = "0.2.4"
+godot = "0.3.0"
 godot-bevy = { path = "../../../godot-bevy" }
 which = "7.0.3"
