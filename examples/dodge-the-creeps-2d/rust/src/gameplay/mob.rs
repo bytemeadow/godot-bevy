@@ -93,7 +93,7 @@ fn spawn_mob(
 
     let position = mob_spawn_location.get_position();
     let transform = GodotTransform2D::IDENTITY.translated(position);
-    let transform = transform.rotated(direction);
+    let transform = transform.rotated_local(direction);
 
     commands
         .spawn_empty()
