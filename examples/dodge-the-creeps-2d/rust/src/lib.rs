@@ -7,6 +7,9 @@ use godot_bevy::prelude::{
     godot_prelude::{gdextension, ExtensionLibrary},
     *,
 };
+use godot_bevy::plugins::inspector::{
+    WorldInspectorPlugin, ResourceInspectorPlugin, AssetInspectorPlugin
+};
 
 mod gameplay;
 mod main_menu;
@@ -28,7 +31,10 @@ fn build_app(app: &mut App) {
         )
         .init_resource::<Score>()
         .add_plugins(main_menu::MainMenuPlugin)
-        .add_plugins(gameplay::GameplayPlugin);
+        .add_plugins(gameplay::GameplayPlugin)
+        .add_plugins(WorldInspectorPlugin::new())
+        .add_plugins(ResourceInspectorPlugin::<Score>::new())
+        .add_plugins(AssetInspectorPlugin::<GodotResource>::new());
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, States)]

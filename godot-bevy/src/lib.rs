@@ -27,6 +27,7 @@ pub mod prelude {
             },
             connect_godot_signal,
         },
+        inspector::WorldInspectorPlugin,
         packed_scene::{GodotScene, PackedScenePlugin},
     };
     pub use godot::prelude as godot_prelude;
