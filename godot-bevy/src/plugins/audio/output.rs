@@ -104,7 +104,7 @@ impl AudioOutput {
     /// Stop a specific sound (direct execution)
     pub fn stop_sound(&mut self, sound_id: SoundId) {
         if let Some(mut handle) = self.playing_sounds.remove(&sound_id) {
-            stop_audio_player(&mut handle);
+            stop_and_free_audio_player(&mut handle);
             self.sound_to_channel.remove(&sound_id);
             self.current_volumes.remove(&sound_id); // Clean up volume tracking
             trace!("Stopped sound: {:?}", sound_id);
@@ -164,14 +164,23 @@ fn resume_audio_player(handle: &mut GodotNodeHandle) {
     }
 }
 
-fn stop_audio_player(handle: &mut GodotNodeHandle) {
-    // Try each player type
+fn stop_and_free_audio_player(handle: &mut GodotNodeHandle) {
+    // First stop the audio player
     if let Some(mut player) = handle.try_get::<AudioStreamPlayer>() {
         player.stop();
     } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer2D>() {
         player.stop();
     } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer3D>() {
         player.stop();
+    }
+
+    // Then remove from scene tree and free the node
+    if let Some(mut node) = handle.try_get::<godot::classes::Node>() {
+        if let Some(mut parent) = node.get_parent() {
+            parent.remove_child(&node);
+        }
+        node.queue_free();
+        trace!("Removed and freed audio node from scene tree");
     }
 }
 

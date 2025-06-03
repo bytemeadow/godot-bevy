@@ -371,11 +371,29 @@ fn cleanup_finished_sounds(mut audio_output: ResMut<AudioOutput>) {
     }
 
     for sound_id in finished_sounds {
+        // First, remove the node from the scene tree and free it
+        if let Some(handle) = audio_output.playing_sounds.get_mut(&sound_id) {
+            remove_and_free_audio_node(handle);
+        }
+
+        // Then clean up our tracking
         audio_output.playing_sounds.remove(&sound_id);
         audio_output.sound_to_channel.remove(&sound_id);
         audio_output.active_tweens.remove(&sound_id);
         audio_output.current_volumes.remove(&sound_id); // Clean up volume tracking
         trace!("Cleaned up finished sound: {:?}", sound_id);
+    }
+}
+
+/// Helper function to remove an audio node from the scene tree and free it
+fn remove_and_free_audio_node(handle: &mut GodotNodeHandle) {
+    if let Some(mut node) = handle.try_get::<godot::classes::Node>() {
+        // Remove from parent and queue for deletion
+        if let Some(mut parent) = node.get_parent() {
+            parent.remove_child(&node);
+        }
+        node.queue_free();
+        trace!("Removed and freed audio node from scene tree");
     }
 }
 
