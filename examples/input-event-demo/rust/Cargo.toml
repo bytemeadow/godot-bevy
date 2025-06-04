@@ -12,7 +12,7 @@ path = "../../run_godot.rs"
 name = "input-event-demo"
 
 [dependencies]
-bevy = { version = "0.16.0", default-features = false }
+bevy = { version = "0.16", default-features = false }
 fastrand = { version = "2.3.0" }
 godot = "0.3.0"
 godot-bevy = { path = "../../../godot-bevy" }
