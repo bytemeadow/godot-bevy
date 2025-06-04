@@ -51,7 +51,7 @@ We'd love to showcase projects built with godot-bevy! If you're using this libra
 We encourage a **Godot-first approach** where you:
 
 - **Design scenes and nodes in Godot** - Use Godot's excellent scene editor, node system, and visual tools for level design, UI, and content creation
-- **Manage assets in Godot** - Import textures, audio, 3D models, and configure them using Godot's import system and project settings  
+- **Manage assets in Godot** - Import textures, audio, 3D models, and configure them using Godot's import system and project settings
 - **Use Bevy ECS for logic** - Write your game systems, components, and logic using Bevy's high-performance, data-oriented ECS
 - **Consume Godot resources from ECS** - Load and use Godot-managed assets seamlessly within your Bevy systems
 
@@ -69,7 +69,7 @@ Add the following to your `Cargo.toml`:
 [dependencies]
 godot-bevy = "0.6.0"
 bevy = { version = "0.16.0", default-features = false }
-godot = "0.2.4"
+godot = "0.3.0"
 ```
 
 ### Godot Setup
@@ -104,14 +104,14 @@ fn move_player(
 ) {
     if let Ok((player_data, mut transform)) = player.single_mut() {
         let mut velocity = Vector2::ZERO;
-        
+
         if Input::singleton().is_action_pressed("move_right") {
             velocity.x += 1.0;
         }
         if Input::singleton().is_action_pressed("move_left") {
             velocity.x -= 1.0;
         }
-        
+
         if velocity.length() > 0.0 {
             velocity = velocity.normalized() * player_data.speed;
             transform.origin += velocity * system_delta.delta_seconds();
@@ -138,16 +138,16 @@ fn update_player_ui(
     if let (Ok(mut player_handle), Ok(health)) = (player.single_mut(), player_health.get_single()) {
         // Cast the handle to your custom Godot class
         let player_node = player_handle.get::<MyPlayerNode>();
-        
+
         // Or cast to built-in Godot classes
         let area2d = player_handle.get::<Area2D>();
         let overlapping_bodies = area2d.get_overlapping_bodies().len();
-        
+
         if overlapping_bodies > 0 {
             println!("Player is colliding with {} bodies", overlapping_bodies);
         }
     }
-    
+
     Ok(())
 }
 ```
@@ -157,19 +157,19 @@ fn update_player_ui(
 ```rust
 // Query entities and check Godot node groups
 fn handle_enemy_groups(
-    mut commands: Commands, 
+    mut commands: Commands,
     entities: Query<(Entity, &mut GodotNodeHandle)>
 ) -> Result {
     for (entity, mut node_handle) in entities.iter() {
         let node = node_handle.get::<Node>();
-        
+
         // Check if node is in a specific Godot group
         if node.is_in_group("enemies".into()) {
             // Add ECS components based on node groups
             commands.entity(entity).insert(Enemy { health: 100 });
         }
     }
-    
+
     Ok(())
 }
 ```
@@ -188,14 +188,14 @@ fn setup_start_position(
             .iter()
             .find_entity_by_name("StartPosition")
             .unwrap();
-            
+
         let start_node = start_pos_handle.get::<Node2D>();
         let position = start_node.get_position();
-        
+
         // Set player position from Godot node
         transform.as_godot_mut().origin = position;
     }
-    
+
     Ok(())
 }
 ```
@@ -217,7 +217,7 @@ fn load_assets(asset_server: Res<AssetServer>) {
     let scene: Handle<GodotResource> = asset_server.load("scenes/player.tscn");
     let audio: Handle<GodotResource> = asset_server.load("audio/music.ogg");
     let texture: Handle<GodotResource> = asset_server.load("art/player.png");
-    
+
     // Works with bevy_asset_loader for loading states
 }
 
@@ -276,7 +276,7 @@ fn play_audio(
          .looped()
          .fade_in(std::time::Duration::from_secs(2));
 
-    // Play 2D positional sound effect  
+    // Play 2D positional sound effect
     sfx.play_2d(asset_server.load("audio/explosion.wav"), Vec2::new(100.0, 50.0))
        .volume(0.6)
        .pitch(1.2);
@@ -310,7 +310,7 @@ Each example includes both Rust code and a complete Godot project ready to run.
 
 | `godot-bevy` | Bevy | Godot-Rust | Godot |
 |------------|------|------------|-------|
-| 0.6.x      | 0.16 | 0.2.4      | 4.2.x |
+| 0.6.x      | 0.16 | 0.3.0      | 4.2.x |
 
 ## Community
 
