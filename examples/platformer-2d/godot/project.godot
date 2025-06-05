@@ -21,8 +21,6 @@ BevyAppSingleton="*res://scenes/bevy_app_singleton.tscn"
 
 [display]
 
-window/size/viewport_width=480
-window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 
 [input]

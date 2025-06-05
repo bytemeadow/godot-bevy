@@ -13,6 +13,7 @@ name = "platformer_2d"
 
 [dependencies]
 bevy = { version = "0.16", default-features = false }
+bevy_asset_loader = "0.23.0"
 fastrand = { version = "2.3.0" }
 godot = "0.3.0"
 godot-bevy = { path = "../../../godot-bevy" }
