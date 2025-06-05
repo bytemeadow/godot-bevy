@@ -1,0 +1,19 @@
+[gd_scene load_steps=2 format=3 uid="uid://bdyp538fqygcq"]
+
+
+[node name="HUD" type="CanvasLayer"]
+
+[node name="CurrentLevel" type="Label" parent="."]
+offset_left = 19.0
+offset_top = 10.0
+offset_right = 73.0
+offset_bottom = 36.0
+text = "Level 2"
+metadata/_edit_use_anchors_ = true
+
+[node name="GemsLabel" type="Label" parent="."]
+offset_left = 19.0
+offset_top = 40.0
+offset_right = 81.0
+offset_bottom = 66.0
+text = "Gems: 0"

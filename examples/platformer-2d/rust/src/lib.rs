@@ -7,6 +7,7 @@ use godot_bevy::prelude::{
 
 mod main_menu;
 mod level_manager;
+mod gameplay;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
@@ -19,6 +20,7 @@ fn build_app(app: &mut App) {
         .add_plugins((
             main_menu::MainMenuPlugin,
             level_manager::LevelManagerPlugin,
+            gameplay::GameplayPlugin,
         ));
 }
 
