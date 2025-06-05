@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://cboi8hec4yf0c"]
+[gd_scene load_steps=10 format=3 uid="uid://cboi8hec4yf0c"]
 
 [ext_resource type="Texture2D" uid="uid://bt22jar36sn81" path="res://assets/art/monochrome_tilemap_transparent.png" id="2_erru1"]
 [ext_resource type="AudioStream" uid="uid://dshvrew8w637m" path="res://assets/audio/jump.wav" id="3_brij0"]
@@ -60,7 +60,7 @@ animations = [{
 radius = 3.0
 height = 8.0
 
-[node name="Player" type="CharacterBody2D"]
+[node name="Player" type="Player2D"]
 
 [node name="Camera2D" type="Camera2D" parent="."]
 zoom = Vector2(3, 3)
