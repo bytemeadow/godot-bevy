@@ -8,6 +8,7 @@ use godot_bevy::prelude::{
 mod main_menu;
 mod level_manager;
 mod gameplay;
+mod components;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
