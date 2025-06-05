@@ -4,8 +4,7 @@ use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::{
-    Data, DeriveInput, Error, Field, Fields, Ident, LitStr, Result, Token,
-    parse_macro_input,
+    Data, DeriveInput, Error, Field, Fields, Ident, LitStr, Result, Token, parse_macro_input,
 };
 
 #[proc_macro_attribute]
@@ -210,7 +209,7 @@ impl Parse for BevyComponentAttr {
             syn::parenthesized!(component_content in content);
 
             let component_name: Ident = component_content.parse()?;
-            
+
             // Check if there's a colon and source field mapping
             let source_field = if component_content.peek(Token![:]) {
                 let _colon: Token![:] = component_content.parse()?;
@@ -278,7 +277,7 @@ fn bevy_component(input: DeriveInput) -> Result<TokenStream2> {
             let component_name = &spec.component_name;
             let field_name = format!("{}", component_name).to_lowercase();
             let field_ident = syn::Ident::new(&field_name, component_name.span());
-            
+
             if let Some(source_field) = &spec.source_field {
                 // Component with field mapping
                 quote! {
@@ -315,7 +314,7 @@ fn bevy_component(input: DeriveInput) -> Result<TokenStream2> {
 
     // Use the first component as a marker to check if the bundle is already added
     let first_component = &attr_args.components[0].component_name;
-    
+
     let plugin_impl = quote! {
         pub struct #plugin_name;
 

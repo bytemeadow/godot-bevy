@@ -1,12 +1,23 @@
 use bevy::{
     app::prelude::*,
-    ecs::{event::{EventReader, EventWriter}, resource::Resource, schedule::IntoScheduleConfigs, system::{Res, ResMut}},
-    state::{condition::in_state, state::{NextState, OnExit}},
+    ecs::{
+        event::{EventReader, EventWriter},
+        resource::Resource,
+        schedule::IntoScheduleConfigs,
+        system::{Res, ResMut},
+    },
+    state::{
+        condition::in_state,
+        state::{NextState, OnExit},
+    },
 };
 use godot::classes::{display_server::WindowMode, Button, DisplayServer};
 use godot_bevy::{prelude::*, utils::print_scene_tree};
 
-use crate::{GameState, level_manager::{LoadLevelEvent, LevelId}};
+use crate::{
+    level_manager::{LevelId, LoadLevelEvent},
+    GameState,
+};
 
 #[derive(Resource, Default)]
 pub struct MenuAssets {
@@ -77,10 +88,10 @@ fn listen_for_button_press(
     for evt in events.read() {
         if evt.name == "pressed" && &evt.target == menu_assets.start_button.as_ref().unwrap() {
             println!("Start button pressed - Loading Tutorial Level");
-            
+
             // Change to InGame state
             app_state.set(GameState::InGame);
-            
+
             // Send level load event to start with tutorial
             level_load_events.write(LoadLevelEvent {
                 level_id: LevelId::Level1,

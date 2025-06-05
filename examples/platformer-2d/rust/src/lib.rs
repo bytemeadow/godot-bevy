@@ -5,18 +5,17 @@ use godot_bevy::prelude::{
     *,
 };
 
-mod main_menu;
-mod level_manager;
-mod gameplay;
 mod components;
+mod gameplay;
+mod level_manager;
+mod main_menu;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
     app.add_plugins(StatesPlugin)
         .init_state::<GameState>()
         .add_loading_state(
-            LoadingState::new(GameState::Loading)
-                .continue_to_state(GameState::MainMenu)
+            LoadingState::new(GameState::Loading).continue_to_state(GameState::MainMenu),
         )
         .add_plugins((
             main_menu::MainMenuPlugin,
