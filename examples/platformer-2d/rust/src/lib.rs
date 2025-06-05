@@ -6,16 +6,20 @@ use godot_bevy::prelude::{
 };
 
 mod main_menu;
+mod level_manager;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
     app.add_plugins(StatesPlugin)
-    .init_state::<GameState>()
-    .add_loading_state(
-        LoadingState::new(GameState::Loading)
-            .continue_to_state(GameState::MainMenu)
-    )
-    .add_plugins(main_menu::MainMenuPlugin);
+        .init_state::<GameState>()
+        .add_loading_state(
+            LoadingState::new(GameState::Loading)
+                .continue_to_state(GameState::MainMenu)
+        )
+        .add_plugins((
+            main_menu::MainMenuPlugin,
+            level_manager::LevelManagerPlugin,
+        ));
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, States)]

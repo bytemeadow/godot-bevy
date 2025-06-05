@@ -1,12 +1,12 @@
 use bevy::{
     app::prelude::*,
-    ecs::{event::EventReader, resource::Resource, schedule::IntoScheduleConfigs, system::{Res, ResMut}},
+    ecs::{event::{EventReader, EventWriter}, resource::Resource, schedule::IntoScheduleConfigs, system::{Res, ResMut}},
     state::{condition::in_state, state::{NextState, OnExit}},
 };
 use godot::classes::{display_server::WindowMode, Button, DisplayServer};
 use godot_bevy::{prelude::*, utils::print_scene_tree};
 
-use crate::GameState;
+use crate::{GameState, level_manager::{LoadLevelEvent, LevelId}};
 
 #[derive(Resource, Default)]
 pub struct MenuAssets {
@@ -72,16 +72,19 @@ fn listen_for_button_press(
     menu_assets: Res<MenuAssets>,
     mut events: EventReader<GodotSignal>,
     mut app_state: ResMut<NextState<GameState>>,
+    mut level_load_events: EventWriter<LoadLevelEvent>,
 ) {
     for evt in events.read() {
         if evt.name == "pressed" && &evt.target == menu_assets.start_button.as_ref().unwrap() {
-            println!("Start button pressed");
+            println!("Start button pressed - Loading Tutorial Level");
+            
+            // Change to InGame state
             app_state.set(GameState::InGame);
-            // get_tree().change_scene_to_file("res://level_1.tscn")
-            if let Some(mut tree) = evt.target.clone().get::<Button>().get_tree() {
-                tree.change_scene_to_packed(packed_scene);
-            }
-
+            
+            // Send level load event to start with tutorial
+            level_load_events.write(LoadLevelEvent {
+                level_id: LevelId::Level1,
+            });
         }
         if evt.name == "pressed" && &evt.target == menu_assets.fullscreen_button.as_ref().unwrap() {
             println!("Fullscreen button pressed");
