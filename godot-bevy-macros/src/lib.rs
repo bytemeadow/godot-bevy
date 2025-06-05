@@ -196,7 +196,6 @@ struct BevyComponentAttr {
 struct ComponentSpec {
     component_name: Ident,
     source_field: Option<Ident>,
-    is_existing: bool,
 }
 
 impl Parse for BevyComponentAttr {
@@ -209,24 +208,6 @@ impl Parse for BevyComponentAttr {
         while !content.is_empty() {
             let component_content;
             syn::parenthesized!(component_content in content);
-
-            // Check for "existing" keyword
-            let is_existing = if component_content.peek(syn::Ident) {
-                let lookahead = component_content.lookahead1();
-                if lookahead.peek(syn::Ident) {
-                    let maybe_existing: syn::Ident = component_content.fork().parse()?;
-                    if maybe_existing == "existing" {
-                        let _existing: syn::Ident = component_content.parse()?;
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
 
             let component_name: Ident = component_content.parse()?;
             
@@ -241,7 +222,6 @@ impl Parse for BevyComponentAttr {
             components.push(ComponentSpec {
                 component_name,
                 source_field,
-                is_existing,
             });
 
             if !content.is_empty() {
@@ -268,20 +248,6 @@ fn bevy_component(input: DeriveInput) -> Result<TokenStream2> {
 
     let attr_args: BevyComponentAttr = bevy_attr.parse_args()?;
     let bundle_name = &attr_args.bundle_name;
-
-    // Generate individual component structs (only for non-existing components)
-    let component_structs: Vec<_> = attr_args
-        .components
-        .iter()
-        .filter(|spec| !spec.is_existing)
-        .map(|spec| {
-            let component_name = &spec.component_name;
-            quote! {
-                #[derive(bevy::prelude::Component, Debug, Clone)]
-                pub struct #component_name(pub f32);
-            }
-        })
-        .collect();
 
     // Generate bundle struct
     let bundle_fields: Vec<_> = attr_args
@@ -377,8 +343,6 @@ fn bevy_component(input: DeriveInput) -> Result<TokenStream2> {
     };
 
     let expanded = quote! {
-        #(#component_structs)*
-
         #bundle_struct
 
         #bundle_constructor

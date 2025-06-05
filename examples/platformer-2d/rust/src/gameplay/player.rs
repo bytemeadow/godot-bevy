@@ -9,7 +9,7 @@ use crate::components::{Speed, JumpVelocity, Player};
 
 #[derive(GodotClass, BevyComponent)]
 #[class(base=CharacterBody2D)]
-#[bevy_component(PlayerBundle((existing Speed: speed), (existing JumpVelocity: jump_velocity), (existing Player)))]
+#[bevy_component(PlayerBundle((Speed: speed), (JumpVelocity: jump_velocity), (Player)))]
 pub struct Player2D {
     base: Base<CharacterBody2D>,
     #[export]
