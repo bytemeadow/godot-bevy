@@ -1,21 +1,24 @@
+use crate::components::{Gravity, JumpVelocity, Player, Speed};
 use bevy::app::{App, Plugin};
 use bevy::prelude::*;
+use godot::classes::{AnimatedSprite2D, Input, ProjectSettings};
+use godot::global::move_toward;
 use godot::{
     classes::{CharacterBody2D, ICharacterBody2D},
     prelude::*,
 };
 use godot_bevy::prelude::*;
-use crate::components::{Speed, JumpVelocity, Player};
 
 #[derive(GodotClass, BevyComponent)]
 #[class(base=CharacterBody2D)]
-#[bevy_component(PlayerBundle((Speed: speed), (JumpVelocity: jump_velocity), (Player)))]
+#[bevy_component(PlayerBundle((Speed: speed), (JumpVelocity: jump_velocity), (Gravity: gravity), (Player)))]
 pub struct Player2D {
     base: Base<CharacterBody2D>,
     #[export]
     speed: f32,
     #[export]
     jump_velocity: f32,
+    gravity: f32,
 }
 
 #[godot_api]
@@ -25,6 +28,10 @@ impl ICharacterBody2D for Player2D {
             base,
             speed: 250.,
             jump_velocity: -400.,
+            gravity: ProjectSettings::singleton()
+                .get_setting("physics/2d/default_gravity")
+                .try_to::<f32>()
+                .unwrap_or(980.0),
         }
     }
 
@@ -36,60 +43,44 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(PlayerBundleAutoSyncPlugin)
-            .add_systems(Update, (test_player_components /*basic_player_movement*/,));
+            .add_systems(PhysicsUpdate, basic_player_movement);
     }
 }
 
-/// Test system to verify our generated components are working
-fn test_player_components(
-    players: Query<(Entity, &Speed, &JumpVelocity), (With<Player>, With<Speed>, With<JumpVelocity>)>,
+fn basic_player_movement(
+    mut player: Query<(&mut GodotNodeHandle, &Speed, &JumpVelocity, &Gravity), With<Player>>,
+    mut system_delta: SystemDeltaTimer,
 ) {
-    for (entity, speed, jump_velocity) in players.iter() {
-        godot_print!("Found player entity {:?} with speed: {} and jump velocity: {}", entity, speed.0, jump_velocity.0);
-        debug!(
-            "Found player entity {:?} with speed: {} and jump velocity: {}",
-            entity, speed.0, jump_velocity.0
-        );
+    if let Ok((mut handle, speed, jump_velocity, gravity)) = player.single_mut() {
+        let input = Input::singleton();
+        let mut character_body = handle.get::<CharacterBody2D>();
+        let mut sprite = character_body.get_node_as::<AnimatedSprite2D>("AnimatedSprite2D");
+        let mut velocity = character_body.get_velocity();
+
+        if !character_body.is_on_floor() {
+            velocity.y += gravity.0 * system_delta.delta_seconds();
+        }
+
+        if input.is_action_just_pressed("jump") && character_body.is_on_floor() {
+            velocity.y = jump_velocity.0;
+            // TOOD: Play jump sound
+        }
+
+        let direction = input.get_axis("move_left", "move_right");
+        if direction != 0.0 {
+            velocity.x = direction * speed.0;
+            sprite.play_ex().name("run").done();
+            sprite.set_flip_h(direction == -1.0);
+        } else {
+            sprite.play_ex().name("idle").done();
+            velocity.x = move_toward(velocity.x as f64, 0.0, speed.0 as f64 / 2.0) as f32;
+        }
+
+        if !character_body.is_on_floor() {
+            sprite.play_ex().name("jump").done();
+        }
+
+        character_body.set_velocity(velocity);
+        character_body.move_and_slide();
     }
 }
-
-// /// Basic movement system for demonstration
-// fn basic_player_movement(
-//     mut players: Query<
-//         (&mut GodotNodeHandle, &Speed, &JumpVelocity),
-//         (With<Speed>, With<JumpVelocity>),
-//     >,
-//     keyboard: Res<ButtonInput<KeyCode>>,
-//     time: Res<Time>,
-// ) {
-//     for (mut handle, speed, jump_velocity) in players.iter_mut() {
-//         if let Some(player_node) = handle.try_get::<Player2D>() {
-//             let mut character_body = player_node.upcast::<CharacterBody2D>();
-//             let mut velocity = character_body.get_velocity();
-
-//             // Handle horizontal movement
-//             let mut direction = 0.0;
-//             if keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::KeyA) {
-//                 direction -= 1.0;
-//             }
-//             if keyboard.pressed(KeyCode::ArrowRight) || keyboard.pressed(KeyCode::KeyD) {
-//                 direction += 1.0;
-//             }
-
-//             velocity.x = direction * speed.0;
-
-//             // Simple gravity (you'd normally handle this in Godot's physics process)
-//             if !character_body.is_on_floor() {
-//                 velocity.y += 980.0 * time.delta_secs(); // gravity
-//             }
-
-//             // Jump
-//             if keyboard.just_pressed(KeyCode::Space) && character_body.is_on_floor() {
-//                 velocity.y = jump_velocity.0;
-//             }
-
-//             character_body.set_velocity(velocity);
-//             character_body.move_and_slide();
-//         }
-//     }
-// }

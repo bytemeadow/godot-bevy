@@ -597,5 +597,3 @@ position = Vector2(1168, 192)
 stream = ExtResource("7_4horr")
 volume_db = -8.0
 autoplay = true
-
-[connection signal="player_entered" from="Door" to="." method="_on_door_player_entered"]

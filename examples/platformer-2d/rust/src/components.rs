@@ -26,6 +26,16 @@ impl Default for JumpVelocity {
     }
 }
 
+/// Component representing gravity in pixels per second squared
+#[derive(Component, Debug, Clone, PartialEq)]
+pub struct Gravity(pub f32);
+
+impl Default for Gravity {
+    fn default() -> Self {
+        Self(980.0)
+    }
+}
+
 /// Component marking an entity as the player
 #[derive(Component, Debug, Clone, Default)]
 pub struct Player;
