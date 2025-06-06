@@ -1,5 +1,6 @@
 use bevy::app::{App, Plugin};
 
+pub mod door;
 pub mod gem;
 pub mod hud;
 pub mod player;
@@ -10,5 +11,6 @@ impl Plugin for GameplayPlugin {
         app.add_plugins(player::PlayerPlugin);
         app.add_plugins(gem::GemPlugin);
         app.add_plugins(hud::HudPlugin);
+        app.add_plugins(door::DoorPlugin);
     }
 }

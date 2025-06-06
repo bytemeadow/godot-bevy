@@ -1,10 +1,13 @@
+use crate::components::Player;
 use bevy::prelude::*;
 use godot::classes::Node;
+use godot::prelude::*;
 use godot_bevy::plugins::core::scene_tree::{SceneTreeEvent, SceneTreeEventType};
 use godot_bevy::prelude::*;
 
 /// Simple level identifier
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, GodotConvert, Var, Export)]
+#[godot(via = GString)]
 pub enum LevelId {
     Level1,
     Level2,
@@ -72,7 +75,7 @@ impl Plugin for LevelManagerPlugin {
                 Update,
                 (
                     handle_level_load_requests,
-                    handle_level_scene_change,
+                    (handle_level_scene_change, apply_deferred).chain(),
                     emit_level_loaded_event_when_scene_ready,
                 ),
             );
@@ -100,6 +103,8 @@ fn handle_level_load_requests(
 
 /// System that handles actual scene changing once assets are loaded
 fn handle_level_scene_change(
+    mut commands: Commands,
+    player: Query<Entity, With<Player>>,
     mut current_level: ResMut<CurrentLevel>,
     mut pending_level: ResMut<PendingLevel>,
     mut scene_tree: SceneTreeRef,
@@ -112,6 +117,10 @@ fn handle_level_scene_change(
         if let Some(godot_resource) = assets.get_mut(handle) {
             if let Some(packed_scene) = godot_resource.try_cast::<godot::classes::PackedScene>() {
                 info!("Changing to level scene: {:?}", level_id);
+
+                if let Ok(player) = player.get_single() {
+                    commands.entity(player).despawn_recursive();
+                }
 
                 // Use change_scene_to_packed instead of change_scene_to_file
                 let mut tree = scene_tree.get();
@@ -150,7 +159,7 @@ fn emit_level_loaded_event_when_scene_ready(
             if let SceneTreeEventType::NodeAdded = event.event_type {
                 let node_path = event.node.clone().get::<Node>().get_path().to_string();
                 if node_path == expected_path {
-                    loaded_events.write(LevelLoadedEvent { level_id });
+                    loaded_events.send(LevelLoadedEvent { level_id });
                     pending_level.level_id = None;
                     break;
                 }

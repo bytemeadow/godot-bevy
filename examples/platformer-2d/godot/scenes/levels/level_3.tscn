@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://lnxfxw2ixsik"]
+[gd_scene load_steps=9 format=3 uid="uid://lnxfxw2ixsik"]
 
 [ext_resource type="Texture2D" uid="uid://bt22jar36sn81" path="res://assets/art/monochrome_tilemap_transparent.png" id="2_r3qw4"]
 [ext_resource type="PackedScene" uid="uid://bdyp538fqygcq" path="res://scenes/ui/hud.tscn" id="3_dypo0"]
@@ -541,7 +541,6 @@ physics_layer_0/collision_layer = 1
 sources/0 = SubResource("TileSetAtlasSource_6issp")
 
 [node name="Level3" type="Node2D"]
-level_num = 3
 
 [node name="TileMap" type="TileMap" parent="."]
 tile_set = SubResource("TileSet_wfi5k")
@@ -554,8 +553,8 @@ layer_0/tile_data = PackedInt32Array(1048599, 524288, 4, 1048600, 524288, 4, 104
 position = Vector2(360, 251)
 
 [node name="Door" parent="." instance=ExtResource("5_i6qe7")]
+level = "Level2"
 position = Vector2(336, 250)
-level = "res://level_2.tscn"
 
 [node name="Label" type="Label" parent="Door"]
 offset_left = -24.0

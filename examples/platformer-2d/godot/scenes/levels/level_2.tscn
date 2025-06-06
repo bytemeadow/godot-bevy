@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://4b2xucjtxgcf"]
+[gd_scene load_steps=9 format=3 uid="uid://4b2xucjtxgcf"]
 
 [ext_resource type="Texture2D" uid="uid://bt22jar36sn81" path="res://assets/art/monochrome_tilemap_transparent.png" id="1_wi2ep"]
 [ext_resource type="PackedScene" uid="uid://cboi8hec4yf0c" path="res://scenes/sprites/player.tscn" id="2_ljyip"]
@@ -541,7 +541,6 @@ physics_layer_0/collision_layer = 1
 sources/0 = SubResource("TileSetAtlasSource_6issp")
 
 [node name="Level2" type="Node2D"]
-level_num = 2
 
 [node name="TileMap" type="TileMap" parent="."]
 tile_set = SubResource("TileSet_wfi5k")
@@ -555,7 +554,6 @@ position = Vector2(360, 251)
 
 [node name="Door" parent="." instance=ExtResource("3_osote")]
 position = Vector2(336, 250)
-level = "res://level_1.tscn"
 
 [node name="Label" type="Label" parent="Door"]
 offset_left = -24.0
@@ -565,15 +563,15 @@ offset_bottom = -8.0
 text = "Level 1"
 
 [node name="Door2" parent="." instance=ExtResource("3_osote")]
+level = "Level3"
 position = Vector2(544, 248)
-level = "res://level_3.tscn"
 
 [node name="Label" type="Label" parent="Door2"]
 offset_left = -24.0
 offset_top = -34.0
 offset_right = 30.0
 offset_bottom = -8.0
-text = "Level 2"
+text = "Level 3"
 
 [node name="Gems" type="Node" parent="."]
 

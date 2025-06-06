@@ -30,5 +30,4 @@ enum GameState {
     Loading,
     MainMenu,
     InGame,
-    GameOver,
 }

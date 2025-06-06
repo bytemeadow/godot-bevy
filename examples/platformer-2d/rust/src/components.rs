@@ -6,6 +6,8 @@
 
 use bevy::prelude::*;
 
+use crate::level_manager::LevelId;
+
 /// Component representing movement speed in pixels per second
 #[derive(Component, Debug, Clone, PartialEq)]
 pub struct Speed(pub f32);
@@ -47,3 +49,7 @@ pub struct Enemy;
 /// Component marking an entity as a gem
 #[derive(Component, Debug, Clone, Default)]
 pub struct Gem;
+
+/// Component marking an entity as a door
+#[derive(Component, Debug, Clone)]
+pub struct Door(pub LevelId);
