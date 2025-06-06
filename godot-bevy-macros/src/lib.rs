@@ -42,11 +42,11 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-#[proc_macro_derive(BevyComponent, attributes(bevy_component))]
-pub fn derive_bevy_component(item: TokenStream) -> TokenStream {
+#[proc_macro_derive(BevyBundle, attributes(bevy_bundle))]
+pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
 
-    let expanded = bevy_component(input).unwrap_or_else(Error::into_compile_error);
+    let expanded = bevy_bundle(input).unwrap_or_else(Error::into_compile_error);
 
     TokenStream::from(expanded)
 }
@@ -186,9 +186,8 @@ fn get_option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
     None
 }
 
-// Parse bevy_component attribute syntax
-struct BevyComponentAttr {
-    bundle_name: Ident,
+// Parse bevy_bundle attribute syntax
+struct BevyBundleAttr {
     components: Vec<ComponentSpec>,
 }
 
@@ -197,19 +196,15 @@ struct ComponentSpec {
     source_field: Option<Ident>,
 }
 
-impl Parse for BevyComponentAttr {
+impl Parse for BevyBundleAttr {
     fn parse(input: ParseStream) -> Result<Self> {
-        let bundle_name: Ident = input.parse()?;
-        let content;
-        syn::parenthesized!(content in input);
-
         let mut components = Vec::new();
-        while !content.is_empty() {
+        while !input.is_empty() {
             let component_content;
-            syn::parenthesized!(component_content in content);
+            syn::parenthesized!(component_content in input);
 
             let component_name: Ident = component_content.parse()?;
-
+            
             // Check if there's a colon and source field mapping
             let source_field = if component_content.peek(Token![:]) {
                 let _colon: Token![:] = component_content.parse()?;
@@ -223,30 +218,31 @@ impl Parse for BevyComponentAttr {
                 source_field,
             });
 
-            if !content.is_empty() {
-                let _comma: Token![,] = content.parse()?;
+            if !input.is_empty() {
+                let _comma: Token![,] = input.parse()?;
             }
         }
 
-        Ok(BevyComponentAttr {
-            bundle_name,
+        Ok(BevyBundleAttr {
             components,
         })
     }
 }
 
-fn bevy_component(input: DeriveInput) -> Result<TokenStream2> {
+fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
     let struct_name = &input.ident;
 
-    // Find the bevy_component attribute
+    // Find the bevy_bundle attribute
     let bevy_attr = input
         .attrs
         .iter()
-        .find(|attr| attr.path().is_ident("bevy_component"))
-        .ok_or_else(|| Error::new_spanned(&input, "Missing #[bevy_component(...)] attribute"))?;
+        .find(|attr| attr.path().is_ident("bevy_bundle"))
+        .ok_or_else(|| Error::new_spanned(&input, "Missing #[bevy_bundle(...)] attribute"))?;
 
-    let attr_args: BevyComponentAttr = bevy_attr.parse_args()?;
-    let bundle_name = &attr_args.bundle_name;
+    let attr_args: BevyBundleAttr = bevy_attr.parse_args()?;
+    
+    // Auto-generate bundle name from struct name
+    let bundle_name = syn::Ident::new(&format!("{}Bundle", struct_name), struct_name.span());
 
     // Generate bundle struct
     let bundle_fields: Vec<_> = attr_args

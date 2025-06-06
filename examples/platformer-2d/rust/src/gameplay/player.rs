@@ -9,9 +9,9 @@ use godot::{
 };
 use godot_bevy::prelude::*;
 
-#[derive(GodotClass, BevyComponent)]
+#[derive(GodotClass, BevyBundle)]
 #[class(base=CharacterBody2D)]
-#[bevy_component(PlayerBundle((Speed: speed), (JumpVelocity: jump_velocity), (Gravity: gravity), (Player)))]
+#[bevy_bundle((Speed: speed), (JumpVelocity: jump_velocity), (Gravity: gravity), (Player))]
 pub struct Player2D {
     base: Base<CharacterBody2D>,
     #[export]
@@ -42,7 +42,7 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(PlayerBundleAutoSyncPlugin)
+        app.add_plugins(Player2DBundleAutoSyncPlugin)
             .add_systems(PhysicsUpdate, basic_player_movement);
     }
 }
