@@ -43,3 +43,7 @@ pub struct Player;
 /// Component marking an entity as an enemy
 #[derive(Component, Debug, Clone, Default)]
 pub struct Enemy;
+
+/// Component marking an entity as a gem
+#[derive(Component, Debug, Clone, Default)]
+pub struct Gem;
