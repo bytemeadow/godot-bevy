@@ -143,7 +143,22 @@ fn create_get_node_expr(field: &Field) -> Result<TokenStream2> {
         None => (false, field_ty),
     };
 
-    // Create appropriate expression based on whether the field is optional
+    let path_value = node_path.value();
+
+    // Check if the path contains wildcards for pattern matching
+    if path_value.contains('*') {
+        create_pattern_matching_expr(&path_value, is_optional, span)
+    } else {
+        // Use existing direct path logic for non-pattern paths
+        create_direct_path_expr(&node_path, is_optional, span)
+    }
+}
+
+fn create_direct_path_expr(
+    node_path: &LitStr,
+    is_optional: bool,
+    span: proc_macro2::Span,
+) -> Result<TokenStream2> {
     let expr = if is_optional {
         quote_spanned! { span =>
             {
@@ -164,7 +179,32 @@ fn create_get_node_expr(field: &Field) -> Result<TokenStream2> {
             }
         }
     };
+    Ok(expr)
+}
 
+fn create_pattern_matching_expr(
+    path_pattern: &str,
+    is_optional: bool,
+    span: proc_macro2::Span,
+) -> Result<TokenStream2> {
+    let expr = if is_optional {
+        quote_spanned! { span =>
+            {
+                let base_node = &node;
+                godot_bevy::node_tree_view::find_node_by_pattern(base_node, #path_pattern)
+                    .map(|node_ref| godot_bevy::bridge::GodotNodeHandle::new(node_ref))
+            }
+        }
+    } else {
+        quote_spanned! { span =>
+            {
+                let base_node = &node;
+                let node_ref = godot_bevy::node_tree_view::find_node_by_pattern(base_node, #path_pattern)
+                    .expect(&format!("Could not find node matching pattern: {}", #path_pattern));
+                godot_bevy::bridge::GodotNodeHandle::new(node_ref)
+            }
+        }
+    };
     Ok(expr)
 }
 

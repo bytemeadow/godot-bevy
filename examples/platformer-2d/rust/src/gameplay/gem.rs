@@ -9,7 +9,7 @@ use godot_bevy::prelude::Collisions;
 use godot_bevy::prelude::*;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default, Resource)]
-pub struct GemsCollected(i64);
+pub struct GemsCollected(pub i64);
 
 #[derive(GodotClass, BevyBundle)]
 #[class(base=Area2D)]
