@@ -8,6 +8,9 @@ use godot::{
 use godot_bevy::prelude::Collisions;
 use godot_bevy::prelude::*;
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default, Resource)]
+pub struct GemsCollected(i64);
+
 #[derive(GodotClass, BevyBundle)]
 #[class(base=Area2D)]
 #[bevy_bundle((Gem))]
@@ -26,20 +29,22 @@ pub struct GemPlugin;
 
 impl Plugin for GemPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(Gem2DBundleAutoSyncPlugin)
+        app.init_resource::<GemsCollected>()
+            .add_plugins(Gem2DBundleAutoSyncPlugin)
             .add_systems(Update, hide_gem_on_player_collision);
     }
 }
 
-/// System that hides the gem when the player enters its Area2D
 fn hide_gem_on_player_collision(
     mut gems: Query<(&mut GodotNodeHandle, &Collisions), With<Gem>>,
     players: Query<Entity, With<Player>>,
+    mut gems_collected: ResMut<GemsCollected>,
 ) {
     for (mut handle, collisions) in gems.iter_mut() {
         for &entity in collisions.recent_collisions() {
             if players.get(entity).is_ok() {
                 handle.get::<Area2D>().set_visible(false);
+                gems_collected.0 += 1;
                 // TODO: Play audio or send event to play audio
             }
         }
