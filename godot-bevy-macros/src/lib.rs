@@ -204,7 +204,7 @@ impl Parse for BevyBundleAttr {
             syn::parenthesized!(component_content in input);
 
             let component_name: Ident = component_content.parse()?;
-            
+
             // Check if there's a colon and source field mapping
             let source_field = if component_content.peek(Token![:]) {
                 let _colon: Token![:] = component_content.parse()?;
@@ -223,9 +223,7 @@ impl Parse for BevyBundleAttr {
             }
         }
 
-        Ok(BevyBundleAttr {
-            components,
-        })
+        Ok(BevyBundleAttr { components })
     }
 }
 
@@ -240,7 +238,7 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
         .ok_or_else(|| Error::new_spanned(&input, "Missing #[bevy_bundle(...)] attribute"))?;
 
     let attr_args: BevyBundleAttr = bevy_attr.parse_args()?;
-    
+
     // Auto-generate bundle name from struct name
     let bundle_name = syn::Ident::new(&format!("{}Bundle", struct_name), struct_name.span());
 

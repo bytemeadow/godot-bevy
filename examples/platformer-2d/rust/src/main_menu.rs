@@ -12,7 +12,7 @@ use bevy::{
     },
 };
 use godot::classes::{display_server::WindowMode, Button, DisplayServer};
-use godot_bevy::{prelude::*, utils::print_scene_tree};
+use godot_bevy::prelude::*;
 
 use crate::{
     level_manager::{LevelId, LoadLevelEvent},

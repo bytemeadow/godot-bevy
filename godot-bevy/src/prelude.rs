@@ -11,7 +11,7 @@ pub use crate::plugins::{
     },
     core::{
         ActionInput, Collisions, FindEntityByNameExt, GodotCorePlugin, GodotSignal, Groups,
-        KeyboardInput, MouseButtonInput, MouseMotion, PhysicsUpdate, SceneTreeEventReader,
+        KeyboardInput, MouseButtonInput, MouseMotion, PhysicsDelta, PhysicsUpdate, SceneTreeEventReader,
         SceneTreeRef, SystemDeltaTimer, Transform2D, Transform3D,
         collisions::{
             ALL_COLLISION_SIGNALS, AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED,

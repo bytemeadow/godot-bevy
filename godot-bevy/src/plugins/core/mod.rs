@@ -30,6 +30,24 @@ pub use input_event::*;
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PhysicsUpdate;
 
+/// Resource containing Godot's physics delta time for the current frame
+#[derive(Resource, Default)]
+pub struct PhysicsDelta {
+    pub delta_seconds: f32,
+}
+
+impl PhysicsDelta {
+    pub fn new(delta: f64) -> Self {
+        Self {
+            delta_seconds: delta as f32,
+        }
+    }
+
+    pub fn delta(&self) -> Duration {
+        Duration::from_secs_f32(self.delta_seconds)
+    }
+}
+
 pub struct GodotCorePlugin;
 
 impl Plugin for GodotCorePlugin {
@@ -53,7 +71,8 @@ impl Plugin for GodotCorePlugin {
             .add_plugins(GodotTransformsPlugin)
             .add_plugins(GodotCollisionsPlugin)
             .add_plugins(GodotSignalsPlugin)
-            .add_plugins(GodotInputEventPlugin);
+            .add_plugins(GodotInputEventPlugin)
+            .init_resource::<PhysicsDelta>();
 
         // Add the PhysicsUpdate schedule
         app.add_schedule(Schedule::new(PhysicsUpdate));

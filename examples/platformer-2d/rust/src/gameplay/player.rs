@@ -7,6 +7,7 @@ use godot::{
     classes::{CharacterBody2D, ICharacterBody2D},
     prelude::*,
 };
+use godot_bevy::plugins::core::PhysicsDelta;
 use godot_bevy::prelude::*;
 
 #[derive(GodotClass, BevyBundle)]
@@ -49,7 +50,7 @@ impl Plugin for PlayerPlugin {
 
 fn basic_player_movement(
     mut player: Query<(&mut GodotNodeHandle, &Speed, &JumpVelocity, &Gravity), With<Player>>,
-    mut system_delta: SystemDeltaTimer,
+    physics_delta: Res<PhysicsDelta>,
 ) {
     if let Ok((mut handle, speed, jump_velocity, gravity)) = player.single_mut() {
         let input = Input::singleton();
@@ -58,12 +59,12 @@ fn basic_player_movement(
         let mut velocity = character_body.get_velocity();
 
         if !character_body.is_on_floor() {
-            velocity.y += gravity.0 * system_delta.delta_seconds();
+            velocity.y += gravity.0 * physics_delta.delta_seconds;
         }
 
         if input.is_action_just_pressed("jump") && character_body.is_on_floor() {
             velocity.y = jump_velocity.0;
-            // TOOD: Play jump sound
+            // TODO: Play jump sound
         }
 
         let direction = input.get_axis("move_left", "move_right");
