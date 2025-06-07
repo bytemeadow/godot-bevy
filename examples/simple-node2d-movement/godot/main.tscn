@@ -7,16 +7,16 @@
 [node name="Icon" type="Sprite2D" parent="."]
 texture = ExtResource("1_ig7tw")
 
-[node name="Icon2" type="Sprite2D" parent="Icon"]
+[node name="SubIcon" type="Sprite2D" parent="Icon"]
 texture = ExtResource("1_ig7tw")
 
-[node name="Icon3" type="Sprite2D" parent="Icon/Icon2"]
+[node name="SubIcon2" type="Sprite2D" parent="Icon/SubIcon"]
 texture = ExtResource("1_ig7tw")
 
-[node name="Icon4" type="Sprite2D" parent="Icon/Icon2/Icon3"]
+[node name="SubIcon3" type="Sprite2D" parent="Icon/SubIcon/SubIcon2"]
 texture = ExtResource("1_ig7tw")
 
-[node name="Icon5" type="Sprite2D" parent="Icon/Icon2/Icon3/Icon4"]
+[node name="SubIcon4" type="Sprite2D" parent="Icon/SubIcon/SubIcon2/SubIcon3"]
 texture = ExtResource("1_ig7tw")
 
 [node name="OtherIcon" type="Sprite2D" parent="."]
