@@ -27,6 +27,10 @@ fn main() -> Result<(), std::io::Error> {
 }
 
 fn godot_binary_path() -> PathBuf {
+    if let Ok(godot_binary_path) = std::env::var("godot") {
+        return PathBuf::from(godot_binary_path);
+    }
+    
     if let Ok(godot_binary_path) = which("godot") {
         return godot_binary_path;
     }
