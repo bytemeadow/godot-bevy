@@ -100,7 +100,7 @@ fn handle_button_clicks(mut events: EventReader<GodotSignal>) {
 // Move player with physics timing
 fn move_player(
     mut player: Query<(&Player, &mut Transform2D)>,
-    mut system_delta: SystemDeltaTimer,
+    physics_delta: Res<PhysicsDelta>,
 ) {
     if let Ok((player_data, mut transform)) = player.single_mut() {
         let mut velocity = Vector2::ZERO;
@@ -114,7 +114,7 @@ fn move_player(
 
         if velocity.length() > 0.0 {
             velocity = velocity.normalized() * player_data.speed;
-            transform.origin += velocity * system_delta.delta_seconds();
+            transform.origin += velocity * physics_delta.delta_seconds;
         }
     }
 }

@@ -84,6 +84,7 @@ impl Plugin for GodotCorePlugin {
 /// Not every system runs on a Bevy update and Bevy can be updated multiple
 /// during a "frame".
 #[derive(SystemParam)]
+#[deprecated(note = "Use PhysicsDelta instead")]
 pub struct SystemDeltaTimer<'w, 's> {
     last_time: Local<'s, Option<Instant>>,
     marker: PhantomData<&'w ()>,

@@ -1,9 +1,12 @@
 #![allow(clippy::type_complexity)]
 
 use bevy::prelude::*;
-use godot_bevy::prelude::{
-    godot_prelude::{gdextension, godot_print, ExtensionLibrary},
-    *,
+use godot_bevy::{
+    plugins::core::PhysicsDelta,
+    prelude::{
+        godot_prelude::{gdextension, godot_print, ExtensionLibrary},
+        *,
+    },
 };
 
 #[bevy_app]
@@ -137,7 +140,7 @@ fn last_schedule_system(stats: Res<TimingStats>, time: Res<Time>) {
 fn physics_update_system(
     mut stats: ResMut<TimingStats>,
     mut counter: ResMut<ProcessCallCounter>,
-    mut system_delta: SystemDeltaTimer,
+    physics_delta: Res<PhysicsDelta>,
 ) {
     stats.physics_update_runs += 1;
     counter.physics_process_calls += 1;
@@ -149,7 +152,7 @@ fn physics_update_system(
             "⚡ PhysicsUpdate #{}: physics_process_calls: {}, Time: {:.2}s",
             stats.physics_update_runs,
             counter.physics_process_calls,
-            system_delta.delta_seconds()
+            physics_delta.delta_seconds
         );
     }
 }
