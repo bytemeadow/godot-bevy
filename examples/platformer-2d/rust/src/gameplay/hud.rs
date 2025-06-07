@@ -11,6 +11,14 @@ pub struct HudHandles {
     pub gems_label: Option<GodotNodeHandle>,
 }
 
+impl HudHandles {
+    /// Clear all HUD handles (useful when scene changes invalidate them)
+    pub fn clear(&mut self) {
+        self.current_level_label = None;
+        self.gems_label = None;
+    }
+}
+
 #[derive(NodeTreeView)]
 pub struct HudUi {
     #[node("/root/*/HUD/CurrentLevel")]

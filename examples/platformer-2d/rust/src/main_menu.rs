@@ -8,7 +8,7 @@ use bevy::{
     },
     state::{
         condition::in_state,
-        state::{NextState, OnExit},
+        state::{NextState, OnEnter, OnExit},
     },
 };
 use godot::classes::{display_server::WindowMode, Button, DisplayServer};
@@ -32,6 +32,10 @@ impl Plugin for MainMenuPlugin {
         app.init_resource::<MenuAssets>()
             .add_systems(
                 OnExit(GameState::Loading),
+                (init_menu_assets, connect_buttons.after(init_menu_assets)),
+            )
+            .add_systems(
+                OnEnter(GameState::MainMenu),
                 (init_menu_assets, connect_buttons.after(init_menu_assets)),
             )
             .add_systems(

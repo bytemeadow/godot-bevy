@@ -25,7 +25,10 @@ impl Plugin for GameplayPlugin {
         app.add_plugins(door::DoorPlugin);
         app.add_systems(
             Update,
-            handle_reset_level.run_if(in_state(GameState::InGame)),
+            (
+                handle_reset_level.run_if(in_state(GameState::InGame)),
+                handle_return_to_main_menu.run_if(in_state(GameState::InGame)),
+            ),
         );
     }
 }
@@ -47,8 +50,7 @@ fn handle_reset_level(
         gems_collected.0 = 0;
 
         // Clear HUD handles since they'll be invalid after scene reload
-        hud_handles.gems_label = None;
-        hud_handles.current_level_label = None;
+        hud_handles.clear();
 
         // Reload the scene
         scene_tree.get().reload_current_scene();
@@ -57,5 +59,37 @@ fn handle_reset_level(
         if let Some(level_id) = current_level.level_id {
             level_loaded_events.write(LevelLoadedEvent { level_id });
         }
+    }
+}
+
+/// System that handles return to main menu input during gameplay
+fn handle_return_to_main_menu(
+    mut gems_collected: ResMut<GemsCollected>,
+    mut scene_tree: SceneTreeRef,
+    mut hud_handles: ResMut<HudHandles>,
+    mut current_level: ResMut<CurrentLevel>,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
+    let input = Input::singleton();
+
+    if input.is_action_just_pressed("return_to_main_menu") {
+        info!("Return to main menu input detected - returning to main menu");
+
+        // Reset gems collected
+        gems_collected.0 = 0;
+
+        // Clear HUD handles since they'll be invalid after scene changes
+        hud_handles.clear();
+
+        // Clear current level state
+        current_level.clear();
+
+        // Change to main menu state
+        next_state.set(GameState::MainMenu);
+
+        // Load main menu scene
+        scene_tree
+            .get()
+            .change_scene_to_file("res://scenes/levels/main_menu.tscn");
     }
 }

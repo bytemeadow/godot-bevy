@@ -40,6 +40,14 @@ pub struct CurrentLevel {
     pub level_handle: Option<Handle<GodotResource>>,
 }
 
+impl CurrentLevel {
+    /// Clear the current level state
+    pub fn clear(&mut self) {
+        self.level_id = None;
+        self.level_handle = None;
+    }
+}
+
 /// Resource that tracks the pending level
 #[derive(Resource, Default)]
 pub struct PendingLevel {
