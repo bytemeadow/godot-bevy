@@ -44,7 +44,7 @@ fn handle_player_door_collision(
     for (door, collisions) in doors.iter() {
         for &entity in collisions.recent_collisions() {
             if players.get(entity).is_ok() {
-                load_level_events.send(LoadLevelEvent { level_id: door.0 });
+                load_level_events.write(LoadLevelEvent { level_id: door.0 });
             }
         }
     }

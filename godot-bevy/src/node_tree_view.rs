@@ -17,12 +17,12 @@ pub fn find_node_by_pattern(
     pattern: &str,
 ) -> Option<godot::obj::Gd<godot::classes::Node>> {
     // Handle absolute vs relative paths
-    let (search_root, pattern_parts) = if pattern.starts_with('/') {
+    let (search_root, pattern_parts) = if let Some(stripped) = pattern.strip_prefix('/') {
         // Absolute path - start from scene tree root
         let scene_tree = base_node.get_tree()?;
         let root = scene_tree.get_root()?;
         let root_as_node = root.upcast::<godot::classes::Node>();
-        let mut parts: Vec<&str> = pattern[1..].split('/').filter(|s| !s.is_empty()).collect();
+        let mut parts: Vec<&str> = stripped.split('/').filter(|s| !s.is_empty()).collect();
 
         // If the first part is "root", skip it since we're already starting from the root
         if !parts.is_empty() && parts[0] == "root" {

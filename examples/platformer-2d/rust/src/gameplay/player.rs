@@ -53,8 +53,12 @@ fn basic_player_movement(
     physics_delta: Res<PhysicsDelta>,
 ) {
     if let Ok((mut handle, speed, jump_velocity, gravity)) = player.single_mut() {
+        // Use try_get to handle case where Godot node might be invalid during scene transitions
+        let Some(mut character_body) = handle.try_get::<CharacterBody2D>() else {
+            return; // Node is invalid, skip this frame
+        };
+
         let input = Input::singleton();
-        let mut character_body = handle.get::<CharacterBody2D>();
         let mut sprite = character_body.get_node_as::<AnimatedSprite2D>("AnimatedSprite2D");
         let mut velocity = character_body.get_velocity();
 

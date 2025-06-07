@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use godot::classes::Label;
 use godot_bevy::prelude::*;
-use godot_bevy::utils::print_scene_tree;
 
 use crate::gameplay::gem::GemsCollected;
 use crate::level_manager::{CurrentLevel, LevelLoadedEvent};
@@ -35,9 +34,8 @@ fn update_hud_on_level_loaded(
     mut events: EventReader<LevelLoadedEvent>,
     current_level: Res<CurrentLevel>,
     mut scene_tree: SceneTreeRef,
+    gems_collected: Res<GemsCollected>,
 ) {
-    print_scene_tree(&mut scene_tree);
-
     for _ in events.read() {
         // Try to get HUD node handles
         let root = scene_tree.get().get_root().unwrap();
@@ -51,6 +49,14 @@ fn update_hud_on_level_loaded(
                 .current_level_label
                 .get::<Label>()
                 .set_text(level_id.display_name());
+        }
+
+        // Set the gems collected label
+        if let Some(gems_label) = &hud_handles.gems_label {
+            let mut label_handle = gems_label.clone();
+            label_handle
+                .get::<Label>()
+                .set_text(&format!("Gems: {}", gems_collected.0));
         }
     }
 }

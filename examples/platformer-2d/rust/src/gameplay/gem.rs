@@ -43,9 +43,10 @@ fn hide_gem_on_player_collision(
     for (mut handle, collisions) in gems.iter_mut() {
         for &entity in collisions.recent_collisions() {
             if players.get(entity).is_ok() {
-                handle.get::<Area2D>().set_visible(false);
-                gems_collected.0 += 1;
-                // TODO: Play audio or send event to play audio
+                if let Some(mut area) = handle.try_get::<Area2D>() {
+                    area.queue_free();
+                    gems_collected.0 += 1;
+                }
             }
         }
     }
