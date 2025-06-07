@@ -1,6 +1,7 @@
 pub use crate::GodotPlugin;
 pub use crate::bridge::*;
 pub use crate::node_tree_view::NodeTreeView;
+#[allow(deprecated)]
 pub use crate::plugins::{
     assets::{GodotAssetsPlugin, GodotResource},
     audio::{

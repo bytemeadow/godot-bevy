@@ -1,3 +1,5 @@
+#![allow(deprecated)] // TODO: remove this once we've removed SystemDeltaTimer
+
 use bevy::app::{App, Plugin, ScheduleRunnerPlugin};
 use bevy::asset::{
     AssetMetaCheck, AssetPlugin,
@@ -90,6 +92,7 @@ pub struct SystemDeltaTimer<'w, 's> {
     marker: PhantomData<&'w ()>,
 }
 
+#[allow(deprecated)]
 impl<'w, 's> SystemDeltaTimer<'w, 's> {
     /// Returns the time passed since the last invocation
     pub fn delta(&mut self) -> Duration {
