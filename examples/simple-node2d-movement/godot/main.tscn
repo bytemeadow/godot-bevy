@@ -1,0 +1,27 @@
+[gd_scene load_steps=2 format=3 uid="uid://by3mlw6lgl61y"]
+
+[ext_resource type="Texture2D" uid="uid://dok2kwhwxfree" path="res://icon.svg" id="1_ig7tw"]
+
+[node name="Node" type="Node"]
+
+[node name="Icon" type="Sprite2D" parent="."]
+texture = ExtResource("1_ig7tw")
+
+[node name="Icon2" type="Sprite2D" parent="Icon"]
+texture = ExtResource("1_ig7tw")
+
+[node name="Icon3" type="Sprite2D" parent="Icon/Icon2"]
+texture = ExtResource("1_ig7tw")
+
+[node name="Icon4" type="Sprite2D" parent="Icon/Icon2/Icon3"]
+texture = ExtResource("1_ig7tw")
+
+[node name="Icon5" type="Sprite2D" parent="Icon/Icon2/Icon3/Icon4"]
+texture = ExtResource("1_ig7tw")
+
+[node name="OtherIcon" type="Sprite2D" parent="."]
+position = Vector2(500, 1)
+texture = ExtResource("1_ig7tw")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(0.5, 0.5)

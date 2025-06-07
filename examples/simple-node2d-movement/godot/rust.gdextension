@@ -1,0 +1,13 @@
+[configuration]
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = 4.1
+
+[libraries]
+linux.debug.x86_64 = "res://../../../target/debug/librust_simple_node2d_movement.so"
+linux.release.x86_64 = "res://../../../target/release/librust_simple_node2d_movement.so"
+macos.debug.x86_64 = "res://../../../target/debug/librust_simple_node2d_movement.dylib"
+macos.release.x86_64 = "res://../../../target/release/librust_simple_node2d_movement.dylib"
+macos.debug.arm64 = "res://../../../target/debug/librust_simple_node2d_movement.dylib"
+macos.release.arm64 = "res://../../../target/release/librust_simple_node2d_movement.dylib"
+windows.debug.x86_64 = "res://../../../target/debug/rust_simple_node2d_movement.dll"
+windows.release.x86_64 = "res://../../../target/release/rust_simple_node2d_movement.dll"

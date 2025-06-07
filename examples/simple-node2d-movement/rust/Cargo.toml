@@ -1,0 +1,18 @@
+[package]
+name = "rust-simple-node2d-movement"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+
+[lib]
+crate-type = ["cdylib"]
+
+[[bin]]
+path = "../../run_godot.rs"
+name = "simple-node2d-movement"
+
+[dependencies]
+godot-bevy = { path = "../../../godot-bevy" }
+bevy = { version = "0.16", default-features = false }
+godot = "0.3.0"
+which = "7.0.3"
