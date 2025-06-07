@@ -8,6 +8,7 @@ use godot_bevy::prelude::SceneTreeRef;
 use crate::level_manager::{CurrentLevel, LevelLoadedEvent};
 use crate::GameState;
 
+pub mod audio;
 pub mod door;
 pub mod gem;
 pub mod hud;
@@ -19,6 +20,7 @@ use hud::HudHandles;
 pub struct GameplayPlugin;
 impl Plugin for GameplayPlugin {
     fn build(&self, app: &mut App) {
+        app.add_plugins(audio::AudioPlugin);
         app.add_plugins(player::PlayerPlugin);
         app.add_plugins(gem::GemPlugin);
         app.add_plugins(hud::HudPlugin);

@@ -31,10 +31,6 @@ impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuAssets>()
             .add_systems(
-                OnExit(GameState::Loading),
-                (init_menu_assets, connect_buttons.after(init_menu_assets)),
-            )
-            .add_systems(
                 OnEnter(GameState::MainMenu),
                 (init_menu_assets, connect_buttons.after(init_menu_assets)),
             )
@@ -91,7 +87,7 @@ fn listen_for_button_press(
 ) {
     for evt in events.read() {
         if evt.name == "pressed" && &evt.target == menu_assets.start_button.as_ref().unwrap() {
-            println!("Start button pressed - Loading Tutorial Level");
+            println!("Start button pressed");
 
             // Change to InGame state
             app_state.set(GameState::InGame);

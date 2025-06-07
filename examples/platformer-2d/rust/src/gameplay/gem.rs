@@ -1,5 +1,6 @@
 use crate::components::Gem;
 use crate::components::Player;
+use crate::gameplay::audio::PlaySfxEvent;
 use bevy::prelude::*;
 use godot::{
     classes::{Area2D, IArea2D},
@@ -39,6 +40,7 @@ fn hide_gem_on_player_collision(
     mut gems: Query<(&mut GodotNodeHandle, &Collisions), With<Gem>>,
     players: Query<Entity, With<Player>>,
     mut gems_collected: ResMut<GemsCollected>,
+    mut sfx_events: EventWriter<PlaySfxEvent>,
 ) {
     for (mut handle, collisions) in gems.iter_mut() {
         for &entity in collisions.recent_collisions() {
@@ -46,6 +48,7 @@ fn hide_gem_on_player_collision(
                 if let Some(mut area) = handle.try_get::<Area2D>() {
                     area.queue_free();
                     gems_collected.0 += 1;
+                    sfx_events.write(PlaySfxEvent::GemCollected);
                 }
             }
         }

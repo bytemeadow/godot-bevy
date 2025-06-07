@@ -1,5 +1,6 @@
 use bevy::{prelude::*, state::app::StatesPlugin};
-use bevy_asset_loader::loading_state::{LoadingState, LoadingStateAppExt};
+use bevy_asset_loader::prelude::*;
+use gameplay::audio::GameAudio;
 use godot_bevy::prelude::{
     godot_prelude::{gdextension, ExtensionLibrary},
     *,
@@ -15,7 +16,9 @@ fn build_app(app: &mut App) {
     app.add_plugins(StatesPlugin)
         .init_state::<GameState>()
         .add_loading_state(
-            LoadingState::new(GameState::Loading).continue_to_state(GameState::MainMenu),
+            LoadingState::new(GameState::Loading)
+                .continue_to_state(GameState::MainMenu)
+                .load_collection::<GameAudio>(),
         )
         .add_plugins((
             main_menu::MainMenuPlugin,

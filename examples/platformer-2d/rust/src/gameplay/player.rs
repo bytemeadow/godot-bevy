@@ -1,4 +1,5 @@
 use crate::components::{Gravity, JumpVelocity, Player, Speed};
+use crate::gameplay::audio::PlaySfxEvent;
 use bevy::app::{App, Plugin};
 use bevy::prelude::*;
 use godot::classes::{AnimatedSprite2D, Input, ProjectSettings};
@@ -51,6 +52,7 @@ impl Plugin for PlayerPlugin {
 fn basic_player_movement(
     mut player: Query<(&mut GodotNodeHandle, &Speed, &JumpVelocity, &Gravity), With<Player>>,
     physics_delta: Res<PhysicsDelta>,
+    mut sfx_events: EventWriter<PlaySfxEvent>,
 ) {
     if let Ok((mut handle, speed, jump_velocity, gravity)) = player.single_mut() {
         // Use try_get to handle case where Godot node might be invalid during scene transitions
@@ -68,7 +70,7 @@ fn basic_player_movement(
 
         if input.is_action_just_pressed("jump") && character_body.is_on_floor() {
             velocity.y = jump_velocity.0;
-            // TODO: Play jump sound
+            sfx_events.write(PlaySfxEvent::PlayerJump);
         }
 
         let direction = input.get_axis("move_left", "move_right");
