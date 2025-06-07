@@ -4,6 +4,8 @@ use godot::prelude::*;
 use godot_bevy::plugins::core::scene_tree::{SceneTreeEvent, SceneTreeEventType};
 use godot_bevy::prelude::*;
 
+use crate::scene_management::SceneOperationEvent;
+
 /// Simple level identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, GodotConvert, Var, Export)]
 #[godot(via = GString)]
@@ -33,19 +35,28 @@ impl LevelId {
     }
 }
 
-/// Resource that tracks the current level and loaded handles
+/// Resource that tracks the current active level (read-mostly for game state)
 #[derive(Resource, Default)]
 pub struct CurrentLevel {
     pub level_id: Option<LevelId>,
-    pub level_handle: Option<Handle<GodotResource>>,
 }
 
 impl CurrentLevel {
+    /// Set the current level
+    pub fn set(&mut self, level_id: LevelId) {
+        self.level_id = Some(level_id);
+    }
+
     /// Clear the current level state
     pub fn clear(&mut self) {
         self.level_id = None;
-        self.level_handle = None;
     }
+}
+
+/// Resource for tracking level loading state (internal to level manager)
+#[derive(Resource, Default)]
+struct LevelLoadingState {
+    pub loading_handle: Option<Handle<GodotResource>>,
 }
 
 /// Resource that tracks the pending level
@@ -68,15 +79,16 @@ pub struct LoadLevelEvent {
 /// Event fired when level loading is complete
 #[derive(Event)]
 pub struct LevelLoadedEvent {
-    #[allow(dead_code)]
     pub level_id: LevelId,
 }
+
 pub struct LevelManagerPlugin;
 
 impl Plugin for LevelManagerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CurrentLevel>()
             .init_resource::<PendingLevel>()
+            .init_resource::<LevelLoadingState>()
             .add_event::<LoadLevelEvent>()
             .add_event::<LevelLoadedEvent>()
             .add_systems(
@@ -92,6 +104,7 @@ impl Plugin for LevelManagerPlugin {
 
 /// System that handles level loading requests - loads the asset
 fn handle_level_load_requests(
+    mut loading_state: ResMut<LevelLoadingState>,
     mut current_level: ResMut<CurrentLevel>,
     mut load_events: EventReader<LoadLevelEvent>,
     asset_server: Res<AssetServer>,
@@ -102,8 +115,11 @@ fn handle_level_load_requests(
         // Load the level scene through Bevy's asset system
         let level_handle: Handle<GodotResource> = asset_server.load(event.level_id.scene_path());
 
-        current_level.level_id = Some(event.level_id);
-        current_level.level_handle = Some(level_handle);
+        // Track loading state separately from current level
+        loading_state.loading_handle = Some(level_handle);
+
+        // Update current level
+        current_level.set(event.level_id);
 
         info!("Level asset loading started for: {:?}", event.level_id);
     }
@@ -111,36 +127,29 @@ fn handle_level_load_requests(
 
 /// System that handles actual scene changing once assets are loaded
 fn handle_level_scene_change(
-    mut current_level: ResMut<CurrentLevel>,
+    current_level: Res<CurrentLevel>,
+    mut loading_state: ResMut<LevelLoadingState>,
     mut pending_level: ResMut<PendingLevel>,
-    mut scene_tree: SceneTreeRef,
+    mut scene_events: EventWriter<SceneOperationEvent>,
     mut assets: ResMut<Assets<GodotResource>>,
 ) {
     if let (Some(level_id), Some(ref handle)) =
-        (current_level.level_id, &current_level.level_handle)
+        (current_level.level_id, &loading_state.loading_handle)
     {
         // Check if the asset is loaded
-        if let Some(godot_resource) = assets.get_mut(handle) {
-            if let Some(packed_scene) = godot_resource.try_cast::<godot::classes::PackedScene>() {
-                info!("Changing to level scene: {:?}", level_id);
+        if let Some(_godot_resource) = assets.get_mut(handle) {
+            info!("Requesting level scene change: {:?}", level_id);
 
-                // Use change_scene_to_packed instead of change_scene_to_file
-                let mut tree = scene_tree.get();
-                tree.change_scene_to_packed(&packed_scene);
+            // Request scene change through centralized scene management
+            scene_events.write(SceneOperationEvent::change_to_packed(handle.clone()));
 
-                // Do NOT emit LevelLoadedEvent here!
-                pending_level.level_id = Some(level_id);
+            // Do NOT emit LevelLoadedEvent here!
+            pending_level.level_id = Some(level_id);
 
-                info!("Successfully changed to level: {:?}", level_id);
+            info!("Level scene change requested for: {:?}", level_id);
 
-                // Clear the handle since we've used it
-                current_level.level_handle = None;
-            } else {
-                warn!(
-                    "Loaded resource is not a PackedScene for level: {:?}",
-                    level_id
-                );
-            }
+            // Clear the loading handle since we've used it
+            loading_state.loading_handle = None;
         }
         // If asset isn't loaded yet, we'll try again next frame
     }

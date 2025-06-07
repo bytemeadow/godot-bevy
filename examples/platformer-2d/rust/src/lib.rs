@@ -10,6 +10,7 @@ mod components;
 mod gameplay;
 mod level_manager;
 mod main_menu;
+mod scene_management;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
@@ -21,6 +22,7 @@ fn build_app(app: &mut App) {
                 .load_collection::<GameAudio>(),
         )
         .add_plugins((
+            scene_management::SceneManagementPlugin,
             main_menu::MainMenuPlugin,
             level_manager::LevelManagerPlugin,
             gameplay::GameplayPlugin,

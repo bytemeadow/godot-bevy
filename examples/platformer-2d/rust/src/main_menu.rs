@@ -1,3 +1,4 @@
+use bevy::prelude::DetectChanges;
 use bevy::{
     app::prelude::*,
     ecs::{
@@ -6,6 +7,7 @@ use bevy::{
         schedule::IntoScheduleConfigs,
         system::{Res, ResMut},
     },
+    log::{debug, info},
     state::{
         condition::in_state,
         state::{NextState, OnEnter},
@@ -24,19 +26,22 @@ pub struct MenuAssets {
     pub start_button: Option<GodotNodeHandle>,
     pub fullscreen_button: Option<GodotNodeHandle>,
     pub quit_button: Option<GodotNodeHandle>,
+    pub initialized: bool,
 }
 
 pub struct MainMenuPlugin;
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuAssets>()
-            .add_systems(
-                OnEnter(GameState::MainMenu),
-                (init_menu_assets, connect_buttons.after(init_menu_assets)),
-            )
+            .add_systems(OnEnter(GameState::MainMenu), reset_menu_assets)
             .add_systems(
                 Update,
-                listen_for_button_press.run_if(in_state(GameState::MainMenu)),
+                (
+                    init_menu_assets.run_if(menu_not_initialized),
+                    connect_buttons.run_if(menu_just_initialized),
+                    listen_for_button_press.run_if(menu_is_initialized),
+                )
+                    .run_if(in_state(GameState::MainMenu)),
             );
     }
 }
@@ -53,30 +58,65 @@ pub struct MenuUi {
     pub quit_button: GodotNodeHandle,
 }
 
-fn init_menu_assets(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTreeRef) {
-    let menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap());
+fn reset_menu_assets(mut menu_assets: ResMut<MenuAssets>) {
+    menu_assets.start_button = None;
+    menu_assets.fullscreen_button = None;
+    menu_assets.quit_button = None;
+    menu_assets.initialized = false;
+}
 
-    menu_assets.start_button = Some(menu_ui.start_button.clone());
-    menu_assets.fullscreen_button = Some(menu_ui.fullscreen_button.clone());
-    menu_assets.quit_button = Some(menu_ui.quit_button.clone());
+fn init_menu_assets(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTreeRef) {
+    // Try to find menu nodes, but handle failure gracefully
+    if let Some(root) = scene_tree.get().get_root() {
+        // Try to create MenuUi - this might fail if nodes aren't ready yet
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| MenuUi::from_node(root))) {
+            Ok(menu_ui) => {
+                info!("MainMenu: Successfully found menu nodes");
+                menu_assets.start_button = Some(menu_ui.start_button.clone());
+                menu_assets.fullscreen_button = Some(menu_ui.fullscreen_button.clone());
+                menu_assets.quit_button = Some(menu_ui.quit_button.clone());
+                menu_assets.initialized = true;
+            }
+            Err(_) => {
+                debug!("MainMenu: Menu nodes not ready yet, will retry next frame");
+            }
+        }
+    } else {
+        debug!("MainMenu: Scene root not available yet");
+    }
+}
+
+fn menu_not_initialized(menu_assets: Res<MenuAssets>) -> bool {
+    !menu_assets.initialized
+}
+
+fn menu_just_initialized(menu_assets: Res<MenuAssets>) -> bool {
+    menu_assets.initialized && menu_assets.is_changed()
+}
+
+fn menu_is_initialized(menu_assets: Res<MenuAssets>) -> bool {
+    menu_assets.initialized
 }
 
 fn connect_buttons(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTreeRef) {
-    connect_godot_signal(
-        menu_assets.start_button.as_mut().unwrap(),
-        "pressed",
-        &mut scene_tree,
-    );
-    connect_godot_signal(
-        menu_assets.fullscreen_button.as_mut().unwrap(),
-        "pressed",
-        &mut scene_tree,
-    );
-    connect_godot_signal(
-        menu_assets.quit_button.as_mut().unwrap(),
-        "pressed",
-        &mut scene_tree,
-    );
+    // Check if all buttons are available first
+    if menu_assets.start_button.is_some()
+        && menu_assets.fullscreen_button.is_some()
+        && menu_assets.quit_button.is_some()
+    {
+        // Get mutable references one at a time to avoid multiple borrows
+        if let Some(start_btn) = menu_assets.start_button.as_mut() {
+            connect_godot_signal(start_btn, "pressed", &mut scene_tree);
+        }
+        if let Some(fullscreen_btn) = menu_assets.fullscreen_button.as_mut() {
+            connect_godot_signal(fullscreen_btn, "pressed", &mut scene_tree);
+        }
+        if let Some(quit_btn) = menu_assets.quit_button.as_mut() {
+            connect_godot_signal(quit_btn, "pressed", &mut scene_tree);
+        }
+
+        info!("MainMenu: Connected button signals");
+    }
 }
 
 fn listen_for_button_press(

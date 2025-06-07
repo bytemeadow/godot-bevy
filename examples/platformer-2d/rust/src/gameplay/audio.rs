@@ -1,6 +1,11 @@
-//! Audio system for the platformer game
+//! Audio system for the platformer game with optimized parallelization
 //!
-//! Handles background music per level and sound effects for player actions and interactions.
+//! Audio systems are organized into parallel system sets:
+//! - `BackgroundMusic`: Handles level music (uses `GameMusicChannel`)
+//! - `SoundEffects`: Handles sound effects (uses `GameSfxChannel`)
+//!
+//! These sets can run in parallel since they use separate audio channels
+//! and have no shared mutable state, improving audio responsiveness.
 
 use bevy::prelude::*;
 use bevy::state::condition::in_state;
@@ -11,7 +16,16 @@ use godot_bevy::prelude::{AudioApp, AudioChannel, AudioChannelMarker, GodotResou
 use crate::level_manager::{LevelId, LevelLoadedEvent};
 use crate::GameState;
 
-/// Plugin that manages background music and sound effects for the game.
+/// System sets for audio operations that can run in parallel
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AudioSystemSet {
+    /// Background music management (independent of SFX)
+    BackgroundMusic,
+    /// Sound effects management (independent of music)
+    SoundEffects,
+}
+
+/// Plugin that manages background music and sound effects with parallel system sets.
 pub struct AudioPlugin;
 
 impl Plugin for AudioPlugin {
@@ -22,9 +36,20 @@ impl Plugin for AudioPlugin {
             .add_systems(
                 Update,
                 (
-                    handle_level_music_change.run_if(in_state(GameState::InGame)),
-                    handle_sfx_events.run_if(in_state(GameState::InGame)),
-                ),
+                    // Music systems run independently of SFX systems
+                    handle_level_music_change,
+                )
+                    .run_if(in_state(GameState::InGame))
+                    .in_set(AudioSystemSet::BackgroundMusic),
+            )
+            .add_systems(
+                Update,
+                (
+                    // SFX systems run independently of music systems
+                    handle_sfx_events,
+                )
+                    .run_if(in_state(GameState::InGame))
+                    .in_set(AudioSystemSet::SoundEffects),
             )
             .add_systems(OnExit(GameState::InGame), stop_background_music);
     }
@@ -70,6 +95,9 @@ pub enum PlaySfxEvent {
 }
 
 /// System that handles level music changes
+///
+/// Runs in `BackgroundMusic` set and can execute in parallel with SFX systems
+/// since it uses a separate audio channel (`GameMusicChannel`).
 fn handle_level_music_change(
     mut level_loaded_events: EventReader<LevelLoadedEvent>,
     music_channel: Res<AudioChannel<GameMusicChannel>>,
@@ -96,6 +124,9 @@ fn handle_level_music_change(
 }
 
 /// System that handles playing sound effects
+///
+/// Runs in `SoundEffects` set and can execute in parallel with music systems
+/// since it uses a separate audio channel (`GameSfxChannel`).
 fn handle_sfx_events(
     mut sfx_events: EventReader<PlaySfxEvent>,
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
