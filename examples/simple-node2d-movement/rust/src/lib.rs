@@ -5,7 +5,6 @@ use bevy::prelude::{
 use godot::builtin::Vector2;
 use godot::classes::Sprite2D;
 use godot::global::godot_print;
-use godot::prelude::Node2D;
 use godot_bevy::prelude::godot_prelude::gdextension;
 use godot_bevy::prelude::godot_prelude::ExtensionLibrary;
 use godot_bevy::prelude::{bevy_app, GodotNodeHandle, Transform2D};
@@ -35,8 +34,9 @@ fn build_app(app: &mut App) {
     // Read more about Bevy's Entities, Components, and Systems here:
     // (https://bevy.org/learn/quick-start/getting-started/ecs/).
     //
-    // The `Update` schedule parameter is provided by Godot-Bevy.
-    // It runs the system during Godot's `_process` update cycle.
+    // Godot-Bevy synchronizes the Bevy 'Update' schedule parameter with the
+    // Godot `_process` update cycle. There is also a `PhysicsUpdate` schedule
+    // parameter that is synchronized with the Godot `_physics_process` update cycle.
     //
     // Read more about other schedules provided by Godot-Bevy here:
     // (https://github.com/dcvz/godot-bevy/blob/main/docs/TIMING_AND_SCHEDULES.md).
