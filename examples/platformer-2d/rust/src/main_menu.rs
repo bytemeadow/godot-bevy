@@ -8,7 +8,7 @@ use bevy::{
     },
     state::{
         condition::in_state,
-        state::{NextState, OnEnter, OnExit},
+        state::{NextState, OnEnter},
     },
 };
 use godot::classes::{display_server::WindowMode, Button, DisplayServer};

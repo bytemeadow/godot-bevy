@@ -107,7 +107,7 @@ impl INode for BevyApp {
         }
     }
 
-    fn physics_process(&mut self, delta: f64) {
+    fn physics_process(&mut self, delta: f32) {
         use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 
         if godot::classes::Engine::singleton().is_editor_hint() {
@@ -117,7 +117,7 @@ impl INode for BevyApp {
         if let Some(app) = self.app.as_mut() {
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
                 // Update physics delta resource with Godot's delta
-                app.world_mut().resource_mut::<PhysicsDelta>().delta_seconds = delta as f32;
+                app.world_mut().resource_mut::<PhysicsDelta>().delta_seconds = delta;
 
                 // Run only our physics-specific schedule
                 app.world_mut().run_schedule(PhysicsUpdate);
