@@ -69,29 +69,22 @@ fn orbit_setup(
     // Also, include the Bevy entity identifier so we can add components to it.
     mut uninitialized: Query<(Entity, &mut GodotNodeHandle), Without<NodeInitialized>>,
 ) {
-    for (entity, mut node_handle) in uninitialized
-        .iter_mut()
-        // Checking a GodotNodeHandle's type requires a mutable reference, so we must use a
-        // `filter_map` function to return the mutable reference, so it is available to the for loop body.
-        .filter_map(|(entity, mut node_handle)| {
-            node_handle
-                .try_get::<Sprite2D>()
-                .map(|_| (entity, node_handle))
-        })
-    {
-        // The GodotNodeHandle allows us to call Godot methods such as `get_name()`.
-        godot_print!(
-            "Initializing node: {:?}",
-            node_handle.get::<Node2D>().get_name().to_string()
-        );
-        // Attach new components to the entity.
-        commands
-            .entity(entity)
-            .insert(InitialPosition {
-                pos: node_handle.get::<Sprite2D>().get_transform().origin,
-            })
-            .insert(Orbiter { angle: 0.0 })
-            .insert(NodeInitialized);
+    for (entity, mut node_handle) in uninitialized.iter_mut() {
+        if let Some(sprite_node) = node_handle.try_get::<Sprite2D>() {
+            // The GodotNodeHandle allows us to call Godot methods such as `get_name()`.
+            godot_print!(
+                "Initializing node: {:?}",
+                sprite_node.get_name().to_string()
+            );
+            // Attach new components to the entity.
+            commands
+                .entity(entity)
+                .insert(InitialPosition {
+                    pos: sprite_node.get_transform().origin,
+                })
+                .insert(Orbiter { angle: 0.0 })
+                .insert(NodeInitialized);
+        }
     }
 }
 
