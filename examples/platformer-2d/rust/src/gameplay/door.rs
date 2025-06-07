@@ -10,7 +10,7 @@ use godot_bevy::prelude::*;
 
 #[derive(GodotClass, BevyBundle)]
 #[class(base=Area2D)]
-#[bevy_bundle((Door: level))]
+#[bevy_bundle(autosync=true, (Door: level))]
 pub struct Door2D {
     base: Base<Area2D>,
     #[export]
@@ -31,8 +31,7 @@ pub struct DoorPlugin;
 
 impl Plugin for DoorPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(Door2DBundleAutoSyncPlugin)
-            .add_systems(Update, handle_player_door_collision);
+        app.add_systems(Update, handle_player_door_collision);
     }
 }
 

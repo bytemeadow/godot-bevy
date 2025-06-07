@@ -229,6 +229,7 @@ fn get_option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
 // Parse bevy_bundle attribute syntax
 struct BevyBundleAttr {
     components: Vec<ComponentSpec>,
+    autosync: bool,
 }
 
 struct ComponentSpec {
@@ -239,31 +240,50 @@ struct ComponentSpec {
 impl Parse for BevyBundleAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut components = Vec::new();
+        let mut autosync = false;
+
         while !input.is_empty() {
-            let component_content;
-            syn::parenthesized!(component_content in input);
+            // Check if this is an autosync parameter
+            if input.peek(syn::Ident) && input.peek2(Token![=]) {
+                let param_name: Ident = input.parse()?;
+                let _eq: Token![=] = input.parse()?;
 
-            let component_name: Ident = component_content.parse()?;
-
-            // Check if there's a colon and source field mapping
-            let source_field = if component_content.peek(Token![:]) {
-                let _colon: Token![:] = component_content.parse()?;
-                Some(component_content.parse()?)
+                if param_name == "autosync" {
+                    let value: syn::LitBool = input.parse()?;
+                    autosync = value.value;
+                } else {
+                    return Err(Error::new_spanned(param_name, "Unknown parameter"));
+                }
             } else {
-                None
-            };
+                // Parse component specification
+                let component_content;
+                syn::parenthesized!(component_content in input);
 
-            components.push(ComponentSpec {
-                component_name,
-                source_field,
-            });
+                let component_name: Ident = component_content.parse()?;
+
+                // Check if there's a colon and source field mapping
+                let source_field = if component_content.peek(Token![:]) {
+                    let _colon: Token![:] = component_content.parse()?;
+                    Some(component_content.parse()?)
+                } else {
+                    None
+                };
+
+                components.push(ComponentSpec {
+                    component_name,
+                    source_field,
+                });
+            }
 
             if !input.is_empty() {
                 let _comma: Token![,] = input.parse()?;
             }
         }
 
-        Ok(BevyBundleAttr { components })
+        Ok(BevyBundleAttr {
+            components,
+            autosync,
+        })
     }
 }
 
@@ -349,6 +369,26 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
     // Use the first component as a marker to check if the bundle is already added
     let first_component = &attr_args.components[0].component_name;
 
+    // Generate the auto-sync trait implementation if requested
+    let autosync_impl = if attr_args.autosync {
+        quote! {
+            impl godot_bevy::prelude::AutoSyncBundle for #struct_name {
+                fn register(app: &mut bevy::app::App) {
+                    app.add_plugins(#plugin_name);
+                }
+            }
+
+            // Auto-register this plugin using inventory
+            godot_bevy::inventory::submit! {
+                godot_bevy::prelude::AutoSyncBundleRegistry {
+                    register_fn: #struct_name::register,
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let plugin_impl = quote! {
         pub struct #plugin_name;
 
@@ -373,6 +413,8 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
                 }
             }
         }
+
+        #autosync_impl
     };
 
     let expanded = quote! {

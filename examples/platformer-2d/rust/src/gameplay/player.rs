@@ -13,7 +13,7 @@ use godot_bevy::prelude::*;
 
 #[derive(GodotClass, BevyBundle)]
 #[class(base=CharacterBody2D)]
-#[bevy_bundle((Speed: speed), (JumpVelocity: jump_velocity), (Gravity: gravity), (Player))]
+#[bevy_bundle(autosync=true, (Speed: speed), (JumpVelocity: jump_velocity), (Gravity: gravity), (Player))]
 pub struct Player2D {
     base: Base<CharacterBody2D>,
     #[export]
@@ -44,8 +44,7 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(Player2DBundleAutoSyncPlugin)
-            .add_systems(PhysicsUpdate, basic_player_movement);
+        app.add_systems(PhysicsUpdate, basic_player_movement);
     }
 }
 

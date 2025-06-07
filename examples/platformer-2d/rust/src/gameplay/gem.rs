@@ -14,7 +14,7 @@ pub struct GemsCollected(pub i64);
 
 #[derive(GodotClass, BevyBundle)]
 #[class(base=Area2D)]
-#[bevy_bundle((Gem))]
+#[bevy_bundle((Gem), autosync=true)]
 pub struct Gem2D {
     base: Base<Area2D>,
 }
@@ -31,7 +31,6 @@ pub struct GemPlugin;
 impl Plugin for GemPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<GemsCollected>()
-            .add_plugins(Gem2DBundleAutoSyncPlugin)
             .add_systems(Update, hide_gem_on_player_collision);
     }
 }
