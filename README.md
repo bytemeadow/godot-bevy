@@ -349,6 +349,7 @@ For detailed API documentation, see [docs.rs/godot-bevy](https://docs.rs/godot-b
 
 The `examples/` directory contains complete sample projects demonstrating different aspects of godot-bevy:
 
+- **[`simple-node2d-movement/`](examples/simple-node2d-movement/)**: A simple example showing how to move a Sprite2D in a circle with many comments to explain what's going on.
 - **[`dodge-the-creeps-2d/`](examples/dodge-the-creeps-2d/)**: A complete 2D game showing ECS-driven gameplay, collision handling, audio system, and state management
 - **[`platformer-2d/`](examples/platformer-2d/)**: A 2D platformer game showing ECS-driven gameplay, scene switching, tagging of editor placed entities via custom Godot nodes, and more
 - **[`timing-test/`](examples/timing-test/)**: Demonstrates the timing behavior and schedule execution patterns for debugging and understanding
