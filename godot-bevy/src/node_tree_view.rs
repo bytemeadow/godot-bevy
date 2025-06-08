@@ -56,9 +56,7 @@ fn find_node_recursive(
         // Try all children
         for i in 0..current_node.get_child_count() {
             if let Some(child) = current_node.get_child(i) {
-                if let Some(result) = find_node_recursive(&child, pattern_parts, depth + 1) {
-                    return Some(result);
-                }
+                return find_node_recursive(&child, pattern_parts, depth + 1);
             }
         }
     } else if pattern_part.contains('*') {
@@ -67,9 +65,7 @@ fn find_node_recursive(
             if let Some(child) = current_node.get_child(i) {
                 let child_name = child.get_name().to_string();
                 if matches_wildcard_pattern(&child_name, pattern_part) {
-                    if let Some(result) = find_node_recursive(&child, pattern_parts, depth + 1) {
-                        return Some(result);
-                    }
+                    return find_node_recursive(&child, pattern_parts, depth + 1);
                 }
             }
         }
@@ -77,9 +73,7 @@ fn find_node_recursive(
         // Exact name match
         if current_node.has_node(pattern_part) {
             let child = current_node.get_node_as::<godot::classes::Node>(pattern_part);
-            if let Some(result) = find_node_recursive(&child, pattern_parts, depth + 1) {
-                return Some(result);
-            }
+            return find_node_recursive(&child, pattern_parts, depth + 1);
         }
     }
 
