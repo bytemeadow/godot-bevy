@@ -1,0 +1,140 @@
+[gd_scene load_steps=4 format=3 uid="uid://c7q8xvbgkktxh"]
+
+[ext_resource type="Script" uid="uid://cy8hdccl6jgw3" path="res://scripts/main.gd" id="1_0x8vg"]
+[ext_resource type="PackedScene" uid="uid://bjsfwt816j4tp" path="res://scenes/bevy_app_singleton.tscn" id="2_3x8vg"]
+[ext_resource type="Script" uid="uid://dr1wry58o81eo" path="res://scripts/godot_boids.gd" id="3_4x8vg"]
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_0x8vg")
+
+[node name="BevyAppSingleton" parent="." instance=ExtResource("2_3x8vg")]
+process_mode = 4
+
+[node name="UI" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -200.0
+offset_right = 400.0
+offset_bottom = -20.0
+grow_vertical = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Title" type="Label" parent="UI/VBoxContainer"]
+layout_mode = 2
+text = "Boids Performance Benchmark"
+
+[node name="HSeparator" type="HSeparator" parent="UI/VBoxContainer"]
+layout_mode = 2
+
+[node name="ImplementationContainer" type="HBoxContainer" parent="UI/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="UI/VBoxContainer/ImplementationContainer"]
+layout_mode = 2
+text = "Implementation:"
+
+[node name="ImplementationOption" type="OptionButton" parent="UI/VBoxContainer/ImplementationContainer"]
+layout_mode = 2
+selected = 0
+item_count = 2
+popup/item_0/text = "Godot (GDScript)"
+popup/item_0/id = 0
+popup/item_1/text = "godot-bevy (Rust + ECS)"
+popup/item_1/id = 1
+
+[node name="BoidCountContainer" type="HBoxContainer" parent="UI/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="UI/VBoxContainer/BoidCountContainer"]
+layout_mode = 2
+text = "Boid Count:"
+
+[node name="BoidCountSlider" type="HSlider" parent="UI/VBoxContainer/BoidCountContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 50.0
+max_value = 2000.0
+step = 50.0
+value = 500.0
+
+[node name="BoidCountLabel" type="Label" parent="UI/VBoxContainer/BoidCountContainer"]
+layout_mode = 2
+text = "500"
+
+[node name="ControlsContainer" type="HBoxContainer" parent="UI/VBoxContainer"]
+layout_mode = 2
+
+[node name="StartButton" type="Button" parent="UI/VBoxContainer/ControlsContainer"]
+layout_mode = 2
+text = "Start Benchmark"
+
+[node name="StopButton" type="Button" parent="UI/VBoxContainer/ControlsContainer"]
+layout_mode = 2
+text = "Stop"
+
+[node name="ResetButton" type="Button" parent="UI/VBoxContainer/ControlsContainer"]
+layout_mode = 2
+text = "Reset Metrics"
+
+[node name="PerformanceContainer" type="VBoxContainer" parent="UI/VBoxContainer"]
+layout_mode = 2
+
+[node name="FPSLabel" type="Label" parent="UI/VBoxContainer/PerformanceContainer"]
+layout_mode = 2
+text = "FPS: 60.0"
+
+[node name="AvgFPSLabel" type="Label" parent="UI/VBoxContainer/PerformanceContainer"]
+layout_mode = 2
+text = "Avg FPS: 60.0"
+
+[node name="MinFPSLabel" type="Label" parent="UI/VBoxContainer/PerformanceContainer"]
+layout_mode = 2
+text = "Min FPS: 60.0"
+
+[node name="MaxFPSLabel" type="Label" parent="UI/VBoxContainer/PerformanceContainer"]
+layout_mode = 2
+text = "Max FPS: 60.0"
+
+[node name="BoidsCountLabel" type="Label" parent="UI/VBoxContainer/PerformanceContainer"]
+layout_mode = 2
+text = "Active Boids: 0"
+
+[node name="BenchmarkStatus" type="Label" parent="UI/VBoxContainer/PerformanceContainer"]
+layout_mode = 2
+text = "Status: Ready"
+
+[node name="GodotBoidsContainer" type="Node2D" parent="."]
+script = ExtResource("3_4x8vg")
+
+[node name="WorldBounds" type="ColorRect" parent="."]
+z_index = -10
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.1, 0.1, 0.2, 1)
+
+[connection signal="item_selected" from="UI/VBoxContainer/ImplementationContainer/ImplementationOption" to="." method="_on_implementation_changed"]
+[connection signal="value_changed" from="UI/VBoxContainer/BoidCountContainer/BoidCountSlider" to="." method="_on_boid_count_changed"]
+[connection signal="pressed" from="UI/VBoxContainer/ControlsContainer/StartButton" to="." method="_on_start_pressed"]
+[connection signal="pressed" from="UI/VBoxContainer/ControlsContainer/StopButton" to="." method="_on_stop_pressed"]
+[connection signal="pressed" from="UI/VBoxContainer/ControlsContainer/ResetButton" to="." method="_on_reset_pressed"]

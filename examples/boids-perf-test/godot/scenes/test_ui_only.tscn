@@ -1,0 +1,131 @@
+[gd_scene load_steps=2 format=3 uid="uid://c1d1qpr8ok3uc"]
+
+[sub_resource type="GDScript" id="GDScript_kf8mo"]
+script/source = "extends Control
+
+## Simple UI test to isolate performance issues
+## This script tests UI responsiveness without any Bevy or complex logic
+
+@onready var test_slider: HSlider = $UI/SliderContainer/TestSlider
+@onready var slider_value: Label = $UI/SliderContainer/SliderValue
+@onready var fps_label: Label = $UI/FPSLabel
+@onready var status_label: Label = $UI/StatusLabel
+
+var frame_count: int = 0
+var start_time: float = 0.0
+
+func _ready():
+	start_time = Time.get_ticks_msec() / 1000.0
+	print(\"🧪 UI Test: Starting UI responsiveness test\")
+	print(\"   - If the slider is slow here, the issue is NOT with Bevy\")
+	print(\"   - If the slider is fast here, the issue IS with Bevy integration\")
+
+func _process(_delta):
+	frame_count += 1
+	
+	# Update FPS every 10 frames to avoid spam
+	if frame_count % 10 == 0:
+		var current_fps = Engine.get_frames_per_second()
+		fps_label.text = \"FPS: %.1f\" % current_fps
+		
+		# Color code the FPS for easy reading
+		if current_fps >= 50:
+			fps_label.modulate = Color.GREEN
+		elif current_fps >= 30:
+			fps_label.modulate = Color.YELLOW
+		else:
+			fps_label.modulate = Color.RED
+
+func _on_slider_changed(value: float):
+	slider_value.text = str(int(value))
+	status_label.text = \"Slider moved to: %d\" % int(value)
+	print(\"🎚️ Slider changed to: %d (Frame: %d)\" % [int(value), frame_count])
+
+func _on_button1_pressed():
+	status_label.text = \"Button 1 pressed! Frame: %d\" % frame_count
+	print(\"🔘 Button 1 pressed at frame %d\" % frame_count)
+
+func _on_button2_pressed():
+	status_label.text = \"Button 2 pressed! Frame: %d\" % frame_count
+	print(\"🔘 Button 2 pressed at frame %d\" % frame_count)"
+
+[node name="TestUIOnly" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = SubResource("GDScript_kf8mo")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.1, 0.1, 0.2, 1)
+
+[node name="UI" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -150.0
+offset_right = 200.0
+offset_bottom = 150.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Title" type="Label" parent="UI"]
+layout_mode = 2
+text = "UI Performance Test"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="UI"]
+layout_mode = 2
+
+[node name="SliderContainer" type="HBoxContainer" parent="UI"]
+layout_mode = 2
+
+[node name="SliderLabel" type="Label" parent="UI/SliderContainer"]
+layout_mode = 2
+text = "Test Slider:"
+
+[node name="TestSlider" type="HSlider" parent="UI/SliderContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+value = 50.0
+
+[node name="SliderValue" type="Label" parent="UI/SliderContainer"]
+layout_mode = 2
+text = "50"
+
+[node name="ButtonsContainer" type="HBoxContainer" parent="UI"]
+layout_mode = 2
+
+[node name="TestButton1" type="Button" parent="UI/ButtonsContainer"]
+layout_mode = 2
+text = "Test Button 1"
+
+[node name="TestButton2" type="Button" parent="UI/ButtonsContainer"]
+layout_mode = 2
+text = "Test Button 2"
+
+[node name="FPSLabel" type="Label" parent="UI"]
+layout_mode = 2
+text = "FPS: 60"
+horizontal_alignment = 1
+
+[node name="StatusLabel" type="Label" parent="UI"]
+layout_mode = 2
+text = "Status: Testing UI responsiveness..."
+horizontal_alignment = 1
+
+[connection signal="value_changed" from="UI/SliderContainer/TestSlider" to="." method="_on_slider_changed"]
+[connection signal="pressed" from="UI/ButtonsContainer/TestButton1" to="." method="_on_button1_pressed"]
+[connection signal="pressed" from="UI/ButtonsContainer/TestButton2" to="." method="_on_button2_pressed"]

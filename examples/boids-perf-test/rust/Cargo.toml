@@ -1,0 +1,19 @@
+[package]
+name = "rustboids"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+
+[lib]
+crate-type = ["cdylib"]
+
+[[bin]]
+path = "../../run_godot.rs"
+name = "boids-benchmark"
+
+[dependencies]
+bevy = { version = "0.16", default-features = false }
+fastrand = { version = "2.3.0" }
+godot = "0.3.0"
+godot-bevy = { path = "../../../godot-bevy" }
+which = "7.0.3"

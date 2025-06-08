@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3 uid="uid://b8xvfqwkr7y2h"]
+
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_1"]
+blend_mode = 1
+
+[node name="Boid" type="Node2D"]
+
+[node name="Triangle" type="Polygon2D" parent="."]
+material = SubResource("CanvasItemMaterial_1")
+color = Color(0.8, 0.9, 1, 0.8)
+polygon = PackedVector2Array(0, -8, -4, 4, 4, 4)
