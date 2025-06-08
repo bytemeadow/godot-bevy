@@ -18,10 +18,7 @@ extends Control
 @onready var benchmark_status: Label = $UI/VBoxContainer/PerformanceContainer/BenchmarkStatus
 
 @onready var godot_boids: Node2D = $GodotBoidsContainer
-@onready var bevy_app: Node = $BevyAppSingleton
-
-# Bevy benchmark interface (not implemented yet)
-var bevy_benchmark: Object = null
+@onready var bevy_boids: Node2D = $BevyBoidsContainer
 
 enum Implementation {
 	GODOT = 0,
@@ -67,41 +64,34 @@ func _update_performance_metrics():
 	var max_fps_val = max_fps
 	var current_boid_count = 0
 	
+	# Use Godot's metrics for Godot implementation
+	# Track frame times for rolling average
+	var frame_time = 1.0 / max(current_fps, 1.0)
+	frame_times.append(frame_time)
+			
+	if frame_times.size() > max_samples:
+		frame_times.pop_front()
+			
+	# Update min/max FPS
+	if current_fps < min_fps and current_fps > 0:
+		min_fps = current_fps
+	if current_fps > max_fps:
+		max_fps = current_fps
+			
+	# Calculate average FPS
+	var avg_frame_time = 0.0
+	for time in frame_times:
+		avg_frame_time += time
+	avg_frame_time /= frame_times.size()
+	avg_fps = 1.0 / avg_frame_time
+	min_fps_val = min_fps
+	max_fps_val = max_fps
+	
 	match current_implementation:
 		Implementation.GODOT:
-			# Use Godot's metrics for Godot implementation
-			# Track frame times for rolling average
-			var frame_time = 1.0 / max(current_fps, 1.0)
-			frame_times.append(frame_time)
-			
-			if frame_times.size() > max_samples:
-				frame_times.pop_front()
-			
-			# Update min/max FPS
-			if current_fps < min_fps and current_fps > 0:
-				min_fps = current_fps
-			if current_fps > max_fps:
-				max_fps = current_fps
-			
-			# Calculate average FPS
-			var avg_frame_time = 0.0
-			for time in frame_times:
-				avg_frame_time += time
-			avg_frame_time /= frame_times.size()
-			avg_fps = 1.0 / avg_frame_time
-			min_fps_val = min_fps
-			max_fps_val = max_fps
-			
 			current_boid_count = godot_boids.get_boid_count()
-			
 		Implementation.BEVY:
-			# Use Bevy's metrics for Bevy implementation
-			if bevy_benchmark:
-				current_fps = bevy_benchmark.get_current_fps()
-				avg_fps = bevy_benchmark.get_avg_fps()
-				min_fps_val = bevy_benchmark.get_min_fps()
-				max_fps_val = bevy_benchmark.get_max_fps()
-				current_boid_count = bevy_benchmark.get_boid_count()
+			current_boid_count = bevy_boids.get_boid_count()
 	
 	# Update UI
 	fps_label.text = "FPS: %.1f" % current_fps
@@ -115,10 +105,6 @@ func reset_performance_metrics():
 	min_fps = INF
 	max_fps = 0.0
 	performance_start_time = Time.get_ticks_msec() / 1000.0
-	
-	# Also reset Bevy metrics if available
-	if bevy_benchmark:
-		bevy_benchmark.reset_metrics()
 
 func _update_boid_count_label():
 	boid_count_label.text = str(int(boid_count_slider.value))
@@ -154,8 +140,7 @@ func _on_boid_count_changed(value: float):
 			Implementation.GODOT:
 				godot_boids.set_target_boid_count(target_boid_count)
 			Implementation.BEVY:
-				if bevy_benchmark:
-					bevy_benchmark.set_boid_count(target_boid_count)
+				bevy_boids.set_target_boid_count(target_boid_count)
 
 func _on_start_pressed():
 	print("🔧 DEBUG: Start button pressed")
@@ -210,9 +195,7 @@ func _start_godot_benchmark():
 
 func _start_bevy_benchmark():
 	_update_status("Running godot-bevy benchmark...")
-	if bevy_benchmark:
-		bevy_benchmark.set_boid_count(target_boid_count)
-		bevy_benchmark.start_benchmark()
+	bevy_boids.start_benchmark(target_boid_count)
 	print("🚀 Started godot-bevy boids benchmark with %d boids" % target_boid_count)
 
 func _stop_current_benchmark():
@@ -220,8 +203,7 @@ func _stop_current_benchmark():
 		Implementation.GODOT:
 			godot_boids.stop_benchmark()
 		Implementation.BEVY:
-			if bevy_benchmark:
-				bevy_benchmark.stop_benchmark()
+			bevy_boids.stop_benchmark()
 
 ## Performance Comparison Utilities
 

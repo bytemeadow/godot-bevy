@@ -133,6 +133,8 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.1, 0.1, 0.2, 1)
 
+[node name="BevyBoidsContainer" type="BevyBoids" parent="."]
+
 [connection signal="item_selected" from="UI/VBoxContainer/ImplementationContainer/ImplementationOption" to="." method="_on_implementation_changed"]
 [connection signal="value_changed" from="UI/VBoxContainer/BoidCountContainer/BoidCountSlider" to="." method="_on_boid_count_changed"]
 [connection signal="pressed" from="UI/VBoxContainer/ControlsContainer/StartButton" to="." method="_on_start_pressed"]

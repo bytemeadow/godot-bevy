@@ -6,6 +6,10 @@ use godot_bevy::prelude::{
     *,
 };
 
+use crate::bevy_boids::{BevyBoids, BoidsContainer};
+
+mod bevy_boids;
+
 /// Performance benchmark comparing pure Godot vs godot-bevy boids implementations
 ///
 /// This benchmark demonstrates the performance benefits of using Bevy's ECS
@@ -20,6 +24,20 @@ pub struct BoidsBenchmarkPlugin;
 
 impl Plugin for BoidsBenchmarkPlugin {
     fn build(&self, app: &mut App) {
-        app;
+        app.add_systems(Update, check_simulation_running);
+    }
+}
+
+// check by querying any nodes with BoidsContainer, we'll cast them to BevyBoids and check the property
+fn check_simulation_running(mut boids: Query<&mut GodotNodeHandle, With<BoidsContainer>>) {
+    for mut handle in boids.iter_mut() {
+        // cast to BevyBoids
+        let bevy_boids = handle.get::<BevyBoids>();
+        if bevy_boids.bind().is_running {
+            println!("Simulation is running");
+            // TODO: set a resource or state that then begins all our other systems
+        } else {
+            println!("Simulation is not running");
+        }
     }
 }
