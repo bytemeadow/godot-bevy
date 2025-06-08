@@ -1,8 +1,11 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned};
+use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Error, Field, Fields, LitStr, Result, parse_macro_input};
+use syn::{
+    Data, DeriveInput, Error, Field, Fields, Ident, LitStr, Result, Token, parse_macro_input,
+};
 
 #[proc_macro_attribute]
 pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -35,6 +38,15 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
     let view = parse_macro_input!(item as DeriveInput);
 
     let expanded = node_tree_view(view).unwrap_or_else(Error::into_compile_error);
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_derive(BevyBundle, attributes(bevy_bundle))]
+pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as DeriveInput);
+
+    let expanded = bevy_bundle(input).unwrap_or_else(Error::into_compile_error);
 
     TokenStream::from(expanded)
 }
@@ -131,7 +143,22 @@ fn create_get_node_expr(field: &Field) -> Result<TokenStream2> {
         None => (false, field_ty),
     };
 
-    // Create appropriate expression based on whether the field is optional
+    let path_value = node_path.value();
+
+    // Check if the path contains wildcards for pattern matching
+    if path_value.contains('*') {
+        create_pattern_matching_expr(&path_value, is_optional, span)
+    } else {
+        // Use existing direct path logic for non-pattern paths
+        create_direct_path_expr(&node_path, is_optional, span)
+    }
+}
+
+fn create_direct_path_expr(
+    node_path: &LitStr,
+    is_optional: bool,
+    span: proc_macro2::Span,
+) -> Result<TokenStream2> {
     let expr = if is_optional {
         quote_spanned! { span =>
             {
@@ -152,7 +179,32 @@ fn create_get_node_expr(field: &Field) -> Result<TokenStream2> {
             }
         }
     };
+    Ok(expr)
+}
 
+fn create_pattern_matching_expr(
+    path_pattern: &str,
+    is_optional: bool,
+    span: proc_macro2::Span,
+) -> Result<TokenStream2> {
+    let expr = if is_optional {
+        quote_spanned! { span =>
+            {
+                let base_node = &node;
+                godot_bevy::node_tree_view::find_node_by_pattern(base_node, #path_pattern)
+                    .map(|node_ref| godot_bevy::bridge::GodotNodeHandle::new(node_ref))
+            }
+        }
+    } else {
+        quote_spanned! { span =>
+            {
+                let base_node = &node;
+                let node_ref = godot_bevy::node_tree_view::find_node_by_pattern(base_node, #path_pattern)
+                    .expect(&format!("Could not find node matching pattern: {}", #path_pattern));
+                godot_bevy::bridge::GodotNodeHandle::new(node_ref)
+            }
+        }
+    };
     Ok(expr)
 }
 
@@ -172,4 +224,206 @@ fn get_option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
         }
     }
     None
+}
+
+// Parse bevy_bundle attribute syntax
+struct BevyBundleAttr {
+    components: Vec<ComponentSpec>,
+    autosync: bool,
+}
+
+struct ComponentSpec {
+    component_name: Ident,
+    source_field: Option<Ident>,
+}
+
+impl Parse for BevyBundleAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut components = Vec::new();
+        let mut autosync = false;
+
+        while !input.is_empty() {
+            // Check if this is an autosync parameter
+            if input.peek(syn::Ident) && input.peek2(Token![=]) {
+                let param_name: Ident = input.parse()?;
+                let _eq: Token![=] = input.parse()?;
+
+                if param_name == "autosync" {
+                    let value: syn::LitBool = input.parse()?;
+                    autosync = value.value;
+                } else {
+                    return Err(Error::new_spanned(param_name, "Unknown parameter"));
+                }
+            } else {
+                // Parse component specification
+                let component_content;
+                syn::parenthesized!(component_content in input);
+
+                let component_name: Ident = component_content.parse()?;
+
+                // Check if there's a colon and source field mapping
+                let source_field = if component_content.peek(Token![:]) {
+                    let _colon: Token![:] = component_content.parse()?;
+                    Some(component_content.parse()?)
+                } else {
+                    None
+                };
+
+                components.push(ComponentSpec {
+                    component_name,
+                    source_field,
+                });
+            }
+
+            if !input.is_empty() {
+                let _comma: Token![,] = input.parse()?;
+            }
+        }
+
+        Ok(BevyBundleAttr {
+            components,
+            autosync,
+        })
+    }
+}
+
+fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
+    let struct_name = &input.ident;
+
+    // Find the bevy_bundle attribute
+    let bevy_attr = input
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("bevy_bundle"))
+        .ok_or_else(|| Error::new_spanned(&input, "Missing #[bevy_bundle(...)] attribute"))?;
+
+    let attr_args: BevyBundleAttr = bevy_attr.parse_args()?;
+
+    // Auto-generate bundle name from struct name
+    let bundle_name = syn::Ident::new(&format!("{}Bundle", struct_name), struct_name.span());
+
+    // Generate bundle struct
+    let bundle_fields: Vec<_> = attr_args
+        .components
+        .iter()
+        .map(|spec| {
+            let component_name = &spec.component_name;
+            let field_name = format!("{}", component_name).to_lowercase();
+            let field_ident = syn::Ident::new(&field_name, component_name.span());
+            quote! {
+                pub #field_ident: #component_name
+            }
+        })
+        .collect();
+
+    let bundle_struct = quote! {
+        #[derive(bevy::prelude::Bundle)]
+        pub struct #bundle_name {
+            #(#bundle_fields),*
+        }
+    };
+
+    // Generate implementation for extracting values from the Godot node
+    let bundle_constructor_fields: Vec<_> = attr_args
+        .components
+        .iter()
+        .map(|spec| {
+            let component_name = &spec.component_name;
+            let field_name = format!("{}", component_name).to_lowercase();
+            let field_ident = syn::Ident::new(&field_name, component_name.span());
+
+            if let Some(source_field) = &spec.source_field {
+                // Component with field mapping
+                quote! {
+                    #field_ident: #component_name(node.bind().#source_field)
+                }
+            } else {
+                // Marker component with no field mapping - use default
+                quote! {
+                    #field_ident: #component_name::default()
+                }
+            }
+        })
+        .collect();
+
+    let bundle_constructor = quote! {
+        impl #bundle_name {
+            pub fn from_godot_node(node: &godot::obj::Gd<#struct_name>) -> Self {
+                Self {
+                    #(#bundle_constructor_fields),*
+                }
+            }
+        }
+    };
+
+    // Generate the auto-sync plugin
+    let plugin_name = syn::Ident::new(
+        &format!("{}AutoSyncPlugin", bundle_name),
+        bundle_name.span(),
+    );
+    let sync_system_name = syn::Ident::new(
+        &format!("sync_{}_components", bundle_name.to_string().to_lowercase()),
+        bundle_name.span(),
+    );
+
+    // Use the first component as a marker to check if the bundle is already added
+    let first_component = &attr_args.components[0].component_name;
+
+    // Generate the auto-sync trait implementation if requested
+    let autosync_impl = if attr_args.autosync {
+        quote! {
+            impl godot_bevy::prelude::AutoSyncBundle for #struct_name {
+                fn register(app: &mut bevy::app::App) {
+                    app.add_plugins(#plugin_name);
+                }
+            }
+
+            // Auto-register this plugin using inventory
+            godot_bevy::inventory::submit! {
+                godot_bevy::prelude::AutoSyncBundleRegistry {
+                    register_fn: #struct_name::register,
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
+    let plugin_impl = quote! {
+        pub struct #plugin_name;
+
+        impl bevy::app::Plugin for #plugin_name {
+            fn build(&self, app: &mut bevy::app::App) {
+                app.add_systems(bevy::app::Update, #sync_system_name);
+            }
+        }
+
+        fn #sync_system_name(
+            mut commands: bevy::ecs::system::Commands,
+            nodes: bevy::ecs::system::Query<(bevy::ecs::entity::Entity, &godot_bevy::bridge::GodotNodeHandle), (
+                bevy::ecs::query::With<godot_bevy::bridge::GodotNodeHandle>,
+                bevy::ecs::query::Without<#first_component>
+            )>,
+        ) {
+            for (entity, handle) in nodes.iter() {
+                if let Some(godot_node) = handle.clone().try_get::<#struct_name>() {
+                    let bundle = #bundle_name::from_godot_node(&godot_node);
+                    commands.entity(entity).insert(bundle);
+                    bevy::log::debug!("Added {} bundle to entity {:?}", stringify!(#bundle_name), entity);
+                }
+            }
+        }
+
+        #autosync_impl
+    };
+
+    let expanded = quote! {
+        #bundle_struct
+
+        #bundle_constructor
+
+        #plugin_impl
+    };
+
+    Ok(expanded)
 }

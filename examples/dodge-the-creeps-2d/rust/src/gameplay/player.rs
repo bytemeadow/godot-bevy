@@ -5,7 +5,7 @@ use godot::{
     builtin::{StringName, Vector2},
     classes::{AnimatedSprite2D, Input, Node2D},
 };
-use godot_bevy::prelude::*;
+use godot_bevy::{plugins::core::PhysicsDelta, prelude::*};
 
 use crate::{nodes::player::Player as GodotPlayerNode, GameState};
 
@@ -92,7 +92,7 @@ fn setup_player(
 
 fn move_player(
     mut player: Query<(&Player, &mut GodotNodeHandle, &mut Transform2D)>,
-    mut system_delta: SystemDeltaTimer,
+    physics_delta: Res<PhysicsDelta>,
 ) -> Result {
     if let Ok((player_data, mut player, mut transform)) = player.single_mut() {
         let player = player.get::<GodotPlayerNode>();
@@ -134,7 +134,7 @@ fn move_player(
         }
 
         let mut godot_transform = transform.as_godot_mut();
-        godot_transform.origin += velocity * system_delta.delta_seconds();
+        godot_transform.origin += velocity * physics_delta.delta_seconds;
         godot_transform.origin.x = f32::min(f32::max(0.0, godot_transform.origin.x), screen_size.x);
         godot_transform.origin.y = f32::min(f32::max(0.0, godot_transform.origin.y), screen_size.y);
     }

@@ -1037,12 +1037,13 @@ dependencies = [
 
 [[package]]
 name = "godot-bevy"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "bevy",
  "futures-lite",
  "godot",
  "godot-bevy-macros",
+ "inventory",
  "lazy_static",
  "once_cell",
  "parking_lot",
@@ -1051,7 +1052,7 @@ dependencies = [
 
 [[package]]
 name = "godot-bevy-macros"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1169,6 +1170,15 @@ checksum = "cea70ddb795996207ad57735b50c5982d8844f38ba9ee5f1aedcfb708a2aa11e"
 dependencies = [
  "equivalent",
  "hashbrown",
+]
+
+[[package]]
+name = "inventory"
+version = "0.3.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab08d7cd2c5897f2c949e5383ea7c7db03fb19130ffcfbf7eda795137ae3cb83"
+dependencies = [
+ "rustversion",
 ]
 
 [[package]]
@@ -1679,6 +1689,18 @@ dependencies = [
 
 [[package]]
 name = "rust"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_asset_loader",
+ "fastrand",
+ "godot",
+ "godot-bevy",
+ "which",
+]
+
+[[package]]
+name = "rust-platformer-2d"
 version = "0.1.0"
 dependencies = [
  "bevy",

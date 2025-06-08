@@ -67,7 +67,7 @@ Add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-godot-bevy = "0.6.1"
+godot-bevy = "0.6.2"
 bevy = { version = "0.16", default-features = false }
 godot = "0.3.0"
 ```
@@ -163,6 +163,42 @@ fn update_player_ui(
 
     Ok(())
 }
+```
+
+#### Defining bundles for custom Godot nodes
+
+```rust
+/// Component representing the health of an entity
+#[derive(Component, Debug, Clone, PartialEq)]
+pub struct Health(pub f32);
+
+/// Component marking an entity as the player
+#[derive(Component, Debug, Clone, Default)]
+pub struct Player;
+
+/// Custom node to be used in editor, but any instance of it will /// be created with this bundle and grab the values from the node vars
+#[derive(GodotClass, BevyBundle)]
+#[class(base=CharacterBody2D)]
+#[bevy_bundle((Health: health), (Player)), autosync=true]
+pub struct Player2D {
+    base: Base<CharacterBody2D>,
+    #[export]
+    health: f32,
+}
+
+#[godot_api]
+impl ICharacterBody2D for Player2D {
+    fn init(base: Base<CharacterBody2D>) -> Self {
+        Self {
+            base,
+            health: 100.0,
+        }
+    }
+}
+
+// If autosync is not true, then you'll have to make sure you add the
+// auto generated plugin to your app: Player2DBundleAutoSyncPlugin
+// app.add_plugins(Player2DBundleAutoSyncPlugin)
 ```
 
 #### Working with Node Groups and Entity Queries
@@ -314,6 +350,7 @@ For detailed API documentation, see [docs.rs/godot-bevy](https://docs.rs/godot-b
 The `examples/` directory contains complete sample projects demonstrating different aspects of godot-bevy:
 
 - **[`dodge-the-creeps-2d/`](examples/dodge-the-creeps-2d/)**: A complete 2D game showing ECS-driven gameplay, collision handling, audio system, and state management
+- **[`platformer-2d/`](examples/platformer-2d/)**: A 2D platformer game showing ECS-driven gameplay, scene switching, tagging of editor placed entities via custom Godot nodes, and more
 - **[`timing-test/`](examples/timing-test/)**: Demonstrates the timing behavior and schedule execution patterns for debugging and understanding
 - **[`input-event-demo/`](examples/input-event-demo/)**: Shows the thread-safe input event system and cross-platform input handling
 

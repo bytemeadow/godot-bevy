@@ -1,0 +1,35 @@
+[gd_scene load_steps=6 format=3 uid="uid://dypev0qrj3e6s"]
+
+[ext_resource type="Texture2D" uid="uid://bt22jar36sn81" path="res://assets/art/monochrome_tilemap_transparent.png" id="1_5m8k5"]
+[ext_resource type="AudioStream" uid="uid://idxewfrxsf0c" path="res://assets/audio/gem.wav" id="3_hfxuq"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_341ky"]
+size = Vector2(10, 14)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_nmvpb"]
+atlas = ExtResource("1_5m8k5")
+region = Rect2(34, 85, 16, 16)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_bhs42"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_nmvpb")
+}],
+"loop": true,
+"name": &"default",
+"speed": 5.0
+}]
+
+[node name="Gem" type="Gem2D"]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_341ky")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+sprite_frames = SubResource("SpriteFrames_bhs42")
+
+[node name="CollectedSfx" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("3_hfxuq")
+
+[connection signal="finished" from="CollectedSfx" to="." method="_on_collected_sfx_finished"]

@@ -70,7 +70,7 @@ app.add_systems(PhysicsUpdate, godot_movement_system);
 ```
 
 ### Delta Time Considerations
-- **Systems in `PhysicsUpdate`**: Use `SystemDeltaTimer` for accurate delta time
+- **Systems in `PhysicsUpdate`**: Use `PhysicsDelta` for Godot's physics delta time
 - **Systems in standard schedules**: Use `Res<Time>`
 
 ## Schedule Usage Examples

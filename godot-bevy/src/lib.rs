@@ -4,41 +4,24 @@
 use bevy::app::{App, Plugin};
 
 pub mod app;
+pub mod autosync;
 pub mod bridge;
 pub mod node_tree_view;
 pub mod plugins;
-pub mod prelude {
-    pub use crate::bridge::*;
-    pub use crate::node_tree_view::NodeTreeView;
-    pub use crate::plugins::{
-        assets::{GodotAssetsPlugin, GodotResource},
-        audio::{
-            Audio, AudioApp, AudioChannel, AudioChannelMarker, AudioEasing, AudioError,
-            AudioOutput, AudioPlayerType, AudioSettings, AudioTween, GodotAudioChannels,
-            GodotAudioPlugin, MainAudioTrack, PlayAudioCommand, SoundId,
-        },
-        core::{
-            ActionInput, Collisions, FindEntityByNameExt, GodotCorePlugin, GodotSignal, Groups,
-            KeyboardInput, MouseButtonInput, MouseMotion, PhysicsUpdate, SceneTreeEventReader,
-            SceneTreeRef, SystemDeltaTimer, Transform2D, Transform3D,
-            collisions::{
-                ALL_COLLISION_SIGNALS, AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED,
-                COLLISION_END_SIGNALS, COLLISION_START_SIGNALS,
-            },
-            connect_godot_signal,
-        },
-        packed_scene::{GodotScene, PackedScenePlugin},
-    };
-    pub use godot::prelude as godot_prelude;
-    pub use godot_bevy_macros::*;
-}
+pub mod prelude;
 pub mod utils;
 pub mod watchers;
+
+// Re-export inventory to avoid requiring users to add it as a dependency
+pub use inventory;
 
 pub struct GodotPlugin;
 
 impl Plugin for GodotPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(plugins::DefaultGodotPlugin);
+
+        // Auto-register all discovered AutoSyncBundle plugins
+        autosync::register_all_autosync_bundles(app);
     }
 }

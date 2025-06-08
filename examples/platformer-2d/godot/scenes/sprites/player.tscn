@@ -1,0 +1,81 @@
+[gd_scene load_steps=10 format=3 uid="uid://cboi8hec4yf0c"]
+
+[ext_resource type="Texture2D" uid="uid://bt22jar36sn81" path="res://assets/art/monochrome_tilemap_transparent.png" id="2_erru1"]
+[ext_resource type="AudioStream" uid="uid://dshvrew8w637m" path="res://assets/audio/jump.wav" id="3_brij0"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_usmjv"]
+atlas = ExtResource("2_erru1")
+region = Rect2(0, 204, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_erdcl"]
+atlas = ExtResource("2_erru1")
+region = Rect2(68, 204, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_6wma1"]
+atlas = ExtResource("2_erru1")
+region = Rect2(17, 204, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_g4kit"]
+atlas = ExtResource("2_erru1")
+region = Rect2(34, 204, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_xnsu8"]
+atlas = ExtResource("2_erru1")
+region = Rect2(51, 204, 16, 16)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_yexds"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_usmjv")
+}],
+"loop": true,
+"name": &"idle",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_erdcl")
+}],
+"loop": true,
+"name": &"jump",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_6wma1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_g4kit")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_xnsu8")
+}],
+"loop": true,
+"name": &"run",
+"speed": 6.0
+}]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_eynex"]
+radius = 3.0
+height = 8.0
+
+[node name="Player" type="Player2D"]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(3, 3)
+position_smoothing_speed = 1.0
+drag_horizontal_enabled = true
+drag_vertical_enabled = true
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+position = Vector2(0, -4)
+sprite_frames = SubResource("SpriteFrames_yexds")
+animation = &"run"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CapsuleShape2D_eynex")
+
+[node name="JumpSfx" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("3_brij0")
+volume_db = -2.0

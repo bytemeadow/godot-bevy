@@ -1,3 +1,5 @@
+#![allow(deprecated)] // TODO: remove this once we've removed SystemDeltaTimer
+
 use bevy::app::{App, Plugin, ScheduleRunnerPlugin};
 use bevy::asset::{
     AssetMetaCheck, AssetPlugin,
@@ -30,6 +32,24 @@ pub use input_event::*;
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PhysicsUpdate;
 
+/// Resource containing Godot's physics delta time for the current frame
+#[derive(Resource, Default)]
+pub struct PhysicsDelta {
+    pub delta_seconds: f32,
+}
+
+impl PhysicsDelta {
+    pub fn new(delta: f64) -> Self {
+        Self {
+            delta_seconds: delta as f32,
+        }
+    }
+
+    pub fn delta(&self) -> Duration {
+        Duration::from_secs_f32(self.delta_seconds)
+    }
+}
+
 pub struct GodotCorePlugin;
 
 impl Plugin for GodotCorePlugin {
@@ -53,7 +73,8 @@ impl Plugin for GodotCorePlugin {
             .add_plugins(GodotTransformsPlugin)
             .add_plugins(GodotCollisionsPlugin)
             .add_plugins(GodotSignalsPlugin)
-            .add_plugins(GodotInputEventPlugin);
+            .add_plugins(GodotInputEventPlugin)
+            .init_resource::<PhysicsDelta>();
 
         // Add the PhysicsUpdate schedule
         app.add_schedule(Schedule::new(PhysicsUpdate));
@@ -65,11 +86,13 @@ impl Plugin for GodotCorePlugin {
 /// Not every system runs on a Bevy update and Bevy can be updated multiple
 /// during a "frame".
 #[derive(SystemParam)]
+#[deprecated(note = "Use PhysicsDelta instead")]
 pub struct SystemDeltaTimer<'w, 's> {
     last_time: Local<'s, Option<Instant>>,
     marker: PhantomData<&'w ()>,
 }
 
+#[allow(deprecated)]
 impl<'w, 's> SystemDeltaTimer<'w, 's> {
     /// Returns the time passed since the last invocation
     pub fn delta(&mut self) -> Duration {

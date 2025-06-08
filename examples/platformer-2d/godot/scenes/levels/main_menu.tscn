@@ -1,0 +1,39 @@
+[gd_scene format=3 uid="uid://barrr2xbxjwc6"]
+
+[node name="MainMenu" type="Node2D"]
+
+[node name="TitleLabel" type="Label" parent="."]
+offset_left = 7.0
+offset_top = 45.0
+offset_right = 1155.0
+offset_bottom = 71.0
+theme_type_variation = &"HeaderLarge"
+text = "2D Platformer"
+horizontal_alignment = 1
+
+[node name="Label" type="Label" parent="."]
+offset_left = 512.0
+offset_top = 520.0
+offset_right = 650.0
+offset_bottom = 572.0
+text = "Sprites by Kenney
+Music by Ted Kerr"
+horizontal_alignment = 1
+
+[node name="Options" type="VFlowContainer" parent="."]
+offset_left = 512.0
+offset_top = 226.0
+offset_right = 654.0
+offset_bottom = 465.0
+
+[node name="StartButton" type="Button" parent="Options"]
+layout_mode = 2
+text = "Start"
+
+[node name="FullscreenButton" type="Button" parent="Options"]
+layout_mode = 2
+text = "Toggle Fullscreen"
+
+[node name="QuitButton" type="Button" parent="Options"]
+layout_mode = 2
+text = "Quit"

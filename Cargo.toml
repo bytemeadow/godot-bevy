@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.6.1"
+version = "0.6.2"
 edition = "2024"
 authors = ["David Chavez <david@dcvz.io>"]
 repository = "https://github.com/dcvz/godot-bevy"
@@ -13,9 +13,10 @@ members = [
     "examples/dodge-the-creeps-2d/rust",
     "examples/timing-test/rust",
     "examples/input-event-demo/rust",
+    "examples/platformer-2d/rust",
     "examples/simple-node2d-movement/rust",
 ]
 resolver = "2"
 
 [workspace.dependencies]
-godot-bevy-macros = { version = "0.6.1", path = "godot-bevy-macros" }
+godot-bevy-macros = { version = "0.6.2", path = "godot-bevy-macros" }

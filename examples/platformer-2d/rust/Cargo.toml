@@ -1,0 +1,20 @@
+[package]
+name = "rust-platformer-2d"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+
+[lib]
+crate-type = ["cdylib"]
+
+[[bin]]
+path = "../../run_godot.rs"
+name = "platformer_2d"
+
+[dependencies]
+bevy = { version = "0.16", default-features = false }
+bevy_asset_loader = "0.23.0"
+fastrand = { version = "2.3.0" }
+godot = "0.3.0"
+godot-bevy = { path = "../../../godot-bevy" }
+which = "7.0.3"
