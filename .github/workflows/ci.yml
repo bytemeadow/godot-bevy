@@ -86,7 +86,6 @@ jobs:
   examples:
     name: build / ${{ matrix.example }}
     runs-on: blaze/macos-latest
-    needs: rust
     strategy:
       matrix:
         example: [dodge-the-creeps-2d, platformer-2d]
@@ -105,23 +104,7 @@ jobs:
         install-templates: true
       id: install-godot
 
-    - name: Download Rust libraries
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts/
 
-    - name: Setup cross-platform libraries
-      run: |
-        mkdir -p target/{release,debug}
-        
-        # Copy all platform libraries to target directories
-        find artifacts/ -name "*rust*" -type f | while read file; do
-          cp "$file" target/release/ 2>/dev/null || true
-          cp "$file" target/debug/ 2>/dev/null || true
-        done
-        
-        echo "Available libraries:"
-        ls -la target/release/ || echo "No release libraries found"
 
     - name: Build example Rust library
       run: cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
