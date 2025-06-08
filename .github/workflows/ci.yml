@@ -72,9 +72,7 @@ jobs:
       run: cargo test
 
     - name: Build release
-      run: |
-        cargo build --release
-        cargo build --release --manifest-path examples/dodge-the-creeps-2d/rust/Cargo.toml
+      run: cargo build --release
 
     - name: Upload Rust libraries
       uses: actions/upload-artifact@v4
@@ -85,14 +83,20 @@ jobs:
           target/release/deps/*rust*${{ matrix.extension }}
         if-no-files-found: error
 
-  godot-export:
-    name: export / examples
+  examples:
+    name: build / ${{ matrix.example }}
     runs-on: blaze/macos-latest
     needs: rust
+    strategy:
+      matrix:
+        example: [dodge-the-creeps-2d, platformer-2d]
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
 
     - name: Install Godot
       uses: CapsCollective/godot-actions/install-godot@v1.2
@@ -119,22 +123,24 @@ jobs:
         echo "Available libraries:"
         ls -la target/release/ || echo "No release libraries found"
 
+    - name: Build example Rust library
+      run: cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
+
     - name: Import Godot project
-      working-directory: examples/dodge-the-creeps-2d/godot
+      working-directory: examples/${{ matrix.example }}/godot
       run: ${{ steps.install-godot.outputs.godot-executable }} --editor --headless --quit || true
 
     - name: Export for all platforms
-      working-directory: examples/dodge-the-creeps-2d/godot
+      working-directory: examples/${{ matrix.example }}/godot
       run: |
         mkdir -p exports
-        
-        ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Linux/X11" exports/dodge-the-creeps-2d-linux
-        ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Windows Desktop" exports/dodge-the-creeps-2d-windows.exe
-        ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "macOS" exports/dodge-the-creeps-2d-macos.app
+        ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Linux/X11" exports/${{ matrix.example }}-linux
+        ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
+        ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
 
     - name: Upload game exports
       uses: actions/upload-artifact@v4
       with:
-        name: game-exports
-        path: examples/dodge-the-creeps-2d/godot/exports/
+        name: ${{ matrix.example }}-exports
+        path: examples/${{ matrix.example }}/godot/exports/
         if-no-files-found: error
