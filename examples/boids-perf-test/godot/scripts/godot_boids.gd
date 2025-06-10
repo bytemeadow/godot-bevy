@@ -27,8 +27,8 @@ var boid_positions: PackedVector2Array = []
 var boid_velocities: PackedVector2Array = []
 var boid_nodes: Array[Node2D] = []
 
-# Pre-created texture for performance
-var boid_texture: ImageTexture
+# Preloaded boid scene
+var boid_scene: PackedScene = preload("res://scenes/boid.tscn")
 
 # Spatial grid for optimization
 var grid_cell_size: float = 75.0
@@ -48,27 +48,7 @@ func _ready():
 	var viewport_size = get_viewport().get_visible_rect().size
 	world_bounds = viewport_size
 	
-	# Pre-create texture once for all boids
-	_create_boid_texture()
-	
 	print("🎮 Optimized Godot boids initialized with world bounds: %v" % world_bounds)
-
-func _create_boid_texture():
-	# Create a simple white circle texture that we'll reuse for all boids
-	var image = Image.create(8, 8, false, Image.FORMAT_RGBA8)
-	image.fill(Color.WHITE)
-	
-	# Draw a simple circle
-	for x in range(8):
-		for y in range(8):
-			var dist = Vector2(x - 3.5, y - 3.5).length()
-			if dist <= 3.0:
-				image.set_pixel(x, y, Color(1, 1, 1, 0.9))
-			else:
-				image.set_pixel(x, y, Color.TRANSPARENT)
-	
-	boid_texture = ImageTexture.new()
-	boid_texture.set_image(image)
 
 func _process(delta):
 	if not is_running:
@@ -121,21 +101,26 @@ func _update_boid_count():
 			_remove_boid()
 
 func _spawn_boid():
-	# Create simple visual node with pre-created texture
-	var sprite = Sprite2D.new()
-	sprite.name = "Boid"
-	sprite.texture = boid_texture
-	sprite.modulate = Color(randf(), randf(), randf(), 0.9)  # Random color for visual variety
+	# Instantiate the boid scene
+	var boid_instance = boid_scene.instantiate()
 	
 	# Random position and velocity
 	var pos = Vector2(randf() * world_bounds.x, randf() * world_bounds.y)
 	var vel = Vector2((randf() - 0.5) * 200.0, (randf() - 0.5) * 200.0)
 	
-	sprite.position = pos
-	add_child(sprite)
+	# Apply random color for visual variety
+	if boid_instance.has_node("Sprite"):
+		boid_instance.get_node("Sprite").modulate = Color(randf(), randf(), randf(), 0.9)
+	elif boid_instance.has_node("Triangle"):
+		boid_instance.get_node("Triangle").modulate = Color(randf(), randf(), randf(), 0.8)
+	elif boid_instance is Sprite2D:
+		boid_instance.modulate = Color(randf(), randf(), randf(), 0.9)
+	
+	boid_instance.position = pos
+	add_child(boid_instance)
 	
 	# Store in optimized arrays
-	boid_nodes.append(sprite)
+	boid_nodes.append(boid_instance)
 	boid_positions.append(pos)
 	boid_velocities.append(vel)
 
@@ -300,9 +285,23 @@ func _update_boid_physics_optimized(boid_index: int, force: Vector2, delta: floa
 	var velocity = boid_velocities[boid_index]
 	var position = boid_positions[boid_index]
 	
+	# Debug logging
+	var debug_counter = Engine.get_physics_frames() % 120
+	var should_debug = debug_counter == 0 and boid_index == 0
+	
+	if should_debug:
+		print("=== GODOT BOID DEBUG ===")
+		print("Delta Time: %.6f" % delta)
+		print("Position: %s" % position)
+		print("Velocity before: %s (length: %.2f)" % [velocity, velocity.length()])
+		print("Force: %s (length: %.2f)" % [force, force.length()])
+	
 	# Update velocity
 	velocity += force * delta
 	velocity = velocity.limit_length(max_speed)
+	
+	if should_debug:
+		print("Velocity after: %s (length: %.2f)" % [velocity, velocity.length()])
 	
 	# Update position
 	position += velocity * delta
@@ -320,6 +319,11 @@ func _update_boid_physics_optimized(boid_index: int, force: Vector2, delta: floa
 	boid.position = position
 	if velocity.length_squared() > 0:
 		boid.rotation = velocity.angle()
+	
+	if should_debug:
+		print("Max Speed: %.2f" % max_speed)
+		print("Max Force: %.2f" % max_force)
+		print("===================")
 
 func _log_performance():
 	var fps = Engine.get_frames_per_second()

@@ -1,11 +1,13 @@
-[gd_scene load_steps=2 format=3 uid="uid://b8xvfqwkr7y2h"]
+[gd_scene load_steps=3 format=3 uid="uid://bqgvd8ndkntsk"]
+
+[ext_resource type="Texture2D" uid="uid://dbilirhfqdt47" path="res://textures/boid_circle.tres" id="1_joc4e"]
 
 [sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_1"]
 blend_mode = 1
 
 [node name="Boid" type="Node2D"]
 
-[node name="Triangle" type="Polygon2D" parent="."]
+[node name="Sprite" type="Sprite2D" parent="."]
 material = SubResource("CanvasItemMaterial_1")
-color = Color(0.8, 0.9, 1, 0.8)
-polygon = PackedVector2Array(0, -8, -4, 4, 4, 4)
+scale = Vector2(1.5, 1.5)
+texture = ExtResource("1_joc4e")

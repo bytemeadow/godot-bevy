@@ -13,7 +13,7 @@ name = "boids-benchmark"
 
 [dependencies]
 bevy = { version = "0.16", default-features = false }
-fastrand = { version = "2.3.0" }
+fastrand = "2.3.0"
 godot = "0.3.0"
 godot-bevy = { path = "../../../godot-bevy" }
 which = "7.0.3"
