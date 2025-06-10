@@ -122,7 +122,7 @@ fn handle_hud_update_events(
                     let mut label_handle = gems_label.clone();
                     label_handle
                         .get::<Label>()
-                        .set_text(&format!("Gems: {}", gem_count));
+                        .set_text(&format!("Gems: {gem_count}"));
                 }
             }
         }
