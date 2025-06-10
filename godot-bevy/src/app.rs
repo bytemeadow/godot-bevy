@@ -94,16 +94,16 @@ impl INode for BevyApp {
             return;
         }
 
-        if let Some(app) = self.app.as_mut() {
-            if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
+        if let Some(app) = self.app.as_mut()
+            && let Err(e) = catch_unwind(AssertUnwindSafe(|| {
                 // Run the full Bevy update cycle - much simpler!
                 app.update();
-            })) {
-                self.app = None;
+            }))
+        {
+            self.app = None;
 
-                eprintln!("bevy app update panicked");
-                resume_unwind(e);
-            }
+            eprintln!("bevy app update panicked");
+            resume_unwind(e);
         }
     }
 
@@ -114,19 +114,19 @@ impl INode for BevyApp {
             return;
         }
 
-        if let Some(app) = self.app.as_mut() {
-            if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
+        if let Some(app) = self.app.as_mut()
+            && let Err(e) = catch_unwind(AssertUnwindSafe(|| {
                 // Update physics delta resource with Godot's delta
                 app.world_mut().resource_mut::<PhysicsDelta>().delta_seconds = delta;
 
                 // Run only our physics-specific schedule
                 app.world_mut().run_schedule(PhysicsUpdate);
-            })) {
-                self.app = None;
+            }))
+        {
+            self.app = None;
 
-                eprintln!("bevy app physics update panicked");
-                resume_unwind(e);
-            }
+            eprintln!("bevy app physics update panicked");
+            resume_unwind(e);
         }
     }
 }

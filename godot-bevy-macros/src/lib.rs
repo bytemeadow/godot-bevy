@@ -210,18 +210,14 @@ fn create_pattern_matching_expr(
 
 // Helper function to extract the inner type of an Option<T>
 fn get_option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
-    if let syn::Type::Path(type_path) = ty {
-        if type_path.path.segments.len() == 1 && type_path.path.segments[0].ident == "Option" {
-            if let syn::PathArguments::AngleBracketed(ref args) =
-                type_path.path.segments[0].arguments
-            {
-                if args.args.len() == 1 {
-                    if let syn::GenericArgument::Type(ref inner_type) = args.args[0] {
-                        return Some(inner_type);
-                    }
-                }
-            }
-        }
+    if let syn::Type::Path(type_path) = ty
+        && type_path.path.segments.len() == 1
+        && type_path.path.segments[0].ident == "Option"
+        && let syn::PathArguments::AngleBracketed(ref args) = type_path.path.segments[0].arguments
+        && args.args.len() == 1
+        && let syn::GenericArgument::Type(ref inner_type) = args.args[0]
+    {
+        return Some(inner_type);
     }
     None
 }
@@ -300,7 +296,7 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
     let attr_args: BevyBundleAttr = bevy_attr.parse_args()?;
 
     // Auto-generate bundle name from struct name
-    let bundle_name = syn::Ident::new(&format!("{}Bundle", struct_name), struct_name.span());
+    let bundle_name = syn::Ident::new(&format!("{struct_name}Bundle"), struct_name.span());
 
     // Generate bundle struct
     let bundle_fields: Vec<_> = attr_args
@@ -308,7 +304,7 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
         .iter()
         .map(|spec| {
             let component_name = &spec.component_name;
-            let field_name = format!("{}", component_name).to_lowercase();
+            let field_name = format!("{component_name}").to_lowercase();
             let field_ident = syn::Ident::new(&field_name, component_name.span());
             quote! {
                 pub #field_ident: #component_name
@@ -329,7 +325,7 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
         .iter()
         .map(|spec| {
             let component_name = &spec.component_name;
-            let field_name = format!("{}", component_name).to_lowercase();
+            let field_name = format!("{component_name}").to_lowercase();
             let field_ident = syn::Ident::new(&field_name, component_name.span());
 
             if let Some(source_field) = &spec.source_field {
@@ -357,10 +353,7 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
     };
 
     // Generate the auto-sync plugin
-    let plugin_name = syn::Ident::new(
-        &format!("{}AutoSyncPlugin", bundle_name),
-        bundle_name.span(),
-    );
+    let plugin_name = syn::Ident::new(&format!("{bundle_name}AutoSyncPlugin"), bundle_name.span());
     let sync_system_name = syn::Ident::new(
         &format!("sync_{}_components", bundle_name.to_string().to_lowercase()),
         bundle_name.span(),

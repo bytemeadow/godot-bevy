@@ -230,8 +230,7 @@ impl AssetLoader for GodotResourceAssetLoader {
                             }
 
                             return Err(GodotAssetLoaderError::ResourceLoadFailed(format!(
-                                "Failed to get loaded Godot resource: {}",
-                                godot_path
+                                "Failed to get loaded Godot resource: {godot_path}"
                             )));
                         }
                     }
@@ -243,8 +242,7 @@ impl AssetLoader for GodotResourceAssetLoader {
                     }
 
                     return Err(GodotAssetLoaderError::ResourceLoadFailed(format!(
-                        "Godot ResourceLoader failed to load: {}",
-                        godot_path
+                        "Godot ResourceLoader failed to load: {godot_path}"
                     )));
                 }
                 ThreadLoadStatus::INVALID_RESOURCE => {
@@ -254,8 +252,7 @@ impl AssetLoader for GodotResourceAssetLoader {
                     }
 
                     return Err(GodotAssetLoaderError::ResourceLoadFailed(format!(
-                        "Invalid resource path or corrupted resource: {}",
-                        godot_path
+                        "Invalid resource path or corrupted resource: {godot_path}"
                     )));
                 }
                 _ => {
@@ -286,6 +283,6 @@ fn ensure_godot_path(path: &Path) -> String {
     if path_str.starts_with("res://") || path_str.starts_with("user://") {
         path_str.to_string()
     } else {
-        format!("res://{}", path_str)
+        format!("res://{path_str}")
     }
 }
