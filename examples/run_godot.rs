@@ -1,6 +1,6 @@
 use std::{
     path::PathBuf,
-    process::{Command, Stdio, exit},
+    process::{exit, Command, Stdio},
 };
 
 use which::{which, which_in_global};

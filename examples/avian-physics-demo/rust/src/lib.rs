@@ -1,5 +1,7 @@
 #![allow(clippy::type_complexity)]
 
+use std::fmt::Debug;
+
 use avian3d::{
     collision::CollisionDiagnostics, dynamics::solver::SolverDiagnostics, math::AsF32, prelude::*,
 };
@@ -7,6 +9,10 @@ use bevy::{prelude::*, scene::ScenePlugin, state::app::StatesPlugin};
 use bevy_asset_loader::{
     asset_collection::AssetCollection,
     loading_state::{config::ConfigureLoadingState, LoadingState, LoadingStateAppExt},
+};
+use godot::{
+    builtin::Vector3,
+    classes::{BoxMesh, MeshInstance3D},
 };
 use godot_bevy::prelude::{
     godot_prelude::{gdextension, ExtensionLibrary},
@@ -52,6 +58,7 @@ impl Plugin for AvianPhysicsDemo {
                 Update,
                 (
                     sync_avian_physics_with_transform.run_if(in_state(GameState::InGame)),
+                    query_size.run_if(in_state(GameState::InGame)),
                     // print_tree.run_if(in_state(GameState::InGame).and(run_once)),
                 ),
             );
@@ -80,6 +87,9 @@ fn spawn_entities(mut commands: Commands, assets: Res<GameAssets>) {
         GodotScene::from_handle(assets.floor_scene.clone()),
     ));
 
+    // GodotScene::from_handle(assets.simple_box_scene.clone()),
+    let s = GodotScene::from_path("scenes/simple_box.tscn");
+
     //
     // Spawn a falling cuboid body with an initial angular velocity
     //
@@ -90,7 +100,8 @@ fn spawn_entities(mut commands: Commands, assets: Res<GameAssets>) {
         // sync with the Mesh, which is currently in godot's scene. I'm sure we can do
         // better
         Collider::cuboid(1.0, 1.0, 1.0),
-        GodotScene::from_handle(assets.simple_box_scene.clone()),
+        s,
+        // GodotScene::from_handle(assets.simple_box_scene.clone()),
         AngularVelocity(Vec3::new(2.5, 3.5, 1.5)),
         // Initialize a bevy transform with the correct starting position so avian's
         // physics simulation is aware of our position. godot-bevy has its own
@@ -98,6 +109,18 @@ fn spawn_entities(mut commands: Commands, assets: Res<GameAssets>) {
         // We keep avian -> godot-bevy in sync in our `update_system` below
         Transform::default().with_translation(Vec3::new(0., 10., 0.)),
     ));
+}
+
+fn query_size(
+    mut commands: Commands,
+    mut query: Query<&mut GodotNodeHandle, With<SimpleBoxTag>>,
+) -> Result {
+    if let Ok(mut godot_node_handle) = query.single_mut() {
+        let g = godot_node_handle.get::<MeshInstance3D>();
+        let mesh = g.get_mesh().unwrap().cast::<BoxMesh>();
+        info!("mesh size: {:?}", mesh.get_size());
+    }
+    Ok(())
 }
 
 // TODO: we shouldn't have to do this function since avian has built in syncing, but
@@ -125,5 +148,6 @@ fn sync_avian_physics_with_transform(
         bevy_transform.translation = position.f32();
         bevy_transform.rotation = rotation.f32();
     }
+
     Ok(())
 }
