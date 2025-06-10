@@ -1,14 +1,17 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use bevy::{
     ecs::{
         component::Component,
         schedule::SystemSet,
-        system::{Commands, Query, Res, ResMut},
+        system::{Commands, Query, Res, ResMut, ParamSet},
     },
     math::Vec2,
     prelude::*,
+    tasks::ComputeTaskPool,
 };
+use bevy_spatial::{AutomaticUpdate, SpatialStructure, SpatialAccess, kdtree::KDTree2};
 use fastrand;
 
 use godot::prelude::*;
@@ -16,6 +19,9 @@ use godot_bevy::plugins::core::Transform2D;
 use godot_bevy::prelude::*;
 
 use crate::container::{BevyBoids, BoidsContainer};
+
+// Type alias for our spatial tree
+type BoidTree = KDTree2<Boid>;
 
 /// Resource that holds the boid scene reference
 #[derive(Resource, Debug)]
@@ -35,8 +41,8 @@ pub struct BoidCount {
 }
 
 
-/// Component for individual boid entities
-#[derive(Component)]
+/// Component for individual boid entities - also used for spatial tracking
+#[derive(Component, Default)]
 pub struct Boid;
 
 /// Component storing boid velocity
@@ -95,7 +101,7 @@ impl Default for BoidsConfig {
     }
 }
 
-/// Resource for spatial grid optimization
+/// Resource for spatial grid optimization  
 #[derive(Resource)]
 pub struct SpatialGrid {
     pub cell_size: f32,
@@ -111,11 +117,64 @@ impl Default for SpatialGrid {
     }
 }
 
-/// Resource for performance tracking
+/// Optimized Structure of Arrays layout with bevy_spatial integration
+#[derive(Resource, Default)]
+pub struct OptimizedBoidData {
+    pub entities: Vec<Entity>,
+    pub positions: Vec<Vec2>,
+    pub velocities: Vec<Vector2>,
+    pub forces: Vec<Vector2>,
+    pub grid_cells: Vec<GridCell>,
+    /// Map from entity to index for fast lookups
+    pub entity_to_index: HashMap<Entity, usize>,
+    /// Spatial partitions for parallel processing - each partition contains indices into the main arrays
+    pub spatial_partitions: Vec<Vec<usize>>,
+    /// Cached Godot node handles to avoid repeated queries
+    pub cached_handles: Vec<GodotNodeHandle>,
+    /// Tracks if this is the first frame (need to read initial positions)
+    pub is_initialized: bool,
+}
+
+/// Resource for performance tracking with detailed timing
 #[derive(Resource)]
 pub struct PerformanceTracker {
     pub frame_count: u32,
     pub last_log_time: f32,
+    pub timing_data: TimingData,
+}
+
+/// Detailed timing metrics for performance analysis
+#[derive(Default)]
+pub struct TimingData {
+    pub sync_from_ecs_us: u64,
+    pub force_calculation_us: u64,
+    pub physics_update_us: u64,
+    pub sync_to_ecs_us: u64,
+    pub total_frame_us: u64,
+    pub spatial_partitioning_us: u64,
+    pub neighbor_queries_us: u64,
+    pub force_computation_us: u64,
+    pub parallel_overhead_us: u64,
+}
+
+/// Resource to control sync frequency and batching optimization
+#[derive(Resource)]
+pub struct SyncConfig {
+    pub visual_sync_every_n_frames: u32,
+    pub current_visual_frame: u32,
+    pub batch_size: usize,
+    pub use_cached_positions: bool,
+}
+
+impl Default for SyncConfig {
+    fn default() -> Self {
+        Self {
+            visual_sync_every_n_frames: 2, // Sync every 2 frames to reduce overhead
+            current_visual_frame: 0,
+            batch_size: 50, // Process boids in batches
+            use_cached_positions: true, // Use cached positions instead of reading from Godot
+        }
+    }
 }
 
 impl Default for PerformanceTracker {
@@ -123,6 +182,7 @@ impl Default for PerformanceTracker {
         Self {
             frame_count: 0,
             last_log_time: 0.0,
+            timing_data: TimingData::default(),
         }
     }
 }
@@ -142,10 +202,14 @@ pub struct BoidsPlugin;
 
 impl Plugin for BoidsPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<BoidsConfig>()
+        app.add_plugins(
+                AutomaticUpdate::<Boid>::new()
+                    .with_spatial_ds(SpatialStructure::KDTree2)
+                    .with_frequency(Duration::from_millis(16)), // Update every 16ms (roughly 60fps)
+            )
+            .init_resource::<BoidsConfig>()
             .init_resource::<SimulationState>()
             .init_resource::<BoidCount>()
-            .init_resource::<SpatialGrid>()
             .init_resource::<PerformanceTracker>()
             .add_systems(Startup, load_assets)
             // Game logic systems
@@ -162,18 +226,7 @@ impl Plugin for BoidsPlugin {
             // Movement systems - use Update schedule like GDScript _process()
             .add_systems(
                 Update,
-                (
-                    build_spatial_grid.in_set(BoidsSystemSet::NeighborDetection),
-                    calculate_all_forces
-                        .in_set(BoidsSystemSet::ForceCalculation)
-                        .after(BoidsSystemSet::NeighborDetection),
-                    apply_steering_forces
-                        .in_set(BoidsSystemSet::VelocityIntegration)
-                        .after(BoidsSystemSet::ForceCalculation),
-                    update_boid_transforms
-                        .in_set(BoidsSystemSet::PositionUpdate)
-                        .after(BoidsSystemSet::VelocityIntegration),
-                )
+                boids_update_with_spatial_tree // Use proper Transform2D sync
                     .run_if(|state: Res<SimulationState>| state.is_running)
                     .after(sync_container_params), // Run after parameter sync
             );
@@ -605,23 +658,1004 @@ fn update_boid_transforms(
     }
 }
 
-/// Log performance metrics
+/// Log performance metrics with detailed ECS overhead analysis
 fn log_performance(
     mut performance: ResMut<PerformanceTracker>,
     time: Res<Time>,
-    boid_count: Res<BoidCount>,
+    _boid_count: Res<BoidCount>,
+    boids: Query<&Transform2D, With<Boid>>,
 ) {
     let current_time = time.elapsed_secs();
     if current_time - performance.last_log_time >= 1.0 {
         let fps = performance.frame_count as f32 / (current_time - performance.last_log_time);
+        let actual_boid_count = boids.iter().count();
+        
         godot_print!(
-            "🎮 Bevy Boids Performance: {} boids | FPS: {:.1}",
-            boid_count.current,
+            "🎮 Bevy Boids: {} boids | FPS: {:.1} | bevy_spatial + proper Transform2D sync",
+            actual_boid_count,
             fps
         );
+        
+        // Show detailed timing breakdown
+        let timing = &performance.timing_data;
+        if timing.total_frame_us > 0 {
+            let total_ms = timing.total_frame_us as f32 / 1000.0;
+            let data_collection_ms = timing.sync_from_ecs_us as f32 / 1000.0;
+            let force_calc_ms = timing.force_calculation_us as f32 / 1000.0;
+            let velocity_ms = timing.physics_update_us as f32 / 1000.0;
+            let transform_sync_ms = timing.sync_to_ecs_us as f32 / 1000.0;
+            let transform_read_ms = timing.spatial_partitioning_us as f32 / 1000.0;
+            let transform_write_ms = timing.neighbor_queries_us as f32 / 1000.0;
+            
+            godot_print!(
+                "   📊 TIMING: Total: {:.2}ms | Data: {:.2}ms | Forces: {:.2}ms | Velocity: {:.2}ms | Transform: {:.2}ms",
+                total_ms, data_collection_ms, force_calc_ms, velocity_ms, transform_sync_ms
+            );
+            godot_print!(
+                "   📊 DETAIL: Transform Read: {:.2}ms | Transform Write: {:.2}ms",
+                transform_read_ms, transform_write_ms
+            );
+            
+            // Show percentages
+            if total_ms > 0.0 {
+                let data_pct = (data_collection_ms / total_ms) * 100.0;
+                let force_pct = (force_calc_ms / total_ms) * 100.0;
+                let velocity_pct = (velocity_ms / total_ms) * 100.0;
+                let transform_pct = (transform_sync_ms / total_ms) * 100.0;
+                
+                godot_print!(
+                    "   📊 PERCENT: Data: {:.1}% | Forces: {:.1}% | Velocity: {:.1}% | Transform: {:.1}%",
+                    data_pct, force_pct, velocity_pct, transform_pct
+                );
+            }
+        }
+        
         performance.last_log_time = current_time;
         performance.frame_count = 0;
     }
+}
+
+/// Optimized sync with caching - only reads from Godot on first frame, then uses cached data
+fn sync_boid_data_from_ecs(
+    mut optimized_data: ResMut<OptimizedBoidData>,
+    boids: Query<(Entity, &GodotNodeHandle, &Velocity), With<Boid>>,
+    mut performance: ResMut<PerformanceTracker>,
+    _sync_config: Res<SyncConfig>,
+) {
+    let start_time = std::time::Instant::now();
+    
+    // If not initialized or entity count changed, rebuild from scratch
+    let current_count = boids.iter().count();
+    let needs_rebuild = !optimized_data.is_initialized || 
+                       optimized_data.entities.len() != current_count;
+    
+    if needs_rebuild {
+        // Clear and rebuild the optimized data structure
+        optimized_data.entities.clear();
+        optimized_data.positions.clear();
+        optimized_data.velocities.clear();
+        optimized_data.forces.clear();
+        optimized_data.grid_cells.clear();
+        optimized_data.entity_to_index.clear();
+        optimized_data.cached_handles.clear();
+
+        // Collect all boid data into arrays
+        for (entity, handle, velocity) in boids.iter() {
+            let index = optimized_data.entities.len();
+            
+            // Read initial position from Godot node (only on first frame or rebuild)
+            let mut handle_clone = handle.clone();
+            let position = if let Some(node) = handle_clone.try_get::<Node2D>() {
+                let godot_pos = node.get_position();
+                Vec2::new(godot_pos.x, godot_pos.y)
+            } else {
+                // Fallback to a random position if node access fails
+                Vec2::new(
+                    fastrand::f32() * 1920.0,
+                    fastrand::f32() * 1080.0,
+                )
+            };
+            
+            optimized_data.entities.push(entity);
+            optimized_data.positions.push(position);
+            optimized_data.velocities.push(velocity.0);
+            optimized_data.forces.push(Vector2::ZERO);
+            optimized_data.grid_cells.push(GridCell::default());
+            optimized_data.entity_to_index.insert(entity, index);
+            optimized_data.cached_handles.push(handle.clone());
+        }
+        
+        optimized_data.is_initialized = true;
+    } else {
+        // Just update velocities from ECS (much faster than reading positions from Godot)
+        for (i, (_entity, _, velocity)) in boids.iter().enumerate() {
+            if i < optimized_data.velocities.len() {
+                optimized_data.velocities[i] = velocity.0;
+            }
+        }
+    }
+    
+    performance.timing_data.sync_from_ecs_us = start_time.elapsed().as_micros() as u64;
+}
+
+/// Spatially-partitioned parallel boids update using ComputeTaskPool
+fn optimized_boids_update(
+    mut optimized_data: ResMut<OptimizedBoidData>,
+    config: Res<BoidsConfig>,
+    time: Res<Time>,
+    mut performance: ResMut<PerformanceTracker>,
+) {
+    let frame_start = std::time::Instant::now();
+    performance.frame_count += 1;
+    let boid_count = optimized_data.entities.len();
+    
+    if boid_count == 0 {
+        return;
+    }
+
+    // Ensure forces array is properly sized
+    if optimized_data.forces.len() != boid_count {
+        optimized_data.forces.resize(boid_count, Vector2::ZERO);
+    }
+
+    // Create spatial partitions for parallel processing (no manual tree building needed with bevy_spatial)
+    let grid_start = std::time::Instant::now();
+    create_spatial_partitions(&mut optimized_data, &config);
+    performance.timing_data.spatial_partitioning_us = grid_start.elapsed().as_micros() as u64;
+
+    let delta = time.delta_secs();
+    let should_debug = performance.frame_count % 120 == 0;
+
+    // Process each spatial partition in parallel using ComputeTaskPool
+    let partition_count = optimized_data.spatial_partitions.len();
+    if partition_count > 1 && boid_count > 100 {
+        // Get the compute task pool for parallel processing
+        let compute_pool = ComputeTaskPool::get();
+        
+        // Parallel force calculation, sequential physics update
+        let force_start = std::time::Instant::now();
+        parallel_force_calculation(&mut optimized_data, &config, compute_pool, &mut performance);
+        performance.timing_data.force_calculation_us = force_start.elapsed().as_micros() as u64;
+        
+        let physics_start = std::time::Instant::now();
+        sequential_physics_update(&mut optimized_data, &config, delta, should_debug);
+        performance.timing_data.physics_update_us = physics_start.elapsed().as_micros() as u64;
+    } else {
+        // Single-threaded processing for small boid counts (overhead not worth it)
+        let calc_start = std::time::Instant::now();
+        sequential_boids_update(&mut optimized_data, &config, delta, should_debug);
+        let calc_time = calc_start.elapsed().as_micros() as u64;
+        performance.timing_data.force_calculation_us = calc_time / 2; // Rough split
+        performance.timing_data.physics_update_us = calc_time / 2;
+    }
+    
+    performance.timing_data.total_frame_us = frame_start.elapsed().as_micros() as u64;
+}
+
+
+/// Boids update system using bevy_spatial with Transform2D sync (original version)
+fn boids_update_with_spatial_tree(
+    mut queries: ParamSet<(
+        Query<(Entity, &mut Transform2D, &mut Velocity), With<Boid>>,
+        Query<(Entity, &Transform2D, &Velocity), With<Boid>>,
+    )>,
+    spatial_tree: Res<BoidTree>,
+    config: Res<BoidsConfig>,
+    time: Res<Time>,
+    mut performance: ResMut<PerformanceTracker>,
+) {
+    let frame_start = std::time::Instant::now();
+    performance.frame_count += 1;
+    let delta = time.delta_secs();
+    
+    // Phase 1: Data collection from ECS
+    let data_collection_start = std::time::Instant::now();
+    let (boid_data, forces) = {
+        let boid_query = queries.p1();
+        let boid_count = boid_query.iter().count();
+        if boid_count == 0 {
+            return;
+        }
+
+        // Collect boid data for processing
+        let boid_data: Vec<(Entity, Vec2, Vector2)> = boid_query.iter()
+            .map(|(entity, transform, velocity)| {
+                let pos = Vec2::new(transform.as_godot().origin.x, transform.as_godot().origin.y);
+                (entity, pos, velocity.0)
+            })
+            .collect();
+        
+        let data_collection_time = data_collection_start.elapsed().as_micros() as u64;
+        
+        // Phase 2: Force calculation using bevy_spatial
+        let force_calculation_start = std::time::Instant::now();
+        let forces: Vec<(Entity, Vector2)> = boid_data.iter()
+            .map(|&(entity, pos, velocity)| {
+                let force = calculate_boid_force_optimized(
+                    entity,
+                    pos,
+                    velocity,
+                    &spatial_tree,
+                    &boid_query,
+                    &config,
+                );
+                (entity, force)
+            })
+            .collect();
+            
+        performance.timing_data.sync_from_ecs_us = data_collection_time;
+        performance.timing_data.force_calculation_us = force_calculation_start.elapsed().as_micros() as u64;
+        (boid_data, forces)
+    };
+    
+    // Phase 3: Apply forces and update transforms
+    let transform_update_start = std::time::Instant::now();
+    let mut boids_mut = queries.p0();
+    let mut transform_read_time = 0u64;
+    let mut velocity_update_time = 0u64;
+    let mut transform_write_time = 0u64;
+    
+    for (entity, force) in forces {
+        if let Ok((_, mut transform, mut velocity)) = boids_mut.get_mut(entity) {
+            // Phase 3a: Apply force to velocity
+            let vel_start = std::time::Instant::now();
+            velocity.0 += force * delta;
+            
+            // Clamp velocity  
+            let speed = velocity.0.length();
+            if speed < config.max_speed * 0.1 {
+                velocity.0 = velocity.0.normalized() * config.max_speed * 0.1;
+            } else if speed > config.max_speed {
+                velocity.0 = velocity.0.normalized() * config.max_speed;
+            }
+            velocity_update_time += vel_start.elapsed().as_micros() as u64;
+            
+            // Phase 3b: Read current position from Transform2D
+            let read_start = std::time::Instant::now();
+            let current_pos = Vec2::new(transform.as_godot().origin.x, transform.as_godot().origin.y);
+            transform_read_time += read_start.elapsed().as_micros() as u64;
+            
+            // Calculate new position
+            let new_pos = current_pos + Vec2::new(velocity.0.x, velocity.0.y) * delta;
+            let bounded_pos = apply_boundary_constraints(new_pos, &config);
+            
+            // Phase 3c: Write new position to Transform2D
+            let write_start = std::time::Instant::now();
+            let mut godot_transform = transform.as_godot().clone();
+            godot_transform.origin = Vector2::new(bounded_pos.x, bounded_pos.y);
+            *transform = Transform2D::from(godot_transform);
+            transform_write_time += write_start.elapsed().as_micros() as u64;
+        }
+    }
+    
+    performance.timing_data.physics_update_us = velocity_update_time;
+    performance.timing_data.sync_to_ecs_us = transform_read_time + transform_write_time;
+    performance.timing_data.spatial_partitioning_us = transform_read_time;
+    performance.timing_data.neighbor_queries_us = transform_write_time;
+    performance.timing_data.total_frame_us = frame_start.elapsed().as_micros() as u64;
+}
+
+/// Optimized force calculation using k_nearest_neighbour
+fn calculate_boid_force_optimized(
+    entity: Entity,
+    pos: Vec2,
+    velocity: Vector2,
+    spatial_tree: &BoidTree,
+    boid_query: &Query<(Entity, &Transform2D, &Velocity), With<Boid>>,
+    config: &BoidsConfig,
+) -> Vector2 {
+    // Use k_nearest_neighbour with a reasonable cap (faster than within_distance)
+    const NEIGHBOR_CAP: usize = 50;
+    let spatial_query_start = std::time::Instant::now();
+    let nearby_entities = spatial_tree.k_nearest_neighbour(pos, NEIGHBOR_CAP);
+    let _spatial_query_time = spatial_query_start.elapsed().as_micros();
+    
+    let perception_radius_sq = config.perception_radius * config.perception_radius;
+    let separation_radius_sq = config.separation_radius * config.separation_radius;
+    let mut separation = Vector2::ZERO;
+    let mut separation_count = 0;
+    let mut avg_vel = Vector2::ZERO;
+    let mut center_of_mass = Vec2::ZERO;
+    let mut neighbor_count = 0;
+    
+    // Process nearby entities
+    for &(neighbor_pos, neighbor_entity_opt) in nearby_entities.iter() {
+        if let Some(neighbor_entity) = neighbor_entity_opt {
+            // Skip self
+            if neighbor_entity == entity {
+                continue;
+            }
+            
+            let diff = pos - neighbor_pos;
+            let dist_sq = diff.length_squared();
+            
+            // Skip if beyond perception radius
+            if dist_sq > perception_radius_sq {
+                continue;
+            }
+            
+            // Direct query is faster than HashMap lookup for small neighbor counts
+            if let Ok((_, _, neighbor_velocity)) = boid_query.get(neighbor_entity) {
+                // Separation (avoid crowding neighbors)
+                if dist_sq < separation_radius_sq && dist_sq > 0.0 {
+                    let inv_dist = 1.0 / dist_sq.sqrt();
+                    separation += Vector2::new(diff.x * inv_dist, diff.y * inv_dist);
+                    separation_count += 1;
+                }
+                
+                // Alignment and cohesion
+                avg_vel += neighbor_velocity.0;
+                center_of_mass += neighbor_pos;
+                neighbor_count += 1;
+            }
+        }
+    }
+    
+    let mut total_force = Vector2::ZERO;
+    
+    // Apply separation
+    if separation_count > 0 {
+        separation = separation.normalized() * config.max_force;
+        total_force += separation * config.separation_weight;
+    }
+    
+    // Apply alignment
+    if neighbor_count > 0 {
+        avg_vel /= neighbor_count as f32;
+        let alignment = (avg_vel - velocity).normalized() * config.max_force;
+        total_force += alignment * config.alignment_weight;
+        
+        // Apply cohesion
+        center_of_mass /= neighbor_count as f32;
+        let desired_direction = (center_of_mass - pos).normalize();
+        let cohesion = Vector2::new(desired_direction.x, desired_direction.y) * config.max_force;
+        total_force += cohesion * config.cohesion_weight;
+    }
+    
+    // Limit total force
+    if total_force.length() > config.max_force {
+        total_force = total_force.normalized() * config.max_force;
+    }
+    
+    total_force
+}
+
+/// Calculate steering forces for a boid using the automatic spatial tree
+fn calculate_boid_force_with_spatial_tree(
+    _entity: Entity,
+    pos: Vec2,
+    velocity: Vector2,
+    spatial_tree: &BoidTree,
+    boid_data: &[(Entity, Vec2, Vector2)],
+    config: &BoidsConfig,
+) -> Vector2 {
+    // Find nearby entities using bevy_spatial
+    let nearby_entities = spatial_tree.within_distance(pos, config.perception_radius);
+    
+    let separation_radius_sq = config.separation_radius * config.separation_radius;
+    let mut separation = Vector2::ZERO;
+    let mut separation_count = 0;
+    let mut avg_vel = Vector2::ZERO;
+    let mut center_of_mass = Vec2::ZERO;
+    let mut neighbor_count = 0;
+    
+    // Process nearby entities
+    for &(neighbor_pos, neighbor_entity_opt) in nearby_entities.iter() {
+        if let Some(neighbor_entity) = neighbor_entity_opt {
+            // Find the neighbor in our boid_data (this is inefficient but works for now)
+            if let Some((_, _, neighbor_velocity)) = boid_data.iter().find(|(e, _, _)| *e == neighbor_entity) {
+                let diff = pos - neighbor_pos;
+                let dist_sq = diff.length_squared();
+                
+                // Skip self
+                if dist_sq < 0.001 {
+                    continue;
+                }
+                
+                // Separation (avoid crowding neighbors)
+                if dist_sq < separation_radius_sq && dist_sq > 0.0 {
+                    let normalized_diff = diff.normalize();
+                    separation += Vector2::new(normalized_diff.x, normalized_diff.y) / dist_sq.sqrt(); // Stronger when closer
+                    separation_count += 1;
+                }
+                
+                // Alignment and cohesion (within perception radius)
+                if dist_sq < config.perception_radius * config.perception_radius {
+                    avg_vel += *neighbor_velocity;
+                    center_of_mass += neighbor_pos;
+                    neighbor_count += 1;
+                }
+            }
+        }
+    }
+    
+    let mut total_force = Vector2::ZERO;
+    
+    // Apply separation
+    if separation_count > 0 {
+        separation = separation.normalized() * config.max_force;
+        total_force += separation * config.separation_weight;
+    }
+    
+    // Apply alignment
+    if neighbor_count > 0 {
+        avg_vel /= neighbor_count as f32;
+        let alignment = (avg_vel - velocity).normalized() * config.max_force;
+        total_force += alignment * config.alignment_weight;
+        
+        // Apply cohesion
+        center_of_mass /= neighbor_count as f32;
+        let desired_direction = (center_of_mass - pos).normalize();
+        let cohesion = Vector2::new(desired_direction.x, desired_direction.y) * config.max_force;
+        total_force += cohesion * config.cohesion_weight;
+    }
+    
+    // Apply boundary forces
+    let boundary_force = calculate_boundary_force(pos, config);
+    total_force += boundary_force * config.boundary_weight;
+    
+    // Limit total force
+    if total_force.length() > config.max_force {
+        total_force = total_force.normalized() * config.max_force;
+    }
+    
+    total_force
+}
+
+/// Apply boundary constraints with wraparound behavior
+fn apply_boundary_constraints(pos: Vec2, config: &BoidsConfig) -> Vec2 {
+    Vec2::new(
+        if pos.x < 0.0 {
+            config.world_bounds.x + pos.x
+        } else if pos.x > config.world_bounds.x {
+            pos.x - config.world_bounds.x
+        } else {
+            pos.x
+        },
+        if pos.y < 0.0 {
+            config.world_bounds.y + pos.y
+        } else if pos.y > config.world_bounds.y {
+            pos.y - config.world_bounds.y
+        } else {
+            pos.y
+        }
+    )
+}
+
+/// Calculate boundary forces (minimal with wraparound - no strong edge avoidance needed)
+fn calculate_boundary_force(_pos: Vec2, _config: &BoidsConfig) -> Vector2 {
+    // With wraparound boundaries, we don't need strong boundary forces
+    // The boids will teleport to the other side when they reach the edge
+    Vector2::ZERO
+}
+
+/// Create spatial partitions based on world regions for parallel processing
+fn create_spatial_partitions(optimized_data: &mut OptimizedBoidData, config: &BoidsConfig) {
+    optimized_data.spatial_partitions.clear();
+    
+    // Determine number of partitions based on available threads and boid count
+    let thread_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+    let boid_count = optimized_data.entities.len();
+    
+    if boid_count < 100 {
+        // Single partition for small counts
+        optimized_data.spatial_partitions.push((0..boid_count).collect());
+        return;
+    }
+    
+    // Partition the world into spatial regions
+    let partition_count = (thread_count).min(8); // Cap at 8 partitions
+    let regions_per_side = (partition_count as f32).sqrt().ceil() as usize;
+    let region_width = config.world_bounds.x / regions_per_side as f32;
+    let region_height = config.world_bounds.y / regions_per_side as f32;
+    
+    // Initialize partitions
+    for _ in 0..regions_per_side * regions_per_side {
+        optimized_data.spatial_partitions.push(Vec::new());
+    }
+    
+    // Assign boids to partitions based on their position
+    for i in 0..boid_count {
+        let pos = optimized_data.positions[i];
+        let region_x = ((pos.x / region_width) as usize).min(regions_per_side - 1);
+        let region_y = ((pos.y / region_height) as usize).min(regions_per_side - 1);
+        let partition_idx = region_y * regions_per_side + region_x;
+        
+        optimized_data.spatial_partitions[partition_idx].push(i);
+    }
+    
+    // Remove empty partitions
+    optimized_data.spatial_partitions.retain(|partition| !partition.is_empty());
+}
+
+/// Parallel force calculation using ComputeTaskPool with detailed timing
+fn parallel_force_calculation(
+    optimized_data: &mut OptimizedBoidData,
+    config: &BoidsConfig,
+    compute_pool: &ComputeTaskPool,
+    performance: &mut PerformanceTracker,
+) {
+    let parallel_start = std::time::Instant::now();
+    
+    // Copy data needed for parallel processing (immutable references)
+    let positions = &optimized_data.positions;
+    let velocities = &optimized_data.velocities;
+    let grid_cells = &optimized_data.grid_cells;
+    let partitions = &optimized_data.spatial_partitions;
+    
+    let neighbor_start = std::time::Instant::now();
+    
+    // Process partitions in parallel and collect results
+    let force_results: Vec<(Vec<(usize, Vector2)>, u64, u64)> = compute_pool.scope(|scope| {
+        partitions.iter().map(|partition| {
+            let positions = positions;
+            let velocities = velocities;
+            let grid_cells = grid_cells;
+            let config = config;
+            
+            scope.spawn(async move {
+                let mut partition_forces = Vec::with_capacity(partition.len());
+                let mut neighbor_query_time = 0u64;
+                let mut force_calc_time = 0u64;
+                
+                for &boid_idx in partition {
+                    let boid_start = std::time::Instant::now();
+                    let force = calculate_boid_force_grid_based(
+                        boid_idx,
+                        positions,
+                        velocities,
+                        grid_cells,
+                        config,
+                    );
+                    force_calc_time += boid_start.elapsed().as_micros() as u64;
+                    partition_forces.push((boid_idx, force));
+                }
+                
+                (partition_forces, neighbor_query_time, force_calc_time)
+            })
+        }).collect()
+    });
+    
+    performance.timing_data.neighbor_queries_us = neighbor_start.elapsed().as_micros() as u64;
+    
+    // Apply the calculated forces back to the main forces array
+    let apply_start = std::time::Instant::now();
+    let mut total_force_calc_time = 0u64;
+    for (partition_forces, _neighbor_time, force_time) in force_results {
+        total_force_calc_time += force_time;
+        for (boid_idx, force) in partition_forces {
+            optimized_data.forces[boid_idx] = force;
+        }
+    }
+    
+    performance.timing_data.force_computation_us = total_force_calc_time;
+    performance.timing_data.parallel_overhead_us = parallel_start.elapsed().as_micros() as u64 - total_force_calc_time;
+}
+
+/// Sequential physics update (position/velocity integration)
+fn sequential_physics_update(
+    optimized_data: &mut OptimizedBoidData,
+    config: &BoidsConfig,
+    delta: f32,
+    should_debug: bool,
+) {
+    let boid_count = optimized_data.entities.len();
+    
+    for i in 0..boid_count {
+        // Debug logging for first boid
+        let debug_this_boid = should_debug && i == 0;
+        
+        if debug_this_boid {
+            godot_print!("=== PARALLEL BEVY BOID DEBUG ===");
+            godot_print!("Delta Time: {:.6}", delta);
+            godot_print!("Velocity before: {} (length: {:.2})", optimized_data.velocities[i], optimized_data.velocities[i].length());
+        }
+
+        // Extract values to avoid borrowing conflicts
+        let force = optimized_data.forces[i];
+        let mut velocity = optimized_data.velocities[i];
+        
+        // Update velocity
+        velocity += force * delta;
+        velocity = limit_vector(velocity, config.max_speed);
+        optimized_data.velocities[i] = velocity;
+
+        if debug_this_boid {
+            godot_print!("Force: {} (length: {:.2})", force, force.length());
+            godot_print!("Velocity after: {} (length: {:.2})", velocity, velocity.length());
+        }
+
+        // Update position
+        let velocity_bevy = Vec2::new(velocity.x, velocity.y);
+        optimized_data.positions[i] += velocity_bevy * delta;
+
+        // Wrap around boundaries
+        optimized_data.positions[i].x = (optimized_data.positions[i].x + config.world_bounds.x) % config.world_bounds.x;
+        optimized_data.positions[i].y = (optimized_data.positions[i].y + config.world_bounds.y) % config.world_bounds.y;
+
+        if optimized_data.positions[i].x < 0.0 {
+            optimized_data.positions[i].x += config.world_bounds.x;
+        }
+        if optimized_data.positions[i].y < 0.0 {
+            optimized_data.positions[i].y += config.world_bounds.y;
+        }
+
+        if debug_this_boid {
+            godot_print!("Position after: {}", optimized_data.positions[i]);
+            godot_print!("==============================");
+        }
+    }
+}
+
+/// Fallback sequential processing for small boid counts
+fn sequential_boids_update(
+    optimized_data: &mut OptimizedBoidData,
+    config: &BoidsConfig,
+    delta: f32,
+    should_debug: bool,
+) {
+    let boid_count = optimized_data.entities.len();
+    
+    // Calculate forces sequentially
+    for i in 0..boid_count {
+        optimized_data.forces[i] = calculate_boid_force_grid_based(
+            i,
+            &optimized_data.positions,
+            &optimized_data.velocities,
+            &optimized_data.grid_cells,
+            config,
+        );
+    }
+    
+    // Update physics sequentially
+    sequential_physics_update(optimized_data, config, delta, should_debug);
+}
+
+// NOTE: Commented out old function that uses manual spatial tree
+/*
+/// Calculate forces using bevy_spatial for ultra-fast neighbor queries
+fn calculate_boid_force_optimized_arrays(
+    boid_index: usize,
+    positions: &[Vec2],
+    velocities: &[Vector2],
+    _grid_cells: &[GridCell],
+    spatial_tree: &KDTree2<usize>,
+    config: &BoidsConfig,
+) -> Vector2 {
+    let boid_pos = positions[boid_index];
+    let boid_vel = velocities[boid_index];
+    
+    // Use bevy_spatial's optimized radius search - much faster than manual grid
+    let neighbors = spatial_tree.within_distance(boid_pos, config.perception_radius);
+    
+    let separation_radius_sq = config.separation_radius * config.separation_radius;
+    let mut separation = Vector2::ZERO;
+    let mut separation_count = 0;
+    let mut avg_vel = Vector2::ZERO;
+    let mut center_of_mass = Vec2::ZERO;
+    let mut neighbor_count = 0;
+    
+    // Process neighbors from bevy_spatial (already filtered by distance)
+    for &neighbor_index in &neighbors {
+        if neighbor_index != boid_index {
+            let neighbor_pos = positions[neighbor_index];
+            let neighbor_vel = velocities[neighbor_index];
+            
+            let diff_x = boid_pos.x - neighbor_pos.x;
+            let diff_y = boid_pos.y - neighbor_pos.y;
+            let dist_sq = diff_x * diff_x + diff_y * diff_y;
+            
+            // Separation calculation (for close neighbors only)
+            if dist_sq > 0.0 && dist_sq < separation_radius_sq {
+                let inv_distance = 1.0 / dist_sq.sqrt();
+                separation += Vector2::new(diff_x * inv_distance, diff_y * inv_distance);
+                separation_count += 1;
+            }
+            
+            // Alignment and cohesion (all neighbors within perception)
+            avg_vel += neighbor_vel;
+            center_of_mass += neighbor_pos;
+            neighbor_count += 1;
+        }
+    }
+
+    // Early exit if no neighbors
+    if neighbor_count == 0 {
+        return calculate_boundary_force_array(boid_pos, boid_vel, config);
+    }
+
+    // Calculate separation force
+    let separation_force = if separation_count > 0 {
+        separation = separation / separation_count as f32;
+        if separation.length_squared() > 0.0 {
+            separation = separation.normalized() * config.max_speed - boid_vel;
+            limit_vector(separation, config.max_force)
+        } else {
+            Vector2::ZERO
+        }
+    } else {
+        Vector2::ZERO
+    };
+
+    // Calculate alignment force  
+    avg_vel = avg_vel / neighbor_count as f32;
+    let alignment_force = if avg_vel.length_squared() > 0.0 {
+        let desired = avg_vel.normalized() * config.max_speed;
+        limit_vector(desired - boid_vel, config.max_force)
+    } else {
+        Vector2::ZERO
+    };
+
+    // Calculate cohesion force
+    center_of_mass /= neighbor_count as f32;
+    let desired = (center_of_mass - boid_pos).normalize_or_zero() * config.max_speed;
+    let cohesion_force = limit_vector(
+        Vector2::new(desired.x, desired.y) - boid_vel,
+        config.max_force,
+    );
+
+    // Calculate boundary force
+    let boundary_force = calculate_boundary_force_array(boid_pos, boid_vel, config);
+
+    // Combine all forces (pre-multiply weights to avoid repeated calculations)
+    let total_force = separation_force * config.separation_weight
+        + alignment_force * config.alignment_weight
+        + cohesion_force * config.cohesion_weight
+        + boundary_force * config.boundary_weight;
+
+    limit_vector(total_force, config.max_force)
+}
+*/
+
+/// Calculate boundary avoidance force using direct values
+fn calculate_boundary_force_array(position: Vec2, velocity: Vector2, config: &BoidsConfig) -> Vector2 {
+    let mut boundary_force = Vector2::ZERO;
+    let margin = 100.0;
+
+    if position.x < margin {
+        boundary_force.x += margin - position.x;
+    } else if position.x > config.world_bounds.x - margin {
+        boundary_force.x -= position.x - (config.world_bounds.x - margin);
+    }
+
+    if position.y < margin {
+        boundary_force.y += margin - position.y;
+    } else if position.y > config.world_bounds.y - margin {
+        boundary_force.y -= position.y - (config.world_bounds.y - margin);
+    }
+
+    if boundary_force.length() > 0.0 {
+        boundary_force = boundary_force.normalized() * config.max_speed - velocity;
+        limit_vector(boundary_force, config.max_force * 2.0)
+    } else {
+        Vector2::ZERO
+    }
+}
+
+/// Grid-based force calculation for parallel processing (fallback when spatial tree isn't available)
+fn calculate_boid_force_grid_based(
+    boid_index: usize,
+    positions: &[Vec2],
+    velocities: &[Vector2],
+    _grid_cells: &[GridCell],
+    config: &BoidsConfig,
+) -> Vector2 {
+    let boid_pos = positions[boid_index];
+    let boid_vel = velocities[boid_index];
+    
+    let perception_radius_sq = config.perception_radius * config.perception_radius;
+    let separation_radius_sq = config.separation_radius * config.separation_radius;
+    let mut separation = Vector2::ZERO;
+    let mut separation_count = 0;
+    let mut avg_vel = Vector2::ZERO;
+    let mut center_of_mass = Vec2::ZERO;
+    let mut neighbor_count = 0;
+    
+    // Check all other boids (brute force approach for parallel processing)
+    for (i, &neighbor_pos) in positions.iter().enumerate() {
+        if i != boid_index {
+            let neighbor_vel = velocities[i];
+            
+            let diff_x = boid_pos.x - neighbor_pos.x;
+            let diff_y = boid_pos.y - neighbor_pos.y;
+            let dist_sq = diff_x * diff_x + diff_y * diff_y;
+            
+            // Skip if outside perception radius
+            if dist_sq > perception_radius_sq {
+                continue;
+            }
+            
+            // Separation (avoid crowding neighbors)
+            if dist_sq < separation_radius_sq && dist_sq > 0.0 {
+                let distance = dist_sq.sqrt();
+                let normalized_diff = Vector2::new(diff_x, diff_y) / distance;
+                separation += normalized_diff / distance; // Stronger when closer
+                separation_count += 1;
+            }
+            
+            // Alignment and cohesion (within perception radius)
+            avg_vel += neighbor_vel;
+            center_of_mass += neighbor_pos;
+            neighbor_count += 1;
+        }
+    }
+    
+    let mut total_force = Vector2::ZERO;
+    
+    // Apply separation
+    if separation_count > 0 {
+        separation = separation.normalized() * config.max_force;
+        total_force += separation * config.separation_weight;
+    }
+    
+    // Apply alignment
+    if neighbor_count > 0 {
+        avg_vel /= neighbor_count as f32;
+        let alignment = (avg_vel - boid_vel).normalized() * config.max_force;
+        total_force += alignment * config.alignment_weight;
+        
+        // Apply cohesion
+        center_of_mass /= neighbor_count as f32;
+        let desired_direction = (center_of_mass - boid_pos).normalize();
+        let cohesion = Vector2::new(desired_direction.x, desired_direction.y) * config.max_force;
+        total_force += cohesion * config.cohesion_weight;
+    }
+    
+    // Apply boundary forces
+    let boundary_force = calculate_boundary_force_simple(boid_pos, boid_vel, config);
+    total_force += boundary_force * config.boundary_weight;
+    
+    // Limit total force
+    if total_force.length() > config.max_force {
+        total_force = total_force.normalized() * config.max_force;
+    }
+    
+    total_force
+}
+
+/// Simple boundary force calculation (minimal with wraparound)
+fn calculate_boundary_force_simple(_pos: Vec2, _velocity: Vector2, _config: &BoidsConfig) -> Vector2 {
+    // With wraparound boundaries, we don't need boundary forces
+    Vector2::ZERO
+}
+
+/// Optimized sync that attempts to minimize transform overhead
+fn sync_boid_data_to_ecs_optimized(
+    optimized_data: Res<OptimizedBoidData>,
+    mut boids: Query<(&mut Transform2D, &mut Velocity, &GodotNodeHandle), With<Boid>>,
+    mut performance: ResMut<PerformanceTracker>,
+    mut sync_config: ResMut<SyncConfig>,
+) {
+    let start_time = std::time::Instant::now();
+    
+    // Update frame counter for visual sync frequency control
+    sync_config.current_visual_frame += 1;
+    let should_sync_visual = sync_config.current_visual_frame >= sync_config.visual_sync_every_n_frames;
+    if should_sync_visual {
+        sync_config.current_visual_frame = 0;
+    }
+    
+    for (i, &entity) in optimized_data.entities.iter().enumerate() {
+        if let Ok((mut transform, mut velocity, handle)) = boids.get_mut(entity) {
+            // Always update velocity (needed for logic)
+            velocity.0 = optimized_data.velocities[i];
+            
+            // Only update visual position at reduced frequency if configured
+            if should_sync_visual {
+                // Option 1: Try to update Godot node directly to bypass some transform overhead
+                let mut handle_clone = handle.clone();
+                if let Some(mut node) = handle_clone.try_get::<Node2D>() {
+                    // Direct position update on Godot node
+                    let new_pos = Vector2::new(
+                        optimized_data.positions[i].x,
+                        optimized_data.positions[i].y,
+                    );
+                    node.set_position(new_pos);
+                    
+                    // Also keep the ECS transform in sync for consistency
+                    let mut godot_transform = transform.as_godot_mut();
+                    godot_transform.origin = new_pos;
+                } else {
+                    // Fallback: Update through ECS transform only
+                    let mut godot_transform = transform.as_godot_mut();
+                    godot_transform.origin = Vector2::new(
+                        optimized_data.positions[i].x,
+                        optimized_data.positions[i].y,
+                    );
+                }
+            } else {
+                // Still need to keep ECS transform somewhat in sync for logic
+                let mut godot_transform = transform.as_godot_mut();
+                godot_transform.origin = Vector2::new(
+                    optimized_data.positions[i].x,
+                    optimized_data.positions[i].y,
+                );
+            }
+        }
+    }
+    
+    performance.timing_data.sync_to_ecs_us = start_time.elapsed().as_micros() as u64;
+}
+
+/// Optimized Godot sync with batching and reduced frequency
+fn sync_boid_data_to_godot_only(
+    optimized_data: Res<OptimizedBoidData>,
+    _boids: Query<&GodotNodeHandle, With<Boid>>,
+    mut performance: ResMut<PerformanceTracker>,
+    mut sync_config: ResMut<SyncConfig>,
+) {
+    let start_time = std::time::Instant::now();
+    
+    // Update frame counter and check if we should sync visuals
+    sync_config.current_visual_frame += 1;
+    let should_sync_visual = sync_config.current_visual_frame >= sync_config.visual_sync_every_n_frames;
+    if should_sync_visual {
+        sync_config.current_visual_frame = 0;
+    }
+    
+    // Only perform visual updates at reduced frequency
+    if should_sync_visual && optimized_data.is_initialized {
+        let batch_size = sync_config.batch_size;
+        let boid_count = optimized_data.cached_handles.len();
+        
+        // Process boids in batches to reduce overhead
+        for batch_start in (0..boid_count).step_by(batch_size) {
+            let batch_end = (batch_start + batch_size).min(boid_count);
+            
+            // Process this batch
+            for i in batch_start..batch_end {
+                if i < optimized_data.cached_handles.len() {
+                    // Use cached handle instead of querying ECS
+                    let mut handle_clone = optimized_data.cached_handles[i].clone();
+                    if let Some(mut node) = handle_clone.try_get::<Node2D>() {
+                        // Pre-compute position once
+                        let new_pos = Vector2::new(
+                            optimized_data.positions[i].x,
+                            optimized_data.positions[i].y,
+                        );
+                        
+                        // Single position update call
+                        node.set_position(new_pos);
+                        
+                        // Optional rotation update (less frequent)
+                        if sync_config.current_visual_frame == 0 { // Only every N frames
+                            let velocity = optimized_data.velocities[i];
+                            if velocity.length() > 0.1 {
+                                node.set_rotation(velocity.angle());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    performance.timing_data.sync_to_ecs_us = start_time.elapsed().as_micros() as u64;
+}
+
+/// Sync optimized data back to ECS components (original version for comparison)
+fn sync_boid_data_to_ecs(
+    optimized_data: Res<OptimizedBoidData>,
+    mut boids: Query<(&mut Transform2D, &mut Velocity), With<Boid>>,
+    mut performance: ResMut<PerformanceTracker>,
+) {
+    let start_time = std::time::Instant::now();
+    
+    for (i, &entity) in optimized_data.entities.iter().enumerate() {
+        if let Ok((mut transform, mut velocity)) = boids.get_mut(entity) {
+            // Update velocity
+            velocity.0 = optimized_data.velocities[i];
+            
+            // Update transform position (keep the ECS transform in sync)
+            let mut godot_transform = transform.as_godot_mut();
+            godot_transform.origin = Vector2::new(
+                optimized_data.positions[i].x,
+                optimized_data.positions[i].y,
+            );
+        }
+    }
+    
+    performance.timing_data.sync_to_ecs_us = start_time.elapsed().as_micros() as u64;
 }
 
 /// Helper function to limit vector magnitude
