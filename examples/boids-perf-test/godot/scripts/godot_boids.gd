@@ -38,6 +38,8 @@ var spatial_grid: Dictionary = {}
 var frame_count: int = 0
 var last_performance_log: float = 0.0
 
+# Timing data removed for performance
+
 # Pre-allocated arrays to avoid garbage collection
 var neighbor_positions: PackedVector2Array = []
 var neighbor_velocities: PackedVector2Array = []
@@ -48,7 +50,7 @@ func _ready():
 	var viewport_size = get_viewport().get_visible_rect().size
 	world_bounds = viewport_size
 	
-	print("🎮 Optimized Godot boids initialized with world bounds: %v" % world_bounds)
+	# Godot boids initialized
 
 func _process(delta):
 	if not is_running:
@@ -72,12 +74,12 @@ func start_benchmark(boid_count: int):
 	is_running = true
 	frame_count = 0
 	last_performance_log = Time.get_ticks_msec() / 1000.0
-	print("🎮 Starting optimized Godot boids benchmark with %d boids" % boid_count)
+	# Starting Godot boids benchmark
 
 func stop_benchmark():
 	is_running = false
 	_clear_all_boids()
-	print("🎮 Stopped optimized Godot boids benchmark")
+	# Stopped Godot boids benchmark
 
 func set_target_boid_count(count: int):
 	target_boid_count = count
@@ -147,14 +149,14 @@ func _update_boids(delta: float):
 	if forces.size() != boid_count:
 		forces.resize(boid_count)
 	
-	# Build spatial grid for efficient neighbor finding
+	# Phase 1: Build spatial grid for efficient neighbor finding
 	_build_spatial_grid()
 	
-	# Calculate forces for all boids using optimized approach
+	# Phase 2: Calculate forces for all boids using optimized approach
 	for i in range(boid_count):
 		forces[i] = _calculate_boid_force_optimized(i)
 	
-	# Apply forces and update positions
+	# Phase 3: Apply forces and update positions
 	for i in range(boid_count):
 		_update_boid_physics_optimized(i, forces[i], delta)
 
@@ -285,23 +287,13 @@ func _update_boid_physics_optimized(boid_index: int, force: Vector2, delta: floa
 	var velocity = boid_velocities[boid_index]
 	var position = boid_positions[boid_index]
 	
-	# Debug logging
-	var debug_counter = Engine.get_physics_frames() % 120
-	var should_debug = debug_counter == 0 and boid_index == 0
-	
-	if should_debug:
-		print("=== GODOT BOID DEBUG ===")
-		print("Delta Time: %.6f" % delta)
-		print("Position: %s" % position)
-		print("Velocity before: %s (length: %.2f)" % [velocity, velocity.length()])
-		print("Force: %s (length: %.2f)" % [force, force.length()])
+	# Debug logging removed for performance
 	
 	# Update velocity
 	velocity += force * delta
 	velocity = velocity.limit_length(max_speed)
 	
-	if should_debug:
-		print("Velocity after: %s (length: %.2f)" % [velocity, velocity.length()])
+	# Debug output removed
 	
 	# Update position
 	position += velocity * delta
@@ -320,14 +312,11 @@ func _update_boid_physics_optimized(boid_index: int, force: Vector2, delta: floa
 	if velocity.length_squared() > 0:
 		boid.rotation = velocity.angle()
 	
-	if should_debug:
-		print("Max Speed: %.2f" % max_speed)
-		print("Max Force: %.2f" % max_force)
-		print("===================")
+	# Debug output removed
 
 func _log_performance():
 	var fps = Engine.get_frames_per_second()
-	print("🎮 Optimized Godot Boids Performance: %d boids | FPS: %.1f" % [boid_nodes.size(), fps])
+	print("🎮 Godot Boids: %d boids | FPS: %.1f" % [boid_nodes.size(), fps])
 
 ## Utility functions for external access
 

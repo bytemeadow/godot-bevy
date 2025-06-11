@@ -10,6 +10,7 @@ use bevy::{
     math::Vec2,
     prelude::*,
     tasks::ComputeTaskPool,
+    diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
 };
 use bevy_spatial::{AutomaticUpdate, SpatialStructure, SpatialAccess, kdtree::KDTree2};
 use fastrand;
@@ -340,7 +341,7 @@ fn spawn_boids(
             ));
     }
 
-    godot_print!("Spawned {} boids", count);
+    // Spawned boids
 }
 
 /// Helper function to despawn a batch of boids
@@ -365,7 +366,7 @@ fn despawn_boids(
         commands.entity(entity).despawn();
     }
 
-    godot_print!("Despawned {} boids", count);
+    // Despawned boids
 }
 
 /// Update simulation state and manage cleanup on stop
@@ -376,7 +377,7 @@ fn update_simulation_state(
 ) {
     // If simulation was just stopped, clean up all boids
     if !simulation_state.is_running && boids.iter().count() > 0 {
-        godot_print!("Cleaning up all boids");
+        // Cleaning up all boids
 
         // Queue all Godot nodes for deletion
         for (entity, handle) in boids.iter() {
@@ -578,19 +579,7 @@ fn apply_steering_forces(
 
     let mut boid_index = 0;
     for (mut velocity, forces) in boids.iter_mut() {
-        // Debug logging (same as GDScript) - only for the first boid
-        let debug_counter = performance.frame_count % 120;
-        let should_debug = debug_counter == 0 && boid_index == 0;
-
-        if should_debug {
-            godot_print!("=== BEVY BOID DEBUG ===");
-            godot_print!("Delta Time: {:.6}", time.delta_secs());
-            godot_print!(
-                "Velocity before: {} (length: {:.2})",
-                velocity.0,
-                velocity.0.length()
-            );
-        }
+        // Debug logging removed for performance
 
         // Combine all forces
         let total_force = forces.separation * config.separation_weight
@@ -600,28 +589,13 @@ fn apply_steering_forces(
 
         let limited_force = limit_vector(total_force, config.max_force);
 
-        if should_debug {
-            godot_print!(
-                "Force: {} (length: {:.2})",
-                limited_force,
-                limited_force.length()
-            );
-        }
+        // Debug output removed
 
         // Update velocity
         velocity.0 += limited_force * time.delta_secs();
         velocity.0 = limit_vector(velocity.0, config.max_speed);
 
-        if should_debug {
-            godot_print!(
-                "Velocity after: {} (length: {:.2})",
-                velocity.0,
-                velocity.0.length()
-            );
-            godot_print!("Max Speed: {:.2}", config.max_speed);
-            godot_print!("Max Force: {:.2}", config.max_force);
-            godot_print!("===================");
-        }
+        // Debug output removed
         
         boid_index += 1;
     }
@@ -664,6 +638,7 @@ fn log_performance(
     time: Res<Time>,
     _boid_count: Res<BoidCount>,
     boids: Query<&Transform2D, With<Boid>>,
+    diagnostics: Res<DiagnosticsStore>,
 ) {
     let current_time = time.elapsed_secs();
     if current_time - performance.last_log_time >= 1.0 {
@@ -671,44 +646,10 @@ fn log_performance(
         let actual_boid_count = boids.iter().count();
         
         godot_print!(
-            "🎮 Bevy Boids: {} boids | FPS: {:.1} | bevy_spatial + proper Transform2D sync",
+            "🎮 Bevy Boids: {} boids | FPS: {:.1}",
             actual_boid_count,
             fps
         );
-        
-        // Show detailed timing breakdown
-        let timing = &performance.timing_data;
-        if timing.total_frame_us > 0 {
-            let total_ms = timing.total_frame_us as f32 / 1000.0;
-            let data_collection_ms = timing.sync_from_ecs_us as f32 / 1000.0;
-            let force_calc_ms = timing.force_calculation_us as f32 / 1000.0;
-            let velocity_ms = timing.physics_update_us as f32 / 1000.0;
-            let transform_sync_ms = timing.sync_to_ecs_us as f32 / 1000.0;
-            let transform_read_ms = timing.spatial_partitioning_us as f32 / 1000.0;
-            let transform_write_ms = timing.neighbor_queries_us as f32 / 1000.0;
-            
-            godot_print!(
-                "   📊 TIMING: Total: {:.2}ms | Data: {:.2}ms | Forces: {:.2}ms | Velocity: {:.2}ms | Transform: {:.2}ms",
-                total_ms, data_collection_ms, force_calc_ms, velocity_ms, transform_sync_ms
-            );
-            godot_print!(
-                "   📊 DETAIL: Transform Read: {:.2}ms | Transform Write: {:.2}ms",
-                transform_read_ms, transform_write_ms
-            );
-            
-            // Show percentages
-            if total_ms > 0.0 {
-                let data_pct = (data_collection_ms / total_ms) * 100.0;
-                let force_pct = (force_calc_ms / total_ms) * 100.0;
-                let velocity_pct = (velocity_ms / total_ms) * 100.0;
-                let transform_pct = (transform_sync_ms / total_ms) * 100.0;
-                
-                godot_print!(
-                    "   📊 PERCENT: Data: {:.1}% | Forces: {:.1}% | Velocity: {:.1}% | Transform: {:.1}%",
-                    data_pct, force_pct, velocity_pct, transform_pct
-                );
-            }
-        }
         
         performance.last_log_time = current_time;
         performance.frame_count = 0;
@@ -844,12 +785,8 @@ fn boids_update_with_spatial_tree(
     time: Res<Time>,
     mut performance: ResMut<PerformanceTracker>,
 ) {
-    let frame_start = std::time::Instant::now();
     performance.frame_count += 1;
     let delta = time.delta_secs();
-    
-    // Phase 1: Data collection from ECS
-    let data_collection_start = std::time::Instant::now();
     let (boid_data, forces) = {
         let boid_query = queries.p1();
         let boid_count = boid_query.iter().count();
@@ -865,10 +802,8 @@ fn boids_update_with_spatial_tree(
             })
             .collect();
         
-        let data_collection_time = data_collection_start.elapsed().as_micros() as u64;
         
         // Phase 2: Force calculation using bevy_spatial
-        let force_calculation_start = std::time::Instant::now();
         let forces: Vec<(Entity, Vector2)> = boid_data.iter()
             .map(|&(entity, pos, velocity)| {
                 let force = calculate_boid_force_optimized(
@@ -883,22 +818,16 @@ fn boids_update_with_spatial_tree(
             })
             .collect();
             
-        performance.timing_data.sync_from_ecs_us = data_collection_time;
-        performance.timing_data.force_calculation_us = force_calculation_start.elapsed().as_micros() as u64;
+        // Timing data removed for performance
         (boid_data, forces)
     };
     
     // Phase 3: Apply forces and update transforms
-    let transform_update_start = std::time::Instant::now();
     let mut boids_mut = queries.p0();
-    let mut transform_read_time = 0u64;
-    let mut velocity_update_time = 0u64;
-    let mut transform_write_time = 0u64;
     
     for (entity, force) in forces {
         if let Ok((_, mut transform, mut velocity)) = boids_mut.get_mut(entity) {
-            // Phase 3a: Apply force to velocity
-            let vel_start = std::time::Instant::now();
+            // Apply force to velocity
             velocity.0 += force * delta;
             
             // Clamp velocity  
@@ -908,31 +837,22 @@ fn boids_update_with_spatial_tree(
             } else if speed > config.max_speed {
                 velocity.0 = velocity.0.normalized() * config.max_speed;
             }
-            velocity_update_time += vel_start.elapsed().as_micros() as u64;
             
-            // Phase 3b: Read current position from Transform2D
-            let read_start = std::time::Instant::now();
+            // Read current position from Transform2D
             let current_pos = Vec2::new(transform.as_godot().origin.x, transform.as_godot().origin.y);
-            transform_read_time += read_start.elapsed().as_micros() as u64;
             
             // Calculate new position
             let new_pos = current_pos + Vec2::new(velocity.0.x, velocity.0.y) * delta;
             let bounded_pos = apply_boundary_constraints(new_pos, &config);
             
-            // Phase 3c: Write new position to Transform2D
-            let write_start = std::time::Instant::now();
+            // Write new position to Transform2D
             let mut godot_transform = transform.as_godot().clone();
             godot_transform.origin = Vector2::new(bounded_pos.x, bounded_pos.y);
             *transform = Transform2D::from(godot_transform);
-            transform_write_time += write_start.elapsed().as_micros() as u64;
         }
     }
     
-    performance.timing_data.physics_update_us = velocity_update_time;
-    performance.timing_data.sync_to_ecs_us = transform_read_time + transform_write_time;
-    performance.timing_data.spatial_partitioning_us = transform_read_time;
-    performance.timing_data.neighbor_queries_us = transform_write_time;
-    performance.timing_data.total_frame_us = frame_start.elapsed().as_micros() as u64;
+    // Timing data removed for performance
 }
 
 /// Optimized force calculation using k_nearest_neighbour
@@ -1245,11 +1165,7 @@ fn sequential_physics_update(
         // Debug logging for first boid
         let debug_this_boid = should_debug && i == 0;
         
-        if debug_this_boid {
-            godot_print!("=== PARALLEL BEVY BOID DEBUG ===");
-            godot_print!("Delta Time: {:.6}", delta);
-            godot_print!("Velocity before: {} (length: {:.2})", optimized_data.velocities[i], optimized_data.velocities[i].length());
-        }
+        // Debug logging removed for performance
 
         // Extract values to avoid borrowing conflicts
         let force = optimized_data.forces[i];
@@ -1260,10 +1176,7 @@ fn sequential_physics_update(
         velocity = limit_vector(velocity, config.max_speed);
         optimized_data.velocities[i] = velocity;
 
-        if debug_this_boid {
-            godot_print!("Force: {} (length: {:.2})", force, force.length());
-            godot_print!("Velocity after: {} (length: {:.2})", velocity, velocity.length());
-        }
+        // Debug output removed
 
         // Update position
         let velocity_bevy = Vec2::new(velocity.x, velocity.y);
@@ -1280,10 +1193,7 @@ fn sequential_physics_update(
             optimized_data.positions[i].y += config.world_bounds.y;
         }
 
-        if debug_this_boid {
-            godot_print!("Position after: {}", optimized_data.positions[i]);
-            godot_print!("==============================");
-        }
+        // Debug output removed
     }
 }
 
