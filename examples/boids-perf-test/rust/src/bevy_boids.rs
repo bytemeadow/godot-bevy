@@ -10,7 +10,6 @@ use bevy::{
     math::Vec2,
     prelude::*,
     tasks::ComputeTaskPool,
-    diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
 };
 use bevy_spatial::{AutomaticUpdate, SpatialStructure, SpatialAccess, kdtree::KDTree2};
 use fastrand;
@@ -249,7 +248,7 @@ fn sync_container_params(
 ) {
     for handle in container_query.iter() {
         let mut handle_clone = handle.clone();
-        if let Some(bevy_boids) = handle_clone.try_get::<BevyBoids>() {
+        if let Some(mut bevy_boids) = handle_clone.try_get::<BevyBoids>() {
             let boids_bind = bevy_boids.bind();
             
             // Update simulation state
@@ -267,8 +266,8 @@ fn sync_container_params(
             // Update current count back to Godot node
             let current_count = boid_count.current;
             drop(boids_bind); // Release the bind before getting mutable access
-            let mut node = bevy_boids.upcast::<Node>();
-            node.set_meta("current_count", &current_count.to_variant());
+            let mut bevy_boids_mut = bevy_boids.bind_mut();
+            bevy_boids_mut.current_boid_count = current_count;
         }
     }
 }
@@ -577,7 +576,7 @@ fn apply_steering_forces(
 ) {
     performance.frame_count += 1;
 
-    let mut boid_index = 0;
+    let mut _boid_index = 0;
     for (mut velocity, forces) in boids.iter_mut() {
         // Debug logging removed for performance
 
@@ -597,7 +596,7 @@ fn apply_steering_forces(
 
         // Debug output removed
         
-        boid_index += 1;
+        _boid_index += 1;
     }
 }
 
@@ -638,7 +637,7 @@ fn log_performance(
     time: Res<Time>,
     _boid_count: Res<BoidCount>,
     boids: Query<&Transform2D, With<Boid>>,
-    diagnostics: Res<DiagnosticsStore>,
+    // Diagnostics removed for performance
 ) {
     let current_time = time.elapsed_secs();
     if current_time - performance.last_log_time >= 1.0 {
@@ -787,7 +786,7 @@ fn boids_update_with_spatial_tree(
 ) {
     performance.frame_count += 1;
     let delta = time.delta_secs();
-    let (boid_data, forces) = {
+    let (_boid_data, forces) = {
         let boid_query = queries.p1();
         let boid_count = boid_query.iter().count();
         if boid_count == 0 {
@@ -1115,7 +1114,7 @@ fn parallel_force_calculation(
             
             scope.spawn(async move {
                 let mut partition_forces = Vec::with_capacity(partition.len());
-                let mut neighbor_query_time = 0u64;
+                let _neighbor_query_time = 0u64;
                 let mut force_calc_time = 0u64;
                 
                 for &boid_idx in partition {
@@ -1131,7 +1130,7 @@ fn parallel_force_calculation(
                     partition_forces.push((boid_idx, force));
                 }
                 
-                (partition_forces, neighbor_query_time, force_calc_time)
+                (partition_forces, _neighbor_query_time, force_calc_time)
             })
         }).collect()
     });
@@ -1139,9 +1138,9 @@ fn parallel_force_calculation(
     performance.timing_data.neighbor_queries_us = neighbor_start.elapsed().as_micros() as u64;
     
     // Apply the calculated forces back to the main forces array
-    let apply_start = std::time::Instant::now();
+    let _apply_start = std::time::Instant::now();
     let mut total_force_calc_time = 0u64;
-    for (partition_forces, _neighbor_time, force_time) in force_results {
+    for (partition_forces, __neighbor_time, force_time) in force_results {
         total_force_calc_time += force_time;
         for (boid_idx, force) in partition_forces {
             optimized_data.forces[boid_idx] = force;
@@ -1163,7 +1162,7 @@ fn sequential_physics_update(
     
     for i in 0..boid_count {
         // Debug logging for first boid
-        let debug_this_boid = should_debug && i == 0;
+        let _debug_this_boid = should_debug && i == 0;
         
         // Debug logging removed for performance
 

@@ -1,7 +1,6 @@
 #![allow(clippy::type_complexity)]
 
 use bevy::prelude::*;
-use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use godot_bevy::prelude::{
     godot_prelude::{gdextension, ExtensionLibrary},
     *,
@@ -21,7 +20,6 @@ mod container;
 fn build_app(app: &mut App) {
     app.add_plugins((
         BoidsPlugin,
-        // Bevy's built-in diagnostics
-        FrameTimeDiagnosticsPlugin::default(),
+        // Diagnostics removed for performance
     ));
 }
