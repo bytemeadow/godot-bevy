@@ -1,13 +1,12 @@
 use bevy::{
     ecs::{
         component::Component,
-        system::{Commands, Query, Res, ResMut, ParamSet},
+        system::{Commands, ParamSet, Query, Res, ResMut},
     },
     math::Vec2,
     prelude::*,
 };
-use bevy_spatial::{AutomaticUpdate, SpatialStructure, SpatialAccess, kdtree::KDTree2};
-use fastrand;
+use bevy_spatial::{kdtree::KDTree2, AutomaticUpdate, SpatialAccess, SpatialStructure};
 
 use godot::prelude::*;
 use godot_bevy::plugins::core::Transform2D;
@@ -101,33 +100,33 @@ pub struct BoidsPlugin;
 impl Plugin for BoidsPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(
-                AutomaticUpdate::<Boid>::new()
-                    .with_spatial_ds(SpatialStructure::KDTree2)
-                    .with_frequency(std::time::Duration::from_millis(16)), // Update every 16ms (roughly 60fps)
+            AutomaticUpdate::<Boid>::new()
+                .with_spatial_ds(SpatialStructure::KDTree2)
+                .with_frequency(std::time::Duration::from_millis(16)), // Update every 16ms (roughly 60fps)
+        )
+        .init_resource::<BoidsConfig>()
+        .init_resource::<SimulationState>()
+        .init_resource::<BoidCount>()
+        .init_resource::<PerformanceTracker>()
+        .add_systems(Startup, load_assets)
+        // Game logic systems
+        .add_systems(
+            Update,
+            (
+                sync_container_params,
+                handle_boid_count,
+                update_simulation_state,
+                log_performance,
             )
-            .init_resource::<BoidsConfig>()
-            .init_resource::<SimulationState>()
-            .init_resource::<BoidCount>()
-            .init_resource::<PerformanceTracker>()
-            .add_systems(Startup, load_assets)
-            // Game logic systems
-            .add_systems(
-                Update,
-                (
-                    sync_container_params,
-                    handle_boid_count,
-                    update_simulation_state,
-                    log_performance,
-                )
-                    .chain(),
-            )
-            // Movement systems
-            .add_systems(
-                Update,
-                boids_update_with_spatial_tree
-                    .run_if(|state: Res<SimulationState>| state.is_running)
-                    .after(sync_container_params),
-            );
+                .chain(),
+        )
+        // Movement systems
+        .add_systems(
+            Update,
+            boids_update_with_spatial_tree
+                .run_if(|state: Res<SimulationState>| state.is_running)
+                .after(sync_container_params),
+        );
     }
 }
 
@@ -148,7 +147,7 @@ fn sync_container_params(
         let mut handle_clone = handle.clone();
         if let Some(mut bevy_boids) = handle_clone.try_get::<BevyBoids>() {
             let boids_bind = bevy_boids.bind();
-            
+
             // Update simulation state
             simulation_state.is_running = boids_bind.is_running;
 
@@ -189,7 +188,7 @@ fn handle_boid_count(
     }
 
     let target_count = boid_count.target;
-    
+
     // Spawn new boids if needed (max 50 per frame)
     if current_count < target_count {
         let to_spawn = (target_count - current_count).min(50);
@@ -203,12 +202,7 @@ fn handle_boid_count(
 }
 
 /// Helper function to spawn a batch of boids
-fn spawn_boids(
-    commands: &mut Commands,
-    count: i32,
-    config: &BoidsConfig,
-    boid_scene: &BoidScene,
-) {
+fn spawn_boids(commands: &mut Commands, count: i32, config: &BoidsConfig, boid_scene: &BoidScene) {
     for _ in 0..count {
         // Create position and velocity
         let pos = Vector2::new(
@@ -229,11 +223,7 @@ fn spawn_boids(
         commands
             .spawn_empty()
             .insert(GodotScene::from_handle(boid_scene.0.clone()))
-            .insert((
-                Boid,
-                Velocity(velocity),
-                transform,
-            ));
+            .insert((Boid, Velocity(velocity), transform));
     }
 }
 
@@ -292,7 +282,7 @@ fn boids_update_with_spatial_tree(
 ) {
     performance.frame_count += 1;
     let delta = time.delta_secs();
-    
+
     // Phase 1: Data collection from ECS
     let forces = {
         let boid_query = queries.p1();
@@ -302,15 +292,17 @@ fn boids_update_with_spatial_tree(
         }
 
         // Collect boid data for processing
-        let boid_data: Vec<(Entity, Vec2, Vector2)> = boid_query.iter()
+        let boid_data: Vec<(Entity, Vec2, Vector2)> = boid_query
+            .iter()
             .map(|(entity, transform, velocity)| {
                 let pos = Vec2::new(transform.as_godot().origin.x, transform.as_godot().origin.y);
                 (entity, pos, velocity.0)
             })
             .collect();
-        
+
         // Phase 2: Force calculation using bevy_spatial
-        let forces: Vec<(Entity, Vector2)> = boid_data.iter()
+        let forces: Vec<(Entity, Vector2)> = boid_data
+            .iter()
             .map(|&(entity, pos, velocity)| {
                 let force = calculate_boid_force_optimized(
                     entity,
@@ -323,35 +315,36 @@ fn boids_update_with_spatial_tree(
                 (entity, force)
             })
             .collect();
-            
+
         forces
     };
-    
+
     // Phase 3: Apply forces and update transforms
     let mut boids_mut = queries.p0();
-    
+
     for (entity, force) in forces {
         if let Ok((_, mut transform, mut velocity)) = boids_mut.get_mut(entity) {
             // Apply force to velocity
             velocity.0 += force * delta;
-            
-            // Clamp velocity  
+
+            // Clamp velocity
             let speed = velocity.0.length();
             if speed < config.max_speed * 0.1 {
                 velocity.0 = velocity.0.normalized() * config.max_speed * 0.1;
             } else if speed > config.max_speed {
                 velocity.0 = velocity.0.normalized() * config.max_speed;
             }
-            
+
             // Read current position from Transform2D
-            let current_pos = Vec2::new(transform.as_godot().origin.x, transform.as_godot().origin.y);
-            
+            let current_pos =
+                Vec2::new(transform.as_godot().origin.x, transform.as_godot().origin.y);
+
             // Calculate new position
             let new_pos = current_pos + Vec2::new(velocity.0.x, velocity.0.y) * delta;
             let bounded_pos = apply_boundary_constraints(new_pos, &config);
-            
+
             // Write new position to Transform2D
-            let mut godot_transform = transform.as_godot().clone();
+            let mut godot_transform = *transform.as_godot();
             godot_transform.origin = Vector2::new(bounded_pos.x, bounded_pos.y);
             *transform = Transform2D::from(godot_transform);
         }
@@ -370,7 +363,7 @@ fn calculate_boid_force_optimized(
     // Use k_nearest_neighbour with a reasonable cap (faster than within_distance)
     const NEIGHBOR_CAP: usize = 50;
     let nearby_entities = spatial_tree.k_nearest_neighbour(pos, NEIGHBOR_CAP);
-    
+
     let perception_radius_sq = config.perception_radius * config.perception_radius;
     let separation_radius_sq = config.separation_radius * config.separation_radius;
     let mut separation = Vector2::ZERO;
@@ -378,7 +371,7 @@ fn calculate_boid_force_optimized(
     let mut avg_vel = Vector2::ZERO;
     let mut center_of_mass = Vec2::ZERO;
     let mut neighbor_count = 0;
-    
+
     // Process nearby entities
     for &(neighbor_pos, neighbor_entity_opt) in nearby_entities.iter() {
         if let Some(neighbor_entity) = neighbor_entity_opt {
@@ -386,15 +379,15 @@ fn calculate_boid_force_optimized(
             if neighbor_entity == entity {
                 continue;
             }
-            
+
             let diff = pos - neighbor_pos;
             let dist_sq = diff.length_squared();
-            
+
             // Skip if beyond perception radius
             if dist_sq > perception_radius_sq {
                 continue;
             }
-            
+
             // Direct query is faster than HashMap lookup for small neighbor counts
             if let Ok((_, _, neighbor_velocity)) = boid_query.get(neighbor_entity) {
                 // Separation (avoid crowding neighbors)
@@ -403,7 +396,7 @@ fn calculate_boid_force_optimized(
                     separation += Vector2::new(diff.x * inv_dist, diff.y * inv_dist);
                     separation_count += 1;
                 }
-                
+
                 // Alignment and cohesion
                 avg_vel += neighbor_velocity.0;
                 center_of_mass += neighbor_pos;
@@ -411,33 +404,33 @@ fn calculate_boid_force_optimized(
             }
         }
     }
-    
+
     let mut total_force = Vector2::ZERO;
-    
+
     // Apply separation
     if separation_count > 0 {
         separation = separation.normalized() * config.max_force;
         total_force += separation * config.separation_weight;
     }
-    
+
     // Apply alignment
     if neighbor_count > 0 {
         avg_vel /= neighbor_count as f32;
         let alignment = (avg_vel - velocity).normalized() * config.max_force;
         total_force += alignment * config.alignment_weight;
-        
+
         // Apply cohesion
         center_of_mass /= neighbor_count as f32;
         let desired_direction = (center_of_mass - pos).normalize();
         let cohesion = Vector2::new(desired_direction.x, desired_direction.y) * config.max_force;
         total_force += cohesion * config.cohesion_weight;
     }
-    
+
     // Limit total force
     if total_force.length() > config.max_force {
         total_force = total_force.normalized() * config.max_force;
     }
-    
+
     total_force
 }
 
@@ -457,7 +450,7 @@ fn apply_boundary_constraints(pos: Vec2, config: &BoidsConfig) -> Vec2 {
             pos.y - config.world_bounds.y
         } else {
             pos.y
-        }
+        },
     )
 }
 
@@ -471,13 +464,13 @@ fn log_performance(
     if current_time - performance.last_log_time >= 1.0 {
         let fps = performance.frame_count as f32 / (current_time - performance.last_log_time);
         let actual_boid_count = boids.iter().count();
-        
+
         godot_print!(
             "🎮 Bevy Boids: {} boids | FPS: {:.1}",
             actual_boid_count,
             fps
         );
-        
+
         performance.last_log_time = current_time;
         performance.frame_count = 0;
     }

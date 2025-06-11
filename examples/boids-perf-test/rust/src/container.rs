@@ -5,7 +5,6 @@ use godot_bevy::prelude::*;
 #[derive(Component, Default)]
 pub struct BoidsContainer;
 
-
 #[derive(GodotClass, BevyBundle)]
 #[class(base=Node2D)]
 #[bevy_bundle((BoidsContainer), autosync=true)]
@@ -39,12 +38,12 @@ impl INode2D for BevyBoids {
 impl BevyBoids {
     #[func]
     fn get_boid_count(&self) -> i32 {
-      return self.current_boid_count;
+        self.current_boid_count
     }
 
     #[func]
     fn set_target_boid_count(&mut self, count: i32) {
-      self.target_boid_count = count;
+        self.target_boid_count = count;
     }
 
     #[func]
