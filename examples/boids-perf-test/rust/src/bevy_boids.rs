@@ -38,6 +38,10 @@ pub struct BoidCount {
 #[derive(Component, Default)]
 pub struct Boid;
 
+/// Marker component for boids that need colorization
+#[derive(Component)]
+pub struct NeedsColorization;
+
 /// Component storing boid velocity
 #[derive(Component)]
 pub struct Velocity(pub Vector2);
@@ -116,6 +120,7 @@ impl Plugin for BoidsPlugin {
                 sync_container_params,
                 handle_boid_count,
                 update_simulation_state,
+                colorize_new_boids,
                 log_performance,
             )
                 .chain(),
@@ -220,10 +225,15 @@ fn spawn_boids(commands: &mut Commands, count: i32, config: &BoidsConfig, boid_s
         let godot_transform = godot::prelude::Transform2D::IDENTITY.translated(pos);
         let transform = Transform2D::from(godot_transform);
 
-        commands
+        let entity = commands
             .spawn_empty()
             .insert(GodotScene::from_handle(boid_scene.0.clone()))
-            .insert((Boid, Velocity(velocity), transform));
+            .insert((Boid, Velocity(velocity), transform))
+            .id();
+
+        // We'll set the color after the entity is spawned in the next frame
+        // by using a marker component
+        commands.entity(entity).insert(NeedsColorization);
     }
 }
 
@@ -266,6 +276,44 @@ fn update_simulation_state(
             }
             commands.entity(entity).despawn();
         }
+    }
+}
+
+/// Colorize newly spawned boids (matches GDScript behavior)
+fn colorize_new_boids(
+    mut commands: Commands,
+    new_boids: Query<(Entity, &GodotNodeHandle), With<NeedsColorization>>,
+) {
+    for (entity, handle) in new_boids.iter() {
+        let mut handle_clone = handle.clone();
+
+        // Generate random color (matching GDScript)
+        let random_color = Color::from_rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.9);
+
+        // Try different node structures (matching GDScript logic)
+        if let Some(mut node) = handle_clone.try_get::<Node2D>() {
+            // Check for Sprite child node
+            if node.has_node("Sprite") {
+                let mut sprite = node.get_node_as::<Node2D>("Sprite");
+                sprite.set_modulate(random_color);
+            }
+            // Check for Triangle child node
+            else if node.has_node("Triangle") {
+                let mut triangle = node.get_node_as::<Node2D>("Triangle");
+                triangle.set_modulate(random_color);
+            }
+            // If it's a Sprite2D directly, set its modulate
+            else if let Some(mut sprite) = handle_clone.try_get::<godot::classes::Sprite2D>() {
+                sprite.set_modulate(random_color);
+            }
+            // Fallback: set modulate on the main node
+            else {
+                node.set_modulate(random_color);
+            }
+        }
+
+        // Remove the marker component
+        commands.entity(entity).remove::<NeedsColorization>();
     }
 }
 
