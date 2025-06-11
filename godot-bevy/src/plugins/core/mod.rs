@@ -50,6 +50,32 @@ impl PhysicsDelta {
     }
 }
 
+/// Configuration resource for transform syncing behavior
+#[derive(Resource, Debug, Clone)]
+pub struct GodotTransformConfig {
+    /// Whether to enable reading transforms from Godot nodes back to Bevy ECS.
+    /// This is useful for hybrid apps that modify transforms outside of ECS.
+    /// Default: false (reading disabled, writing enabled)
+    pub enable_transform_reading: bool,
+}
+
+impl Default for GodotTransformConfig {
+    fn default() -> Self {
+        Self {
+            enable_transform_reading: false,
+        }
+    }
+}
+
+impl GodotTransformConfig {
+    /// Enable reading transforms from Godot nodes to ECS components
+    pub fn with_transform_reading() -> Self {
+        Self {
+            enable_transform_reading: true,
+        }
+    }
+}
+
 pub struct GodotCorePlugin;
 
 impl Plugin for GodotCorePlugin {
@@ -74,7 +100,8 @@ impl Plugin for GodotCorePlugin {
             .add_plugins(GodotCollisionsPlugin)
             .add_plugins(GodotSignalsPlugin)
             .add_plugins(GodotInputEventPlugin)
-            .init_resource::<PhysicsDelta>();
+            .init_resource::<PhysicsDelta>()
+            .init_resource::<GodotTransformConfig>();
 
         // Add the PhysicsUpdate schedule
         app.add_schedule(Schedule::new(PhysicsUpdate));
