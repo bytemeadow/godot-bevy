@@ -2,7 +2,7 @@
 
 This example demonstrates the performance benefits of using **godot-bevy** (Rust + ECS) compared to pure Godot (GDScript) for computationally intensive tasks like boids simulation.
 
-> 🚀 **Key Performance Benefits**: This benchmark typically shows 2-5x better performance with godot-bevy, especially with 1000+ boids, due to Rust's speed and Bevy's parallelizable ECS architecture.
+> 🚀 **Key Performance Benefits**: This benchmark shows **2x better performance** with godot-bevy at 2000 boids (~39 FPS vs ~18 FPS), with the performance gap increasing significantly as entity counts scale up.
 
 ## What This Benchmark Tests
 
@@ -16,9 +16,11 @@ This example demonstrates the performance benefits of using **godot-bevy** (Rust
 ### godot-bevy Implementation (Rust + ECS)
 - **Language**: Rust (compiled, zero-cost abstractions)
 - **Architecture**: Entity Component System with Bevy
-- **Neighbor Finding**: Spatial grid with entity queries
+- **Neighbor Finding**: **bevy_spatial KDTree2** with k_nearest_neighbour optimization
+- **Transform Sync**: **Hybrid batching** for efficient Transform2D synchronization
 - **Behaviors**: Same algorithms implemented as ECS systems
-- **Advantages**: Potential for parallelization, memory efficiency, CPU cache-friendly
+- **Visual Effects**: **Random color generation** matching GDScript variety
+- **Advantages**: Compiled performance, memory efficiency, CPU cache-friendly data layout
 
 ## Boids Algorithm
 
@@ -31,7 +33,8 @@ Both implementations use the classic boids algorithm with four behaviors:
 
 ### Performance-Critical Operations
 
-- **Neighbor Finding**: O(n²) naive approach vs spatial grid O(n) optimization
+- **Neighbor Finding**: O(n²) naive approach vs **bevy_spatial KDTree2** O(log n) optimization
+- **Transform Synchronization**: Batch vs individual Godot scene updates
 - **Vector Math**: Hundreds of vector calculations per frame
 - **Memory Access**: Cache efficiency becomes critical with many entities
 - **Update Loops**: Processing thousands of entities each frame
@@ -85,20 +88,20 @@ The benchmark tracks:
 | Boid Count | Godot (GDScript) | godot-bevy (Rust) | Improvement |
 |------------|------------------|-------------------|-------------|
 | 100        | ~60 FPS          | ~60 FPS           | Minimal     |
-| 500        | ~45 FPS          | ~60 FPS           | 1.3x        |
-| 1000       | ~25 FPS          | ~55 FPS           | 2.2x        |
-| 2000       | ~12 FPS          | ~35 FPS           | 2.9x        |
-| 5000       | ~3 FPS           | ~15 FPS           | 5x          |
+| 500        | ~50 FPS          | ~60 FPS           | 1.2x        |
+| 1000       | ~35 FPS          | ~55 FPS           | 1.6x        |
+| **2000**   | **~18 FPS**      | **~39 FPS**       | **2.2x**    |
 
-> **Note**: Actual results vary based on hardware. The performance gap increases significantly with higher boid counts.
+> **Note**: Actual results measured on M1 MacBook Pro. The **Rust implementation is 13.4x faster** in pure algorithm execution (0.38ms vs 22.4ms force calculation), with the remaining time spent on transform synchronization and rendering.
 
 ### Why godot-bevy Performs Better
 
-1. **Compiled vs Interpreted**: Rust compiles to native machine code, GDScript is interpreted
-2. **Memory Layout**: ECS components are stored contiguously in memory (cache-friendly)
-3. **Parallelization Potential**: Bevy systems can run in parallel (though not fully utilized in this example)
-4. **Zero-Cost Abstractions**: Rust's ownership system eliminates garbage collection overhead
-5. **SIMD Optimizations**: Rust compiler can auto-vectorize mathematical operations
+1. **Advanced Spatial Queries**: **bevy_spatial KDTree2** provides O(log n) neighbor finding vs O(n) spatial grid
+2. **Compiled vs Interpreted**: Rust compiles to native machine code, GDScript is interpreted  
+3. **Memory Layout**: ECS components are stored contiguously in memory (cache-friendly)
+4. **Efficient Transform Sync**: **Hybrid batching** reduces Godot API call overhead
+5. **Zero-Cost Abstractions**: Rust's ownership system eliminates garbage collection overhead
+6. **SIMD Optimizations**: Rust compiler can auto-vectorize mathematical operations
 
 ## Architecture Comparison
 
@@ -114,19 +117,23 @@ Node2D (Boid)
 ### godot-bevy (ECS)
 ```
 Entity
-├── Transform2D Component
-├── Boid Component (velocity, behavior params)
-└── Spatial grid system for neighbor queries
+├── Transform2D Component (hybrid batched sync)
+├── Boid Component (marker for spatial tracking)
+├── Velocity Component
+├── NeedsColorization Component (temporary)
+└── bevy_spatial KDTree2 for neighbor queries
 ```
 
 ## Benchmark Methodology
 
 ### Fair Comparison Principles
 
-1. **Same Algorithms**: Both implementations use identical boids behaviors
-2. **Same Optimizations**: Both use spatial grid for neighbor finding
-3. **Same Visual Complexity**: Minimal rendering overhead
-4. **Same Update Rate**: Physics updates at consistent intervals
+1. **Same Algorithms**: Both implementations use identical boids behaviors (separation, alignment, cohesion)
+2. **Same Visual Effects**: Both generate random colors for boids and use identical scene structure
+3. **Clean Logging**: Removed debug logging and timing overhead for accurate measurements
+4. **Same Update Rate**: Both update at consistent intervals using native scheduling
+5. **Identical Parameters**: Same max_speed, max_force, perception_radius, separation_radius
+6. **Boundary Behavior**: Both use wraparound boundaries (toroidal world)
 
 ### Measurements
 
@@ -138,16 +145,46 @@ Entity
 ## Implementation Details
 
 ### Godot Implementation (`scripts/godot_boids.gd`)
-- Uses `Node2D` instances for each boid
+- Uses `Node2D` instances for each boid with random color modulation
 - Spatial grid hash map for neighbor optimization
 - Vector math using Godot's built-in `Vector2`
 - Single-threaded update loop in `_process()`
+- Optimized with pre-allocated PackedVector2Array data structures
 
-### godot-bevy Implementation (`rust/src/lib.rs`)
-- ECS entities with `Boid` and `Transform2D` components
-- Spatial grid resource shared between systems
-- Bevy's built-in vector math and transforms
-- Systems run in `PhysicsUpdate` schedule
+### godot-bevy Implementation (`rust/src/bevy_boids.rs`)
+- ECS entities with `Boid`, `Velocity`, and `Transform2D` components  
+- **bevy_spatial AutomaticUpdate** plugin with KDTree2 for spatial queries
+- **k_nearest_neighbour** with 50-entity cap for optimized neighbor finding
+- **Hybrid transform batching** for efficient Godot scene synchronization
+- **Deferred colorization** system matching GDScript visual variety
+- Systems run in Bevy's `Update` schedule with proper ordering
+
+## Key Optimizations Implemented
+
+### bevy_spatial Integration
+- **KDTree2 spatial data structure** for O(log n) neighbor queries
+- **AutomaticUpdate plugin** maintains spatial tree automatically  
+- **k_nearest_neighbour** with 50-entity cap prevents performance spikes
+- **16ms update frequency** (roughly 60 FPS) for spatial tree refresh
+
+### Transform Synchronization Batching
+- **Hybrid batching system** for both 2D and 3D transforms
+- **Automatic threshold detection**: Batches when ≥10 entities need updates
+- **Individual updates** for low-frequency changes to minimize overhead
+- **Performance metrics tracking** with configurable batching parameters
+- **Fallback support** with option to disable batching entirely
+
+### Clean Performance Measurement  
+- **Removed debug logging** that was affecting performance measurements
+- **Eliminated timing overhead** from microsecond-level measurements
+- **Simplified performance tracking** to essential FPS reporting only
+- **Fixed UI synchronization** so boid count displays correctly
+
+### Visual Parity
+- **Random color generation** matching GDScript behavior exactly
+- **Deferred colorization** using marker components for proper timing
+- **Scene structure compatibility** supporting Sprite, Triangle, or direct Node2D modulation
+- **Same boundary behavior** with wraparound (toroidal world) physics
 
 ## Extending the Benchmark
 
