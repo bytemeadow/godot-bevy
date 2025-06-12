@@ -16,6 +16,7 @@ Godot-Bevy supports three distinct sync modes:
 
 ### `TransformSyncMode::Disabled`
 - **No syncing** - zero overhead
+- **No transform components created** - saves memory and CPU
 - Use `GodotNodeHandle` for direct Godot physics (`move_and_slide`, etc.)
 - **Best for**: Platformers, physics-heavy games
 
@@ -210,6 +211,7 @@ fn build_app(app: &mut App) {
 
 **`Disabled` Mode:**
 - ✅ **Zero overhead** - no transform systems run
+- ✅ **No memory usage** - transform components not created
 - ✅ **Best performance** for physics-heavy games
 
 **`OneWay` Mode:**

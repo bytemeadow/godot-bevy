@@ -24,6 +24,9 @@ use crate::{
     bridge::GodotNodeHandle,
     prelude::{Collisions, Transform2D, Transform3D},
 };
+use bevy::ecs::system::Res;
+
+use super::{GodotTransformConfig, TransformSyncMode};
 
 use super::collisions::ALL_COLLISION_SIGNALS;
 
@@ -75,6 +78,7 @@ fn initialize_scene_tree(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
+    config: Res<GodotTransformConfig>,
 ) {
     fn traverse(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
         events.push(SceneTreeEvent {
@@ -91,7 +95,13 @@ fn initialize_scene_tree(
     let mut events = vec![];
     traverse(root.upcast(), &mut events);
 
-    create_scene_tree_entity(&mut commands, events, &mut scene_tree, &mut entities);
+    create_scene_tree_entity(
+        &mut commands,
+        events,
+        &mut scene_tree,
+        &mut entities,
+        &config,
+    );
 }
 
 #[derive(Debug, Clone, Event)]
@@ -178,6 +188,7 @@ fn create_scene_tree_entity(
     events: impl IntoIterator<Item = SceneTreeEvent>,
     scene_tree: &mut SceneTreeRef,
     entities: &mut Query<(&mut GodotNodeHandle, Entity)>,
+    config: &GodotTransformConfig,
 ) {
     let mut ent_mapping = entities
         .iter()
@@ -202,14 +213,16 @@ fn create_scene_tree_entity(
                 ent.insert(GodotNodeHandle::clone(&node))
                     .insert(Name::from(node.get::<Node>().get_name().to_string()));
 
-                if let Some(node3d) = node.try_get::<Node3D>() {
-                    ent.insert(Transform3D::from(node3d.get_transform()));
-                }
+                // Only add transform components if sync mode is not disabled
+                if config.sync_mode != TransformSyncMode::Disabled {
+                    if let Some(node3d) = node.try_get::<Node3D>() {
+                        ent.insert(Transform3D::from(node3d.get_transform()));
+                    }
 
-                if let Some(node2d) = node.try_get::<Node2D>() {
-                    // TODO: validate this is as expected
-                    let transform = node2d.get_transform();
-                    ent.insert(Transform2D::from(transform));
+                    if let Some(node2d) = node.try_get::<Node2D>() {
+                        let transform = node2d.get_transform();
+                        ent.insert(Transform2D::from(transform));
+                    }
                 }
 
                 let mut node = node.get::<Node>();
@@ -276,11 +289,13 @@ fn read_scene_tree_events(
     mut scene_tree: SceneTreeRef,
     mut event_reader: EventReader<SceneTreeEvent>,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
+    config: Res<GodotTransformConfig>,
 ) {
     create_scene_tree_entity(
         &mut commands,
         event_reader.read().cloned(),
         &mut scene_tree,
         &mut entities,
+        &config,
     );
 }
