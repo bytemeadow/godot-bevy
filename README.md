@@ -341,6 +341,7 @@ fn play_audio(
 ### Core Concepts
 - **[Timing and Schedules](docs/TIMING_AND_SCHEDULES.md)** - Understanding frame timing, schedule execution, and data synchronization
 - **[Input Systems](docs/INPUT_SYSTEMS.md)** - Choosing between Bevy's built-in input and Godot's bridged input system
+- **[Transform Syncing](docs/TRANSFORMS.md)** - Understanding transform syncing in `godot-bevy`
 
 ### API Reference
 For detailed API documentation, see [docs.rs/godot-bevy](https://docs.rs/godot-bevy).
