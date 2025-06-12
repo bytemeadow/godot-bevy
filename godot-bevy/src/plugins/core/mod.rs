@@ -50,28 +50,59 @@ impl PhysicsDelta {
     }
 }
 
+/// Transform synchronization modes
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransformSyncMode {
+    /// No transform syncing - use direct Godot physics (move_and_slide, etc.)
+    /// Best for: Platformers, physics-heavy games
+    Disabled,
+    /// One-way sync: ECS → Godot only
+    /// Best for: Pure ECS games, simple movement
+    OneWay,
+    /// Two-way sync: ECS ↔ Godot
+    /// Best for: Hybrid apps migrating from GDScript to ECS
+    TwoWay,
+}
+
+impl Default for TransformSyncMode {
+    fn default() -> Self {
+        Self::OneWay
+    }
+}
+
 /// Configuration resource for transform syncing behavior
 #[derive(Resource, Debug, Clone)]
 pub struct GodotTransformConfig {
-    /// Whether to enable reading transforms from Godot nodes back to Bevy ECS.
-    /// This is useful for hybrid apps that modify transforms outside of ECS.
-    /// Default: false (reading disabled, writing enabled)
-    pub enable_transform_reading: bool,
+    pub sync_mode: TransformSyncMode,
 }
 
 impl Default for GodotTransformConfig {
     fn default() -> Self {
         Self {
-            enable_transform_reading: false,
+            sync_mode: TransformSyncMode::OneWay,
         }
     }
 }
 
 impl GodotTransformConfig {
-    /// Enable reading transforms from Godot nodes to ECS components
-    pub fn with_transform_reading() -> Self {
+    /// Disable all transform syncing - use direct Godot physics instead
+    pub fn disabled() -> Self {
         Self {
-            enable_transform_reading: true,
+            sync_mode: TransformSyncMode::Disabled,
+        }
+    }
+
+    /// Enable one-way sync (ECS → Godot) - default behavior
+    pub fn one_way() -> Self {
+        Self {
+            sync_mode: TransformSyncMode::OneWay,
+        }
+    }
+
+    /// Enable two-way sync (ECS ↔ Godot) for hybrid apps
+    pub fn two_way() -> Self {
+        Self {
+            sync_mode: TransformSyncMode::TwoWay,
         }
     }
 }

@@ -11,9 +11,10 @@ pub use crate::plugins::{
         MainAudioTrack, PlayAudioCommand, SoundId,
     },
     core::{
-        ActionInput, Collisions, FindEntityByNameExt, GodotCorePlugin, GodotSignal, Groups,
-        GodotTransformConfig, KeyboardInput, MouseButtonInput, MouseMotion, PhysicsDelta, PhysicsUpdate,
-        SceneTreeEventReader, SceneTreeRef, SystemDeltaTimer, Transform2D, Transform3D,
+        ActionInput, Collisions, FindEntityByNameExt, GodotCorePlugin, GodotSignal,
+        GodotTransformConfig, Groups, KeyboardInput, MouseButtonInput, MouseMotion, PhysicsDelta,
+        PhysicsUpdate, SceneTreeEventReader, SceneTreeRef, SystemDeltaTimer, Transform2D,
+        Transform3D, TransformSyncMode,
         collisions::{
             ALL_COLLISION_SIGNALS, AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED,
             COLLISION_END_SIGNALS, COLLISION_START_SIGNALS,
