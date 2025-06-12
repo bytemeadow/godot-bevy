@@ -1,13 +1,12 @@
 # godot-bevy
 
-`godot-bevy` is a Rust library that brings [Bevy's](https://bevyengine.org/) powerful Entity Component System (ECS) to the versatile [Godot Game Engine](https://godotengine.org/). Use Bevy's ergonomic and high-performance Rust ECS within your Godot projects to get the best of both worlds.
-
 [![Discord](https://img.shields.io/discord/1379465862800736258.svg?color=7289da&&logo=discord)](https://discord.gg/gqkeBsH93H)
 [![Current Crates.io Version](https://img.shields.io/crates/v/godot-bevy.svg)](https://crates.io/crates/godot-bevy)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue)](https://docs.rs/godot-bevy/latest/godot_bevy/)
-[![Test Status](https://github.com/dcvz/godot-bevy/actions/workflows/ci.yml/badge.svg)](https://github.com/dcvz/godot-bevy/actions/workflows/ci.yml)
-[![Rust Version](https://img.shields.io/badge/Rust-1.87.0+-blue)](https://releases.rs/docs/1.87.0)
-![license](https://shields.io/badge/license-MIT%2FApache--2.0-blue)
+[![Book](https://img.shields.io/badge/book-read-green)](https://godot-rust.github.io/godot-bevy)
+[![Test Status](https://github.com/godot-rust/godot-bevy/actions/workflows/ci.yml/badge.svg)](https://github.com/godot-rust/godot-bevy/actions/workflows/ci.yml)
+
+**godot-bevy** brings Bevy's powerful ECS to Godot, allowing you to write high-performance game logic in Rust while leveraging Godot's excellent editor and rendering capabilities.
 
 ---
 
@@ -25,45 +24,20 @@ _Special thanks to [Blaze](https://runblaze.dev) for their support of this proje
 
 </div>
 
-## Features
+## 📚 Documentation
 
-- **Deep ECS Integration**: True Bevy ECS systems controlling Godot nodes, not just bindings
-- **Bidirectional Transform Sync**: Seamless Transform2D/3D synchronization between Bevy and Godot
-- **Godot Signals in ECS**: Listen to and respond to Godot signals from Bevy systems
-- **Collision Event Handling**: React to Godot collision events in your ECS systems
-- **Scene Tree Queries**: Query and manipulate Godot's scene tree from Bevy
-- **Resource Management**: Load and manage Godot resources (scenes, textures, etc.) from ECS via AssetServer
-- **Audio System**: Dual-mode audio with one-shot sound effects and persistent audio sources
-- **Node Groups Integration**: Work with Godot node groups in your Bevy systems
-- **Smart Scheduling**: Physics-rate vs visual-rate system execution with proper timing
-- **Godot Input Events**: Thread-safe Godot input events delivered as Bevy Events
+**[Read the godot-bevy Book →](https://dcvz.github.io/godot-bevy)**
 
-## Projects Using `godot-bevy`
+The book covers everything you need to know:
+- Installation and setup
+- Core concepts and architecture  
+- Transform system and physics
+- Input handling
+- Examples and best practices
 
-We'd love to showcase projects built with godot-bevy! If you're using this library in your game or project, please consider adding it to our [showcase](docs/SHOWCASE.md).
+## 🚀 Quick Start
 
-*Are you building something with godot-bevy? [Submit your project →](docs/SHOWCASE.md)*
-
-## Recommended Workflow
-
-**godot-bevy is a library for Godot developers who want to leverage Bevy's powerful ECS system within their Godot projects.** This is not a Godot plugin for Bevy users, but rather a way to bring the best of both worlds together with Godot as the foundation.
-
-We encourage a **Godot-first approach** where you:
-
-- **Design scenes and nodes in Godot** - Use Godot's excellent scene editor, node system, and visual tools for level design, UI, and content creation
-- **Manage assets in Godot** - Import textures, audio, 3D models, and configure them using Godot's import system and project settings
-- **Use Bevy ECS for logic** - Write your game systems, components, and logic using Bevy's high-performance, data-oriented ECS
-- **Consume Godot resources from ECS** - Load and use Godot-managed assets seamlessly within your Bevy systems
-
-This approach gives you the **visual authoring power of Godot** combined with the **performance and architectural benefits of Bevy's ECS**, while maintaining a single source of truth for your game's content and configuration.
-
-The library handles all the complex bridging between these two paradigms, so you can focus on building your game rather than managing integration details.
-
-## Quick Start
-
-### Installation
-
-Add the following to your `Cargo.toml`:
+Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
@@ -72,30 +46,12 @@ bevy = { version = "0.16", default-features = false }
 godot = "0.3.0"
 ```
 
-### Godot Setup
-**Add a `BevyAppSingleton` autoload** in your Godot project settings, which is a Godot scene containing a single root node of type BevyApp, which you can see examples of in `examples/` - this is the entry point for our systems.
-
-
-### Basic Usage
+Basic example:
 
 ```rust
-use bevy::ecs::system::Query;
-use bevy::prelude::{App, Update};
-use godot::global::godot_print;
-use godot_bevy::prelude::godot_prelude::gdextension;
-use godot_bevy::prelude::godot_prelude::ExtensionLibrary;
-use godot_bevy::prelude::{bevy_app, Transform2D};
+use bevy::prelude::*;
+use godot_bevy::prelude::*;
 
-// The build_app function runs at your game's startup.
-//
-// Entry point for the Godot-Bevy plugin. For more about the `#[bevy_app]` macro, see:
-// (https://docs.rs/godot-bevy-macros/0.6.1/godot_bevy_macros/attr.bevy_app.html)
-//
-// The #[bevy_app] macro is a wrapper around the Godot-Rust #[gdextension] macro:
-// (https://godot-rust.github.io/docs/gdext/master/godot/prelude/trait.ExtensionLibrary.html)
-//
-// Read more about the Bevy `App` parameter here:
-// (https://bevy.org/learn/quick-start/getting-started/apps/)
 #[bevy_app]
 fn build_app(app: &mut App) {
     // Print to the Godot console:
@@ -131,262 +87,40 @@ fn position_system(mut transform: Query<&mut Transform2D>) {
         transform.as_godot_mut().origin.x += 1.0;
     }
 }
+
 ```
 
-### Node Queries
+## 🎮 Examples
 
-One of godot-bevy's most powerful features is the ability to **query and interact with Godot nodes directly through Bevy's ECS**. Every Godot node becomes a Bevy entity that you can query, modify, and control.
+Check out the [examples](./examples) directory:
+- **[2D Platformer](./examples/platformer-2d)** - Physics-based platformer
+- **[Dodge the Creeps](./examples/dodge-the-creeps-2d)** - Classic arcade game
+- **[Simple Movement](./examples/simple-node2d-movement)** - Basic transform usage
 
-#### Querying
+## 🤝 Contributing
 
-```rust
-use godot::classes::{Label, Button, Area2D, Node2D};
-use godot_bevy::prelude::*;
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md).
 
-// Query nodes with your custom components, then cast to specific Godot types
-fn update_player_ui(
-    mut player: Query<&mut GodotNodeHandle, With<Player>>,
-    player_health: Query<&Health, With<Player>>,
-) -> Result {
-    if let (Ok(mut player_handle), Ok(health)) = (player.single_mut(), player_health.get_single()) {
-        // Cast the handle to your custom Godot class
-        let player_node = player_handle.get::<MyPlayerNode>();
+### Development Setup
 
-        // Or cast to built-in Godot classes
-        let area2d = player_handle.get::<Area2D>();
-        let overlapping_bodies = area2d.get_overlapping_bodies().len();
+1. Fork and clone the repository
+2. Install Rust 1.87+ and Godot 4.3
+3. Run tests: `cargo test`
+4. Build examples: `cargo build --examples`
 
-        if overlapping_bodies > 0 {
-            println!("Player is colliding with {} bodies", overlapping_bodies);
-        }
-    }
+## 📄 License
 
-    Ok(())
-}
-```
+Licensed under either of:
 
-#### Defining bundles for custom Godot nodes
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT license ([LICENSE-MIT](LICENSE-MIT))
 
-```rust
-/// Component representing the health of an entity
-#[derive(Component, Debug, Clone, PartialEq)]
-pub struct Health(pub f32);
+at your option.
 
-/// Component marking an entity as the player
-#[derive(Component, Debug, Clone, Default)]
-pub struct Player;
+## 🙏 Acknowledgments
 
-/// Custom node to be used in editor, but any instance of it will /// be created with this bundle and grab the values from the node vars
-#[derive(GodotClass, BevyBundle)]
-#[class(base=CharacterBody2D)]
-#[bevy_bundle((Health: health), (Player)), autosync=true]
-pub struct Player2D {
-    base: Base<CharacterBody2D>,
-    #[export]
-    health: f32,
-}
-
-#[godot_api]
-impl ICharacterBody2D for Player2D {
-    fn init(base: Base<CharacterBody2D>) -> Self {
-        Self {
-            base,
-            health: 100.0,
-        }
-    }
-}
-
-// If autosync is not true, then you'll have to make sure you add the
-// auto generated plugin to your app: Player2DBundleAutoSyncPlugin
-// app.add_plugins(Player2DBundleAutoSyncPlugin)
-```
-
-#### Working with Node Groups and Entity Queries
-
-```rust
-// Query entities and check Godot node groups
-fn handle_enemy_groups(
-    mut commands: Commands,
-    entities: Query<(Entity, &mut GodotNodeHandle)>
-) -> Result {
-    for (entity, mut node_handle) in entities.iter() {
-        let node = node_handle.get::<Node>();
-
-        // Check if node is in a specific Godot group
-        if node.is_in_group("enemies".into()) {
-            // Add ECS components based on node groups
-            commands.entity(entity).insert(Enemy { health: 100 });
-        }
-    }
-
-    Ok(())
-}
-```
-
-#### Finding Nodes by Name
-
-```rust
-// Use a helper trait to find entities by node name
-fn setup_start_position(
-    mut player: Query<&mut Transform2D, With<Player>>,
-    entities: Query<(&Name, &mut GodotNodeHandle)>,
-) -> Result {
-    if let Ok(mut transform) = player.single_mut() {
-        // Find the start position node by name
-        let start_pos_handle = entities
-            .iter()
-            .find_entity_by_name("StartPosition")
-            .unwrap();
-
-        let start_node = start_pos_handle.get::<Node2D>();
-        let position = start_node.get_position();
-
-        // Set player position from Godot node
-        transform.as_godot_mut().origin = position;
-    }
-
-    Ok(())
-}
-```
-
-### Asset Management
-
-**The library provides unified asset loading that works consistently in both development and exported games**. While Godot packages assets differently when exporting (filesystem vs .pck files), `godot-bevy` abstracts this complexity away.
-
-#### Quick Start
-
-Use Bevy's `AssetServer`  for modern, non-blocking asset loading:
-
-```rust
-use bevy::asset::{AssetServer, Assets, Handle};
-use godot_bevy::prelude::*;
-
-fn load_assets(asset_server: Res<AssetServer>) {
-    // Load any Godot resource through Bevy's asset system (async, non-blocking)
-    let scene: Handle<GodotResource> = asset_server.load("scenes/player.tscn");
-    let audio: Handle<GodotResource> = asset_server.load("audio/music.ogg");
-    let texture: Handle<GodotResource> = asset_server.load("art/player.png");
-
-    // Works with bevy_asset_loader for loading states
-}
-
-fn use_loaded_assets(
-    mut assets: ResMut<Assets<GodotResource>>,
-    scene_handle: Handle<GodotResource>, // Your loaded handle
-) {
-    if let Some(asset) = assets.get_mut(&scene_handle) {
-        // Cast to specific Godot types as needed
-        if let Some(scene) = asset.try_cast::<PackedScene>() {
-            // Use the scene...
-        }
-        if let Some(audio) = asset.try_cast::<AudioStream>() {
-            // Use the audio...
-        }
-    }
-}
-```
-
-### Audio System
-
-The library provides a powerful channel-based audio API using Godot's audio engine with spatial audio support.
-
-#### Quick Start
-
-```rust
-use bevy::prelude::*;
-use godot_bevy::prelude::*;
-
-// Define audio channels for organization
-#[derive(Resource)]
-struct Music;
-impl AudioChannelMarker for Music {
-    const CHANNEL_NAME: &'static str = "music";
-}
-
-#[derive(Resource)]
-struct SoundEffects;
-impl AudioChannelMarker for SoundEffects {
-    const CHANNEL_NAME: &'static str = "sfx";
-}
-
-fn setup_audio(mut app: ResMut<App>) {
-    app.add_audio_channel::<Music>()
-       .add_audio_channel::<SoundEffects>();
-}
-
-fn play_audio(
-    music: Res<AudioChannel<Music>>,
-    sfx: Res<AudioChannel<SoundEffects>>,
-    asset_server: Res<AssetServer>,
-) {
-    // Play background music with fade-in
-    music.play(asset_server.load("audio/background.ogg"))
-         .volume(0.8)
-         .looped()
-         .fade_in(std::time::Duration::from_secs(2));
-
-    // Play 2D positional sound effect
-    sfx.play_2d(asset_server.load("audio/explosion.wav"), Vec2::new(100.0, 50.0))
-       .volume(0.6)
-       .pitch(1.2);
-
-    // Channel-wide controls
-    music.set_volume(0.5); // Fade all music
-    sfx.stop(); // Stop all sound effects
-}
-```
-
-## Documentation
-
-### Core Concepts
-- **[Timing and Schedules](docs/TIMING_AND_SCHEDULES.md)** - Understanding frame timing, schedule execution, and data synchronization
-- **[Input Systems](docs/INPUT_SYSTEMS.md)** - Choosing between Bevy's built-in input and Godot's bridged input system
-- **[Transform Syncing](docs/TRANSFORMS.md)** - Understanding transform syncing in `godot-bevy`
-
-### API Reference
-For detailed API documentation, see [docs.rs/godot-bevy](https://docs.rs/godot-bevy).
-
-## Examples
-
-The `examples/` directory contains complete sample projects demonstrating different aspects of godot-bevy:
-
-- **[`simple-node2d-movement/`](examples/simple-node2d-movement/)**: A simple example showing how to move a Sprite2D in a circle with many comments to explain what's going on.
-- **[`dodge-the-creeps-2d/`](examples/dodge-the-creeps-2d/)**: A complete 2D game showing ECS-driven gameplay, collision handling, audio system, and state management
-- **[`platformer-2d/`](examples/platformer-2d/)**: A 2D platformer game showing ECS-driven gameplay, scene switching, tagging of editor placed entities via custom Godot nodes, and more
-- **[`timing-test/`](examples/timing-test/)**: Demonstrates the timing behavior and schedule execution patterns for debugging and understanding
-- **[`input-event-demo/`](examples/input-event-demo/)**: Shows the thread-safe input event system and cross-platform input handling
-
-Each example includes both Rust code and a complete Godot project ready to run.
-
-## Version Compatibility Matrix
-
-| `godot-bevy` | Bevy | Godot-Rust | Godot |
-|------------|------|------------|-------|
-| 0.6.x      | 0.16 | 0.3.0      | 4.4.x |
-
-## Community
-
-If you are excited about the project or want to contribute, don't hesitate to join our [Discord](https://discord.gg/gqkeBsH93H)!
-We try to be as welcoming as possible to everybody from any background. We're still building this out, but you can ask your questions there!
-
-## Inspiration and Acknowledgements
-
-This library is inspired by and builds upon the work of [bevy_godot](https://github.com/rand0m-cloud/bevy_godot), which provided similar functionality for Godot 3. `godot-bevy` extends this concept to support Godot 4 and Bevy 0.16.
-
-**Alternative**: If you're looking for a different approach to `godot-bevy`, check out [bevy_godot4](https://github.com/jrockett6/bevy_godot4). For a comparison of the differences between these libraries, see [Issue #2](https://github.com/dcvz/godot-bevy/issues/2).
-
-## MSRV
-
-The minimum supported Rust version is 1.87.0.
-
-The MSRV is the minimum Rust version that can be used to compile each crate.
-
-## License
-
-godot-bevy is distributed under the terms of both the MIT license and the Apache License (Version 2.0).
-See [LICENSE-APACHE](./LICENSE-APACHE) and [LICENSE-MIT](./LICENSE-MIT) for details. Opening a pull
-request is assumed to signal agreement with these licensing terms.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+Special thanks to:
+- The [Bevy](https://bevyengine.org/) team for their amazing ECS
+- The [godot-rust](https://godot-rust.github.io/) team for the Godot bindings
+- [Blaze](https://runblaze.dev) for CI runner support
+- Our [contributors](https://github.com/godot-rust/godot-bevy/graphs/contributors) and community

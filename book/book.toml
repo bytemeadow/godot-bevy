@@ -1,0 +1,6 @@
+[book]
+authors = ["David Chavez"]
+language = "en"
+multilingual = false
+src = "src"
+title = "The godot-bevy Book 👾"

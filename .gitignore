@@ -4,3 +4,6 @@ target/
 
 # Jetbrains IDEs
 .idea
+
+# Book
+book/book
