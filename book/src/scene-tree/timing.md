@@ -18,12 +18,12 @@ fn find_player(query: Query<&PlayerBundle>) {
 
 ## How It Works
 
-The scene tree initialization happens in the `PreStartup` schedule, ensuring entities are ready before any `Startup` systems run. This process has two phases:
+The scene tree initialization happens in the `PreStartup` schedule, ensuring entities are ready before any `Startup` systems run. This process has two parallel systems:
 
 1. **`initialize_scene_tree`** - Traverses the entire Godot scene tree and creates Bevy entities with components like `GodotNodeHandle`, `Name`, transforms, and more
 2. **`connect_scene_tree`** - Sets up event listeners for runtime scene changes (nodes being added, removed, or renamed)
 
-These systems are chained together in `PreStartup`, guaranteeing they complete before your `Startup` systems run. This means you can safely query for Godot scene entities in `Startup`!
+Both systems run in parallel during `PreStartup`, and both complete before your `Startup` systems run. This means you can safely query for Godot scene entities in `Startup`!
 
 ## Runtime Scene Updates
 

@@ -34,14 +34,11 @@ pub struct GodotSceneTreePlugin;
 
 impl Plugin for GodotSceneTreePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            PreStartup,
-            (initialize_scene_tree, connect_scene_tree).chain(),
-        )
-        .add_systems(First, write_scene_tree_events.before(event_update_system))
-        .add_systems(First, read_scene_tree_events.before(event_update_system))
-        .add_event::<SceneTreeEvent>()
-        .init_non_send_resource::<SceneTreeRefImpl>();
+        app.add_systems(PreStartup, (initialize_scene_tree, connect_scene_tree))
+            .add_systems(First, write_scene_tree_events.before(event_update_system))
+            .add_systems(First, read_scene_tree_events.before(event_update_system))
+            .add_event::<SceneTreeEvent>()
+            .init_non_send_resource::<SceneTreeRefImpl>();
     }
 }
 
