@@ -1,3 +1,5 @@
+//! Debug utilities for scene tree inspection and diagnostics.
+
 use godot::{classes::Node, global::godot_print, obj::Gd};
 
 use crate::prelude::SceneTreeRef;

@@ -250,3 +250,97 @@ pub struct MainAudioTrack;
 impl AudioChannelMarker for MainAudioTrack {
     const CHANNEL_NAME: &'static str = "main";
 }
+
+/// Audio parameter validation utilities.
+/// 
+/// These functions provide testable implementations of audio parameter
+/// validation and processing used throughout the audio system.
+pub mod validation {
+    /// Audio parameter bounds
+    pub mod bounds {
+        pub const VOLUME_MIN: f32 = 0.0;
+        pub const VOLUME_MAX: f32 = 1.0;
+        pub const PITCH_MIN: f32 = 0.1;
+        pub const PITCH_MAX: f32 = 4.0;
+        pub const PANNING_MIN: f32 = -1.0;
+        pub const PANNING_MAX: f32 = 1.0;
+    }
+
+    /// Validate and clamp volume to valid range [0.0, 1.0]
+    pub fn clamp_volume(volume: f32) -> f32 {
+        volume.clamp(bounds::VOLUME_MIN, bounds::VOLUME_MAX)
+    }
+
+    /// Validate and clamp pitch to valid range [0.1, 4.0]
+    pub fn clamp_pitch(pitch: f32) -> f32 {
+        pitch.clamp(bounds::PITCH_MIN, bounds::PITCH_MAX)
+    }
+
+    /// Validate and clamp panning to valid range [-1.0, 1.0]
+    pub fn clamp_panning(panning: f32) -> f32 {
+        panning.clamp(bounds::PANNING_MIN, bounds::PANNING_MAX)
+    }
+
+    /// Check if volume is within valid range
+    pub fn is_valid_volume(volume: f32) -> bool {
+        volume.is_finite() && volume >= bounds::VOLUME_MIN && volume <= bounds::VOLUME_MAX
+    }
+
+    /// Check if pitch is within valid range
+    pub fn is_valid_pitch(pitch: f32) -> bool {
+        pitch.is_finite() && pitch >= bounds::PITCH_MIN && pitch <= bounds::PITCH_MAX
+    }
+
+    /// Check if panning is within valid range
+    pub fn is_valid_panning(panning: f32) -> bool {
+        panning.is_finite() && panning >= bounds::PANNING_MIN && panning <= bounds::PANNING_MAX
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_clamp_volume() {
+            assert_eq!(clamp_volume(-0.5), 0.0);
+            assert_eq!(clamp_volume(0.5), 0.5);
+            assert_eq!(clamp_volume(1.5), 1.0);
+            assert_eq!(clamp_volume(0.0), 0.0);
+            assert_eq!(clamp_volume(1.0), 1.0);
+        }
+
+        #[test]
+        fn test_clamp_pitch() {
+            assert_eq!(clamp_pitch(0.05), 0.1);
+            assert_eq!(clamp_pitch(2.0), 2.0);
+            assert_eq!(clamp_pitch(5.0), 4.0);
+            assert_eq!(clamp_pitch(0.1), 0.1);
+            assert_eq!(clamp_pitch(4.0), 4.0);
+        }
+
+        #[test]
+        fn test_clamp_panning() {
+            assert_eq!(clamp_panning(-2.0), -1.0);
+            assert_eq!(clamp_panning(0.0), 0.0);
+            assert_eq!(clamp_panning(2.0), 1.0);
+            assert_eq!(clamp_panning(-1.0), -1.0);
+            assert_eq!(clamp_panning(1.0), 1.0);
+        }
+
+        #[test]
+        fn test_validation_functions() {
+            assert!(is_valid_volume(0.5));
+            assert!(!is_valid_volume(-0.1));
+            assert!(!is_valid_volume(1.1));
+            assert!(!is_valid_volume(f32::NAN));
+
+            assert!(is_valid_pitch(2.0));
+            assert!(!is_valid_pitch(0.05));
+            assert!(!is_valid_pitch(5.0));
+
+            assert!(is_valid_panning(0.0));
+            assert!(!is_valid_panning(-1.5));
+            assert!(!is_valid_panning(1.5));
+        }
+    }
+}
