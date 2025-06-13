@@ -490,20 +490,20 @@ fn calculate_boid_force_optimized(
 fn calculate_boundary_avoidance(pos: Vec2, velocity: Vector2, config: &BoidsConfig) -> Vector2 {
     let mut steer = Vector2::ZERO;
     let margin = 100.0;
-    
+
     // Calculate boundary forces (matching GDScript logic)
     if pos.x < margin {
         steer.x += margin - pos.x;
     } else if pos.x > config.world_bounds.x - margin {
         steer.x -= pos.x - (config.world_bounds.x - margin);
     }
-    
+
     if pos.y < margin {
         steer.y += margin - pos.y;
     } else if pos.y > config.world_bounds.y - margin {
         steer.y -= pos.y - (config.world_bounds.y - margin);
     }
-    
+
     if steer.length_squared() > 0.0 {
         steer = steer.normalized() * config.max_speed - velocity;
         let max_boundary_force = config.max_force * 2.0; // Double strength like GDScript
@@ -512,7 +512,7 @@ fn calculate_boundary_avoidance(pos: Vec2, velocity: Vector2, config: &BoidsConf
         }
         return steer;
     }
-    
+
     Vector2::ZERO
 }
 
@@ -540,18 +540,18 @@ fn apply_boundary_constraints(pos: Vec2, config: &BoidsConfig) -> Vec2 {
 fn log_performance(
     mut performance: ResMut<PerformanceTracker>,
     time: Res<Time>,
-    boids: Query<&Transform2D, With<Boid>>,
+    _boids: Query<&Transform2D, With<Boid>>,
 ) {
     let current_time = time.elapsed_secs();
     if current_time - performance.last_log_time >= 1.0 {
-        let fps = performance.frame_count as f32 / (current_time - performance.last_log_time);
-        let actual_boid_count = boids.iter().count();
-
-        godot_print!(
-            "🎮 Bevy Boids: {} boids | FPS: {:.1}",
-            actual_boid_count,
-            fps
-        );
+        // Performance logging disabled for accurate benchmarking
+        // let fps = performance.frame_count as f32 / (current_time - performance.last_log_time);
+        // let actual_boid_count = boids.iter().count();
+        // godot_print!(
+        //     "🎮 Bevy Boids: {} boids | FPS: {:.1}",
+        //     actual_boid_count,
+        //     fps
+        // );
 
         performance.last_log_time = current_time;
         performance.frame_count = 0;

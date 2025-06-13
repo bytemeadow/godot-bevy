@@ -315,8 +315,10 @@ func _update_boid_physics_optimized(boid_index: int, force: Vector2, delta: floa
 	# Debug output removed
 
 func _log_performance():
-	var fps = Engine.get_frames_per_second()
-	print("🎮 Godot Boids: %d boids | FPS: %.1f" % [boid_nodes.size(), fps])
+	# Performance logging disabled for accurate benchmarking
+	# var fps = Engine.get_frames_per_second()
+	# print("🎮 Godot Boids: %d boids | FPS: %.1f" % [boid_nodes.size(), fps])
+	pass
 
 ## Utility functions for external access
 

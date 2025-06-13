@@ -115,7 +115,6 @@ func _update_status(status: String):
 ## UI Event Handlers
 
 func _on_implementation_changed(index: int):
-	print("🔧 DEBUG: Implementation changed to index: ", index)
 	current_implementation = index as Implementation
 	
 	if is_benchmark_running:
@@ -124,13 +123,10 @@ func _on_implementation_changed(index: int):
 	match current_implementation:
 		Implementation.GODOT:
 			_update_status("Switched to Godot (GDScript)")
-			print("🎯 Switched to Godot-only implementation")
 		Implementation.BEVY:
 			_update_status("Switched to godot-bevy (Rust + ECS)")
-			print("🚀 Switched to godot-bevy implementation")
 
 func _on_boid_count_changed(value: float):
-	print("🔧 DEBUG: Boid count changed to: ", value)
 	target_boid_count = int(value)
 	_update_boid_count_label()
 	
@@ -143,18 +139,14 @@ func _on_boid_count_changed(value: float):
 				bevy_boids.set_target_boid_count(target_boid_count)
 
 func _on_start_pressed():
-	print("🔧 DEBUG: Start button pressed")
 	_start_benchmark()
 
 func _on_stop_pressed():
-	print("🔧 DEBUG: Stop button pressed")
 	_stop_benchmark()
 
 func _on_reset_pressed():
-	print("🔧 DEBUG: Reset button pressed")
 	reset_performance_metrics()
 	_update_status("Metrics reset")
-	print("🔄 Performance metrics reset")
 
 ## Benchmark Control
 
@@ -191,12 +183,10 @@ func _stop_benchmark():
 func _start_godot_benchmark():
 	_update_status("Running Godot benchmark...")
 	godot_boids.start_benchmark(target_boid_count)
-	print("🎮 Started Godot boids benchmark with %d boids" % target_boid_count)
 
 func _start_bevy_benchmark():
 	_update_status("Running godot-bevy benchmark...")
 	bevy_boids.start_benchmark(target_boid_count)
-	print("🚀 Started godot-bevy boids benchmark with %d boids" % target_boid_count)
 
 func _stop_current_benchmark():
 	match current_implementation:
