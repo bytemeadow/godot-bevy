@@ -14,7 +14,15 @@ use bevy::{
 };
 use godot::{
     builtin::GString,
-    classes::{Engine, Node, Node2D, Node3D, SceneTree},
+    classes::{
+        AnimatedSprite2D, AnimatedSprite3D, AnimationPlayer, AnimationTree, Area2D, Area3D,
+        AudioStreamPlayer, AudioStreamPlayer2D, AudioStreamPlayer3D, Button, Camera2D, Camera3D,
+        CanvasItem, CharacterBody2D, CharacterBody3D, CollisionPolygon2D, CollisionPolygon3D,
+        CollisionShape2D, CollisionShape3D, Control, DirectionalLight3D, Engine,
+        Label, LineEdit, MeshInstance2D, MeshInstance3D, Node, Node2D, Node3D,
+        Panel, Path2D, Path3D, PathFollow2D, PathFollow3D, RigidBody2D, RigidBody3D,
+        SceneTree, SpotLight3D, Sprite2D, Sprite3D, StaticBody2D, StaticBody3D, TextEdit, Timer,
+    },
     meta::ToGodot,
     obj::{Gd, Inherits},
     prelude::GodotConvert,
@@ -24,6 +32,8 @@ use crate::{
     bridge::GodotNodeHandle,
     prelude::{Collisions, Transform2D, Transform3D},
 };
+
+use super::node_markers::*;
 use bevy::ecs::system::Res;
 
 use super::{GodotTransformConfig, TransformSyncMode};
@@ -172,6 +182,162 @@ impl<T: Inherits<Node>> From<&Gd<T>> for Groups {
     }
 }
 
+/// Adds appropriate marker components to an entity based on the Godot node type
+fn add_node_type_markers(entity_commands: &mut bevy::ecs::system::EntityCommands, node: &mut GodotNodeHandle) {
+    // Try each node type and add the corresponding marker component
+    // We check more specific types first, then fall back to more general ones
+    
+    // Visual nodes
+    if node.try_get::<Sprite2D>().is_some() {
+        entity_commands.insert(Sprite2DMarker);
+    }
+    if node.try_get::<Sprite3D>().is_some() {
+        entity_commands.insert(Sprite3DMarker);
+    }
+    if node.try_get::<AnimatedSprite2D>().is_some() {
+        entity_commands.insert(AnimatedSprite2DMarker);
+    }
+    if node.try_get::<AnimatedSprite3D>().is_some() {
+        entity_commands.insert(AnimatedSprite3DMarker);
+    }
+    if node.try_get::<MeshInstance2D>().is_some() {
+        entity_commands.insert(MeshInstance2DMarker);
+    }
+    if node.try_get::<MeshInstance3D>().is_some() {
+        entity_commands.insert(MeshInstance3DMarker);
+    }
+    
+    // Physics bodies
+    if node.try_get::<CharacterBody2D>().is_some() {
+        entity_commands.insert(CharacterBody2DMarker);
+    }
+    if node.try_get::<CharacterBody3D>().is_some() {
+        entity_commands.insert(CharacterBody3DMarker);
+    }
+    if node.try_get::<RigidBody2D>().is_some() {
+        entity_commands.insert(RigidBody2DMarker);
+    }
+    if node.try_get::<RigidBody3D>().is_some() {
+        entity_commands.insert(RigidBody3DMarker);
+    }
+    if node.try_get::<StaticBody2D>().is_some() {
+        entity_commands.insert(StaticBody2DMarker);
+    }
+    if node.try_get::<StaticBody3D>().is_some() {
+        entity_commands.insert(StaticBody3DMarker);
+    }
+    
+    // Areas
+    if node.try_get::<Area2D>().is_some() {
+        entity_commands.insert(Area2DMarker);
+    }
+    if node.try_get::<Area3D>().is_some() {
+        entity_commands.insert(Area3DMarker);
+    }
+    
+    // Collision shapes
+    if node.try_get::<CollisionShape2D>().is_some() {
+        entity_commands.insert(CollisionShape2DMarker);
+    }
+    if node.try_get::<CollisionShape3D>().is_some() {
+        entity_commands.insert(CollisionShape3DMarker);
+    }
+    if node.try_get::<CollisionPolygon2D>().is_some() {
+        entity_commands.insert(CollisionPolygon2DMarker);
+    }
+    if node.try_get::<CollisionPolygon3D>().is_some() {
+        entity_commands.insert(CollisionPolygon3DMarker);
+    }
+    
+    // Audio nodes
+    if node.try_get::<AudioStreamPlayer>().is_some() {
+        entity_commands.insert(AudioStreamPlayerMarker);
+    }
+    if node.try_get::<AudioStreamPlayer2D>().is_some() {
+        entity_commands.insert(AudioStreamPlayer2DMarker);
+    }
+    if node.try_get::<AudioStreamPlayer3D>().is_some() {
+        entity_commands.insert(AudioStreamPlayer3DMarker);
+    }
+    
+    // UI nodes
+    if node.try_get::<Label>().is_some() {
+        entity_commands.insert(LabelMarker);
+    }
+    if node.try_get::<Button>().is_some() {
+        entity_commands.insert(ButtonMarker);
+    }
+    if node.try_get::<LineEdit>().is_some() {
+        entity_commands.insert(LineEditMarker);
+    }
+    if node.try_get::<TextEdit>().is_some() {
+        entity_commands.insert(TextEditMarker);
+    }
+    if node.try_get::<Panel>().is_some() {
+        entity_commands.insert(PanelMarker);
+    }
+    
+    // Camera nodes
+    if node.try_get::<Camera2D>().is_some() {
+        entity_commands.insert(Camera2DMarker);
+    }
+    if node.try_get::<Camera3D>().is_some() {
+        entity_commands.insert(Camera3DMarker);
+    }
+    
+    // Light nodes
+    if node.try_get::<DirectionalLight3D>().is_some() {
+        entity_commands.insert(DirectionalLight3DMarker);
+    }
+    if node.try_get::<SpotLight3D>().is_some() {
+        entity_commands.insert(SpotLight3DMarker);
+    }
+    
+    // Animation nodes
+    if node.try_get::<AnimationPlayer>().is_some() {
+        entity_commands.insert(AnimationPlayerMarker);
+    }
+    if node.try_get::<AnimationTree>().is_some() {
+        entity_commands.insert(AnimationTreeMarker);
+    }
+    
+    // Timer
+    if node.try_get::<Timer>().is_some() {
+        entity_commands.insert(TimerMarker);
+    }
+    
+    // Path nodes
+    if node.try_get::<Path2D>().is_some() {
+        entity_commands.insert(Path2DMarker);
+    }
+    if node.try_get::<Path3D>().is_some() {
+        entity_commands.insert(Path3DMarker);
+    }
+    if node.try_get::<PathFollow2D>().is_some() {
+        entity_commands.insert(PathFollow2DMarker);
+    }
+    if node.try_get::<PathFollow3D>().is_some() {
+        entity_commands.insert(PathFollow3DMarker);
+    }
+    
+    // Base node types (checked last to ensure more specific types take precedence)
+    if node.try_get::<Control>().is_some() {
+        entity_commands.insert(ControlMarker);
+    }
+    if node.try_get::<CanvasItem>().is_some() {
+        entity_commands.insert(CanvasItemMarker);
+    }
+    if node.try_get::<Node3D>().is_some() {
+        entity_commands.insert(Node3DMarker);
+    }
+    if node.try_get::<Node2D>().is_some() {
+        entity_commands.insert(Node2DMarker);
+    }
+    
+    // All nodes inherit from Node, so add this last
+    entity_commands.insert(NodeMarker);
+}
+
 #[doc(hidden)]
 pub struct SceneTreeEventReader(pub std::sync::mpsc::Receiver<SceneTreeEvent>);
 
@@ -211,6 +377,9 @@ fn create_scene_tree_entity(
 
                 ent.insert(GodotNodeHandle::clone(&node))
                     .insert(Name::from(node.get::<Node>().get_name().to_string()));
+
+                // Add node type marker components
+                add_node_type_markers(&mut ent, &mut node);
 
                 // Only add transform components if sync mode is not disabled
                 if config.sync_mode != TransformSyncMode::Disabled {

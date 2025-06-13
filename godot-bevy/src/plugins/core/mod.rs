@@ -27,6 +27,9 @@ pub use signals::*;
 pub mod input_event;
 pub use input_event::*;
 
+pub mod node_markers;
+pub use node_markers::*;
+
 /// Schedule that runs during Godot's physics_process at physics frame rate.
 /// Use this for movement, physics, and systems that need to sync with Godot's physics timing.
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
