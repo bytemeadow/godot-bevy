@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use bevy::app::{App, Last, Plugin, PreUpdate};
 use bevy::ecs::change_detection::DetectChanges;
-use bevy::ecs::query::{Added, Changed, Or};
+use bevy::ecs::query::{Added, Changed, Or, With};
 use bevy::ecs::system::Query;
 use bevy::math::Vec3;
 use bevy::prelude::Res;
@@ -15,7 +15,7 @@ use godot::prelude::Transform3D as GodotTransform3D;
 
 use crate::bridge::GodotNodeHandle;
 
-use super::SceneTreeRef;
+use super::{SceneTreeRef, Node2DMarker, Node3DMarker};
 
 #[derive(Debug, Component, Default, Copy, Clone)]
 pub struct Transform3D {
@@ -336,7 +336,7 @@ fn post_update_godot_transforms_3d(
     _scene_tree: SceneTreeRef,
     mut entities: Query<
         (&Transform3D, &mut GodotNodeHandle),
-        Or<(Added<Transform3D>, Changed<Transform3D>)>,
+        (Or<(Added<Transform3D>, Changed<Transform3D>)>, With<Node3DMarker>),
     >,
 ) {
     // Early return if transform syncing is disabled
@@ -356,7 +356,7 @@ fn post_update_godot_transforms_3d(
 fn pre_update_godot_transforms_3d(
     config: Res<super::GodotTransformConfig>,
     _scene_tree: SceneTreeRef,
-    mut entities: Query<(&mut Transform3D, &mut GodotNodeHandle)>,
+    mut entities: Query<(&mut Transform3D, &mut GodotNodeHandle), With<Node3DMarker>>,
 ) {
     // Early return if not using two-way sync
     if config.sync_mode != super::TransformSyncMode::TwoWay {
@@ -381,7 +381,7 @@ fn post_update_godot_transforms_2d(
     _scene_tree: SceneTreeRef,
     mut entities: Query<
         (&Transform2D, &mut GodotNodeHandle),
-        Or<(Added<Transform2D>, Changed<Transform2D>)>,
+        (Or<(Added<Transform2D>, Changed<Transform2D>)>, With<Node2DMarker>),
     >,
 ) {
     // Early return if transform syncing is disabled
@@ -405,7 +405,7 @@ fn post_update_godot_transforms_2d(
 fn pre_update_godot_transforms_2d(
     config: Res<super::GodotTransformConfig>,
     _scene_tree: SceneTreeRef,
-    mut entities: Query<(&mut Transform2D, &mut GodotNodeHandle)>,
+    mut entities: Query<(&mut Transform2D, &mut GodotNodeHandle), With<Node2DMarker>>,
 ) {
     // Early return if not using two-way sync
     if config.sync_mode != super::TransformSyncMode::TwoWay {
@@ -435,7 +435,7 @@ fn pre_update_godot_transforms_2d(
 /// These functions provide testable implementations of core mathematical
 /// operations used in transform conversion traits.
 pub mod math {
-    use bevy::prelude::{Quat, Transform, Vec3};
+    use bevy::prelude::{Quat, Transform};
 
     /// Extract rotation angle from 2D transform matrix components
     pub fn extract_rotation_from_2d_matrix(a_x: f32, a_y: f32) -> f32 {
