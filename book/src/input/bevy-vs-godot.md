@@ -95,6 +95,28 @@ fn movement_system(
 - Console ports
 - Games with complex controls
 
+## Input Event Processing
+
+godot-bevy processes Godot's dual input system intelligently to prevent duplicate events:
+
+- **Normal Input Events**: Generate `ActionInput` events for mapped keys/buttons
+- **Unhandled Input Events**: Generate raw `KeyboardInput`, `MouseButtonInput`, etc. for unmapped inputs
+
+This ensures:
+- ✅ **No duplicate events** - each physical input generates exactly one event
+- ✅ **Proper input flow** - mapped inputs become actions, unmapped inputs become raw events
+- ✅ **Clean event streams** - predictable, non-redundant event processing
+
+```rust
+// For a key mapped to "jump" action in Godot's Input Map:
+// ✅ Generates ONE ActionInput { action: "jump", pressed: true }
+// ❌ Does NOT generate duplicate KeyboardInput events
+
+// For an unmapped key (e.g., 'Q' with no action mapping):
+// ✅ Generates ONE KeyboardInput { keycode: Q, pressed: true }
+// ❌ Does NOT generate ActionInput events
+```
+
 ## Available Input Events
 
 godot-bevy provides several input event types:
@@ -204,6 +226,21 @@ fn game_controls(mut events: EventReader<ActionInput>) {
 
 This gives you the best of both worlds: simple debug controls and flexible game controls.
 
-## Next Steps
+## Troubleshooting
 
-Ready to implement input in your game? Check out [Best Practices](./best-practices.md) for implementation patterns and tips.
+### Duplicate Events (Fixed in v0.7.0+)
+
+If you're seeing duplicate `ActionInput` events for the same key press, you may be using an older version of godot-bevy. This was fixed in version 0.7.0 through improved input event processing.
+
+**Symptoms:**
+```rust
+// Old behavior (before v0.7.0):
+🎮 Action: 'jump' pressed    // First event
+🎮 Action: 'jump' pressed    // Duplicate event (unwanted)
+```
+
+**Solution:** Update to godot-bevy v0.7.0 or later where input processing was improved to eliminate duplicates.
+
+### Mouse Events Only on Movement
+
+`MouseMotion` events are only generated when the mouse actually moves. If you need continuous mouse position tracking, consider using Godot's `Input.get_global_mouse_position()` in a system that runs every frame.
