@@ -127,21 +127,13 @@ fn write_input_events(
         
         match event_type {
             InputEventType::Normal => {
-                godot_print!("⚡ Processing NORMAL input (includes ActionInput events)");
-                // Process all event types including actions from normal input
-                extract_input_events(
-                    input_event,
-                    &mut keyboard_events,
-                    &mut mouse_button_events,
-                    &mut mouse_motion_events,
-                    &mut touch_events,
-                    &mut action_events,
-                );
+                godot_print!("⚡ Processing NORMAL input (ActionInput events only)");
+                // Only process ActionInput events from normal input (mapped keys/actions)
+                extract_action_events_only(input_event, &mut action_events);
             }
             InputEventType::Unhandled => {
-                godot_print!("🔄 Processing UNHANDLED input (NO ActionInput events)");
-                // Process all event types except actions from unhandled input
-                // to avoid duplicate ActionInput events
+                godot_print!("🔄 Processing UNHANDLED input (raw input events only)");
+                // Process raw input events from unhandled input (unmapped keys, mouse, etc.)
                 extract_input_events_no_actions(
                     input_event,
                     &mut keyboard_events,
@@ -154,27 +146,15 @@ fn write_input_events(
     }
 }
 
-fn extract_input_events(
+fn extract_action_events_only(
     input_event: Gd<GodotInputEvent>,
-    keyboard_events: &mut EventWriter<KeyboardInput>,
-    mouse_button_events: &mut EventWriter<MouseButtonInput>,
-    mouse_motion_events: &mut EventWriter<MouseMotion>,
-    touch_events: &mut EventWriter<TouchInput>,
     action_events: &mut EventWriter<ActionInput>,
 ) {
-    // Extract basic input events (keyboard, mouse, touch)
-    extract_basic_input_events(
-        input_event.clone(),
-        keyboard_events,
-        mouse_button_events,
-        mouse_motion_events,
-        touch_events,
-    );
-
-    // Action input - Check if this event matches any actions
+    // Only process ActionInput events from normal input (mapped keys/actions)
     // Note: InputEventAction is not emitted by the engine, so we need to check manually
     check_action_events(&input_event, action_events);
 }
+
 
 fn extract_input_events_no_actions(
     input_event: Gd<GodotInputEvent>,
