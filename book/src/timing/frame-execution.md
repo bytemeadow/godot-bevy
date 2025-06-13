@@ -172,6 +172,8 @@ app.add_systems(FixedUpdate, update_ai);
 3. **FixedUpdate** may run multiple times per visual frame to catch up
 4. Transform syncing happens at schedule boundaries
 
+> **Note:** Scene tree entities are initialized during `PreStartup`, before any `Startup` systems run. This means you can safely query Godot scene entities in your `Startup` systems! See [Scene Tree Initialization and Timing](../scene-tree/timing.md) for details.
+
 ## Next Steps
 
 - Learn about the [PhysicsUpdate Schedule](./physics-update.md) in detail
