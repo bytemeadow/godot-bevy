@@ -5,6 +5,7 @@ use bevy::{
         schedule::IntoScheduleConfigs,
         system::NonSendMut,
     },
+    log::trace,
     math::Vec2,
 };
 use godot::{
@@ -109,30 +110,14 @@ fn write_input_events(
     mut action_events: EventWriter<ActionInput>,
 ) {
     for (event_type, input_event) in events.0.try_iter() {
-        // Log the event type for debugging
-        use godot::global::godot_print;
-        use godot::classes::InputEventKey;
-        
-        let event_type_str = match event_type {
-            InputEventType::Normal => "NORMAL",
-            InputEventType::Unhandled => "UNHANDLED",
-        };
-        
-        // Log basic info about the event to confirm which type we're processing
-        if let Ok(key_event) = input_event.clone().try_cast::<InputEventKey>() {
-            let key_name = format!("{:?}", key_event.get_keycode());
-            let pressed = if key_event.is_pressed() { "pressed" } else { "released" };
-            godot_print!("🔍 INPUT EVENT TYPE: {} - Key: {} {}", event_type_str, key_name, pressed);
-        }
-        
+        trace!("Processing {:?} input event", event_type);
+
         match event_type {
             InputEventType::Normal => {
-                godot_print!("⚡ Processing NORMAL input (ActionInput events only)");
                 // Only process ActionInput events from normal input (mapped keys/actions)
                 extract_action_events_only(input_event, &mut action_events);
             }
             InputEventType::Unhandled => {
-                godot_print!("🔄 Processing UNHANDLED input (raw input events only)");
                 // Process raw input events from unhandled input (unmapped keys, mouse, etc.)
                 extract_input_events_no_actions(
                     input_event,
@@ -154,7 +139,6 @@ fn extract_action_events_only(
     // Note: InputEventAction is not emitted by the engine, so we need to check manually
     check_action_events(&input_event, action_events);
 }
-
 
 fn extract_input_events_no_actions(
     input_event: Gd<GodotInputEvent>,
@@ -239,6 +223,13 @@ fn check_action_events(
         if input_event.is_action(&action_string_name) {
             let pressed = input_event.is_action_pressed(&action_string_name);
             let strength = input_event.get_action_strength(&action_string_name);
+
+            trace!(
+                "Generated ActionInput: '{}' {} (strength: {:.2})",
+                action_name,
+                if pressed { "pressed" } else { "released" },
+                strength
+            );
 
             action_events.write(ActionInput {
                 action: action_name,
