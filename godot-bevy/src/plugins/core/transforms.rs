@@ -499,6 +499,7 @@ pub mod math {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use bevy::prelude::Vec3;
         use std::f32::consts::PI;
 
         #[test]
