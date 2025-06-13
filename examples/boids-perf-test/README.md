@@ -10,7 +10,7 @@ This example demonstrates the performance benefits of using **godot-bevy** (Rust
 - **Language**: GDScript
 - **Architecture**: Traditional object-oriented approach with Node2D instances
 - **Neighbor Finding**: Spatial grid optimization
-- **Behaviors**: Separation, alignment, cohesion, boundary avoidance
+- **Behaviors**: Separation, alignment, cohesion, boundary avoidance (with wraparound)
 - **Limitations**: Single-threaded, interpreted language overhead
 
 ### godot-bevy Implementation (Rust + ECS)
@@ -18,18 +18,19 @@ This example demonstrates the performance benefits of using **godot-bevy** (Rust
 - **Architecture**: Entity Component System with Bevy
 - **Neighbor Finding**: **bevy_spatial KDTree2** with k_nearest_neighbour optimization
 - **Transform Sync**: **Hybrid batching** for efficient Transform2D synchronization
-- **Behaviors**: Same algorithms implemented as ECS systems
+- **Behaviors**: Separation, alignment, cohesion with wraparound boundaries
 - **Visual Effects**: **Random color generation** matching GDScript variety
 - **Advantages**: Compiled performance, memory efficiency, CPU cache-friendly data layout
 
 ## Boids Algorithm
 
-Both implementations use the classic boids algorithm with four behaviors:
+Both implementations use the classic boids algorithm with three core behaviors plus boundary handling:
 
 1. **Separation**: Avoid crowding neighbors
 2. **Alignment**: Steer towards average heading of neighbors  
 3. **Cohesion**: Move towards center of mass of neighbors
-4. **Boundary Avoidance**: Stay within world bounds
+
+**Boundary Handling**: Both implementations use wraparound boundaries (toroidal world), though the GDScript version also includes boundary avoidance forces in the steering calculation.
 
 ### Performance-Critical Operations
 
@@ -128,12 +129,12 @@ Entity
 
 ### Fair Comparison Principles
 
-1. **Same Algorithms**: Both implementations use identical boids behaviors (separation, alignment, cohesion)
+1. **Core Algorithms**: Both implementations use the three core boids behaviors (separation, alignment, cohesion)
 2. **Same Visual Effects**: Both generate random colors for boids and use identical scene structure
 3. **Clean Logging**: Removed debug logging and timing overhead for accurate measurements
 4. **Same Update Rate**: Both update at consistent intervals using native scheduling
 5. **Identical Parameters**: Same max_speed, max_force, perception_radius, separation_radius
-6. **Boundary Behavior**: Both use wraparound boundaries (toroidal world)
+6. **Boundary Handling**: Both use wraparound, but GDScript also includes boundary avoidance forces
 
 ### Measurements
 
@@ -179,12 +180,13 @@ Entity
 - **Eliminated timing overhead** from microsecond-level measurements
 - **Simplified performance tracking** to essential FPS reporting only
 - **Fixed UI synchronization** so boid count displays correctly
+- **Fixed restart behavior** ensuring simulation can be stopped and restarted reliably
 
 ### Visual Parity
 - **Random color generation** matching GDScript behavior exactly
 - **Deferred colorization** using marker components for proper timing
 - **Scene structure compatibility** supporting Sprite, Triangle, or direct Node2D modulation
-- **Same boundary behavior** with wraparound (toroidal world) physics
+- **Comparable boundary behavior** (both use wraparound, GDScript adds avoidance forces)
 
 ## Extending the Benchmark
 
@@ -226,6 +228,7 @@ You could extend this benchmark to compare:
 - **V-Sync**: Disable for accurate FPS measurement
 - **Background Processes**: Close other applications during testing
 - **Hardware Limits**: GPU-bound rendering vs CPU-bound simulation
+
 
 ### Build Issues
 - **Missing Dependencies**: Check Rust toolchain installation
