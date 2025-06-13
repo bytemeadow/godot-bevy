@@ -252,7 +252,7 @@ impl AudioChannelMarker for MainAudioTrack {
 }
 
 /// Audio parameter validation utilities.
-/// 
+///
 /// These functions provide testable implementations of audio parameter
 /// validation and processing used throughout the audio system.
 pub mod validation {
@@ -283,17 +283,17 @@ pub mod validation {
 
     /// Check if volume is within valid range
     pub fn is_valid_volume(volume: f32) -> bool {
-        volume.is_finite() && volume >= bounds::VOLUME_MIN && volume <= bounds::VOLUME_MAX
+        volume.is_finite() && (bounds::VOLUME_MIN..=bounds::VOLUME_MAX).contains(&volume)
     }
 
     /// Check if pitch is within valid range
     pub fn is_valid_pitch(pitch: f32) -> bool {
-        pitch.is_finite() && pitch >= bounds::PITCH_MIN && pitch <= bounds::PITCH_MAX
+        pitch.is_finite() && (bounds::PITCH_MIN..=bounds::PITCH_MAX).contains(&pitch)
     }
 
     /// Check if panning is within valid range
     pub fn is_valid_panning(panning: f32) -> bool {
-        panning.is_finite() && panning >= bounds::PANNING_MIN && panning <= bounds::PANNING_MAX
+        panning.is_finite() && (bounds::PANNING_MIN..=bounds::PANNING_MAX).contains(&panning)
     }
 
     #[cfg(test)]

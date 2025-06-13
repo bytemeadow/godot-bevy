@@ -58,7 +58,6 @@ pub struct StaticBody2DMarker;
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StaticBody3DMarker;
 
-
 // Area nodes
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Area2DMarker;
@@ -115,7 +114,6 @@ pub struct Camera3DMarker;
 // Light nodes
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DirectionalLight3DMarker;
-
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpotLight3DMarker;

@@ -1,5 +1,5 @@
 //! Shared mathematical utilities used across multiple domains.
-//! 
+//!
 //! This module contains only truly cross-cutting mathematical functions
 //! that are used in multiple parts of the codebase.
 

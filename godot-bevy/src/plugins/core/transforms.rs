@@ -15,7 +15,7 @@ use godot::prelude::Transform3D as GodotTransform3D;
 
 use crate::bridge::GodotNodeHandle;
 
-use super::{SceneTreeRef, Node2DMarker, Node3DMarker};
+use super::{Node2DMarker, Node3DMarker, SceneTreeRef};
 
 #[derive(Debug, Component, Default, Copy, Clone)]
 pub struct Transform3D {
@@ -336,7 +336,10 @@ fn post_update_godot_transforms_3d(
     _scene_tree: SceneTreeRef,
     mut entities: Query<
         (&Transform3D, &mut GodotNodeHandle),
-        (Or<(Added<Transform3D>, Changed<Transform3D>)>, With<Node3DMarker>),
+        (
+            Or<(Added<Transform3D>, Changed<Transform3D>)>,
+            With<Node3DMarker>,
+        ),
     >,
 ) {
     // Early return if transform syncing is disabled
@@ -381,7 +384,10 @@ fn post_update_godot_transforms_2d(
     _scene_tree: SceneTreeRef,
     mut entities: Query<
         (&Transform2D, &mut GodotNodeHandle),
-        (Or<(Added<Transform2D>, Changed<Transform2D>)>, With<Node2DMarker>),
+        (
+            Or<(Added<Transform2D>, Changed<Transform2D>)>,
+            With<Node2DMarker>,
+        ),
     >,
 ) {
     // Early return if transform syncing is disabled
@@ -431,7 +437,7 @@ fn pre_update_godot_transforms_2d(
 }
 
 /// Mathematical utilities for transform conversions.
-/// 
+///
 /// These functions provide testable implementations of core mathematical
 /// operations used in transform conversion traits.
 pub mod math {
@@ -450,13 +456,17 @@ pub mod math {
     }
 
     /// Create 2D rotation matrix components from angle and scale
-    pub fn create_2d_rotation_matrix(rotation_z: f32, scale_x: f32, scale_y: f32) -> ((f32, f32), (f32, f32)) {
+    pub fn create_2d_rotation_matrix(
+        rotation_z: f32,
+        scale_x: f32,
+        scale_y: f32,
+    ) -> ((f32, f32), (f32, f32)) {
         let cos_rot = rotation_z.cos();
         let sin_rot = rotation_z.sin();
-        
+
         let a = (cos_rot * scale_x, sin_rot * scale_x);
         let b = (-sin_rot * scale_y, cos_rot * scale_y);
-        
+
         (a, b)
     }
 
@@ -495,7 +505,7 @@ pub mod math {
         fn test_extract_rotation_from_2d_matrix() {
             // Test identity matrix (no rotation)
             assert!((extract_rotation_from_2d_matrix(1.0, 0.0) - 0.0).abs() < 1e-6);
-            
+
             // Test 90-degree rotation
             assert!((extract_rotation_from_2d_matrix(0.0, 1.0) - PI / 2.0).abs() < 1e-6);
         }
@@ -541,7 +551,7 @@ pub mod math {
         fn test_extract_z_rotation_from_quat() {
             // Test identity quaternion
             assert!(extract_z_rotation_from_quat(Quat::IDENTITY).abs() < 1e-6);
-            
+
             // Test Z rotation
             let z_rot_quat = Quat::from_rotation_z(PI / 4.0);
             assert!((extract_z_rotation_from_quat(z_rot_quat) - PI / 4.0).abs() < 1e-6);

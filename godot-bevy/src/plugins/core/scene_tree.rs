@@ -18,10 +18,10 @@ use godot::{
         AnimatedSprite2D, AnimatedSprite3D, AnimationPlayer, AnimationTree, Area2D, Area3D,
         AudioStreamPlayer, AudioStreamPlayer2D, AudioStreamPlayer3D, Button, Camera2D, Camera3D,
         CanvasItem, CharacterBody2D, CharacterBody3D, CollisionPolygon2D, CollisionPolygon3D,
-        CollisionShape2D, CollisionShape3D, Control, DirectionalLight3D, Engine,
-        Label, LineEdit, MeshInstance2D, MeshInstance3D, Node, Node2D, Node3D,
-        Panel, Path2D, Path3D, PathFollow2D, PathFollow3D, RigidBody2D, RigidBody3D,
-        SceneTree, SpotLight3D, Sprite2D, Sprite3D, StaticBody2D, StaticBody3D, TextEdit, Timer,
+        CollisionShape2D, CollisionShape3D, Control, DirectionalLight3D, Engine, Label, LineEdit,
+        MeshInstance2D, MeshInstance3D, Node, Node2D, Node3D, Panel, Path2D, Path3D, PathFollow2D,
+        PathFollow3D, RigidBody2D, RigidBody3D, SceneTree, SpotLight3D, Sprite2D, Sprite3D,
+        StaticBody2D, StaticBody3D, TextEdit, Timer,
     },
     meta::ToGodot,
     obj::{Gd, Inherits},
@@ -183,10 +183,13 @@ impl<T: Inherits<Node>> From<&Gd<T>> for Groups {
 }
 
 /// Adds appropriate marker components to an entity based on the Godot node type
-fn add_node_type_markers(entity_commands: &mut bevy::ecs::system::EntityCommands, node: &mut GodotNodeHandle) {
+fn add_node_type_markers(
+    entity_commands: &mut bevy::ecs::system::EntityCommands,
+    node: &mut GodotNodeHandle,
+) {
     // Try each node type and add the corresponding marker component
     // We check more specific types first, then fall back to more general ones
-    
+
     // Visual nodes
     if node.try_get::<Sprite2D>().is_some() {
         entity_commands.insert(Sprite2DMarker);
@@ -206,7 +209,7 @@ fn add_node_type_markers(entity_commands: &mut bevy::ecs::system::EntityCommands
     if node.try_get::<MeshInstance3D>().is_some() {
         entity_commands.insert(MeshInstance3DMarker);
     }
-    
+
     // Physics bodies
     if node.try_get::<CharacterBody2D>().is_some() {
         entity_commands.insert(CharacterBody2DMarker);
@@ -226,7 +229,7 @@ fn add_node_type_markers(entity_commands: &mut bevy::ecs::system::EntityCommands
     if node.try_get::<StaticBody3D>().is_some() {
         entity_commands.insert(StaticBody3DMarker);
     }
-    
+
     // Areas
     if node.try_get::<Area2D>().is_some() {
         entity_commands.insert(Area2DMarker);
@@ -234,7 +237,7 @@ fn add_node_type_markers(entity_commands: &mut bevy::ecs::system::EntityCommands
     if node.try_get::<Area3D>().is_some() {
         entity_commands.insert(Area3DMarker);
     }
-    
+
     // Collision shapes
     if node.try_get::<CollisionShape2D>().is_some() {
         entity_commands.insert(CollisionShape2DMarker);
@@ -248,7 +251,7 @@ fn add_node_type_markers(entity_commands: &mut bevy::ecs::system::EntityCommands
     if node.try_get::<CollisionPolygon3D>().is_some() {
         entity_commands.insert(CollisionPolygon3DMarker);
     }
-    
+
     // Audio nodes
     if node.try_get::<AudioStreamPlayer>().is_some() {
         entity_commands.insert(AudioStreamPlayerMarker);
@@ -259,7 +262,7 @@ fn add_node_type_markers(entity_commands: &mut bevy::ecs::system::EntityCommands
     if node.try_get::<AudioStreamPlayer3D>().is_some() {
         entity_commands.insert(AudioStreamPlayer3DMarker);
     }
-    
+
     // UI nodes
     if node.try_get::<Label>().is_some() {
         entity_commands.insert(LabelMarker);
@@ -276,7 +279,7 @@ fn add_node_type_markers(entity_commands: &mut bevy::ecs::system::EntityCommands
     if node.try_get::<Panel>().is_some() {
         entity_commands.insert(PanelMarker);
     }
-    
+
     // Camera nodes
     if node.try_get::<Camera2D>().is_some() {
         entity_commands.insert(Camera2DMarker);
@@ -284,7 +287,7 @@ fn add_node_type_markers(entity_commands: &mut bevy::ecs::system::EntityCommands
     if node.try_get::<Camera3D>().is_some() {
         entity_commands.insert(Camera3DMarker);
     }
-    
+
     // Light nodes
     if node.try_get::<DirectionalLight3D>().is_some() {
         entity_commands.insert(DirectionalLight3DMarker);
@@ -292,7 +295,7 @@ fn add_node_type_markers(entity_commands: &mut bevy::ecs::system::EntityCommands
     if node.try_get::<SpotLight3D>().is_some() {
         entity_commands.insert(SpotLight3DMarker);
     }
-    
+
     // Animation nodes
     if node.try_get::<AnimationPlayer>().is_some() {
         entity_commands.insert(AnimationPlayerMarker);
@@ -300,12 +303,12 @@ fn add_node_type_markers(entity_commands: &mut bevy::ecs::system::EntityCommands
     if node.try_get::<AnimationTree>().is_some() {
         entity_commands.insert(AnimationTreeMarker);
     }
-    
+
     // Timer
     if node.try_get::<Timer>().is_some() {
         entity_commands.insert(TimerMarker);
     }
-    
+
     // Path nodes
     if node.try_get::<Path2D>().is_some() {
         entity_commands.insert(Path2DMarker);
@@ -319,7 +322,7 @@ fn add_node_type_markers(entity_commands: &mut bevy::ecs::system::EntityCommands
     if node.try_get::<PathFollow3D>().is_some() {
         entity_commands.insert(PathFollow3DMarker);
     }
-    
+
     // Base node types (checked last to ensure more specific types take precedence)
     if node.try_get::<Control>().is_some() {
         entity_commands.insert(ControlMarker);
@@ -333,7 +336,7 @@ fn add_node_type_markers(entity_commands: &mut bevy::ecs::system::EntityCommands
     if node.try_get::<Node2D>().is_some() {
         entity_commands.insert(Node2DMarker);
     }
-    
+
     // All nodes inherit from Node, so add this last
     entity_commands.insert(NodeMarker);
 }
