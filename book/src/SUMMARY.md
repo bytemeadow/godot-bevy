@@ -11,6 +11,7 @@
 # Scene Tree
 
 - [Initialization and Timing](./scene-tree/timing.md)
+- [Querying with Node Type Markers](./scene-tree/querying.md)
 
 # Transform System
 
@@ -24,3 +25,7 @@
 # Timing & Schedules
 
 - [Frame Execution](./timing/frame-execution.md)
+
+# Migration Guides
+
+- [v0.6 to v0.7](./migration/v0.6-to-v0.7.md)
