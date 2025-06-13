@@ -444,12 +444,21 @@ fn create_scene_tree_entity(
                 }
             }
             SceneTreeEventType::NodeRemoved => {
-                commands.entity(ent.unwrap()).despawn();
+                if let Some(ent) = ent {
+                    commands.entity(ent).despawn();
+                } else {
+                    // Entity was already despawned (common when using queue_free)
+                    trace!(target: "godot_scene_tree_events", "Entity for removed node was already despawned");
+                }
             }
             SceneTreeEventType::NodeRenamed => {
-                commands
-                    .entity(ent.unwrap())
-                    .insert(Name::from(node.get::<Node>().get_name().to_string()));
+                if let Some(ent) = ent {
+                    commands
+                        .entity(ent)
+                        .insert(Name::from(node.get::<Node>().get_name().to_string()));
+                } else {
+                    trace!(target: "godot_scene_tree_events", "Entity for renamed node was already despawned");
+                }
             }
         }
     }
