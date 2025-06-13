@@ -41,31 +41,6 @@ Both implementations use the classic boids algorithm with four behaviors:
 - **Memory Access**: Cache efficiency becomes critical with many entities
 - **Update Loops**: Processing thousands of entities each frame
 
-## Running the Benchmark
-
-### Prerequisites
-
-1. **Rust toolchain** (for compiling the godot-bevy implementation)
-2. **Godot 4.2+** 
-3. **Build the project**:
-   ```bash
-   cd rust
-   cargo build --release
-   ```
-
-### Launch Options
-
-**Option 1: From Godot Editor**
-1. Open `godot/project.godot` in Godot
-2. Run the main scene
-3. Use the UI controls to switch implementations and adjust settings
-
-**Option 2: From Command Line**
-```bash
-# From the rust directory
-cargo run
-```
-
 ## Using the Benchmark
 
 ### UI Controls
@@ -89,10 +64,10 @@ The benchmark tracks:
 
 | Boid Count | Godot (GDScript) | godot-bevy (Rust) | Improvement |
 |------------|------------------|-------------------|-------------|
-| 100        | ~60 FPS          | ~60 FPS           | Minimal     |
-| 500        | ~50 FPS          | ~60 FPS           | 1.2x        |
-| 1000       | ~35 FPS          | ~55 FPS           | 1.6x        |
-| **2000**   | **~18 FPS**      | **~39 FPS**       | **2.2x**    |
+| 100        | ~120 FPS          | ~120 FPS           | Minimal     |
+| 500        | ~120 FPS          | ~120 FPS           | Minimal        |
+| 1000       | ~68 FPS          | ~113 FPS           | 1.6x        |
+| **2000**   | **~29 FPS**      | **~57 FPS**       | **1.9x**    |
 
 > **Note**: Actual results measured on M1 MacBook Pro. The **Rust implementation is 13.4x faster** in pure algorithm execution (0.38ms vs 22.4ms force calculation), with the remaining time spent on transform synchronization and rendering.
 
@@ -101,30 +76,8 @@ The benchmark tracks:
 1. **Different Spatial Structures**: **bevy_spatial KDTree2** with k_nearest_neighbour (50-entity cap) vs spatial grid (75x75px cells)
 2. **Compiled vs Interpreted**: Rust compiles to native machine code, GDScript is interpreted  
 3. **Memory Layout**: ECS components are stored contiguously in memory (cache-friendly)
-4. **Efficient Transform Sync**: **Hybrid batching** reduces Godot API call overhead
 5. **Zero-Cost Abstractions**: Rust's ownership system eliminates garbage collection overhead
 6. **SIMD Optimizations**: Rust compiler can auto-vectorize mathematical operations
-
-## Architecture Comparison
-
-### Godot (Traditional OOP)
-```
-Node2D (Boid)
-├── Polygon2D (Visual)
-├── Meta: velocity
-├── Meta: acceleration
-└── Manual neighbor queries
-```
-
-### godot-bevy (ECS)
-```
-Entity
-├── Transform2D Component (hybrid batched sync)
-├── Boid Component (marker for spatial tracking)
-├── Velocity Component
-├── NeedsColorization Component (temporary)
-└── bevy_spatial KDTree2 for neighbor queries
-```
 
 ## Benchmark Methodology
 
@@ -169,13 +122,6 @@ Entity
 - **k_nearest_neighbour** with 50-entity cap prevents performance spikes
 - **16ms update frequency** (roughly 60 FPS) for spatial tree refresh
 
-### Transform Synchronization Batching
-- **Hybrid batching system** for both 2D and 3D transforms
-- **Automatic threshold detection**: Batches when ≥10 entities need updates
-- **Individual updates** for low-frequency changes to minimize overhead
-- **Performance metrics tracking** with configurable batching parameters
-- **Fallback support** with option to disable batching entirely
-
 ### Clean Performance Measurement  
 - **Removed debug logging** that was affecting performance measurements
 - **Eliminated timing overhead** from microsecond-level measurements
@@ -188,53 +134,6 @@ Entity
 - **Deferred colorization** using marker components for proper timing
 - **Scene structure compatibility** supporting Sprite, Triangle, or direct Node2D modulation
 - **Identical boundary behavior** (both use avoidance forces + wraparound fallback)
-
-## Extending the Benchmark
-
-### Adding More Implementations
-You could extend this benchmark to compare:
-- **C# with Godot**: Compiled language vs GDScript
-- **GDExtension C++**: Native performance comparison
-- **WebAssembly**: Browser performance testing
-
-### Advanced Optimizations
-- **Parallel Processing**: Utilize Bevy's `par_iter()` for system parallelization
-- **Compute Shaders**: GPU-accelerated boids on graphics hardware
-- **SIMD Instructions**: Hand-optimized vector operations
-- **Memory Pooling**: Reduce allocation overhead
-
-### Profiling Integration
-- **Bevy Diagnostic Plugin**: Built-in performance tracking
-- **Godot Profiler**: Memory and CPU usage analysis
-- **Custom Metrics**: Algorithm-specific measurements
-
-## Performance Tips
-
-### For Godot Users
-1. Use spatial partitioning for neighbor queries
-2. Minimize `get_meta()` calls (cache values)
-3. Prefer packed arrays for bulk operations
-4. Consider GDScript compilation flags
-
-### For godot-bevy Users
-1. Use `Query` filters to reduce iteration
-2. Leverage Bevy's change detection
-3. Group related components for cache efficiency
-4. Profile with `bevy/dynamic_linking` for faster iteration
-
-## Troubleshooting
-
-### Low Performance Issues
-- **Debug vs Release**: Ensure `cargo build --release` for Rust
-- **V-Sync**: Disable for accurate FPS measurement
-- **Background Processes**: Close other applications during testing
-- **Hardware Limits**: GPU-bound rendering vs CPU-bound simulation
-
-
-### Build Issues
-- **Missing Dependencies**: Check Rust toolchain installation
-- **Godot Version**: Requires Godot 4.2+ for best compatibility
-- **Extension Loading**: Verify `rust.gdextension` is properly configured
 
 ## Conclusion
 
