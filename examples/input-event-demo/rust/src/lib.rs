@@ -132,30 +132,49 @@ fn handle_touch_input(mut touch_events: EventReader<TouchInput>) {
 }
 
 fn handle_action_input(mut action_events: EventReader<ActionInput>) {
+    static mut EVENT_COUNTER: usize = 0;
+
     for event in action_events.read() {
-        let state = if event.pressed { "pressed" } else { "released" };
+        unsafe {
+            EVENT_COUNTER += 1;
+            let state = if event.pressed { "pressed" } else { "released" };
 
-        godot_print!(
-            "🎮 Action: '{}' {} (strength: {:.2})",
-            event.action,
-            state,
-            event.strength
-        );
+            godot_print!(
+                "🎮 Action #{}: '{}' {} (strength: {:.2})",
+                EVENT_COUNTER,
+                event.action,
+                state,
+                event.strength
+            );
 
-        // Handle common action names
-        match event.action.as_str() {
-            "ui_accept" if event.pressed => {
-                godot_print!("✅ UI Accept action triggered!");
+            // Special logging for testing duplicate detection
+            if event.action == "jump" || event.action == "ui_accept" {
+                godot_print!(
+                    "🔍 TEST ACTION '{}' {}: Event #{} - Should see only ONE event per key press!",
+                    event.action,
+                    state,
+                    EVENT_COUNTER
+                );
             }
-            "ui_cancel" if event.pressed => {
-                godot_print!("❌ UI Cancel action triggered!");
-            }
-            "move_left" | "move_right" | "move_up" | "move_down" => {
-                if event.pressed {
-                    godot_print!("🏃 Movement action: {}", event.action);
+
+            // Handle common action names
+            match event.action.as_str() {
+                "ui_accept" if event.pressed => {
+                    godot_print!("✅ UI Accept action triggered!");
                 }
+                "ui_cancel" if event.pressed => {
+                    godot_print!("❌ UI Cancel action triggered!");
+                }
+                "move_left" | "move_right" | "move_up" | "move_down" => {
+                    if event.pressed {
+                        godot_print!("🏃 Movement action: {}", event.action);
+                    }
+                }
+                "jump" => {
+                    godot_print!("🦘 Jump action: {}", state);
+                }
+                _ => {}
             }
-            _ => {}
         }
     }
 }

@@ -109,9 +109,26 @@ fn write_input_events(
     mut action_events: EventWriter<ActionInput>,
 ) {
     for (event_type, input_event) in events.0.try_iter() {
+        // Log the event type for debugging
+        use godot::global::godot_print;
+        use godot::classes::InputEventKey;
+        
+        let event_type_str = match event_type {
+            InputEventType::Normal => "NORMAL",
+            InputEventType::Unhandled => "UNHANDLED",
+        };
+        
+        // Log basic info about the event to confirm which type we're processing
+        if let Ok(key_event) = input_event.clone().try_cast::<InputEventKey>() {
+            let key_name = format!("{:?}", key_event.get_keycode());
+            let pressed = if key_event.is_pressed() { "pressed" } else { "released" };
+            godot_print!("🔍 INPUT EVENT TYPE: {} - Key: {} {}", event_type_str, key_name, pressed);
+        }
+        
         match event_type {
-            InputEventType::Normal | InputEventType::Unhandled => {
-                // Extract data from Godot input event and create thread-safe events
+            InputEventType::Normal => {
+                godot_print!("⚡ Processing NORMAL input (includes ActionInput events)");
+                // Process all event types including actions from normal input
                 extract_input_events(
                     input_event,
                     &mut keyboard_events,
@@ -119,6 +136,18 @@ fn write_input_events(
                     &mut mouse_motion_events,
                     &mut touch_events,
                     &mut action_events,
+                );
+            }
+            InputEventType::Unhandled => {
+                godot_print!("🔄 Processing UNHANDLED input (NO ActionInput events)");
+                // Process all event types except actions from unhandled input
+                // to avoid duplicate ActionInput events
+                extract_input_events_no_actions(
+                    input_event,
+                    &mut keyboard_events,
+                    &mut mouse_button_events,
+                    &mut mouse_motion_events,
+                    &mut touch_events,
                 );
             }
         }
@@ -132,6 +161,43 @@ fn extract_input_events(
     mouse_motion_events: &mut EventWriter<MouseMotion>,
     touch_events: &mut EventWriter<TouchInput>,
     action_events: &mut EventWriter<ActionInput>,
+) {
+    // Extract basic input events (keyboard, mouse, touch)
+    extract_basic_input_events(
+        input_event.clone(),
+        keyboard_events,
+        mouse_button_events,
+        mouse_motion_events,
+        touch_events,
+    );
+
+    // Action input - Check if this event matches any actions
+    // Note: InputEventAction is not emitted by the engine, so we need to check manually
+    check_action_events(&input_event, action_events);
+}
+
+fn extract_input_events_no_actions(
+    input_event: Gd<GodotInputEvent>,
+    keyboard_events: &mut EventWriter<KeyboardInput>,
+    mouse_button_events: &mut EventWriter<MouseButtonInput>,
+    mouse_motion_events: &mut EventWriter<MouseMotion>,
+    touch_events: &mut EventWriter<TouchInput>,
+) {
+    extract_basic_input_events(
+        input_event,
+        keyboard_events,
+        mouse_button_events,
+        mouse_motion_events,
+        touch_events,
+    );
+}
+
+fn extract_basic_input_events(
+    input_event: Gd<GodotInputEvent>,
+    keyboard_events: &mut EventWriter<KeyboardInput>,
+    mouse_button_events: &mut EventWriter<MouseButtonInput>,
+    mouse_motion_events: &mut EventWriter<MouseMotion>,
+    touch_events: &mut EventWriter<TouchInput>,
 ) {
     // Try to cast to specific input event types and extract data
 
@@ -171,10 +237,6 @@ fn extract_input_events(
             pressed: touch_event.is_pressed(),
         });
     }
-
-    // Action input - Check if this event matches any actions
-    // Note: InputEventAction is not emitted by the engine, so we need to check manually
-    check_action_events(&input_event, action_events);
 }
 
 fn check_action_events(
