@@ -10,7 +10,7 @@ This example demonstrates the performance benefits of using **godot-bevy** (Rust
 - **Language**: GDScript
 - **Architecture**: Traditional object-oriented approach with Node2D instances
 - **Neighbor Finding**: Spatial grid optimization
-- **Behaviors**: Separation, alignment, cohesion, boundary avoidance (with wraparound)
+- **Behaviors**: Separation, alignment, cohesion, boundary avoidance
 - **Limitations**: Single-threaded, interpreted language overhead
 
 ### godot-bevy Implementation (Rust + ECS)
@@ -18,23 +18,24 @@ This example demonstrates the performance benefits of using **godot-bevy** (Rust
 - **Architecture**: Entity Component System with Bevy
 - **Neighbor Finding**: **bevy_spatial KDTree2** with k_nearest_neighbour optimization
 - **Transform Sync**: **Hybrid batching** for efficient Transform2D synchronization
-- **Behaviors**: Separation, alignment, cohesion with wraparound boundaries
+- **Behaviors**: Separation, alignment, cohesion, boundary avoidance
 - **Visual Effects**: **Random color generation** matching GDScript variety
 - **Advantages**: Compiled performance, memory efficiency, CPU cache-friendly data layout
 
 ## Boids Algorithm
 
-Both implementations use the classic boids algorithm with three core behaviors plus boundary handling:
+Both implementations use the classic boids algorithm with four behaviors:
 
 1. **Separation**: Avoid crowding neighbors
 2. **Alignment**: Steer towards average heading of neighbors  
 3. **Cohesion**: Move towards center of mass of neighbors
+4. **Boundary Avoidance**: Steer away from world edges (both use 100px margin with 2x force strength)
 
-**Boundary Handling**: Both implementations use wraparound boundaries (toroidal world), though the GDScript version also includes boundary avoidance forces in the steering calculation.
+**Boundary Handling**: Both implementations also use wraparound boundaries as a fallback - if a boid still reaches an edge despite avoidance forces, it wraps to the opposite side (toroidal world).
 
 ### Performance-Critical Operations
 
-- **Neighbor Finding**: O(n²) naive approach vs **bevy_spatial KDTree2** O(log n) optimization
+- **Neighbor Finding**: Spatial grid (75x75px cells) vs **bevy_spatial KDTree2** with k_nearest_neighbour
 - **Transform Synchronization**: Batch vs individual Godot scene updates
 - **Vector Math**: Hundreds of vector calculations per frame
 - **Memory Access**: Cache efficiency becomes critical with many entities
@@ -97,7 +98,7 @@ The benchmark tracks:
 
 ### Why godot-bevy Performs Better
 
-1. **Advanced Spatial Queries**: **bevy_spatial KDTree2** provides O(log n) neighbor finding vs O(n) spatial grid
+1. **Different Spatial Structures**: **bevy_spatial KDTree2** with k_nearest_neighbour (50-entity cap) vs spatial grid (75x75px cells)
 2. **Compiled vs Interpreted**: Rust compiles to native machine code, GDScript is interpreted  
 3. **Memory Layout**: ECS components are stored contiguously in memory (cache-friendly)
 4. **Efficient Transform Sync**: **Hybrid batching** reduces Godot API call overhead
@@ -129,12 +130,12 @@ Entity
 
 ### Fair Comparison Principles
 
-1. **Core Algorithms**: Both implementations use the three core boids behaviors (separation, alignment, cohesion)
+1. **Identical Algorithms**: Both implementations use the four boids behaviors (separation, alignment, cohesion, boundary avoidance)
 2. **Same Visual Effects**: Both generate random colors for boids and use identical scene structure
 3. **Clean Logging**: Removed debug logging and timing overhead for accurate measurements
 4. **Same Update Rate**: Both update at consistent intervals using native scheduling
-5. **Identical Parameters**: Same max_speed, max_force, perception_radius, separation_radius
-6. **Boundary Handling**: Both use wraparound, but GDScript also includes boundary avoidance forces
+5. **Identical Parameters**: Same max_speed, max_force, perception_radius, separation_radius, boundary_weight
+6. **Same Boundary Behavior**: Both use boundary avoidance forces (100px margin, 2x strength) plus wraparound fallback
 
 ### Measurements
 
@@ -186,7 +187,7 @@ Entity
 - **Random color generation** matching GDScript behavior exactly
 - **Deferred colorization** using marker components for proper timing
 - **Scene structure compatibility** supporting Sprite, Triangle, or direct Node2D modulation
-- **Comparable boundary behavior** (both use wraparound, GDScript adds avoidance forces)
+- **Identical boundary behavior** (both use avoidance forces + wraparound fallback)
 
 ## Extending the Benchmark
 

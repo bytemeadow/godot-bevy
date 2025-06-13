@@ -63,7 +63,7 @@ pub struct BoidsConfig {
     pub separation_weight: f32,
     pub alignment_weight: f32,
     pub cohesion_weight: f32,
-    // boundary_weight removed (not used with wraparound boundaries)
+    pub boundary_weight: f32,
 }
 
 impl Default for BoidsConfig {
@@ -77,7 +77,7 @@ impl Default for BoidsConfig {
             separation_weight: 2.0,
             alignment_weight: 1.0,
             cohesion_weight: 1.0,
-            // boundary_weight: 3.0, // removed
+            boundary_weight: 3.0,
         }
     }
 }
@@ -474,12 +474,46 @@ fn calculate_boid_force_optimized(
         total_force += cohesion * config.cohesion_weight;
     }
 
+    // Apply boundary avoidance
+    let boundary = calculate_boundary_avoidance(pos, velocity, config);
+    total_force += boundary * config.boundary_weight;
+
     // Limit total force
     if total_force.length() > config.max_force {
         total_force = total_force.normalized() * config.max_force;
     }
 
     total_force
+}
+
+/// Calculate boundary avoidance force (matches GDScript implementation)
+fn calculate_boundary_avoidance(pos: Vec2, velocity: Vector2, config: &BoidsConfig) -> Vector2 {
+    let mut steer = Vector2::ZERO;
+    let margin = 100.0;
+    
+    // Calculate boundary forces (matching GDScript logic)
+    if pos.x < margin {
+        steer.x += margin - pos.x;
+    } else if pos.x > config.world_bounds.x - margin {
+        steer.x -= pos.x - (config.world_bounds.x - margin);
+    }
+    
+    if pos.y < margin {
+        steer.y += margin - pos.y;
+    } else if pos.y > config.world_bounds.y - margin {
+        steer.y -= pos.y - (config.world_bounds.y - margin);
+    }
+    
+    if steer.length_squared() > 0.0 {
+        steer = steer.normalized() * config.max_speed - velocity;
+        let max_boundary_force = config.max_force * 2.0; // Double strength like GDScript
+        if steer.length() > max_boundary_force {
+            steer = steer.normalized() * max_boundary_force;
+        }
+        return steer;
+    }
+    
+    Vector2::ZERO
 }
 
 /// Apply boundary constraints with wraparound behavior
