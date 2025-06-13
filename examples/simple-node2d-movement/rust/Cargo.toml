@@ -14,5 +14,5 @@ name = "simple-node2d-movement"
 [dependencies]
 godot-bevy = { path = "../../../godot-bevy" }
 bevy = { version = "0.16", default-features = false }
-godot = "0.3.0"
+godot = "0.3"
 which = "7.0.3"
