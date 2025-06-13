@@ -1,7 +1,7 @@
 use std::{collections::HashMap, marker::PhantomData};
 
 use bevy::{
-    app::{App, First, Plugin, PreStartup, Startup},
+    app::{App, First, Plugin, PreStartup},
     ecs::{
         component::Component,
         entity::Entity,
@@ -34,12 +34,14 @@ pub struct GodotSceneTreePlugin;
 
 impl Plugin for GodotSceneTreePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreStartup, initialize_scene_tree)
-            .add_systems(Startup, connect_scene_tree)
-            .add_systems(First, write_scene_tree_events.before(event_update_system))
-            .add_systems(First, read_scene_tree_events.before(event_update_system))
-            .add_event::<SceneTreeEvent>()
-            .init_non_send_resource::<SceneTreeRefImpl>();
+        app.add_systems(
+            PreStartup,
+            (initialize_scene_tree, connect_scene_tree).chain(),
+        )
+        .add_systems(First, write_scene_tree_events.before(event_update_system))
+        .add_systems(First, read_scene_tree_events.before(event_update_system))
+        .add_event::<SceneTreeEvent>()
+        .init_non_send_resource::<SceneTreeRefImpl>();
     }
 }
 
