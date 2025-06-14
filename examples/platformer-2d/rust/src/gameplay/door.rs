@@ -16,7 +16,7 @@ pub struct DoorEnteredEvent {
 
 #[derive(GodotClass, BevyBundle)]
 #[class(base=Area2D)]
-#[bevy_bundle((Door: level), autosync=true)]
+#[bevy_bundle((Door: level))]
 pub struct Door2D {
     base: Base<Area2D>,
     #[export]

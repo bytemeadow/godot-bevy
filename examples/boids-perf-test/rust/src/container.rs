@@ -7,7 +7,7 @@ pub struct BoidsContainer;
 
 #[derive(GodotClass, BevyBundle)]
 #[class(base=Node2D)]
-#[bevy_bundle((BoidsContainer), autosync=true)]
+#[bevy_bundle((BoidsContainer))]
 pub struct BevyBoids {
     base: Base<Node2D>,
     pub is_running: bool,

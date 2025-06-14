@@ -229,7 +229,6 @@ fn get_option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
 // Parse bevy_bundle attribute syntax
 struct BevyBundleAttr {
     components: Vec<ComponentSpec>,
-    autosync: bool,
 }
 
 struct ComponentSpec {
@@ -240,50 +239,33 @@ struct ComponentSpec {
 impl Parse for BevyBundleAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut components = Vec::new();
-        let mut autosync = false;
 
         while !input.is_empty() {
-            // Check if this is an autosync parameter
-            if input.peek(syn::Ident) && input.peek2(Token![=]) {
-                let param_name: Ident = input.parse()?;
-                let _eq: Token![=] = input.parse()?;
+            // Parse component specification
+            let component_content;
+            syn::parenthesized!(component_content in input);
 
-                if param_name == "autosync" {
-                    let value: syn::LitBool = input.parse()?;
-                    autosync = value.value;
-                } else {
-                    return Err(Error::new_spanned(param_name, "Unknown parameter"));
-                }
+            let component_name: Ident = component_content.parse()?;
+
+            // Check if there's a colon and source field mapping
+            let source_field = if component_content.peek(Token![:]) {
+                let _colon: Token![:] = component_content.parse()?;
+                Some(component_content.parse()?)
             } else {
-                // Parse component specification
-                let component_content;
-                syn::parenthesized!(component_content in input);
+                None
+            };
 
-                let component_name: Ident = component_content.parse()?;
-
-                // Check if there's a colon and source field mapping
-                let source_field = if component_content.peek(Token![:]) {
-                    let _colon: Token![:] = component_content.parse()?;
-                    Some(component_content.parse()?)
-                } else {
-                    None
-                };
-
-                components.push(ComponentSpec {
-                    component_name,
-                    source_field,
-                });
-            }
+            components.push(ComponentSpec {
+                component_name,
+                source_field,
+            });
 
             if !input.is_empty() {
                 let _comma: Token![,] = input.parse()?;
             }
         }
 
-        Ok(BevyBundleAttr {
-            components,
-            autosync,
-        })
+        Ok(BevyBundleAttr { components })
     }
 }
 
@@ -365,37 +347,29 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
         bundle_name.span(),
     );
 
-    // Generate the auto-sync registration if requested
-    let autosync_impl = if attr_args.autosync {
-        quote! {
-            fn #create_bundle_fn_name(
-                commands: &mut bevy::ecs::system::Commands,
-                entity: bevy::ecs::entity::Entity,
-                handle: &godot_bevy::bridge::GodotNodeHandle,
-            ) -> bool {
-                // Try to get the node as the correct type
-                if let Some(godot_node) = handle.clone().try_get::<#struct_name>() {
-                    let bundle = #bundle_name::from_godot_node(&godot_node);
-                    commands.entity(entity).insert(bundle);
-                    return true;
-                }
-                false
+    // Generate the bundle registration (always enabled now)
+    let bundle_impl = quote! {
+        fn #create_bundle_fn_name(
+            commands: &mut bevy::ecs::system::Commands,
+            entity: bevy::ecs::entity::Entity,
+            handle: &godot_bevy::bridge::GodotNodeHandle,
+        ) -> bool {
+            // Try to get the node as the correct type
+            if let Some(godot_node) = handle.clone().try_get::<#struct_name>() {
+                let bundle = #bundle_name::from_godot_node(&godot_node);
+                commands.entity(entity).insert(bundle);
+                return true;
             }
+            false
+        }
 
-            // Auto-register this bundle using inventory
-            godot_bevy::inventory::submit! {
-                godot_bevy::prelude::AutoSyncBundleRegistry {
-                    godot_class_name: stringify!(#struct_name),
-                    create_bundle_fn: #create_bundle_fn_name,
-                }
+        // Auto-register this bundle using inventory
+        godot_bevy::inventory::submit! {
+            godot_bevy::prelude::AutoSyncBundleRegistry {
+                godot_class_name: stringify!(#struct_name),
+                create_bundle_fn: #create_bundle_fn_name,
             }
         }
-    } else {
-        quote! {}
-    };
-
-    let plugin_impl = quote! {
-        #autosync_impl
     };
 
     let expanded = quote! {
@@ -403,7 +377,7 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
 
         #bundle_constructor
 
-        #plugin_impl
+        #bundle_impl
     };
 
     Ok(expanded)

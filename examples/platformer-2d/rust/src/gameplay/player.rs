@@ -40,7 +40,7 @@ pub struct PlayerMovementEvent {
 
 #[derive(GodotClass, BevyBundle)]
 #[class(base=CharacterBody2D)]
-#[bevy_bundle((Speed: speed), (JumpVelocity: jump_velocity), (Gravity: gravity), (Player), autosync=true)]
+#[bevy_bundle((Speed: speed), (JumpVelocity: jump_velocity), (Gravity: gravity), (Player))]
 pub struct Player2D {
     base: Base<CharacterBody2D>,
     #[export]

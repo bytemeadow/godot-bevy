@@ -25,7 +25,7 @@ pub struct GemsCollected(pub i64);
 
 #[derive(GodotClass, BevyBundle)]
 #[class(base=Area2D)]
-#[bevy_bundle((Gem), autosync=true)]
+#[bevy_bundle((Gem))]
 pub struct Gem2D {
     base: Base<Area2D>,
 }
