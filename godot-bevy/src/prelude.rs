@@ -1,5 +1,5 @@
 pub use crate::GodotPlugin;
-pub use crate::autosync::{AutoSyncBundle, AutoSyncBundleRegistry};
+pub use crate::autosync::AutoSyncBundleRegistry;
 pub use crate::bridge::*;
 pub use crate::node_tree_view::NodeTreeView;
 #[allow(deprecated)]

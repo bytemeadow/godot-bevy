@@ -83,7 +83,7 @@ impl Default for SceneTreeRefImpl {
     }
 }
 
-fn initialize_scene_tree(
+pub fn initialize_scene_tree(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
@@ -435,6 +435,9 @@ fn create_scene_tree_entity(
 
                 let ent = ent.id();
                 ent_mapping.insert(node.instance_id(), ent);
+
+                // Try to add any registered bundles for this node type
+                crate::autosync::try_add_bundles_for_node(commands, ent, &event.node);
 
                 if node.instance_id() != scene_root.instance_id() {
                     let parent = node.get_parent().unwrap().instance_id();
