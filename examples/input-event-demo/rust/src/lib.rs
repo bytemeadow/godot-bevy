@@ -13,9 +13,9 @@ use godot_bevy::plugins::core::input_event::{
 };
 
 // This example demonstrates godot-bevy's input event system.
-// 
+//
 // Key behavior:
-// - Keys mapped in Godot's Input Map (like arrow keys → "ui_down", "move_down") 
+// - Keys mapped in Godot's Input Map (like arrow keys → "ui_down", "move_down")
 //   generate ActionInput events only (no duplicate raw keyboard events)
 // - Unmapped keys (like random letters) generate KeyboardInput events only
 // - This prevents duplicate events and follows Godot's intended input flow
