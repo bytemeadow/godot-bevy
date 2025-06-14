@@ -265,7 +265,7 @@ use godot::classes::{CharacterBody2D, ICharacterBody2D};
 
 #[derive(GodotClass, BevyBundle)]
 #[class(base=CharacterBody2D)]
-#[bevy_bundle((Speed: speed), (Player), autosync=true)]
+#[bevy_bundle((Speed: speed), (Player))]
 pub struct Player2D {
     base: Base<CharacterBody2D>,
     #[export]

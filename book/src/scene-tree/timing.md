@@ -43,7 +43,34 @@ When the scene tree is parsed, each Godot node becomes a Bevy entity with these 
 - **`Transform2D`** or **`Transform3D`** - For Node2D and Node3D types respectively
 - **`Groups`** - The node's group memberships
 - **`Collisions`** - If the node has collision signals
-- Plus any components from your custom bundles!
+- **Node type markers** - Components like `ButtonMarker`, `Sprite2DMarker`, etc.
+- **Custom bundles** - Components from `#[derive(BevyBundle)]` are automatically added
+
+## BevyBundle Component Timing
+
+If you've defined custom Godot node types with `#[derive(BevyBundle)]`, their components are added **immediately** during scene tree processing. This happens:
+
+- **During `PreStartup`** for nodes that exist when the scene is first loaded
+- **During `First`** for nodes added dynamically at runtime
+
+This means BevyBundle components are available in `Startup` systems for initial scene nodes, and immediately available for dynamically added nodes.
+
+```rust
+#[derive(GodotClass, BevyBundle)]
+#[class(base=Node2D)]
+#[bevy_bundle((Health), (Velocity))]
+pub struct Player {
+    base: Base<Node2D>,
+}
+
+// This will work in Startup - the Health and Velocity components
+// are automatically added during PreStartup for existing nodes
+fn setup_player(mut query: Query<(Entity, &Health, &Velocity)>) {
+    for (entity, health, velocity) in &mut query {
+        // Player components are guaranteed to be here!
+    }
+}
+```
 
 ## Best Practices
 
