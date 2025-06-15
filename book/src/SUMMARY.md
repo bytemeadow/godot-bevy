@@ -12,6 +12,7 @@
 
 - [Initialization and Timing](./scene-tree/timing.md)
 - [Querying with Node Type Markers](./scene-tree/querying.md)
+- [Custom Node Markers](./scene-tree/custom-nodes.md)
 
 # Transform System
 
