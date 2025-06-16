@@ -1,10 +1,10 @@
+use bevy::prelude::{
+    App, AssetServer, Component, Entity, Handle, IntoScheduleConfigs, Plugin, Resource, Startup,
+    Time, Update, Vec, With,
+};
 use bevy::{
-    ecs::{
-        component::Component,
-        system::{Commands, ParamSet, Query, Res, ResMut},
-    },
+    ecs::system::{Commands, ParamSet, Query, Res, ResMut},
     math::Vec2,
-    prelude::*,
 };
 use bevy_spatial::{kdtree::KDTree2, AutomaticUpdate, SpatialAccess, SpatialStructure};
 

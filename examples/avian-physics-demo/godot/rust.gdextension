@@ -1,0 +1,13 @@
+[configuration]
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = 4.1
+
+[libraries]
+linux.debug.x86_64 = "res://../../../target/debug/libavian_physics_test.so"
+linux.release.x86_64 = "res://../../../target/release/libavian_physics_test.so"
+macos.debug.x86_64 = "res://../../../target/debug/libavian_physics_test.dylib"
+macos.release.x86_64 = "res://../../../target/release/libavian_physics_test.dylib"
+macos.debug.arm64 = "res://../../../target/debug/libavian_physics_test.dylib"
+macos.release.arm64 = "res://../../../target/release/libavian_physics_test.dylib"
+windows.debug.x86_64 = "res://../../../target/debug/avian_physics_test.dll"
+windows.release.x86_64 = "res://../../../target/release/avian_physics_test.dll"

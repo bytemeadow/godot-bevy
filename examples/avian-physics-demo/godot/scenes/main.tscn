@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3 uid="uid://crt73ja5heco1"]
+
+[sub_resource type="Environment" id="Environment_sgp6g"]
+ambient_light_source = 2
+ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_energy = 0.25
+
+[node name="Main" type="Node"]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.98179, 0.189969, 0, -0.189969, 0.981789, 0, 6.83371, 11.6035)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_sgp6g")
