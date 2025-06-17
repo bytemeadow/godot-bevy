@@ -15,7 +15,6 @@ use bevy::{
 use godot::{
     builtin::GString,
     classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader},
-    global::godot_print,
 };
 
 use crate::plugins::{assets::GodotResource, core::transforms::IntoGodotTransform2D};
@@ -112,10 +111,8 @@ fn spawn_scene(
 
         if let Some(transform) = transform {
             if let Ok(mut node) = instance.clone().try_cast::<Node3D>() {
-                godot_print!("setup initial godot ndoe transform for 3d");
                 node.set_global_transform(transform.to_godot_transform());
             } else if let Ok(mut node) = instance.clone().try_cast::<Node2D>() {
-                godot_print!("setup initial godot ndoe transform for 2d");
                 node.set_global_transform(transform.to_godot_transform_2d());
             } else {
                 tracing::error!(
