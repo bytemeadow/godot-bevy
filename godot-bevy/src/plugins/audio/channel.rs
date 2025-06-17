@@ -70,7 +70,7 @@ impl<T: AudioChannelMarker> AudioChannel<T> {
     }
 
     /// Play audio with configurable settings - returns a fluent builder
-    pub fn play(&self, handle: Handle<GodotResource>) -> PlayAudioCommand<'_, T> {
+    pub fn play(&self, handle: Handle<GodotResource>) -> PlayAudioCommand<T> {
         PlayAudioCommand::new(
             self.channel_id,
             handle,
@@ -80,11 +80,7 @@ impl<T: AudioChannelMarker> AudioChannel<T> {
     }
 
     /// Play 2D positional audio
-    pub fn play_2d(
-        &self,
-        handle: Handle<GodotResource>,
-        position: Vec2,
-    ) -> PlayAudioCommand<'_, T> {
+    pub fn play_2d(&self, handle: Handle<GodotResource>, position: Vec2) -> PlayAudioCommand<T> {
         PlayAudioCommand::new(
             self.channel_id,
             handle,
@@ -94,11 +90,7 @@ impl<T: AudioChannelMarker> AudioChannel<T> {
     }
 
     /// Play 3D positional audio
-    pub fn play_3d(
-        &self,
-        handle: Handle<GodotResource>,
-        position: Vec3,
-    ) -> PlayAudioCommand<'_, T> {
+    pub fn play_3d(&self, handle: Handle<GodotResource>, position: Vec3) -> PlayAudioCommand<T> {
         PlayAudioCommand::new(
             self.channel_id,
             handle,
