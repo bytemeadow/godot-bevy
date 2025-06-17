@@ -2,8 +2,8 @@
 
 use bevy::app::{App, Plugin, ScheduleRunnerPlugin};
 use bevy::asset::{
-    io::{AssetSource, AssetSourceId},
     AssetMetaCheck, AssetPlugin,
+    io::{AssetSource, AssetSourceId},
 };
 use bevy::ecs::schedule::{Schedule, ScheduleLabel};
 use bevy::ecs::system::SystemParam;

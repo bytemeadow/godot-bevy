@@ -5,7 +5,7 @@ use bevy::{
     ecs::{
         component::Component,
         entity::Entity,
-        event::{event_update_system, Event, EventReader, EventWriter},
+        event::{Event, EventReader, EventWriter, event_update_system},
         name::Name,
         schedule::IntoScheduleConfigs,
         system::{Commands, NonSendMut, Query, SystemParam},

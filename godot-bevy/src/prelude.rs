@@ -1,3 +1,4 @@
+pub use crate::GodotPlugin;
 pub use crate::autosync::AutoSyncBundleRegistry;
 pub use crate::bridge::*;
 pub use crate::node_tree_view::NodeTreeView;
@@ -10,11 +11,6 @@ pub use crate::plugins::{
         MainAudioTrack, PlayAudioCommand, SoundId,
     },
     core::{
-        collisions::{
-            ALL_COLLISION_SIGNALS, AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED,
-            COLLISION_END_SIGNALS, COLLISION_START_SIGNALS,
-        },
-        connect_godot_signal,
         ActionInput,
         // Node type marker components for type-safe ECS queries
         AnimatedSprite2DMarker,
@@ -74,9 +70,13 @@ pub use crate::plugins::{
         TextEditMarker,
         TimerMarker,
         TransformSyncMode,
+        collisions::{
+            ALL_COLLISION_SIGNALS, AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED,
+            COLLISION_END_SIGNALS, COLLISION_START_SIGNALS,
+        },
+        connect_godot_signal,
     },
     packed_scene::{GodotScene, PackedScenePlugin},
 };
-pub use crate::GodotPlugin;
 pub use godot::prelude as godot_prelude;
 pub use godot_bevy_macros::*;
