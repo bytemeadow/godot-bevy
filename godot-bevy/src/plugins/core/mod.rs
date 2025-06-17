@@ -58,14 +58,17 @@ pub enum TransformSyncMode {
     /// No transform syncing - use direct Godot physics (move_and_slide, etc.)
     /// Best for: Platformers, physics-heavy games
     Disabled,
-    /// Before and after bevy systems run, sync godot transforms to bevy transforms.
-    /// Best for: Pure ECS games, simple movement, bevy handling physics (Avian, etc)
-    Enabled,
+    /// One-way sync: ECS → Godot only
+    /// Best for: Pure ECS games, simple movement
+    OneWay,
+    /// Two-way sync: ECS ↔ Godot
+    /// Best for: Hybrid apps migrating from GDScript to ECS
+    TwoWay,
 }
 
 impl Default for TransformSyncMode {
     fn default() -> Self {
-        Self::Enabled
+        Self::OneWay
     }
 }
 
@@ -78,7 +81,7 @@ pub struct GodotTransformConfig {
 impl Default for GodotTransformConfig {
     fn default() -> Self {
         Self {
-            sync_mode: TransformSyncMode::Enabled,
+            sync_mode: TransformSyncMode::OneWay,
         }
     }
 }
@@ -94,7 +97,14 @@ impl GodotTransformConfig {
     /// Enable one-way sync (ECS → Godot) - default behavior
     pub fn one_way() -> Self {
         Self {
-            sync_mode: TransformSyncMode::Enabled,
+            sync_mode: TransformSyncMode::OneWay,
+        }
+    }
+
+    /// Enable two-way sync (ECS ↔ Godot) for hybrid apps
+    pub fn two_way() -> Self {
+        Self {
+            sync_mode: TransformSyncMode::TwoWay,
         }
     }
 }
