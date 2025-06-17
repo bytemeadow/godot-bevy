@@ -2,8 +2,8 @@
 
 use bevy::app::{App, Plugin, ScheduleRunnerPlugin};
 use bevy::asset::{
-    AssetMetaCheck, AssetPlugin,
     io::{AssetSource, AssetSourceId},
+    AssetMetaCheck, AssetPlugin,
 };
 use bevy::ecs::schedule::{Schedule, ScheduleLabel};
 use bevy::ecs::system::SystemParam;
@@ -19,7 +19,6 @@ pub mod scene_tree;
 pub use scene_tree::*;
 
 pub mod transforms;
-pub use transforms::{Transform2D, Transform3D};
 
 pub mod signals;
 pub use signals::*;
@@ -59,17 +58,14 @@ pub enum TransformSyncMode {
     /// No transform syncing - use direct Godot physics (move_and_slide, etc.)
     /// Best for: Platformers, physics-heavy games
     Disabled,
-    /// One-way sync: ECS → Godot only
-    /// Best for: Pure ECS games, simple movement
-    OneWay,
-    /// Two-way sync: ECS ↔ Godot
-    /// Best for: Hybrid apps migrating from GDScript to ECS
-    TwoWay,
+    /// Before and after bevy systems run, sync godot transforms to bevy transforms.
+    /// Best for: Pure ECS games, simple movement, bevy handling physics (Avian, etc)
+    Enabled,
 }
 
 impl Default for TransformSyncMode {
     fn default() -> Self {
-        Self::OneWay
+        Self::Enabled
     }
 }
 
@@ -82,7 +78,7 @@ pub struct GodotTransformConfig {
 impl Default for GodotTransformConfig {
     fn default() -> Self {
         Self {
-            sync_mode: TransformSyncMode::OneWay,
+            sync_mode: TransformSyncMode::Enabled,
         }
     }
 }
@@ -98,14 +94,7 @@ impl GodotTransformConfig {
     /// Enable one-way sync (ECS → Godot) - default behavior
     pub fn one_way() -> Self {
         Self {
-            sync_mode: TransformSyncMode::OneWay,
-        }
-    }
-
-    /// Enable two-way sync (ECS ↔ Godot) for hybrid apps
-    pub fn two_way() -> Self {
-        Self {
-            sync_mode: TransformSyncMode::TwoWay,
+            sync_mode: TransformSyncMode::Enabled,
         }
     }
 }

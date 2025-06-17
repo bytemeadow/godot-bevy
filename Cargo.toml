@@ -10,12 +10,14 @@ license = "MIT OR Apache-2.0"
 [workspace]
 members = [
     "godot-bevy",
-    "examples/dodge-the-creeps-2d/rust",
-    "examples/timing-test/rust",
-    "examples/input-event-demo/rust",
-    "examples/platformer-2d/rust",
-    "examples/simple-node2d-movement/rust",
-    "examples/boids-perf-test/rust",
+    "examples/avian-physics-demo/rust",
+    # TODO
+    # "examples/dodge-the-creeps-2d/rust",
+    # "examples/timing-test/rust",
+    # "examples/input-event-demo/rust",
+    # "examples/platformer-2d/rust",
+    # "examples/simple-node2d-movement/rust",
+    # "examples/boids-perf-test/rust",
 ]
 resolver = "2"
 

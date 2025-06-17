@@ -5,7 +5,7 @@ use bevy::{
     ecs::{
         component::Component,
         entity::Entity,
-        event::{Event, EventReader, EventWriter, event_update_system},
+        event::{event_update_system, Event, EventReader, EventWriter},
         name::Name,
         schedule::IntoScheduleConfigs,
         system::{Commands, NonSendMut, Query, SystemParam},
@@ -28,15 +28,9 @@ use godot::{
     prelude::GodotConvert,
 };
 
-use crate::{
-    bridge::GodotNodeHandle,
-    prelude::{Collisions, Transform2D, Transform3D},
-};
+use crate::{bridge::GodotNodeHandle, prelude::Collisions};
 
 use super::node_markers::*;
-use bevy::ecs::system::Res;
-
-use super::{GodotTransformConfig, TransformSyncMode};
 
 use super::collisions::ALL_COLLISION_SIGNALS;
 
@@ -87,7 +81,6 @@ pub fn initialize_scene_tree(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
-    config: Res<GodotTransformConfig>,
 ) {
     fn traverse(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
         events.push(SceneTreeEvent {
@@ -104,13 +97,7 @@ pub fn initialize_scene_tree(
     let mut events = vec![];
     traverse(root.upcast(), &mut events);
 
-    create_scene_tree_entity(
-        &mut commands,
-        events,
-        &mut scene_tree,
-        &mut entities,
-        &config,
-    );
+    create_scene_tree_entity(&mut commands, events, &mut scene_tree, &mut entities);
 }
 
 #[derive(Debug, Clone, Event)]
@@ -356,13 +343,13 @@ fn create_scene_tree_entity(
     events: impl IntoIterator<Item = SceneTreeEvent>,
     scene_tree: &mut SceneTreeRef,
     entities: &mut Query<(&mut GodotNodeHandle, Entity)>,
-    config: &GodotTransformConfig,
 ) {
     let mut ent_mapping = entities
         .iter()
         .map(|(reference, ent)| (reference.instance_id(), ent))
         .collect::<HashMap<_, _>>();
-    let scene_root = scene_tree.get().get_root().unwrap();
+    // TODO rm me
+    // let scene_root = scene_tree.get().get_root().unwrap();
 
     for event in events.into_iter() {
         trace!(target: "godot_scene_tree_events", event = ?event);
@@ -384,17 +371,20 @@ fn create_scene_tree_entity(
                 // Add node type marker components
                 add_node_type_markers(&mut ent, &mut node);
 
+                // TODO rm. we shouldn't need to insert Bevy components, this is the
+                // perogative of the user's code
+                //
                 // Only add transform components if sync mode is not disabled
-                if config.sync_mode != TransformSyncMode::Disabled {
-                    if let Some(node3d) = node.try_get::<Node3D>() {
-                        ent.insert(Transform3D::from(node3d.get_transform()));
-                    }
-
-                    if let Some(node2d) = node.try_get::<Node2D>() {
-                        let transform = node2d.get_transform();
-                        ent.insert(Transform2D::from(transform));
-                    }
-                }
+                // if config.sync_mode != TransformSyncMode::Disabled {
+                //
+                // if let Some(node3d) = node.try_get::<Node3D>() {
+                //     ent.insert(node3d.get_transform().to_bevy_transform());
+                // }
+                //
+                // if let Some(node2d) = node.try_get::<Node2D>() {
+                //     ent.insert(node2d.get_transform().to_bevy_transform());
+                // }
+                // }
 
                 let mut node = node.get::<Node>();
 
@@ -404,8 +394,8 @@ fn create_scene_tree_entity(
                     .any(|&signal| node.has_signal(signal));
 
                 if has_collision_signals {
-                    debug!(target: "godot_scene_tree_collisions", 
-                           node_id = node.instance_id().to_string(), 
+                    debug!(target: "godot_scene_tree_collisions",
+                           node_id = node.instance_id().to_string(),
                            "has collision signals");
 
                     let signal_watcher = scene_tree
@@ -439,12 +429,16 @@ fn create_scene_tree_entity(
                 // Try to add any registered bundles for this node type
                 crate::autosync::try_add_bundles_for_node(commands, ent, &event.node);
 
-                if node.instance_id() != scene_root.instance_id() {
-                    let parent = node.get_parent().unwrap().instance_id();
-                    commands
-                        .entity(*ent_mapping.get(&parent).unwrap())
-                        .add_children(&[ent]);
-                }
+                // TODO rm. this is problematic as it creates an entity
+                // parent/child relationship that breaks avian. Also,
+                // why do we have/need the relationship at all?
+                //
+                // if node.instance_id() != scene_root.instance_id() {
+                //     let parent = node.get_parent().unwrap().instance_id();
+                //     commands
+                //         .entity(*ent_mapping.get(&parent).unwrap())
+                //         .add_children(&[ent]);
+                // }
             }
             SceneTreeEventType::NodeRemoved => {
                 if let Some(ent) = ent {
@@ -472,13 +466,11 @@ fn read_scene_tree_events(
     mut scene_tree: SceneTreeRef,
     mut event_reader: EventReader<SceneTreeEvent>,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
-    config: Res<GodotTransformConfig>,
 ) {
     create_scene_tree_entity(
         &mut commands,
         event_reader.read().cloned(),
         &mut scene_tree,
         &mut entities,
-        &config,
     );
 }
