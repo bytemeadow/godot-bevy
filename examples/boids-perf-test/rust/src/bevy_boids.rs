@@ -1,3 +1,22 @@
+// Boids Performance Test - Demonstrates NodeRegistry System
+//
+// This example showcases the new NodeRegistry system that eliminates GodotNodeHandle 
+// query conflicts. Key improvements demonstrated:
+//
+// 1. sync_container_params() - Uses Query<Entity, With<BevyBoidsMarker>> + 
+//    registry.access::<BevyBoidsMarker>(entity) instead of Query<&GodotNodeHandle>
+//
+// 2. colorize_new_boids() - Uses registry.access::<Sprite2DMarker>(entity) and 
+//    registry.access::<Node2DMarker>(entity) for entity-specific node access
+//
+// 3. Type Safety - All access is strongly typed through generated/built-in marker components
+//
+// 4. Entity-Specific Access - The registry maps entities to their GodotNodeHandles,
+//    allowing multiple entities with the same marker type to be accessed correctly
+//
+// Note: The ParamSet in boids_update_with_spatial_tree() is still needed because it's
+// doing legitimate read-write access to the same ECS components, not GodotNodeHandle conflicts.
+
 use bevy::{
     ecs::{
         component::Component,
@@ -12,7 +31,7 @@ use godot::prelude::*;
 use godot_bevy::plugins::core::Transform2D;
 use godot_bevy::prelude::*;
 
-use crate::container::{BevyBoids, BoidsContainer};
+use crate::container::BevyBoidsMarker;
 
 // Type alias for our spatial tree
 type BoidTree = KDTree2<Boid>;
@@ -120,10 +139,14 @@ impl Plugin for BoidsPlugin {
                 sync_container_params,
                 handle_boid_count,
                 update_simulation_state,
-                colorize_new_boids,
                 log_performance,
             )
                 .chain(),
+        )
+        // Colorization runs in First schedule after scene tree processing
+        .add_systems(
+            First,
+            colorize_new_boids.after(bevy::ecs::event::event_update_system),
         )
         // Movement systems
         .add_systems(
@@ -146,11 +169,12 @@ fn sync_container_params(
     mut boid_count: ResMut<BoidCount>,
     mut config: ResMut<BoidsConfig>,
     mut simulation_state: ResMut<SimulationState>,
-    container_query: Query<&GodotNodeHandle, With<BoidsContainer>>,
+    container_entities: Query<Entity, With<BevyBoidsMarker>>,
+    registry: NodeRegistryAccess,
 ) {
-    for handle in container_query.iter() {
-        let mut handle_clone = handle.clone();
-        if let Some(mut bevy_boids) = handle_clone.try_get::<BevyBoids>() {
+    // Access the BevyBoids node through the registry using auto-generated marker
+    for entity in container_entities.iter() {
+        if let Some(mut bevy_boids) = registry.access::<BevyBoidsMarker>(entity) {
             let boids_bind = bevy_boids.bind();
 
             // Update simulation state
@@ -170,6 +194,9 @@ fn sync_container_params(
             drop(boids_bind); // Release the bind before getting mutable access
             let mut bevy_boids_mut = bevy_boids.bind_mut();
             bevy_boids_mut.current_boid_count = current_count;
+            
+            // Only handle the first container (there should be only one)
+            break;
         }
     }
 }
@@ -279,40 +306,47 @@ fn update_simulation_state(
     }
 }
 
-/// Colorize newly spawned boids (matches GDScript behavior)
+/// Colorize newly spawned boids using NodeRegistry system
+/// Demonstrates accessing nodes through different built-in markers
 fn colorize_new_boids(
     mut commands: Commands,
-    new_boids: Query<(Entity, &GodotNodeHandle), With<NeedsColorization>>,
+    new_boids: Query<Entity, With<NeedsColorization>>,
+    registry: NodeRegistryAccess,
 ) {
-    for (entity, handle) in new_boids.iter() {
-        let mut handle_clone = handle.clone();
-
-        // Generate random color (matching GDScript)
+    for entity in new_boids.iter() {
+        // Generate random color for each boid (matching GDScript)
         let random_color = Color::from_rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.9);
 
-        // Try different node structures (matching GDScript logic)
-        if let Some(mut node) = handle_clone.try_get::<Node2D>() {
+        // Debug: Check if entity is in registry
+        bevy::log::info!("Trying to colorize entity: {:?}", entity);
+        
+        // Try Sprite2D first
+        if let Some(mut sprite) = registry.access::<Sprite2DMarker>(entity) {
+            bevy::log::info!("Found Sprite2D for entity: {:?}", entity);
+            sprite.set_modulate(random_color);
+        }
+        // Try Node2D (for boids with Sprite or Triangle children)
+        else if let Some(mut node) = registry.access::<Node2DMarker>(entity) {
+            bevy::log::info!("Found Node2D for entity: {:?}", entity);
             // Check for Sprite child node
             if node.has_node("Sprite") {
                 let mut sprite = node.get_node_as::<Node2D>("Sprite");
                 sprite.set_modulate(random_color);
             }
-            // Check for Triangle child node
+            // Check for Triangle child node  
             else if node.has_node("Triangle") {
                 let mut triangle = node.get_node_as::<Node2D>("Triangle");
                 triangle.set_modulate(random_color);
-            }
-            // If it's a Sprite2D directly, set its modulate
-            else if let Some(mut sprite) = handle_clone.try_get::<godot::classes::Sprite2D>() {
-                sprite.set_modulate(random_color);
             }
             // Fallback: set modulate on the main node
             else {
                 node.set_modulate(random_color);
             }
         }
-
-        // Remove the marker component
+        else {
+            bevy::log::warn!("No node found in registry for entity: {:?}", entity);
+        }
+        
         commands.entity(entity).remove::<NeedsColorization>();
     }
 }
