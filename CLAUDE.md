@@ -47,6 +47,12 @@ cargo build --release --manifest-path examples/{example}/rust/Cargo.toml
 - `GodotResourceHandle` - Manages Godot resources within Bevy's asset system
 - Automatic transform synchronization between Bevy and Godot coordinate systems
 
+**NodeRegistry** (`godot-bevy/src/node_registry.rs`): Eliminates ECS query conflicts when accessing multiple node types:
+- Maps entities to their `GodotNodeHandle` instances for fast, conflict-free access
+- Provides `access()` (panicking) and `try_access()` (safe) methods for node retrieval
+- Automatically registers entities during scene tree parsing and cleans up on node removal
+- Enables multiple systems to access different node types without `ParamSet` workarounds
+
 **Watchers** (`godot-bevy/src/watchers/`): Thread-safe event bridges:
 - `SceneTreeWatcher` - Monitors Godot scene tree changes
 - `GodotSignalWatcher` - Converts Godot signals to Bevy events  
@@ -88,6 +94,57 @@ Examples are structured as workspace members with separate Rust crates. Each exa
 **Node Queries**: Query Godot nodes directly from Bevy systems using `Query<&mut GodotNodeHandle>` and cast to specific Godot types.
 
 **Asset Loading**: Use Bevy's `AssetServer` to load Godot resources (`Handle<GodotResource>`) which works consistently in development and exported games.
+
+## ECS Query Patterns and Best Practices
+
+### NodeRegistry vs GodotNodeHandle Queries
+
+**NodeRegistry Pattern** (Recommended for multiple node types):
+```rust
+fn update_multiple_types(
+    sprites: Query<Entity, (With<Sprite2DMarker>, With<GodotNodeHandle>)>,
+    buttons: Query<Entity, (With<ButtonMarker>, With<GodotNodeHandle>)>,
+    registry: NodeRegistryAccess,
+) {
+    for entity in sprites.iter() {
+        let sprite = registry.access::<Sprite2D>(entity);
+        // Work with sprite...
+    }
+    for entity in buttons.iter() {
+        let button = registry.access::<Button>(entity);
+        // Work with button...
+    }
+}
+```
+
+**Direct GodotNodeHandle Pattern** (Fine for single node types):
+```rust
+fn update_sprites(
+    mut sprites: Query<&mut GodotNodeHandle, With<Sprite2DMarker>>,
+) {
+    for mut handle in sprites.iter_mut() {
+        let sprite = handle.get::<Sprite2D>();
+        // Work with sprite...
+    }
+}
+```
+
+### Query Conflict Resolution
+
+- **Problem**: Multiple `Query<&mut GodotNodeHandle>` parameters with different markers cause Bevy ECS conflicts
+- **Solution**: Use `NodeRegistryAccess` with entity-based queries instead of handle-based queries
+- **Always include `With<GodotNodeHandle>`** when using NodeRegistry to ensure entities are ready
+
+### Timing Considerations
+
+**Scene Tree Initialization**: Entities created during `PreStartup` are available in `Startup` systems.
+
+**Dynamic Scene Spawning**: When using `GodotScene::from_handle()`, there's a frame delay:
+- Frame N: Entity created with `GodotScene` component  
+- Frame N: `spawn_scene` system creates Godot node, adds `GodotNodeHandle`
+- Frame N+1: Entity registered in NodeRegistry via scene tree events
+
+**Best Practice**: Always use `With<GodotNodeHandle>` filter when working with NodeRegistry to avoid timing issues.
 
 ## Testing and CI
 
