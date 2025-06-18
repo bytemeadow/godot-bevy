@@ -89,3 +89,72 @@ Here's what happens when a node is added to the scene tree during runtime:
 5. `read_scene_tree_events` (also in `First` schedule) processes the event and creates/updates entities
 
 This architecture allows for flexible event handling while maintaining a clean separation between Godot and Bevy.
+
+## Dynamic Scene Spawning Timing
+
+When you spawn scenes dynamically using `GodotScene::from_handle()`, there's an important timing consideration to be aware of:
+
+```rust
+fn spawn_enemy(mut commands: Commands, enemy_scene: Res<EnemyScene>) {
+    let entity = commands.spawn_empty()
+        .insert(GodotScene::from_handle(enemy_scene.0.clone()))
+        .insert(NeedsInitialization)
+        .id();
+    
+    // The entity exists but the Godot node hasn't been created yet!
+    // This system will run before the node is available
+}
+```
+
+### The Timeline
+
+Here's what happens when you spawn with `GodotScene::from_handle()`:
+
+1. **Frame N, Update**: Entity created with `GodotScene` component
+2. **Frame N, PostUpdate**: `spawn_scene` system creates Godot node, adds `GodotNodeHandle`
+3. **Frame N+1, First**: Scene tree events register entity in NodeRegistry
+4. **Frame N+1**: Entity is fully ready for NodeRegistry access
+
+### Working with Newly Spawned Scenes
+
+If you need to work with newly spawned scenes immediately, use `With<GodotNodeHandle>` in your queries to ensure entities are ready:
+
+```rust
+// ❌ This might process entities before their nodes are ready
+fn initialize_enemies(
+    enemies: Query<Entity, With<NeedsInitialization>>,
+    registry: NodeRegistryAccess,
+) {
+    for entity in enemies.iter() {
+        // This might fail if the node isn't ready yet!
+        if let Some(enemy) = registry.try_access::<EnemyNode>(entity) {
+            // Initialize enemy...
+        }
+    }
+}
+
+// ✅ This only processes entities with ready nodes
+fn initialize_enemies(
+    enemies: Query<Entity, (With<NeedsInitialization>, With<GodotNodeHandle>)>,
+    registry: NodeRegistryAccess,
+) {
+    for entity in enemies.iter() {
+        // This is guaranteed to work since we require GodotNodeHandle
+        let enemy = registry.access::<EnemyNode>(entity);
+        // Initialize enemy...
+    }
+}
+```
+
+### Schedule Considerations
+
+If you absolutely need to process newly spawned scenes in the same frame, run your systems in the `First` schedule after scene tree processing:
+
+```rust
+app.add_systems(
+    First,
+    initialize_enemies.after(bevy::ecs::event::event_update_system),
+);
+```
+
+This ensures your system runs after the scene tree events have been processed and entities are registered in the NodeRegistry.
