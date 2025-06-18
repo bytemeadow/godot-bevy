@@ -14,17 +14,6 @@ pub struct NodeRegistry {
     entity_to_handle: HashMap<Entity, GodotNodeHandle>,
 }
 
-/// Trait that enables typed access to Godot nodes through marker components
-pub trait NodeAccess: Component + 'static {
-    /// The Godot node type this marker corresponds to
-    type GodotType: GodotClass + Inherits<Node>;
-    
-    /// Access the Godot node through the registry for a specific entity
-    fn access_node_for_entity(registry: &NodeRegistry, entity: Entity) -> Option<Gd<Self::GodotType>> {
-        let node_handle = registry.entity_to_handle.get(&entity)?;
-        node_handle.clone().try_get::<Self::GodotType>()
-    }
-}
 
 /// Typed reference to a Godot node that provides ergonomic access
 pub struct TypedNodeRef<T: GodotClass + Inherits<Node>> {
@@ -79,9 +68,11 @@ impl NodeRegistry {
         self.entity_to_handle.insert(entity, handle);
     }
     
-    /// Access a Godot node for a specific entity through its marker component type
-    pub fn access<T: NodeAccess>(&self, entity: Entity) -> Option<TypedNodeRef<T::GodotType>> {
-        T::access_node_for_entity(self, entity).map(TypedNodeRef::new)
+    /// Access a Godot node for a specific entity as the given type
+    pub fn access<T: GodotClass + Inherits<Node>>(&self, entity: Entity) -> Option<TypedNodeRef<T>> {
+        let node_handle = self.entity_to_handle.get(&entity)?;
+        let node = node_handle.clone().try_get::<T>()?;
+        Some(TypedNodeRef::new(node))
     }
     
     /// Remove an entity from the registry (called when entities are despawned)
@@ -99,8 +90,8 @@ pub struct NodeRegistryAccess<'w, 's> {
 }
 
 impl<'w, 's> NodeRegistryAccess<'w, 's> {
-    /// Access a Godot node for a specific entity through its marker component type
-    pub fn access<T: NodeAccess>(&self, entity: Entity) -> Option<TypedNodeRef<T::GodotType>> {
+    /// Access a Godot node for a specific entity as the given type
+    pub fn access<T: GodotClass + Inherits<Node>>(&self, entity: Entity) -> Option<TypedNodeRef<T>> {
         self.registry.access::<T>(entity)
     }
 }

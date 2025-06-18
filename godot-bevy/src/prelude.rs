@@ -1,7 +1,7 @@
 pub use crate::GodotPlugin;
 pub use crate::autosync::AutoSyncBundleRegistry;
 pub use crate::bridge::*;
-pub use crate::node_registry::{NodeAccess, NodeRegistry, NodeRegistryAccess, TypedNodeRef};
+pub use crate::node_registry::{NodeRegistry, NodeRegistryAccess, TypedNodeRef};
 pub use crate::node_tree_view::NodeTreeView;
 #[allow(deprecated)]
 pub use crate::plugins::{

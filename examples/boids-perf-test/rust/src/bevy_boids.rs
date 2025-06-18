@@ -31,7 +31,7 @@ use godot::prelude::*;
 use godot_bevy::plugins::core::Transform2D;
 use godot_bevy::prelude::*;
 
-use crate::container::BevyBoidsMarker;
+use crate::container::{BoidsContainer, BevyBoids};
 
 // Type alias for our spatial tree
 type BoidTree = KDTree2<Boid>;
@@ -169,12 +169,12 @@ fn sync_container_params(
     mut boid_count: ResMut<BoidCount>,
     mut config: ResMut<BoidsConfig>,
     mut simulation_state: ResMut<SimulationState>,
-    container_entities: Query<Entity, With<BevyBoidsMarker>>,
+    container_entities: Query<Entity, With<BoidsContainer>>,
     registry: NodeRegistryAccess,
 ) {
-    // Access the BevyBoids node through the registry using auto-generated marker
+    // Access the BevyBoids node directly through the registry
     for entity in container_entities.iter() {
-        if let Some(mut bevy_boids) = registry.access::<BevyBoidsMarker>(entity) {
+        if let Some(mut bevy_boids) = registry.access::<BevyBoids>(entity) {
             let boids_bind = bevy_boids.bind();
 
             // Update simulation state
@@ -306,8 +306,8 @@ fn update_simulation_state(
     }
 }
 
-/// Colorize newly spawned boids using NodeRegistry system
-/// Demonstrates accessing nodes through different built-in markers
+/// Colorize newly spawned boids using simplified NodeRegistry system
+/// Demonstrates direct node type access without marker components
 fn colorize_new_boids(
     mut commands: Commands,
     new_boids: Query<Entity, With<NeedsColorization>>,
@@ -317,17 +317,12 @@ fn colorize_new_boids(
         // Generate random color for each boid (matching GDScript)
         let random_color = Color::from_rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.9);
 
-        // Debug: Check if entity is in registry
-        bevy::log::info!("Trying to colorize entity: {:?}", entity);
-        
         // Try Sprite2D first
-        if let Some(mut sprite) = registry.access::<Sprite2DMarker>(entity) {
-            bevy::log::info!("Found Sprite2D for entity: {:?}", entity);
+        if let Some(mut sprite) = registry.access::<godot::classes::Sprite2D>(entity) {
             sprite.set_modulate(random_color);
         }
         // Try Node2D (for boids with Sprite or Triangle children)
-        else if let Some(mut node) = registry.access::<Node2DMarker>(entity) {
-            bevy::log::info!("Found Node2D for entity: {:?}", entity);
+        else if let Some(mut node) = registry.access::<godot::classes::Node2D>(entity) {
             // Check for Sprite child node
             if node.has_node("Sprite") {
                 let mut sprite = node.get_node_as::<Node2D>("Sprite");
@@ -342,9 +337,6 @@ fn colorize_new_boids(
             else {
                 node.set_modulate(random_color);
             }
-        }
-        else {
-            bevy::log::warn!("No node found in registry for entity: {:?}", entity);
         }
         
         commands.entity(entity).remove::<NeedsColorization>();
