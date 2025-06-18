@@ -30,11 +30,12 @@ use godot::{
 
 use crate::{
     bridge::GodotNodeHandle,
+    node_registry::NodeRegistry,
     prelude::{Collisions, Transform2D, Transform3D},
 };
 
 use super::node_markers::*;
-use bevy::ecs::system::Res;
+use bevy::ecs::system::{Res, ResMut};
 
 use super::{GodotTransformConfig, TransformSyncMode};
 
@@ -88,6 +89,7 @@ pub fn initialize_scene_tree(
     mut scene_tree: SceneTreeRef,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
     config: Res<GodotTransformConfig>,
+    mut registry: ResMut<NodeRegistry>,
 ) {
     fn traverse(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
         events.push(SceneTreeEvent {
@@ -110,6 +112,7 @@ pub fn initialize_scene_tree(
         &mut scene_tree,
         &mut entities,
         &config,
+        &mut registry,
     );
 }
 
@@ -183,10 +186,16 @@ impl<T: Inherits<Node>> From<&Gd<T>> for Groups {
 }
 
 /// Adds appropriate marker components to an entity based on the Godot node type
+/// Also registers the entity in the NodeRegistry for immediate access
 fn add_node_type_markers(
     entity_commands: &mut bevy::ecs::system::EntityCommands,
     node: &mut GodotNodeHandle,
+    registry: &mut NodeRegistry,
 ) {
+    let entity = entity_commands.id();
+    
+    // Register the entity with its GodotNodeHandle in the registry
+    registry.register_entity(entity, node.clone());
     // Try each node type and add the corresponding marker component
     // We check more specific types first, then fall back to more general ones
 
@@ -357,6 +366,7 @@ fn create_scene_tree_entity(
     scene_tree: &mut SceneTreeRef,
     entities: &mut Query<(&mut GodotNodeHandle, Entity)>,
     config: &GodotTransformConfig,
+    registry: &mut NodeRegistry,
 ) {
     let mut ent_mapping = entities
         .iter()
@@ -381,8 +391,8 @@ fn create_scene_tree_entity(
                 ent.insert(GodotNodeHandle::clone(&node))
                     .insert(Name::from(node.get::<Node>().get_name().to_string()));
 
-                // Add node type marker components
-                add_node_type_markers(&mut ent, &mut node);
+                // Add node type marker components and register in NodeRegistry
+                add_node_type_markers(&mut ent, &mut node, registry);
 
                 // Only add transform components if sync mode is not disabled
                 if config.sync_mode != TransformSyncMode::Disabled {
@@ -473,6 +483,7 @@ fn read_scene_tree_events(
     mut event_reader: EventReader<SceneTreeEvent>,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
     config: Res<GodotTransformConfig>,
+    mut registry: ResMut<NodeRegistry>,
 ) {
     create_scene_tree_entity(
         &mut commands,
@@ -480,5 +491,7 @@ fn read_scene_tree_events(
         &mut scene_tree,
         &mut entities,
         &config,
+        &mut registry,
     );
 }
+

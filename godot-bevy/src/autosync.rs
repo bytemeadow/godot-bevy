@@ -57,8 +57,8 @@ pub fn try_add_bundles_for_node(
     entity: Entity,
     node_handle: &GodotNodeHandle,
 ) {
-    let registry = BUNDLE_REGISTRY.read().unwrap();
-    if let Some(entries) = &*registry {
+    let bundle_registry = BUNDLE_REGISTRY.read().unwrap();
+    if let Some(entries) = &*bundle_registry {
         for entry in entries {
             // Try to create and add the bundle
             // The function will check if the node is the right type and if the bundle is already added

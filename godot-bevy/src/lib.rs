@@ -6,6 +6,7 @@ use bevy::app::{App, Plugin};
 pub mod app;
 pub mod autosync;
 pub mod bridge;
+pub mod node_registry;
 pub mod node_tree_view;
 pub mod plugins;
 pub mod prelude;

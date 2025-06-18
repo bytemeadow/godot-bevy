@@ -284,6 +284,9 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
     // Auto-generate bundle name from struct name
     let bundle_name = syn::Ident::new(&format!("{}Bundle", struct_name), struct_name.span());
 
+    // Auto-generate marker component name for node registry
+    let marker_name = syn::Ident::new(&format!("{}Marker", struct_name), struct_name.span());
+
     // Generate bundle struct
     let bundle_fields: Vec<_> = attr_args
         .components
@@ -358,6 +361,8 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
             if let Some(godot_node) = handle.clone().try_get::<#struct_name>() {
                 let bundle = #bundle_name::from_godot_node(&godot_node);
                 commands.entity(entity).insert(bundle);
+                // Also add the marker component for node registry access
+                commands.entity(entity).insert(#marker_name);
                 return true;
             }
             false
@@ -372,12 +377,24 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
         }
     };
 
+    // Generate the marker component for node registry access
+    let marker_component = quote! {
+        #[derive(bevy::prelude::Component, Debug, Clone, Copy, PartialEq, Eq)]
+        pub struct #marker_name;
+
+        impl godot_bevy::prelude::NodeAccess for #marker_name {
+            type GodotType = #struct_name;
+        }
+    };
+
     let expanded = quote! {
         #bundle_struct
 
         #bundle_constructor
 
         #bundle_impl
+
+        #marker_component
     };
 
     Ok(expanded)

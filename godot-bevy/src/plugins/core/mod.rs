@@ -135,7 +135,8 @@ impl Plugin for GodotCorePlugin {
             .add_plugins(GodotSignalsPlugin)
             .add_plugins(GodotInputEventPlugin)
             .init_resource::<PhysicsDelta>()
-            .init_resource::<GodotTransformConfig>();
+            .init_resource::<GodotTransformConfig>()
+            .init_resource::<crate::node_registry::NodeRegistry>();
 
         // Add the PhysicsUpdate schedule
         app.add_schedule(Schedule::new(PhysicsUpdate));
