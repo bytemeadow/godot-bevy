@@ -52,6 +52,8 @@ impl Plugin for AvianPhysicsDemo {
             .add_systems(
                 PhysicsUpdate,
                 (
+                    // TODO: clean up
+                    //
                     // print_avian_physics.run_if(in_state(GameState::InGame)),
                     // sync_avian_physics_with_transform.run_if(in_state(GameState::InGame)),
                     // simple_move.run_if(in_state(GameState::InGame)),
@@ -84,7 +86,6 @@ fn spawn_entities(mut commands: Commands, assets: Res<GameAssets>) {
         GodotScene::from_handle(assets.floor_scene.clone()),
     ));
 
-    // GodotScene::from_handle(assets.simple_box_scene.clone()),
     //
     // Spawn a falling cuboid body with an initial angular velocity
     //
@@ -95,6 +96,7 @@ fn spawn_entities(mut commands: Commands, assets: Res<GameAssets>) {
         // sync with the Mesh, which is currently in godot's scene. I'm sure we can do
         // better
         Collider::cuboid(1.0, 1.0, 1.0),
+        // TODO: pick one of these and remove the other
         GodotScene::from_path("scenes/simple_box.tscn"),
         // GodotScene::from_handle(assets.simple_box_scene.clone()),
         AngularVelocity(Vec3::new(1.0, 2.0, 3.0)),
@@ -106,6 +108,7 @@ fn spawn_entities(mut commands: Commands, assets: Res<GameAssets>) {
     ));
 }
 
+// TODO: use or discard this
 fn query_size(
     _commands: Commands,
     mut query: Query<&mut GodotNodeHandle, With<SimpleBoxTag>>,

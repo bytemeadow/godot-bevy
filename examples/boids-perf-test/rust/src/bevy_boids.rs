@@ -1,7 +1,10 @@
+use bevy::math::{vec3, Vec3Swizzles};
 use bevy::prelude::{
     App, AssetServer, Component, Entity, Handle, IntoScheduleConfigs, Plugin, Resource, Startup,
     Time, Update, Vec, With,
 };
+use bevy::transform::components::Transform;
+use bevy::utils::default;
 use bevy::{
     ecs::system::{Commands, ParamSet, Query, Res, ResMut},
     math::Vec2,
@@ -9,7 +12,6 @@ use bevy::{
 use bevy_spatial::{kdtree::KDTree2, AutomaticUpdate, SpatialAccess, SpatialStructure};
 
 use godot::prelude::*;
-use godot_bevy::plugins::core::Transform2D;
 use godot_bevy::prelude::*;
 
 use crate::container::{BevyBoids, BoidsContainer};
@@ -210,9 +212,10 @@ fn handle_boid_count(
 fn spawn_boids(commands: &mut Commands, count: i32, config: &BoidsConfig, boid_scene: &BoidScene) {
     for _ in 0..count {
         // Create position and velocity
-        let pos = Vector2::new(
+        let translation = vec3(
             fastrand::f32() * config.world_bounds.x,
             fastrand::f32() * config.world_bounds.y,
+            0.,
         );
 
         // Match GDScript initial velocity exactly
@@ -221,9 +224,11 @@ fn spawn_boids(commands: &mut Commands, count: i32, config: &BoidsConfig, boid_s
             (fastrand::f32() - 0.5) * 200.0,
         );
 
-        // Create a transform using Godot's Transform2D
-        let godot_transform = godot::prelude::Transform2D::IDENTITY.translated(pos);
-        let transform = Transform2D::from(godot_transform);
+        // Create a transform
+        let transform = Transform {
+            translation,
+            ..default()
+        };
 
         let entity = commands
             .spawn_empty()
@@ -320,8 +325,8 @@ fn colorize_new_boids(
 /// Boids update system using bevy_spatial with Transform2D sync
 fn boids_update_with_spatial_tree(
     mut queries: ParamSet<(
-        Query<(Entity, &mut Transform2D, &mut Velocity), With<Boid>>,
-        Query<(Entity, &Transform2D, &Velocity), With<Boid>>,
+        Query<(Entity, &mut Transform, &mut Velocity), With<Boid>>,
+        Query<(Entity, &Transform, &Velocity), With<Boid>>,
     )>,
     spatial_tree: Res<BoidTree>,
     config: Res<BoidsConfig>,
@@ -343,7 +348,7 @@ fn boids_update_with_spatial_tree(
         let boid_data: Vec<(Entity, Vec2, Vector2)> = boid_query
             .iter()
             .map(|(entity, transform, velocity)| {
-                let pos = Vec2::new(transform.as_godot().origin.x, transform.as_godot().origin.y);
+                let pos = transform.translation.xy();
                 (entity, pos, velocity.0)
             })
             .collect();
@@ -383,18 +388,10 @@ fn boids_update_with_spatial_tree(
                 velocity.0 = velocity.0.normalized() * config.max_speed;
             }
 
-            // Read current position from Transform2D
-            let current_pos =
-                Vec2::new(transform.as_godot().origin.x, transform.as_godot().origin.y);
-
             // Calculate new position
-            let new_pos = current_pos + Vec2::new(velocity.0.x, velocity.0.y) * delta;
-            let bounded_pos = apply_boundary_constraints(new_pos, &config);
-
-            // Write new position to Transform2D
-            let mut godot_transform = *transform.as_godot();
-            godot_transform.origin = Vector2::new(bounded_pos.x, bounded_pos.y);
-            *transform = Transform2D::from(godot_transform);
+            transform.translation.x += velocity.0.x * delta;
+            transform.translation.y += velocity.0.y * delta;
+            apply_boundary_constraints(&mut transform, &config);
         }
     }
 }
@@ -405,7 +402,7 @@ fn calculate_boid_force_optimized(
     pos: Vec2,
     velocity: Vector2,
     spatial_tree: &BoidTree,
-    boid_query: &Query<(Entity, &Transform2D, &Velocity), With<Boid>>,
+    boid_query: &Query<(Entity, &Transform, &Velocity), With<Boid>>,
     config: &BoidsConfig,
 ) -> Vector2 {
     // Use k_nearest_neighbour with a reasonable cap (faster than within_distance)
@@ -517,30 +514,31 @@ fn calculate_boundary_avoidance(pos: Vec2, velocity: Vector2, config: &BoidsConf
 }
 
 /// Apply boundary constraints with wraparound behavior
-fn apply_boundary_constraints(pos: Vec2, config: &BoidsConfig) -> Vec2 {
-    Vec2::new(
-        if pos.x < 0.0 {
-            config.world_bounds.x + pos.x
-        } else if pos.x > config.world_bounds.x {
-            pos.x - config.world_bounds.x
-        } else {
-            pos.x
-        },
-        if pos.y < 0.0 {
-            config.world_bounds.y + pos.y
-        } else if pos.y > config.world_bounds.y {
-            pos.y - config.world_bounds.y
-        } else {
-            pos.y
-        },
-    )
+fn apply_boundary_constraints(transform: &mut Transform, config: &BoidsConfig) {
+    transform.translation.x = if transform.translation.x < 0.0 {
+        config.world_bounds.x + transform.translation.x
+    } else if transform.translation.x > config.world_bounds.x {
+        transform.translation.x - config.world_bounds.x
+    } else {
+        transform.translation.x
+    };
+
+    transform.translation.y = if transform.translation.y < 0.0 {
+        config.world_bounds.y + transform.translation.y
+    } else if transform.translation.y > config.world_bounds.y {
+        transform.translation.y - config.world_bounds.y
+    } else {
+        transform.translation.y
+    };
+
+    transform.translation.z = 0.;
 }
 
 /// Log performance metrics
 fn log_performance(
     mut performance: ResMut<PerformanceTracker>,
     time: Res<Time>,
-    _boids: Query<&Transform2D, With<Boid>>,
+    _boids: Query<&Transform, With<Boid>>,
 ) {
     let current_time = time.elapsed_secs();
     if current_time - performance.last_log_time >= 1.0 {
