@@ -193,7 +193,7 @@ fn add_node_type_markers(
     registry: &mut NodeRegistry,
 ) {
     let entity = entity_commands.id();
-    
+
     // Register the entity with its GodotNodeHandle in the registry
     registry.register_entity(entity, node.clone());
     // Try each node type and add the corresponding marker component
@@ -494,4 +494,3 @@ fn read_scene_tree_events(
         &mut registry,
     );
 }
-

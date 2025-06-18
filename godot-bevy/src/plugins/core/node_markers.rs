@@ -141,4 +141,3 @@ pub struct PathFollow2DMarker;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PathFollow3DMarker;
-

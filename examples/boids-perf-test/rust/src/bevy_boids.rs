@@ -1,12 +1,12 @@
 // Boids Performance Test - Demonstrates NodeRegistry System
 //
-// This example showcases the new NodeRegistry system that eliminates GodotNodeHandle 
+// This example showcases the new NodeRegistry system that eliminates GodotNodeHandle
 // query conflicts. Key improvements demonstrated:
 //
-// 1. sync_container_params() - Uses Query<Entity, With<BevyBoidsMarker>> + 
+// 1. sync_container_params() - Uses Query<Entity, With<BevyBoidsMarker>> +
 //    registry.access::<BevyBoidsMarker>(entity) instead of Query<&GodotNodeHandle>
 //
-// 2. colorize_new_boids() - Uses registry.access::<Sprite2DMarker>(entity) and 
+// 2. colorize_new_boids() - Uses registry.access::<Sprite2DMarker>(entity) and
 //    registry.access::<Node2DMarker>(entity) for entity-specific node access
 //
 // 3. Type Safety - All access is strongly typed through generated/built-in marker components
@@ -31,7 +31,7 @@ use godot::prelude::*;
 use godot_bevy::plugins::core::Transform2D;
 use godot_bevy::prelude::*;
 
-use crate::container::{BoidsContainer, BevyBoids};
+use crate::container::{BevyBoids, BoidsContainer};
 
 // Type alias for our spatial tree
 type BoidTree = KDTree2<Boid>;
@@ -173,8 +173,9 @@ fn sync_container_params(
     registry: NodeRegistryAccess,
 ) {
     // Access the BevyBoids node directly through the registry
+    // Using try_access() for safe handling when node might not exist
     for entity in container_entities.iter() {
-        if let Some(mut bevy_boids) = registry.access::<BevyBoids>(entity) {
+        if let Some(mut bevy_boids) = registry.try_access::<BevyBoids>(entity) {
             let boids_bind = bevy_boids.bind();
 
             // Update simulation state
@@ -194,11 +195,20 @@ fn sync_container_params(
             drop(boids_bind); // Release the bind before getting mutable access
             let mut bevy_boids_mut = bevy_boids.bind_mut();
             bevy_boids_mut.current_boid_count = current_count;
-            
+
             // Only handle the first container (there should be only one)
             break;
         }
     }
+
+    // Alternative using access() when you're confident the node exists:
+    // This would panic if the entity doesn't have a BevyBoids node
+    /*
+    for entity in container_entities.iter() {
+        let mut bevy_boids = registry.access::<BevyBoids>(entity);
+        // ... same logic as above, no need for if-let since it panics on failure
+    }
+    */
 }
 
 /// System that handles spawning and despawning boids
@@ -318,17 +328,17 @@ fn colorize_new_boids(
         let random_color = Color::from_rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.9);
 
         // Try Sprite2D first
-        if let Some(mut sprite) = registry.access::<godot::classes::Sprite2D>(entity) {
+        if let Some(mut sprite) = registry.try_access::<godot::classes::Sprite2D>(entity) {
             sprite.set_modulate(random_color);
         }
         // Try Node2D (for boids with Sprite or Triangle children)
-        else if let Some(mut node) = registry.access::<godot::classes::Node2D>(entity) {
+        else if let Some(mut node) = registry.try_access::<godot::classes::Node2D>(entity) {
             // Check for Sprite child node
             if node.has_node("Sprite") {
                 let mut sprite = node.get_node_as::<Node2D>("Sprite");
                 sprite.set_modulate(random_color);
             }
-            // Check for Triangle child node  
+            // Check for Triangle child node
             else if node.has_node("Triangle") {
                 let mut triangle = node.get_node_as::<Node2D>("Triangle");
                 triangle.set_modulate(random_color);
@@ -338,7 +348,7 @@ fn colorize_new_boids(
                 node.set_modulate(random_color);
             }
         }
-        
+
         commands.entity(entity).remove::<NeedsColorization>();
     }
 }
