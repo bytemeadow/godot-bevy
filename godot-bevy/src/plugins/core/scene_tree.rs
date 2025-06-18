@@ -458,6 +458,7 @@ fn create_scene_tree_entity(
             }
             SceneTreeEventType::NodeRemoved => {
                 if let Some(ent) = ent {
+                    registry.unregister_entity(ent);
                     commands.entity(ent).despawn();
                 } else {
                     // Entity was already despawned (common when using queue_free)
