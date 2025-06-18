@@ -12,8 +12,6 @@ use crate::bridge::GodotNodeHandle;
 pub struct NodeRegistry {
     /// Maps entity to its GodotNodeHandle for fast access
     entity_to_handle: HashMap<Entity, GodotNodeHandle>,
-    /// Optional caching for frequently accessed nodes
-    node_cache: HashMap<Entity, Option<InstanceId>>,
 }
 
 /// Trait that enables typed access to Godot nodes through marker components
@@ -89,12 +87,6 @@ impl NodeRegistry {
     /// Remove an entity from the registry (called when entities are despawned)
     pub fn unregister_entity(&mut self, entity: Entity) {
         self.entity_to_handle.remove(&entity);
-        self.node_cache.remove(&entity);
-    }
-    
-    /// Clear the node cache (useful when nodes are destroyed)
-    pub fn clear_cache(&mut self) {
-        self.node_cache.clear();
     }
     
 }
