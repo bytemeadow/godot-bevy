@@ -84,7 +84,7 @@ Replace `your_game_name` with your actual crate name from `Cargo.toml`.
 1. In Godot, create a new scene
 2. Add a `BevyApp` node as the root
 3. Save it as `bevy_app_singleton.tscn`
-4. Go to Project → Project Settings → Autoload
+4. Go to Project → Project Settings → Globals → Autoload
 5. Add the scene with name "BevyAppSingleton"
 
 ## Write Your First Code
@@ -92,6 +92,7 @@ Replace `your_game_name` with your actual crate name from `Cargo.toml`.
 Edit `rust/src/lib.rs`:
 
 ```rust
+use godot::prelude::*;
 use bevy::prelude::*;
 use godot_bevy::prelude::*;
 
