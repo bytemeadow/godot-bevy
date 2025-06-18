@@ -138,15 +138,11 @@ impl Plugin for BoidsPlugin {
             (
                 sync_container_params,
                 handle_boid_count,
+                colorize_new_boids,
                 update_simulation_state,
                 log_performance,
             )
                 .chain(),
-        )
-        // Colorization runs in First schedule after scene tree processing
-        .add_systems(
-            First,
-            colorize_new_boids.after(bevy::ecs::event::event_update_system),
         )
         // Movement systems
         .add_systems(
@@ -320,7 +316,7 @@ fn update_simulation_state(
 /// Demonstrates direct node type access without marker components
 fn colorize_new_boids(
     mut commands: Commands,
-    new_boids: Query<Entity, With<NeedsColorization>>,
+    new_boids: Query<Entity, (With<NeedsColorization>, With<GodotNodeHandle>)>,
     registry: NodeRegistryAccess,
 ) {
     for entity in new_boids.iter() {
