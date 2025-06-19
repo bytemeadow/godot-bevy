@@ -5,7 +5,7 @@ use bevy::{
     ecs::{
         component::Component,
         entity::Entity,
-        event::{Event, EventReader, EventWriter, event_update_system},
+        event::{event_update_system, Event, EventReader, EventWriter},
         name::Name,
         schedule::IntoScheduleConfigs,
         system::{Commands, NonSendMut, Query, SystemParam},
@@ -385,17 +385,17 @@ fn create_scene_tree_entity(
 
                 // Only add transform components if sync mode is not disabled
                 if config.sync_mode != TransformSyncMode::Disabled {
-                    if let Some(node3d) = node.try_get::<Node3D>() {
-                        // Only insert a Transform if it doesn't exist already, i.e.,
-                        // users may have already added a Transform
-                        ent.insert_if_new(node3d.get_transform().to_bevy_transform());
-                    }
-
-                    if let Some(node2d) = node.try_get::<Node2D>() {
-                        // Only insert a Transform if it doesn't exist already, i.e.,
-                        // users may have already added a Transform
-                        ent.insert_if_new(node2d.get_transform().to_bevy_transform());
-                    }
+                    // if let Some(node3d) = node.try_get::<Node3D>() {
+                    //     // Only insert a Transform if it doesn't exist already, i.e.,
+                    //     // users may have already added a Transform
+                    //     ent.insert_if_new(node3d.get_transform().to_bevy_transform());
+                    // }
+                    //
+                    // if let Some(node2d) = node.try_get::<Node2D>() {
+                    //     // Only insert a Transform if it doesn't exist already, i.e.,
+                    //     // users may have already added a Transform
+                    //     ent.insert_if_new(node2d.get_transform().to_bevy_transform());
+                    // }
                 }
 
                 let mut node = node.get::<Node>();

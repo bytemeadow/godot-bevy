@@ -81,6 +81,7 @@ fn spawn_scene(
     mut scene_tree: SceneTreeRef,
     mut assets: ResMut<Assets<GodotResource>>,
 ) {
+    // godot::global::godot_print!("spawning scene: {}", new_scenes.iter().count());
     for (mut scene, ent, transform) in new_scenes.iter_mut() {
         let packed_scene = match &scene.resource {
             GodotSceneResource::Handle(handle) => assets

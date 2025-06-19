@@ -1,9 +1,10 @@
 use bevy::app::{App, Last, Plugin, PreUpdate};
 use bevy::ecs::change_detection::DetectChanges;
+use bevy::ecs::component::Component;
 use bevy::ecs::query::{Added, Changed, Or, With};
 use bevy::ecs::system::Query;
-use bevy::math::Quat;
 use bevy::math::Vec3;
+use bevy::math::{vec3, Quat};
 use bevy::prelude::Res;
 use bevy::prelude::Transform as BevyTransform;
 use godot::builtin::Transform3D as GodotTransform3D;
@@ -177,6 +178,21 @@ fn post_update_godot_transforms_2d(
         return;
     }
 
+    // let count = entities.iter().count();
+    // godot::global::godot_print!("visiting: {}", count);
+
+    // entities.iter_mut().for_each(|(transform, mut reference)| {
+    //     let mut obj = reference.get::<Node2D>();
+    //     obj.set_transform(transform.to_godot_transform_2d());
+    // });
+
+    // entities
+    //     .par_iter_mut()
+    //     .for_each(|(transform, mut reference)| {
+    //         let mut obj = reference.get::<Node2D>();
+    //         obj.set_transform(transform.to_godot_transform_2d());
+    //     });
+
     for (transform, mut reference) in entities.iter_mut() {
         let mut obj = reference.get::<Node2D>();
 
@@ -194,8 +210,9 @@ fn pre_update_godot_transforms_2d(
     _scene_tree: SceneTreeRef,
     mut entities: Query<(&mut BevyTransform, &mut GodotNodeHandle), With<Node2DMarker>>,
 ) {
+    // TODO move this to system run conditional, test to see if changed doesn't fire!
     // Early return if transform syncing is disabled
-    if config.sync_mode == super::TransformSyncMode::Disabled {
+    if config.sync_mode != super::TransformSyncMode::TwoWay {
         return;
     }
 
@@ -207,11 +224,13 @@ fn pre_update_godot_transforms_2d(
 
         let obj = reference.get::<Node2D>();
 
-        let mut obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
-        obj_transform = obj_transform.rotated(obj.get_rotation());
-        obj_transform = obj_transform.scaled(obj.get_scale());
+        // let obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
+        // obj_transform = obj_transform.rotated(obj.get_rotation());
+        // obj_transform = obj_transform.scaled(obj.get_scale());
+        // my_godot_transform_copy.xform = obj_transform;
 
-        *transform = obj_transform.to_bevy_transform();
+        // TODO why is this expensive in debug builds but not in release
+        *transform = obj.get_transform().to_bevy_transform();
     }
 }
 

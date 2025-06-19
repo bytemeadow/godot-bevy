@@ -2,8 +2,8 @@
 
 use bevy::app::{App, Plugin, ScheduleRunnerPlugin};
 use bevy::asset::{
-    AssetMetaCheck, AssetPlugin,
     io::{AssetSource, AssetSourceId},
+    AssetMetaCheck, AssetPlugin,
 };
 use bevy::ecs::schedule::{Schedule, ScheduleLabel};
 use bevy::ecs::system::SystemParam;
@@ -58,9 +58,11 @@ pub enum TransformSyncMode {
     /// No transform syncing - use direct Godot physics (move_and_slide, etc.)
     /// Best for: Platformers, physics-heavy games
     Disabled,
+    // TODO: fix this comment (global, as this appears elsewhere)
     /// One-way sync: ECS → Godot only
     /// Best for: Pure ECS games, simple movement
     OneWay,
+    // TODO: fix this comment
     /// Two-way sync: ECS ↔ Godot
     /// Best for: Hybrid apps migrating from GDScript to ECS
     TwoWay,
@@ -73,17 +75,9 @@ impl Default for TransformSyncMode {
 }
 
 /// Configuration resource for transform syncing behavior
-#[derive(Resource, Debug, Clone)]
+#[derive(Resource, Debug, Clone, Default)]
 pub struct GodotTransformConfig {
     pub sync_mode: TransformSyncMode,
-}
-
-impl Default for GodotTransformConfig {
-    fn default() -> Self {
-        Self {
-            sync_mode: TransformSyncMode::OneWay,
-        }
-    }
 }
 
 impl GodotTransformConfig {

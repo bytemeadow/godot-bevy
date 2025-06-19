@@ -122,7 +122,8 @@ impl Plugin for BoidsPlugin {
                 sync_container_params,
                 handle_boid_count,
                 update_simulation_state,
-                colorize_new_boids,
+                // FIXME
+                // colorize_new_boids,
                 log_performance,
             )
                 .chain(),
@@ -322,6 +323,35 @@ fn colorize_new_boids(
     }
 }
 
+// fn color(
+//     treeaccess: Res<NNTree>,
+//     mouse: Res<Mouse2D>,
+//     mut query: Query<&mut Sprite, With<NearestNeighbourComponent>>,
+// ) {
+//     for (_, entity) in treeaccess.within_distance(mouse.pos, 50.0) {
+//         if let Ok(mut sprite) = query.get_mut(entity.unwrap()) {
+//             sprite.color = Color::BLACK;
+//         }
+//     }
+// }
+
+// current: n^2 in the worst, n log n mostly
+//   for each boid
+//     gather position, velocity
+//   for each boid
+//     for K-closest neighbors
+//        calculate apply seperation, alignment, cohesion
+//   for each boid
+//     apply forces
+//
+//
+// proposed: n^2 in the worst, n log n mostly
+//   for each boid
+//     for K-closest neighbors
+//        calculate apply seperation, alignment, cohesion
+//     apply seperation, alignment, cohesion, boundary alignment, limit total force
+
+// TODO fix Transform2D reference
 /// Boids update system using bevy_spatial with Transform2D sync
 fn boids_update_with_spatial_tree(
     mut queries: ParamSet<(
@@ -345,21 +375,22 @@ fn boids_update_with_spatial_tree(
         }
 
         // Collect boid data for processing
-        let boid_data: Vec<(Entity, Vec2, Vector2)> = boid_query
-            .iter()
-            .map(|(entity, transform, velocity)| {
-                let pos = transform.translation.xy();
-                (entity, pos, velocity.0)
-            })
-            .collect();
+        // let boid_data: Vec<(Entity, Vec2, Vector2)> = boid_query
+        //     .iter()
+        //     .map(|(entity, transform, velocity)| {
+        //         let pos = transform.translation.xy();
+        //         bevy::log::info!("pos {}", pos);
+        //         (entity, pos, velocity.0)
+        //     })
+        //     .collect();
 
         // Phase 2: Force calculation using bevy_spatial
-        let forces: Vec<(Entity, Vector2)> = boid_data
+        let forces: Vec<(Entity, Vector2)> = boid_query
             .iter()
-            .map(|&(entity, pos, velocity)| {
+            .map(|(entity, transform, velocity)| {
                 let force = calculate_boid_force_optimized(
                     entity,
-                    pos,
+                    transform,
                     velocity,
                     &spatial_tree,
                     &boid_query,
@@ -399,15 +430,17 @@ fn boids_update_with_spatial_tree(
 /// Optimized force calculation using k_nearest_neighbour
 fn calculate_boid_force_optimized(
     entity: Entity,
-    pos: Vec2,
-    velocity: Vector2,
+    tranform: &Transform,
+    velocity: &Velocity,
     spatial_tree: &BoidTree,
     boid_query: &Query<(Entity, &Transform, &Velocity), With<Boid>>,
     config: &BoidsConfig,
 ) -> Vector2 {
     // Use k_nearest_neighbour with a reasonable cap (faster than within_distance)
     const NEIGHBOR_CAP: usize = 50;
+    let pos = tranform.translation.xy();
     let nearby_entities = spatial_tree.k_nearest_neighbour(pos, NEIGHBOR_CAP);
+    bevy::log::info!("nearby_entities {:?}", nearby_entities.len());
 
     let perception_radius_sq = config.perception_radius * config.perception_radius;
     let separation_radius_sq = config.separation_radius * config.separation_radius;
@@ -461,7 +494,7 @@ fn calculate_boid_force_optimized(
     // Apply alignment
     if neighbor_count > 0 {
         avg_vel /= neighbor_count as f32;
-        let alignment = (avg_vel - velocity).normalized() * config.max_force;
+        let alignment = (avg_vel - velocity.0).normalized() * config.max_force;
         total_force += alignment * config.alignment_weight;
 
         // Apply cohesion
@@ -472,7 +505,7 @@ fn calculate_boid_force_optimized(
     }
 
     // Apply boundary avoidance
-    let boundary = calculate_boundary_avoidance(pos, velocity, config);
+    let boundary = calculate_boundary_avoidance(pos, velocity.0, config);
     total_force += boundary * config.boundary_weight;
 
     // Limit total force
