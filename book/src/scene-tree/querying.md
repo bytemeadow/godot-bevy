@@ -22,7 +22,7 @@ fn update_sprites(
 }
 ```
 
-> **Important**: Always include `With<GodotNodeHandle>` when using `NodeRegistryAccess` to ensure entities are ready for node access otherwise sometimes the registry will fail to produce a node handle since it hasn't been created yet. See our [timing doc](./timing.md) for more details.
+> **Important**: Always include `With<GodotNodeHandle>` when using `NodeRegistryAccess` to ensure entities are ready for node access otherwise sometimes the registry will fail to produce a node handle since it hasn't been created yet. See our [timing doc](./timing.md#dynamic-scene-spawning-timing) for more details.
 
 ## Available Marker Components
 
