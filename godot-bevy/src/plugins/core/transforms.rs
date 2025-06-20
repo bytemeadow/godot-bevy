@@ -448,7 +448,7 @@ pub mod math {
         a_y.atan2(a_x)
     }
 
-    /// Extract scale from 2D transform matrix components  
+    /// Extract scale from 2D transform matrix components
     pub fn extract_scale_from_2d_matrix(a_x: f32, a_y: f32, b_x: f32, b_y: f32) -> (f32, f32) {
         let scale_x = (a_x * a_x + a_y * a_y).sqrt();
         let scale_y = (b_x * b_x + b_y * b_y).sqrt();

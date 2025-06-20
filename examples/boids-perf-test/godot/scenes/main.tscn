@@ -69,9 +69,9 @@ text = "Boid Count:"
 layout_mode = 2
 size_flags_horizontal = 3
 min_value = 50.0
-max_value = 2000.0
+max_value = 50000.0
 step = 50.0
-value = 500.0
+value = 20000.0
 
 [node name="BoidCountLabel" type="Label" parent="UI/VBoxContainer/BoidCountContainer"]
 layout_mode = 2

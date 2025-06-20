@@ -1,7 +1,7 @@
 use bevy::{
     ecs::{
         component::Component,
-        system::{Commands, ParamSet, Query, Res, ResMut},
+        system::{Commands, Query, Res, ResMut},
     },
     math::Vec2,
     prelude::*,
@@ -43,14 +43,11 @@ pub struct Boid;
 pub struct NeedsColorization;
 
 /// Component storing boid velocity
-#[derive(Component)]
+#[derive(Component, Default)]
 pub struct Velocity(pub Vector2);
 
-impl Default for Velocity {
-    fn default() -> Self {
-        Self(Vector2::ZERO)
-    }
-}
+#[derive(Component, Default)]
+pub struct BoidForce(pub Vector2);
 
 /// Resource for boids simulation parameters
 #[derive(Resource)]
@@ -70,14 +67,14 @@ impl Default for BoidsConfig {
     fn default() -> Self {
         Self {
             world_bounds: Vec2::new(1920.0, 1080.0),
-            max_speed: 150.0,
+            max_speed: 50.0,
             max_force: 5.0,
-            perception_radius: 50.0,
+            perception_radius: 150.0,
             separation_radius: 25.0,
-            separation_weight: 2.0,
-            alignment_weight: 1.0,
+            separation_weight: 1.1,
+            alignment_weight: 2.5,
             cohesion_weight: 1.0,
-            boundary_weight: 3.0,
+            boundary_weight: 1.0,
         }
     }
 }
@@ -128,7 +125,12 @@ impl Plugin for BoidsPlugin {
         // Movement systems
         .add_systems(
             Update,
-            boids_update_with_spatial_tree
+            (
+                sync_transforms,
+                boids_calculate_neighborhood_forces,
+                boids_apply_forces,
+            )
+                .chain()
                 .run_if(|state: Res<SimulationState>| state.is_running)
                 .after(sync_container_params),
         );
@@ -228,7 +230,13 @@ fn spawn_boids(commands: &mut Commands, count: i32, config: &BoidsConfig, boid_s
         let entity = commands
             .spawn_empty()
             .insert(GodotScene::from_handle(boid_scene.0.clone()))
-            .insert((Boid, Velocity(velocity), transform))
+            .insert((
+                Boid,
+                Velocity(velocity),
+                transform,
+                Transform::default(),
+                BoidForce::default(),
+            ))
             .id();
 
         // We'll set the color after the entity is spawned in the next frame
@@ -317,63 +325,65 @@ fn colorize_new_boids(
     }
 }
 
-/// Boids update system using bevy_spatial with Transform2D sync
-fn boids_update_with_spatial_tree(
-    mut queries: ParamSet<(
-        Query<(Entity, &mut Transform2D, &mut Velocity), With<Boid>>,
-        Query<(Entity, &Transform2D, &Velocity), With<Boid>>,
-    )>,
+// system to copy transform
+fn sync_transforms(mut query: Query<(&Transform2D, &mut Transform), With<Boid>>) {
+    query
+        .par_iter_mut()
+        .for_each(|(encapsulated_transform, mut vanilla_transform)| {
+            // for bevy_spatial's Kd tree to work properly, we need to have a Bevy Transform component
+            // directly in entity (as opposed to our  Transform2D which encapsulates bevy and godot
+            // transforms). so we replicate Transform2D's internal one to a location friendly for
+            // bevy_spatial:
+            *vanilla_transform = *encapsulated_transform.as_bevy()
+        });
+}
+
+// system to calculate/store neighborhood forces
+fn boids_calculate_neighborhood_forces(
     spatial_tree: Res<BoidTree>,
+    all_boids: Query<(&Transform, &Velocity), With<Boid>>,
+    mut pending_velocity_update_query: Query<
+        (Entity, &Transform, &mut BoidForce, &Velocity),
+        With<Boid>,
+    >,
     config: Res<BoidsConfig>,
+) {
+    pending_velocity_update_query.iter_mut().for_each(
+        |(entity, transform, mut boid_force, velocity)| {
+            boid_force.0 = calculate_boid_force_optimized(
+                entity,
+                transform.translation.xy(),
+                velocity.0,
+                &spatial_tree,
+                all_boids,
+                &config,
+            );
+        },
+    );
+}
+
+// system to apply forces
+fn boids_apply_forces(
+    mut boid_transform_query: Query<
+        (Entity, &mut Transform2D, &mut Velocity, &BoidForce),
+        With<Boid>,
+    >,
     time: Res<Time>,
+    config: Res<BoidsConfig>,
     mut performance: ResMut<PerformanceTracker>,
 ) {
     performance.frame_count += 1;
     let delta = time.delta_secs();
 
-    // Phase 1: Data collection from ECS
-    let forces = {
-        let boid_query = queries.p1();
-        let boid_count = boid_query.iter().count();
-        if boid_count == 0 {
-            return;
-        }
+    let boid_count = boid_transform_query.iter().count();
+    if boid_count == 0 {
+        return;
+    }
 
-        // Collect boid data for processing
-        let boid_data: Vec<(Entity, Vec2, Vector2)> = boid_query
-            .iter()
-            .map(|(entity, transform, velocity)| {
-                let pos = Vec2::new(transform.as_godot().origin.x, transform.as_godot().origin.y);
-                (entity, pos, velocity.0)
-            })
-            .collect();
-
-        // Phase 2: Force calculation using bevy_spatial
-        let forces: Vec<(Entity, Vector2)> = boid_data
-            .iter()
-            .map(|&(entity, pos, velocity)| {
-                let force = calculate_boid_force_optimized(
-                    entity,
-                    pos,
-                    velocity,
-                    &spatial_tree,
-                    &boid_query,
-                    &config,
-                );
-                (entity, force)
-            })
-            .collect();
-
-        forces
-    };
-
-    // Phase 3: Apply forces and update transforms
-    let mut boids_mut = queries.p0();
-
-    for (entity, force) in forces {
-        if let Ok((_, mut transform, mut velocity)) = boids_mut.get_mut(entity) {
-            // Apply force to velocity
-            velocity.0 += force * delta;
+    boid_transform_query
+        .iter_mut()
+        .for_each(|(_, mut transform, mut velocity, force)| {
+            velocity.0 += force.0 * delta;
 
             // Clamp velocity
             let speed = velocity.0.length();
@@ -395,8 +405,7 @@ fn boids_update_with_spatial_tree(
             let mut godot_transform = *transform.as_godot();
             godot_transform.origin = Vector2::new(bounded_pos.x, bounded_pos.y);
             *transform = Transform2D::from(godot_transform);
-        }
-    }
+        });
 }
 
 /// Optimized force calculation using k_nearest_neighbour
@@ -405,11 +414,11 @@ fn calculate_boid_force_optimized(
     pos: Vec2,
     velocity: Vector2,
     spatial_tree: &BoidTree,
-    boid_query: &Query<(Entity, &Transform2D, &Velocity), With<Boid>>,
+    all_boids: Query<(&Transform, &Velocity), With<Boid>>,
     config: &BoidsConfig,
 ) -> Vector2 {
     // Use k_nearest_neighbour with a reasonable cap (faster than within_distance)
-    const NEIGHBOR_CAP: usize = 50;
+    const NEIGHBOR_CAP: usize = 10;
     let nearby_entities = spatial_tree.k_nearest_neighbour(pos, NEIGHBOR_CAP);
 
     let perception_radius_sq = config.perception_radius * config.perception_radius;
@@ -437,7 +446,7 @@ fn calculate_boid_force_optimized(
             }
 
             // Direct query is faster than HashMap lookup for small neighbor counts
-            if let Ok((_, _, neighbor_velocity)) = boid_query.get(neighbor_entity) {
+            if let Ok((_, neighbor_velocity)) = all_boids.get(neighbor_entity) {
                 // Separation (avoid crowding neighbors)
                 if dist_sq < separation_radius_sq && dist_sq > 0.0 {
                     let inv_dist = 1.0 / dist_sq.sqrt();
