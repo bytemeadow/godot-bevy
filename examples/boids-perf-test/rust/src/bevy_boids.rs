@@ -463,7 +463,8 @@ fn calculate_boid_force_optimized(
 
     // Apply separation
     if separation_count > 0 {
-        separation = (separation / separation_count as f32).normalized() * config.max_speed - velocity;
+        separation =
+            (separation / separation_count as f32).normalized() * config.max_speed - velocity;
         let separation_force = if separation.length() > config.max_force {
             separation.normalized() * config.max_force
         } else {
