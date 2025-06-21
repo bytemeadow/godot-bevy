@@ -18,6 +18,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 BevyAppSingleton="*res://scenes/bevy_app_singleton.tscn"
+BenchmarkCLI="*res://scenes/benchmark_cli.tscn"
 
 [display]
 

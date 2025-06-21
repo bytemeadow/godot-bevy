@@ -7,3 +7,4 @@ target/
 
 # Book
 book/book
+benchmark_results/
