@@ -10,6 +10,11 @@ env:
   CARGO_TERM_COLOR: always
   GODOT_VERSION: "4.3"
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -20,9 +25,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [blaze/compute/ubuntu-latest, blaze/macos-latest, windows-latest]
+        os:
+          [
+            blaze/compute/ubuntu-latest-amd64,
+            blaze/macos-latest,
+            windows-latest,
+          ]
         include:
-          - os: blaze/compute/ubuntu-latest
+          - os: blaze/compute/ubuntu-latest-amd64
             platform: linux
             target: x86_64-unknown-linux-gnu
             extension: .so
@@ -158,6 +168,24 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Download Rust libraries
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Setup cross-platform libraries
+        run: |
+          mkdir -p target/{release,debug}
+
+          # Copy all platform libraries to target directories
+          find artifacts/ -name "*rust*" -type f | while read file; do
+            cp "$file" target/release/ 2>/dev/null || true
+            cp "$file" target/debug/ 2>/dev/null || true
+          done
+
+          echo "Available libraries:"
+          ls -la target/release/ || echo "No release libraries found"
+
       - name: Install gdenv
         run: |
           # Install gdenv using official installer
@@ -169,64 +197,29 @@ jobs:
           # Install Godot 4.4.1 using gdenv
           gdenv install 4.4.1
           gdenv use 4.4.1
-          
+
           # Add gdenv bin directory to PATH
           echo "$HOME/.local/share/gdenv/bin" >> $GITHUB_PATH
-          
+
           # Set the executable path
           echo "GODOT_EXECUTABLE=$HOME/.local/share/gdenv/bin/godot" >> $GITHUB_ENV
-          
+
           # Verify installation
           $HOME/.local/share/gdenv/bin/godot --version
-
-      - name: Download Rust libraries
-        uses: actions/download-artifact@v4
-        with:
-          name: rust-libs-Linux
-          path: artifacts/
-
-      - name: Setup Rust libraries
-        run: |
-          # Create target directory structure at repository root
-          mkdir -p target/release
-          
-          # Copy all Rust libraries to target/release at repo root
-          find artifacts/ -name "*rust*.so" -type f | while read file; do
-            echo "Copying $file to target/release/"
-            cp "$file" target/release/
-          done
-          
-          # Also copy to examples/boids-perf-test/target/release for the specific benchmark
-          mkdir -p examples/boids-perf-test/target/release
-          find artifacts/ -name "*rustboids.so" -type f | while read file; do
-            echo "Copying $file to examples/boids-perf-test/target/release/"
-            cp "$file" examples/boids-perf-test/target/release/
-          done
-          
-          # List what we have
-          echo "Available libraries in repo root target/release:"
-          ls -la target/release/
-          echo "Available libraries in examples/boids-perf-test/target/release:"
-          ls -la examples/boids-perf-test/target/release/ || echo "Directory not found"
 
       - name: Build boids benchmark
         run: cargo build --release --manifest-path examples/boids-perf-test/rust/Cargo.toml
 
       - name: Import Godot project
         working-directory: examples/boids-perf-test/godot
-        run: |
-          # Import the Godot project to generate .godot folder and fix UIDs
-          $GODOT_EXECUTABLE --editor --headless --quit || true
-          
-          # Verify the .godot folder was created
-          ls -la .godot/ || echo "Warning: .godot folder not found"
+        run: $GODOT_EXECUTABLE --editor --headless --quit || true
 
       - name: Run performance benchmark
         id: benchmark
         working-directory: examples/boids-perf-test
         run: |
-          # Run quick benchmark for CI (shorter duration, fewer boids for speed)
-          if python3 regression_test.py --boids 1000 3000 --duration 5 --godot "$GODOT_EXECUTABLE"; then
+          # Run quick benchmark for CI
+          if python3 regression_test.py --godot "$GODOT_EXECUTABLE"; then
             echo "benchmark_success=true" >> $GITHUB_OUTPUT
           else
             echo "benchmark_success=false" >> $GITHUB_OUTPUT
@@ -240,7 +233,7 @@ jobs:
           # Download baseline from main branch
           if curl -f -o main-baseline.json https://raw.githubusercontent.com/${{ github.repository }}/main/examples/boids-perf-test/baseline.json; then
             echo "Checking for performance regression against main branch..."
-            python3 regression_test.py --boids 1000 3000 --duration 5 --baseline main-baseline.json --threshold 0.85 --godot "$GODOT_EXECUTABLE" || {
+            python3 regression_test.py --baseline main-baseline.json --threshold 0.85 --godot "$GODOT_EXECUTABLE" || {
               echo "::warning::Performance regression detected! Bevy implementation performance dropped more than 15%"
               exit 1
             }
