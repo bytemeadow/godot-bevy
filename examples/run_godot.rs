@@ -1,5 +1,6 @@
 use std::{
-    path::PathBuf,
+    fs,
+    path::{Path, PathBuf},
     process::{exit, Command, Stdio},
 };
 
@@ -9,6 +10,23 @@ fn main() -> Result<(), std::io::Error> {
     let run_dir = format!("{}/../godot", env!("CARGO_MANIFEST_DIR"));
     println!("run: {run_dir:?}");
 
+    // Detect build profile
+    let profile = if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    };
+    
+    println!("Running with Rust build profile: {}", profile);
+    
+    // Update gdextension file if running in release mode
+    let gdextension_path = Path::new(&run_dir).join("rust.gdextension");
+    let original_content = if profile == "release" && gdextension_path.exists() {
+        Some(update_gdextension_for_release(&gdextension_path)?)
+    } else {
+        None
+    };
+
     let mut child = Command::new(godot_binary_path())
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
@@ -17,6 +35,13 @@ fn main() -> Result<(), std::io::Error> {
         .spawn()?;
 
     let status = child.wait()?;
+    
+    // Restore original gdextension content if we modified it
+    if let Some(content) = original_content {
+        fs::write(&gdextension_path, content)?;
+        println!("Restored original gdextension file");
+    }
+    
     match status.code() {
         Some(code) => exit(code),
         None => {
@@ -24,6 +49,25 @@ fn main() -> Result<(), std::io::Error> {
             exit(255);
         }
     }
+}
+
+fn update_gdextension_for_release(path: &Path) -> Result<String, std::io::Error> {
+    let original_content = fs::read_to_string(path)?;
+    let mut lines: Vec<String> = original_content.lines().map(|s| s.to_string()).collect();
+    
+    println!("Updating gdextension to use release builds for all configurations...");
+    
+    // Update debug entries to point to release builds
+    for line in &mut lines {
+        if line.contains(".debug.") && (line.contains("/debug/") || line.contains("\\debug\\")) {
+            *line = line.replace("/debug/", "/release/").replace("\\debug\\", "\\release\\");
+        }
+    }
+    
+    let modified_content = lines.join("\n");
+    fs::write(path, &modified_content)?;
+    
+    Ok(original_content)
 }
 
 fn godot_binary_path() -> PathBuf {
