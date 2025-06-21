@@ -2,13 +2,18 @@ name: ci
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 env:
   CARGO_TERM_COLOR: always
   GODOT_VERSION: "4.3"
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -20,9 +25,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [blaze/compute/ubuntu-latest, blaze/macos-latest, windows-latest]
+        os:
+          [
+            blaze/compute/ubuntu-latest-amd64,
+            blaze/macos-latest,
+            windows-latest,
+          ]
         include:
-          - os: blaze/compute/ubuntu-latest
+          - os: blaze/compute/ubuntu-latest-amd64
             platform: linux
             target: x86_64-unknown-linux-gnu
             extension: .so
@@ -36,52 +46,52 @@ jobs:
             extension: .dll
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Cache cargo dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+      - name: Cache cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: ${{ matrix.target }}
-        components: rustfmt, clippy
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: rustfmt, clippy
 
-    - name: Install Linux dependencies
-      if: runner.os == 'linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+      - name: Install Linux dependencies
+        if: runner.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
-    - name: Check formatting
-      run: cargo fmt --all -- --check
+      - name: Check formatting
+        run: cargo fmt --all -- --check
 
-    - name: Run clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
-    - name: Run tests
-      run: cargo test
+      - name: Run tests
+        run: cargo test
 
-    - name: Build release
-      run: cargo build --release
+      - name: Build release
+        run: cargo build --release
 
-    - name: Upload Rust libraries
-      uses: actions/upload-artifact@v4
-      with:
-        name: rust-libs-${{ runner.os }}
-        path: |
-          target/release/*rust${{ matrix.extension }}
-          target/release/deps/*rust*${{ matrix.extension }}
-        if-no-files-found: error
+      - name: Upload Rust libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-libs-${{ runner.os }}
+          path: |
+            target/release/*rust${{ matrix.extension }}
+            target/release/deps/*rust*${{ matrix.extension }}
+          if-no-files-found: error
 
   examples:
     name: build / ${{ matrix.example }}
@@ -90,57 +100,229 @@ jobs:
     strategy:
       matrix:
         example: [dodge-the-creeps-2d, platformer-2d]
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: Install Godot
-      uses: CapsCollective/godot-actions/install-godot@v1.2
-      with:
-        godot-version: ${{ env.GODOT_VERSION }}
-        install-templates: true
-      id: install-godot
+      - name: Install Godot
+        uses: CapsCollective/godot-actions/install-godot@v1.2
+        with:
+          godot-version: ${{ env.GODOT_VERSION }}
+          install-templates: true
+        id: install-godot
 
-    - name: Download Rust libraries
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts/
+      - name: Download Rust libraries
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
 
-    - name: Setup cross-platform libraries
-      run: |
-        mkdir -p target/{release,debug}
-        
-        # Copy all platform libraries to target directories
-        find artifacts/ -name "*rust*" -type f | while read file; do
-          cp "$file" target/release/ 2>/dev/null || true
-          cp "$file" target/debug/ 2>/dev/null || true
-        done
-        
-        echo "Available libraries:"
-        ls -la target/release/ || echo "No release libraries found"
+      - name: Setup cross-platform libraries
+        run: |
+          mkdir -p target/{release,debug}
 
-    - name: Build example Rust library
-      run: cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
+          # Copy all platform libraries to target directories
+          find artifacts/ -name "*rust*" -type f | while read file; do
+            cp "$file" target/release/ 2>/dev/null || true
+            cp "$file" target/debug/ 2>/dev/null || true
+          done
 
-    - name: Import Godot project
-      working-directory: examples/${{ matrix.example }}/godot
-      run: ${{ steps.install-godot.outputs.godot-executable }} --editor --headless --quit || true
+          echo "Available libraries:"
+          ls -la target/release/ || echo "No release libraries found"
 
-    - name: Export for all platforms
-      working-directory: examples/${{ matrix.example }}/godot
-      run: |
-        mkdir -p exports
-        ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Linux/X11" exports/${{ matrix.example }}-linux
-        ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
-        ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
+      - name: Build example Rust library
+        run: cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
 
-    - name: Upload game exports
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.example }}-exports
-        path: examples/${{ matrix.example }}/godot/exports/
-        if-no-files-found: error
+      - name: Import Godot project
+        working-directory: examples/${{ matrix.example }}/godot
+        run: ${{ steps.install-godot.outputs.godot-executable }} --editor --headless --quit || true
+
+      - name: Export for all platforms
+        working-directory: examples/${{ matrix.example }}/godot
+        run: |
+          mkdir -p exports
+          ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Linux/X11" exports/${{ matrix.example }}-linux
+          ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
+          ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
+
+      - name: Upload game exports
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.example }}-exports
+          path: examples/${{ matrix.example }}/godot/exports/
+          if-no-files-found: error
+
+  benchmark:
+    name: performance / boids benchmark
+    runs-on: blaze/compute/ubuntu-latest-amd64
+    needs: rust
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Download Rust libraries
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Setup cross-platform libraries
+        run: |
+          mkdir -p target/{release,debug}
+
+          # Copy all platform libraries to target directories
+          find artifacts/ -name "*rust*" -type f | while read file; do
+            cp "$file" target/release/ 2>/dev/null || true
+            cp "$file" target/debug/ 2>/dev/null || true
+          done
+
+          echo "Available libraries:"
+          ls -la target/release/ || echo "No release libraries found"
+
+      - name: Install gdenv
+        run: |
+          # Install gdenv using official installer
+          curl -fsSL https://gdenv.bytemeadow.com | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install Godot via gdenv
+        run: |
+          # Install Godot 4.4.1 using gdenv
+          gdenv install 4.4.1
+          gdenv use 4.4.1
+
+          # Add gdenv bin directory to PATH
+          echo "$HOME/.local/share/gdenv/bin" >> $GITHUB_PATH
+
+          # Set the executable path
+          echo "GODOT_EXECUTABLE=$HOME/.local/share/gdenv/bin/godot" >> $GITHUB_ENV
+
+          # Verify installation
+          $HOME/.local/share/gdenv/bin/godot --version
+
+      - name: Build boids benchmark
+        run: cargo build --release --manifest-path examples/boids-perf-test/rust/Cargo.toml
+
+      - name: Import Godot project
+        working-directory: examples/boids-perf-test/godot
+        run: $GODOT_EXECUTABLE --editor --headless --quit || true
+
+      - name: Run performance benchmark
+        id: benchmark
+        working-directory: examples/boids-perf-test
+        run: |
+          # Run quick benchmark for CI
+          if python3 regression_test.py --godot "$GODOT_EXECUTABLE"; then
+            echo "benchmark_success=true" >> $GITHUB_OUTPUT
+          else
+            echo "benchmark_success=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Check for regression
+        if: github.event_name == 'pull_request' && steps.benchmark.outputs.benchmark_success == 'true'
+        working-directory: examples/boids-perf-test
+        run: |
+          # Download baseline from main branch
+          if curl -f -o main-baseline.json https://raw.githubusercontent.com/${{ github.repository }}/main/examples/boids-perf-test/baseline.json; then
+            echo "Checking for performance regression against main branch..."
+            python3 regression_test.py --baseline main-baseline.json --threshold 0.85 --godot "$GODOT_EXECUTABLE" || {
+              echo "::warning::Performance regression detected! Bevy implementation performance dropped more than 15%"
+              exit 1
+            }
+          else
+            echo "No baseline found on main branch, skipping regression check"
+          fi
+
+      - name: Generate benchmark summary
+        if: always() && steps.benchmark.outputs.benchmark_success == 'true'
+        working-directory: examples/boids-perf-test
+        run: |
+          # The regression_test.py already outputs the results, just add to job summary
+          echo "## 🚀 Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Quick CI benchmark completed successfully. Check the benchmark job logs for detailed results." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Full results are available in the artifacts." >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request' && steps.benchmark.outputs.benchmark_success == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Read benchmark results
+            const resultsDir = 'examples/boids-perf-test/benchmark_results';
+            const files = fs.readdirSync(resultsDir).filter(f => f.startsWith('full_comparison_')).sort().reverse();
+
+            if (files.length === 0) return;
+
+            const resultsPath = path.join(resultsDir, files[0]);
+            const data = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+
+            const analysis = data.analysis || {};
+            const ratios = analysis.performance_ratios || {};
+
+            let comment = "## 📊 Benchmark Results\n\n";
+
+            if (Object.keys(ratios).length > 0) {
+              comment += "| Boid Count | Godot FPS | Bevy FPS | Speedup |\n";
+              comment += "|------------|-----------|----------|----------|\n";
+
+              for (const [count, r] of Object.entries(ratios).sort((a, b) => Number(a[0]) - Number(b[0]))) {
+                comment += `| ${Number(count).toLocaleString()} | ${r.godot_fps.toFixed(1)} | ${r.bevy_fps.toFixed(1)} | **${r.speedup.toFixed(2)}x** |\n`;
+              }
+            }
+
+            if (analysis.summary) {
+              const s = analysis.summary;
+              comment += `\n**Average Speedup**: ${s.avg_speedup.toFixed(2)}x\n`;
+              comment += `**Range**: ${s.min_speedup.toFixed(2)}x - ${s.max_speedup.toFixed(2)}x\n`;
+            }
+
+            comment += "\n<sub>🤖 Generated by godot-bevy CI</sub>";
+
+            // Find existing comment or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' && comment.body.includes('📊 Benchmark Results')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment,
+              });
+            }
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            examples/boids-perf-test/benchmark_results/
+            examples/boids-perf-test/benchmark_output.txt
