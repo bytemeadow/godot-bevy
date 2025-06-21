@@ -217,7 +217,6 @@ fn spawn_boids(commands: &mut Commands, count: i32, config: &BoidsConfig, boid_s
             fastrand::f32() * config.world_bounds.y,
         );
 
-        // Match GDScript initial velocity exactly
         let velocity = Vector2::new(
             (fastrand::f32() - 0.5) * 200.0,
             (fastrand::f32() - 0.5) * 200.0,
@@ -385,11 +384,8 @@ fn boids_apply_forces(
         .for_each(|(_, mut transform, mut velocity, force)| {
             velocity.0 += force.0 * delta;
 
-            // Clamp velocity
-            let speed = velocity.0.length();
-            if speed < config.max_speed * 0.1 {
-                velocity.0 = velocity.0.normalized() * config.max_speed * 0.1;
-            } else if speed > config.max_speed {
+            // Clamp velocity to max speed only (match GDScript)
+            if velocity.0.length() > config.max_speed {
                 velocity.0 = velocity.0.normalized() * config.max_speed;
             }
 
@@ -449,8 +445,9 @@ fn calculate_boid_force_optimized(
             if let Ok((_, neighbor_velocity)) = all_boids.get(neighbor_entity) {
                 // Separation (avoid crowding neighbors)
                 if dist_sq < separation_radius_sq && dist_sq > 0.0 {
-                    let inv_dist = 1.0 / dist_sq.sqrt();
-                    separation += Vector2::new(diff.x * inv_dist, diff.y * inv_dist);
+                    let distance = dist_sq.sqrt();
+                    let normalized_diff = diff.normalize();
+                    separation += Vector2::new(normalized_diff.x, normalized_diff.y) / distance;
                     separation_count += 1;
                 }
 
@@ -466,21 +463,36 @@ fn calculate_boid_force_optimized(
 
     // Apply separation
     if separation_count > 0 {
-        separation = separation.normalized() * config.max_force;
-        total_force += separation * config.separation_weight;
+        separation = (separation / separation_count as f32).normalized() * config.max_speed - velocity;
+        let separation_force = if separation.length() > config.max_force {
+            separation.normalized() * config.max_force
+        } else {
+            separation
+        };
+        total_force += separation_force * config.separation_weight;
     }
 
     // Apply alignment
     if neighbor_count > 0 {
-        avg_vel /= neighbor_count as f32;
-        let alignment = (avg_vel - velocity).normalized() * config.max_force;
-        total_force += alignment * config.alignment_weight;
+        avg_vel = (avg_vel / neighbor_count as f32).normalized() * config.max_speed;
+        let alignment = avg_vel - velocity;
+        let alignment_force = if alignment.length() > config.max_force {
+            alignment.normalized() * config.max_force
+        } else {
+            alignment
+        };
+        total_force += alignment_force * config.alignment_weight;
 
         // Apply cohesion
         center_of_mass /= neighbor_count as f32;
-        let desired_direction = (center_of_mass - pos).normalize();
-        let cohesion = Vector2::new(desired_direction.x, desired_direction.y) * config.max_force;
-        total_force += cohesion * config.cohesion_weight;
+        let desired = (center_of_mass - pos).normalize() * config.max_speed;
+        let cohesion = Vector2::new(desired.x, desired.y) - velocity;
+        let cohesion_force = if cohesion.length() > config.max_force {
+            cohesion.normalized() * config.max_force
+        } else {
+            cohesion
+        };
+        total_force += cohesion_force * config.cohesion_weight;
     }
 
     // Apply boundary avoidance
