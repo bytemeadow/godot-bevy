@@ -3,14 +3,16 @@
 # Boids Performance Benchmark Runner
 # This script runs automated benchmarks comparing Godot and Bevy implementations
 
-set -e
+# bash strict mode, http://redsymbol.net/articles/unofficial-bash-strict-mode/
+set -euo pipefail
+IFS=$'\n\t'
 
 # Default values
 GODOT_EXECUTABLE="godot"
 IMPLEMENTATION="godot"
 BOID_COUNT=1000
 DURATION=10
-OUTPUT_DIR="benchmark_results"
+OUTPUT_DIR="$(readlink -f .)/benchmark_results"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
 # Parse command line arguments
@@ -88,15 +90,29 @@ cd rust
 cargo build --release
 cd ..
 
+echo "🔨 Exporting a godot release build..."
+EXPORT_DIR="$OUTPUT_DIR/export"
+BENCHMARK_BINARY="$EXPORT_DIR/boids"
+mkdir -p "$EXPORT_DIR"
+cd godot
+PLATFORM=""
+if [ "$(uname)" == "Linux" ]; then
+  PLATFORM="Linux/X11"
+elif [ "$(uname)" == "Darwin" ]; then
+  PLATFORM="macOS"
+else
+  PLATFORM="Windows Desktop"
+fi
+godot --headless --export-release "$PLATFORM" "$BENCHMARK_BINARY" project.godot
+cd ..
+
 # Run the benchmark
 echo "🚀 Starting benchmark..."
-cd godot
-$GODOT_EXECUTABLE --headless \
+"$BENCHMARK_BINARY" --headless \
     --implementation="$IMPLEMENTATION" \
     --boid-count="$BOID_COUNT" \
     --duration="$DURATION" \
-    --output="../$OUTPUT_FILE"
-cd ..
+    --output="$OUTPUT_FILE"
 
 echo ""
 echo "✅ Benchmark complete!"
@@ -106,5 +122,5 @@ echo "Results saved to: $OUTPUT_FILE"
 if [ -f "$OUTPUT_FILE" ]; then
     echo ""
     echo "📊 Results:"
-    cat "$OUTPUT_FILE" | jq '.'
+    jq '.' "$OUTPUT_FILE"
 fi
