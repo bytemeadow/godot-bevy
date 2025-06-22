@@ -2,13 +2,16 @@ use bevy::{
     app::{App, Plugin, PostUpdate, PreUpdate},
     ecs::{event::EventReader, system::ResMut},
     input::{
-        ButtonInput, keyboard::KeyCode, mouse::MouseButton as BevyMouseButton, touch::Touches,
+        ButtonInput, 
+        keyboard::KeyCode, 
+        mouse::MouseButton as BevyMouseButton, 
+        touch::Touches,
     },
 };
 
 use crate::plugins::core::input_event::{
     KeyboardInput as GodotKeyboardInput, MouseButton as GodotMouseButton,
-    MouseButtonInput as GodotMouseButtonInput, TouchInput as GodotTouchInput,
+    MouseButtonInput as GodotMouseButtonInput,
 };
 
 /// Plugin that bridges godot-bevy's input events to Bevy's standard input resources.
@@ -26,7 +29,6 @@ impl Plugin for BevyInputBridgePlugin {
                 (
                     bridge_keyboard_input,
                     bridge_mouse_button_input,
-                    bridge_touch_input,
                 ),
             )
             .add_systems(PostUpdate, update_input_resources);
@@ -63,34 +65,15 @@ fn bridge_mouse_button_input(
     }
 }
 
-fn bridge_touch_input(
-    mut touch_events: EventReader<GodotTouchInput>,
-    mut touches: ResMut<Touches>,
-) {
-    for event in touch_events.read() {
-        let id = event.finger_id as u64;
-
-        if event.pressed {
-            // Note: Bevy's Touches API doesn't expose direct add methods
-            // We need to send TouchInput events instead
-            // For now, we'll skip touch bridging until we can properly implement it
-        } else {
-            touches.release(id);
-        }
-    }
-}
 
 fn update_input_resources(
     mut keyboard_input: ResMut<ButtonInput<KeyCode>>,
     mut mouse_input: ResMut<ButtonInput<BevyMouseButton>>,
-    mut _touches: ResMut<Touches>,
 ) {
     // Clear just_pressed/just_released states at the end of each frame
     // This is what Bevy's InputPlugin normally does
     keyboard_input.clear();
     mouse_input.clear();
-    // Note: Touches has a different API - it handles clearing internally via events
-    // For now we'll skip manual clearing since our touch implementation is incomplete
 }
 
 // Conversion functions
