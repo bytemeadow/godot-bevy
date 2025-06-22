@@ -1,12 +1,7 @@
 use bevy::{
     app::{App, Plugin, PostUpdate, PreUpdate},
     ecs::{event::EventReader, system::ResMut},
-    input::{
-        ButtonInput, 
-        keyboard::KeyCode, 
-        mouse::MouseButton as BevyMouseButton, 
-        touch::Touches,
-    },
+    input::{ButtonInput, keyboard::KeyCode, mouse::MouseButton as BevyMouseButton},
 };
 
 use crate::plugins::core::input_event::{
@@ -15,7 +10,6 @@ use crate::plugins::core::input_event::{
 };
 
 /// Plugin that bridges godot-bevy's input events to Bevy's standard input resources.
-/// This allows libraries like leafwing-input-manager to work with godot-bevy.
 pub struct BevyInputBridgePlugin;
 
 impl Plugin for BevyInputBridgePlugin {
@@ -23,13 +17,9 @@ impl Plugin for BevyInputBridgePlugin {
         // Add Bevy's standard input resources
         app.init_resource::<ButtonInput<KeyCode>>()
             .init_resource::<ButtonInput<BevyMouseButton>>()
-            .init_resource::<Touches>()
             .add_systems(
                 PreUpdate,
-                (
-                    bridge_keyboard_input,
-                    bridge_mouse_button_input,
-                ),
+                (bridge_keyboard_input, bridge_mouse_button_input),
             )
             .add_systems(PostUpdate, update_input_resources);
     }
@@ -64,7 +54,6 @@ fn bridge_mouse_button_input(
         }
     }
 }
-
 
 fn update_input_resources(
     mut keyboard_input: ResMut<ButtonInput<KeyCode>>,
