@@ -1,4 +1,4 @@
-use godot::classes::Node;
+use godot::classes::{InputEvent, Node};
 use godot::obj::Gd;
 use godot::prelude::*;
 use std::sync::mpsc::Sender;
@@ -32,6 +32,34 @@ impl GodotSignalWatcher {
                 name: signal_name.to_string(),
                 origin: GodotNodeHandle::from_instance_id(origin.instance_id()),
                 target: GodotNodeHandle::from_instance_id(target.instance_id()),
+                arguments: vec![],
+            });
+        }
+    }
+
+    #[func]
+    pub fn handle_input_event(
+        &self,
+        viewport: Gd<Node>,
+        event: Gd<InputEvent>,
+        shape_idx: i32,
+        source_node: Gd<Node>,
+    ) {
+        if let Some(channel) = self.notification_channel.as_ref() {
+            let args = vec![
+                crate::plugins::core::variant_to_signal_argument(&viewport.to_variant()),
+                crate::plugins::core::variant_to_signal_argument(&event.to_variant()),
+                crate::plugins::core::variant_to_signal_argument(&shape_idx.to_variant()),
+            ];
+
+            // Use the bound source node as the origin
+            let source_handle = GodotNodeHandle::from_instance_id(source_node.instance_id());
+
+            let _ = channel.send(GodotSignal {
+                name: "input_event".to_string(),
+                origin: source_handle.clone(),
+                target: source_handle,
+                arguments: args,
             });
         }
     }
@@ -43,6 +71,7 @@ impl GodotSignalWatcher {
                 name: signal_name.to_string(),
                 origin: GodotNodeHandle::from_instance_id(origin.instance_id()),
                 target: GodotNodeHandle::from_instance_id(target.instance_id()),
+                arguments: vec![],
             });
         }
     }
