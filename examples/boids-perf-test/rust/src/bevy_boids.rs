@@ -380,11 +380,6 @@ fn boids_apply_forces(
     performance.frame_count += 1;
     let delta = time.delta_secs();
 
-    let boid_count = boid_transform_query.iter().count();
-    if boid_count == 0 {
-        return;
-    }
-
     boid_transform_query
         .iter_mut()
         .for_each(|(_, mut transform, mut velocity, force)| {
