@@ -44,9 +44,13 @@ class BenchmarkRunner:
 
             # Run benchmark with timeout and without capturing output
             # This prevents hanging on output buffer issues
+            # Calculate timeout based on boid count - higher counts need more warmup time
+            warmup_time = min(60, max(30, boid_count // 200))  # 30-60s warmup based on boid count
+            total_timeout = duration + warmup_time + 30  # warmup + benchmark + shutdown
+            
             result = subprocess.run(
                 cmd,
-                timeout=duration + 30,  # Give extra time for startup/shutdown
+                timeout=total_timeout,
                 check=True
             )
 
@@ -84,7 +88,7 @@ class BenchmarkRunner:
             return None
 
         except subprocess.TimeoutExpired:
-            print(f"❌ Benchmark timed out after {duration + 30} seconds")
+            print(f"❌ Benchmark timed out after {total_timeout} seconds")
             os.chdir(original_dir)
             return None
         except subprocess.CalledProcessError as e:
