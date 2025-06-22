@@ -18,7 +18,5 @@ mod container;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins((
-        BoidsPlugin,
-    ));
+    app.add_plugins((BoidsPlugin,));
 }
