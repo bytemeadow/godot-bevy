@@ -69,8 +69,6 @@ pub use crate::plugins::{
         SystemDeltaTimer,
         TextEditMarker,
         TimerMarker,
-        Transform2D,
-        Transform3D,
         TransformSyncMode,
         collisions::{
             ALL_COLLISION_SIGNALS, AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED,

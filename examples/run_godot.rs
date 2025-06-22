@@ -84,7 +84,8 @@ fn godot_binary_path() -> PathBuf {
     // Search in some reasonable locations across linux and osx for godot.
     // Windows is trickier, as I believe the binary name contains the version
     // of godot, e.g., C:\Program Files\Godot\Godot_v3.4.2-stable_win64.exe
-    let godot_search_paths = "/usr/local/bin:/usr/bin:/bin:/Applications/Godot.app/Contents/MacOS";
+    let godot_search_paths =
+        "$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/Applications/Godot.app/Contents/MacOS";
 
     if let Ok(path_it) = which_in_global("godot", Some(godot_search_paths)) {
         if let Some(godot_binary_path) = path_it.into_iter().next() {

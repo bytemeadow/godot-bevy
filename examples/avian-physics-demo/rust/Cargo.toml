@@ -1,0 +1,34 @@
+[package]
+name = "avian_physics_test"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+
+[lib]
+crate-type = ["cdylib"]
+
+[[bin]]
+path = "../../run_godot.rs"
+name = "avian_physics_test"
+
+[dependencies]
+avian3d = { version= "0.3", default-features = false, features = [
+    # this is the default feature list for avian3d
+    # ref https://github.com/Jondolf/avian/blob/main/crates/avian3d/Cargo.toml#L15
+    "3d",
+    "f32",
+    "parry-f32",
+    "collider-from-mesh",
+    "bevy_scene",
+    "bevy_picking",
+    "debug-plugin",
+    # uncommenting the "parallel" feature may _not_ safe for your godot/bevy app,
+    # see https://github.com/bytemeadow/godot-bevy/pull/65#issuecomment-2996778781
+    #
+    #   "parallel",
+]}
+bevy = { version = "0.16", default-features = false }
+bevy_asset_loader = "0.23.0"
+godot = "0.3"
+godot-bevy = { path = "../../../godot-bevy" }
+which = "8"

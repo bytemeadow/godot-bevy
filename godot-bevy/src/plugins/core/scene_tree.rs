@@ -1,11 +1,16 @@
-use std::{collections::HashMap, marker::PhantomData};
-
+use super::collisions::ALL_COLLISION_SIGNALS;
+use super::node_markers::*;
+use super::{GodotTransformConfig, TransformSyncMode};
+use crate::{
+    bridge::GodotNodeHandle, plugins::core::transforms::IntoBevyTransform, prelude::Collisions,
+};
+use bevy::ecs::system::Res;
 use bevy::{
     app::{App, First, Plugin, PreStartup},
     ecs::{
         component::Component,
         entity::Entity,
-        event::{Event, EventReader, EventWriter, event_update_system},
+        event::{event_update_system, Event, EventReader, EventWriter},
         name::Name,
         schedule::IntoScheduleConfigs,
         system::{Commands, NonSendMut, Query, SystemParam},
@@ -27,18 +32,11 @@ use godot::{
     obj::{Gd, Inherits},
     prelude::GodotConvert,
 };
-
-use crate::{
-    bridge::GodotNodeHandle,
-    prelude::{Collisions, Transform2D, Transform3D},
+use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
+    marker::PhantomData,
 };
-
-use super::node_markers::*;
-use bevy::ecs::system::Res;
-
-use super::{GodotTransformConfig, TransformSyncMode};
-
-use super::collisions::ALL_COLLISION_SIGNALS;
 
 pub struct GodotSceneTreePlugin;
 
@@ -362,7 +360,6 @@ fn create_scene_tree_entity(
         .iter()
         .map(|(reference, ent)| (reference.instance_id(), ent))
         .collect::<HashMap<_, _>>();
-    let scene_root = scene_tree.get().get_root().unwrap();
 
     for event in events.into_iter() {
         trace!(target: "godot_scene_tree_events", event = ?event);
@@ -378,21 +375,23 @@ fn create_scene_tree_entity(
                     commands.spawn_empty()
                 };
 
-                ent.insert(GodotNodeHandle::clone(&node))
-                    .insert(Name::from(node.get::<Node>().get_name().to_string()));
+                // insert_if_new so we avoid stomping on user-provided data
+                ent.insert_if_new(GodotNodeHandle::clone(&node))
+                    .insert_if_new(Name::from(node.get::<Node>().get_name().to_string()));
 
                 // Add node type marker components
                 add_node_type_markers(&mut ent, &mut node);
 
                 // Only add transform components if sync mode is not disabled
                 if config.sync_mode != TransformSyncMode::Disabled {
-                    if let Some(node3d) = node.try_get::<Node3D>() {
-                        ent.insert(Transform3D::from(node3d.get_transform()));
-                    }
-
-                    if let Some(node2d) = node.try_get::<Node2D>() {
-                        let transform = node2d.get_transform();
-                        ent.insert(Transform2D::from(transform));
+                    if node.type_id() == TypeId::of::<Node3D>() {
+                        // Only insert a Transform if it doesn't exist already, i.e.,
+                        // users may have already added a Transform
+                        ent.insert_if_new(node.get::<Node3D>().get_transform().to_bevy_transform());
+                    } else if node.type_id() == TypeId::of::<Node2D>() {
+                        // Only insert a Transform if it doesn't exist already, i.e.,
+                        // users may have already added a Transform
+                        ent.insert_if_new(node.get::<Node2D>().get_transform().to_bevy_transform());
                     }
                 }
 
@@ -404,8 +403,8 @@ fn create_scene_tree_entity(
                     .any(|&signal| node.has_signal(signal));
 
                 if has_collision_signals {
-                    debug!(target: "godot_scene_tree_collisions", 
-                           node_id = node.instance_id().to_string(), 
+                    debug!(target: "godot_scene_tree_collisions",
+                           node_id = node.instance_id().to_string(),
                            "has collision signals");
 
                     let signal_watcher = scene_tree
@@ -438,13 +437,6 @@ fn create_scene_tree_entity(
 
                 // Try to add any registered bundles for this node type
                 crate::autosync::try_add_bundles_for_node(commands, ent, &event.node);
-
-                if node.instance_id() != scene_root.instance_id() {
-                    let parent = node.get_parent().unwrap().instance_id();
-                    commands
-                        .entity(*ent_mapping.get(&parent).unwrap())
-                        .add_children(&[ent]);
-                }
             }
             SceneTreeEventType::NodeRemoved => {
                 if let Some(ent) = ent {

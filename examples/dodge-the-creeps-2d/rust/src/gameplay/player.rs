@@ -48,6 +48,7 @@ fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
     commands
         .spawn_empty()
         .insert(GodotScene::from_handle(assets.player_scene.clone()))
+        .insert(Transform::default())
         .insert(Player { speed: 0.0 });
 }
 
@@ -71,7 +72,7 @@ fn player_on_ready(
 }
 
 fn setup_player(
-    mut player: Query<(&mut GodotNodeHandle, &mut Transform2D), With<Player>>,
+    mut player: Query<(&mut GodotNodeHandle, &mut Transform), With<Player>>,
     mut entities: Query<(&Name, &mut GodotNodeHandle), Without<Player>>,
 ) -> Result {
     if let Ok((mut player, mut transform)) = player.single_mut() {
@@ -84,14 +85,15 @@ fn setup_player(
             .unwrap()
             .get::<Node2D>()
             .get_position();
-        transform.as_godot_mut().origin = start_position;
+        transform.translation.x = start_position.x;
+        transform.translation.y = start_position.y;
     }
 
     Ok(())
 }
 
 fn move_player(
-    mut player: Query<(&Player, &mut GodotNodeHandle, &mut Transform2D)>,
+    mut player: Query<(&Player, &mut GodotNodeHandle, &mut Transform)>,
     physics_delta: Res<PhysicsDelta>,
 ) -> Result {
     if let Ok((player_data, mut player, mut transform)) = player.single_mut() {
@@ -133,10 +135,10 @@ fn move_player(
             sprite.stop();
         }
 
-        let mut godot_transform = transform.as_godot_mut();
-        godot_transform.origin += velocity * physics_delta.delta_seconds;
-        godot_transform.origin.x = f32::min(f32::max(0.0, godot_transform.origin.x), screen_size.x);
-        godot_transform.origin.y = f32::min(f32::max(0.0, godot_transform.origin.y), screen_size.y);
+        transform.translation.x += velocity.x * physics_delta.delta_seconds;
+        transform.translation.y += velocity.y * physics_delta.delta_seconds;
+        transform.translation.x = f32::min(f32::max(0.0, transform.translation.x), screen_size.x);
+        transform.translation.y = f32::min(f32::max(0.0, transform.translation.y), screen_size.y);
     }
 
     Ok(())
