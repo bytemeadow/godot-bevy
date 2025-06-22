@@ -20,6 +20,5 @@ mod container;
 fn build_app(app: &mut App) {
     app.add_plugins((
         BoidsPlugin,
-        // Diagnostics removed for performance
     ));
 }
