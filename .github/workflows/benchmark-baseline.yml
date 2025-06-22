@@ -57,18 +57,17 @@ jobs:
           jq '. + {"ci_metadata": {"commit": "${{ github.sha }}", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'", "runner": "GitHub Actions"}}' baseline.json > baseline.tmp.json
           mv baseline.tmp.json baseline.json
           
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update benchmark baseline from CI"
-          title: "Update benchmark baseline"
-          body: |
-            This PR updates the benchmark baseline from the latest main branch.
-            
-            **Commit**: ${{ github.sha }}
-            **Runner**: GitHub Actions (blaze/compute/ubuntu-latest-amd64)
-            
-            This ensures all benchmarks are compared against a consistent baseline from the same hardware.
-          branch: update-benchmark-baseline
-          delete-branch: true
+      - name: Commit and push baseline
+        run: |
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          git add examples/boids-perf-test/baseline.json
+          git commit -m "chore: update benchmark baseline from CI [skip ci]
+
+          Updated baseline from commit: ${{ github.sha }}
+          Runner: GitHub Actions (blaze/compute/ubuntu-latest-amd64)
+          
+          This ensures all benchmarks are compared against a consistent baseline from the same hardware."
+          
+          git push origin main
