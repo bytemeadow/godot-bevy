@@ -1,0 +1,6 @@
+# Ignore benchmark results and output
+benchmark_results/
+benchmark_output.txt
+
+# Don't commit local baseline - only CI should update this
+baseline.json

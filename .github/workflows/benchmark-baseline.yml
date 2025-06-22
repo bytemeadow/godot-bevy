@@ -1,0 +1,74 @@
+name: benchmark-baseline
+
+on:
+  workflow_dispatch:  # Allow manual triggering
+  push:
+    branches: [main]
+    paths:
+      - 'godot-bevy/**'
+      - 'godot-bevy-macros/**'
+      - 'examples/boids-perf-test/**'
+
+permissions:
+  contents: write
+
+jobs:
+  update-baseline:
+    name: Update benchmark baseline
+    runs-on: blaze/compute/ubuntu-latest-amd64
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        
+      - name: Install gdenv
+        run: |
+          curl -fsSL https://gdenv.bytemeadow.com | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          
+      - name: Install Godot via gdenv
+        run: |
+          gdenv install 4.4.1
+          gdenv use 4.4.1
+          echo "$HOME/.local/share/gdenv/bin" >> $GITHUB_PATH
+          echo "GODOT_EXECUTABLE=$HOME/.local/share/gdenv/bin/godot" >> $GITHUB_ENV
+          $HOME/.local/share/gdenv/bin/godot --version
+          
+      - name: Build boids benchmark
+        run: |
+          cargo build --release --manifest-path examples/boids-perf-test/rust/Cargo.toml
+          
+      - name: Import Godot project
+        working-directory: examples/boids-perf-test/godot
+        run: $GODOT_EXECUTABLE --editor --headless --quit || true
+        
+      - name: Run full benchmark
+        working-directory: examples/boids-perf-test
+        run: |
+          # Run comprehensive benchmark for baseline
+          python3 regression_test.py --boids 500 1000 2000 5000 10000 20000 --duration 10 --godot "$GODOT_EXECUTABLE"
+          
+          # Add CI metadata to baseline
+          jq '. + {"ci_metadata": {"commit": "${{ github.sha }}", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'", "runner": "GitHub Actions"}}' baseline.json > baseline.tmp.json
+          mv baseline.tmp.json baseline.json
+          
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update benchmark baseline from CI"
+          title: "Update benchmark baseline"
+          body: |
+            This PR updates the benchmark baseline from the latest main branch.
+            
+            **Commit**: ${{ github.sha }}
+            **Runner**: GitHub Actions (blaze/compute/ubuntu-latest-amd64)
+            
+            This ensures all benchmarks are compared against a consistent baseline from the same hardware.
+          branch: update-benchmark-baseline
+          delete-branch: true
