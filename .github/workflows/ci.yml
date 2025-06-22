@@ -155,11 +155,33 @@ jobs:
           path: examples/${{ matrix.example }}/godot/exports/
           if-no-files-found: error
 
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      benchmark: ${{ steps.filter.outputs.benchmark }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            benchmark:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/boids-perf-test/**'
+              - '.github/workflows/ci.yml'
+
   benchmark:
     name: performance / boids benchmark
     runs-on: blaze/compute/ubuntu-latest-amd64
-    needs: rust
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    needs: [rust, changes]
+    if: |
+      (needs.changes.outputs.benchmark == 'true' || 
+       contains(github.event.pull_request.labels.*.name, 'benchmark')) && (
+        github.ref == 'refs/heads/main' ||
+        github.event_name == 'pull_request'
+      )
 
     steps:
       - name: Checkout code
