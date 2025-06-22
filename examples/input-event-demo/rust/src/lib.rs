@@ -6,6 +6,7 @@ use godot_bevy::prelude::{
     godot_prelude::{gdextension, godot_print, ExtensionLibrary},
     *,
 };
+use leafwing_input_manager::prelude::*;
 
 // Import input event types directly to avoid naming conflicts
 use godot_bevy::plugins::core::input_event::{
@@ -19,10 +20,25 @@ use godot_bevy::plugins::core::input_event::{
 //   generate ActionInput events only (no duplicate raw keyboard events)
 // - Unmapped keys (like random letters) generate KeyboardInput events only
 // - This prevents duplicate events and follows Godot's intended input flow
+//
+// Also demonstrates leafwing-input-manager integration via BevyInputBridgePlugin
+
+#[derive(Actionlike, PartialEq, Eq, Hash, Clone, Copy, Debug, Reflect, Component)]
+enum PlayerAction {
+    Jump,
+    Shoot,
+    MoveLeft,
+    MoveRight,
+    Sprint,
+}
 
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(InputEventPlugin);
+    app.add_plugins(InputEventPlugin)
+        // Test leafwing-input-manager integration
+        .add_plugins(InputManagerPlugin::<PlayerAction>::default())
+        .add_systems(Startup, spawn_player)
+        .add_systems(Update, test_leafwing_input);
 }
 
 struct InputEventPlugin;
@@ -196,5 +212,50 @@ fn test_bevy_input_resources(
 
     if keyboard_input.pressed(KeyCode::Space) {
         godot_print!("🧪 BRIDGE TEST: Space held via Bevy input system!");
+    }
+}
+
+#[derive(Component)]
+struct Player;
+
+fn spawn_player(mut commands: Commands) {
+    godot_print!("🎮 Spawning player with leafwing-input-manager!");
+
+    // Create input map using Bevy's KeyCode (which now works via our bridge!)
+    let input_map = InputMap::new([
+        (PlayerAction::Jump, KeyCode::Space),
+        (PlayerAction::Shoot, KeyCode::KeyF),
+        (PlayerAction::MoveLeft, KeyCode::KeyA),
+        (PlayerAction::MoveRight, KeyCode::KeyD),
+        (PlayerAction::Sprint, KeyCode::ShiftLeft),
+    ]);
+
+    commands.spawn((Player, input_map, ActionState::<PlayerAction>::default()));
+}
+
+fn test_leafwing_input(query: Query<&ActionState<PlayerAction>, With<Player>>) {
+    let Ok(action_state) = query.single() else {
+        return;
+    };
+
+    // Test leafwing-input-manager integration
+    if action_state.just_pressed(&PlayerAction::Jump) {
+        godot_print!("🚀 LEAFWING: Player jumped!");
+    }
+
+    if action_state.just_pressed(&PlayerAction::Shoot) {
+        godot_print!("💥 LEAFWING: Player shot!");
+    }
+
+    if action_state.pressed(&PlayerAction::MoveLeft) {
+        godot_print!("⬅️ LEAFWING: Moving left...");
+    }
+
+    if action_state.pressed(&PlayerAction::MoveRight) {
+        godot_print!("➡️ LEAFWING: Moving right...");
+    }
+
+    if action_state.pressed(&PlayerAction::Sprint) {
+        godot_print!("🏃 LEAFWING: Sprinting!");
     }
 }

@@ -8,6 +8,8 @@ use bevy::{
 };
 use bevy_spatial::{kdtree::KDTree2, AutomaticUpdate, SpatialAccess, SpatialStructure};
 
+use godot::builtin::Color as GodotColor;
+use godot::classes::Node as GodotNode;
 use godot::prelude::*;
 use godot_bevy::plugins::core::Transform2D;
 use godot_bevy::prelude::*;
@@ -266,7 +268,7 @@ fn despawn_boids(
     // Despawn each entity and free the Godot node
     for (entity, handle) in entities_to_despawn {
         let mut handle_clone = handle.clone();
-        if let Some(mut node) = handle_clone.try_get::<Node>() {
+        if let Some(mut node) = handle_clone.try_get::<GodotNode>() {
             node.queue_free();
         }
         commands.entity(entity).despawn();
@@ -284,7 +286,7 @@ fn update_simulation_state(
         // Queue all Godot nodes for deletion
         for (entity, handle) in boids.iter() {
             let mut handle_clone = handle.clone();
-            if let Some(mut node) = handle_clone.try_get::<Node>() {
+            if let Some(mut node) = handle_clone.try_get::<GodotNode>() {
                 node.queue_free();
             }
             commands.entity(entity).despawn();
@@ -301,7 +303,8 @@ fn colorize_new_boids(
         let mut handle_clone = handle.clone();
 
         // Generate random color (matching GDScript)
-        let random_color = Color::from_rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.9);
+        let random_color =
+            GodotColor::from_rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.9);
 
         // Try different node structures (matching GDScript logic)
         if let Some(mut node) = handle_clone.try_get::<Node2D>() {

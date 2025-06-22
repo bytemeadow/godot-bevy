@@ -1,12 +1,17 @@
 use bevy::{
     app::{App, Plugin, PostUpdate, PreUpdate},
     ecs::{event::EventReader, system::ResMut},
-    input::{ButtonInput, keyboard::KeyCode, mouse::MouseButton as BevyMouseButton},
+    input::{
+        ButtonInput,
+        keyboard::KeyCode,
+        mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll, MouseButton as BevyMouseButton},
+    },
+    math::Vec2,
 };
 
 use crate::plugins::core::input_event::{
     KeyboardInput as GodotKeyboardInput, MouseButton as GodotMouseButton,
-    MouseButtonInput as GodotMouseButtonInput,
+    MouseButtonInput as GodotMouseButtonInput, MouseMotion as GodotMouseMotion,
 };
 
 /// Plugin that bridges godot-bevy's input events to Bevy's standard input resources.
@@ -17,9 +22,15 @@ impl Plugin for BevyInputBridgePlugin {
         // Add Bevy's standard input resources
         app.init_resource::<ButtonInput<KeyCode>>()
             .init_resource::<ButtonInput<BevyMouseButton>>()
+            .init_resource::<AccumulatedMouseMotion>()
+            .init_resource::<AccumulatedMouseScroll>()
             .add_systems(
                 PreUpdate,
-                (bridge_keyboard_input, bridge_mouse_button_input),
+                (
+                    bridge_keyboard_input,
+                    bridge_mouse_button_input,
+                    bridge_mouse_motion,
+                ),
             )
             .add_systems(PostUpdate, update_input_resources);
     }
@@ -55,14 +66,30 @@ fn bridge_mouse_button_input(
     }
 }
 
+fn bridge_mouse_motion(
+    mut mouse_motion_events: EventReader<GodotMouseMotion>,
+    mut accumulated_motion: ResMut<AccumulatedMouseMotion>,
+) {
+    // Accumulate mouse motion deltas
+    for event in mouse_motion_events.read() {
+        accumulated_motion.delta += event.delta;
+    }
+}
+
 fn update_input_resources(
     mut keyboard_input: ResMut<ButtonInput<KeyCode>>,
     mut mouse_input: ResMut<ButtonInput<BevyMouseButton>>,
+    mut accumulated_motion: ResMut<AccumulatedMouseMotion>,
+    mut accumulated_scroll: ResMut<AccumulatedMouseScroll>,
 ) {
     // Clear just_pressed/just_released states at the end of each frame
     // This is what Bevy's InputPlugin normally does
     keyboard_input.clear();
     mouse_input.clear();
+
+    // Clear accumulated mouse motion and scroll
+    accumulated_motion.delta = Vec2::ZERO;
+    accumulated_scroll.delta = Vec2::ZERO;
 }
 
 // Conversion functions

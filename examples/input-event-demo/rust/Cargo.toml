@@ -16,4 +16,5 @@ bevy = { version = "0.16", default-features = false }
 fastrand = { version = "2.3.0" }
 godot = "0.3"
 godot-bevy = { path = "../../../godot-bevy" }
+leafwing-input-manager = "0.17.0"
 which = "7.0.3"
