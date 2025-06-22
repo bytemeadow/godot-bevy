@@ -120,6 +120,7 @@ impl From<godot::global::MouseButton> for MouseButton {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn write_input_events(
     events: NonSendMut<InputEventReader>,
     mut keyboard_events: EventWriter<KeyboardInput>,
