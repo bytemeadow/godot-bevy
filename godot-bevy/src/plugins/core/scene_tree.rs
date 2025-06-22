@@ -411,8 +411,13 @@ fn create_scene_tree_entity(
                     // Connect all available collision signals using the universal handler
                     for &signal_name in ALL_COLLISION_SIGNALS {
                         if node.has_signal(signal_name) {
-                            let mut node_handle = GodotNodeHandle::from_instance_id(node.instance_id());
-                            super::signals::connect_godot_signal(&mut node_handle, signal_name, scene_tree);
+                            let mut node_handle =
+                                GodotNodeHandle::from_instance_id(node.instance_id());
+                            super::signals::connect_godot_signal(
+                                &mut node_handle,
+                                signal_name,
+                                scene_tree,
+                            );
                         }
                     }
 
