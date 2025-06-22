@@ -4,7 +4,7 @@ use bevy::{
         event::{EventReader, EventWriter},
         resource::Resource,
         schedule::IntoScheduleConfigs,
-        system::{Res, ResMut},
+        system::{NonSendMut, Res, ResMut},
     },
     log::{debug, info},
     state::{
@@ -99,7 +99,10 @@ fn menu_is_initialized(menu_assets: Res<MenuAssets>) -> bool {
     menu_assets.initialized
 }
 
-fn connect_buttons(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTreeRef) {
+fn connect_buttons(
+    mut menu_assets: ResMut<MenuAssets>,
+    signal_sender: NonSendMut<GodotSignalSender>,
+) {
     // Check if all buttons are available first
     if menu_assets.start_button.is_some()
         && menu_assets.fullscreen_button.is_some()
@@ -108,13 +111,13 @@ fn connect_buttons(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTre
     {
         // Get mutable references one at a time to avoid multiple borrows
         if let Some(start_btn) = menu_assets.start_button.as_mut() {
-            connect_godot_signal(start_btn, "pressed", &mut scene_tree);
+            connect_godot_signal(start_btn, "pressed", signal_sender.0.clone());
         }
         if let Some(fullscreen_btn) = menu_assets.fullscreen_button.as_mut() {
-            connect_godot_signal(fullscreen_btn, "pressed", &mut scene_tree);
+            connect_godot_signal(fullscreen_btn, "pressed", signal_sender.0.clone());
         }
         if let Some(quit_btn) = menu_assets.quit_button.as_mut() {
-            connect_godot_signal(quit_btn, "pressed", &mut scene_tree);
+            connect_godot_signal(quit_btn, "pressed", signal_sender.0.clone());
         }
 
         menu_assets.signals_connected = true;

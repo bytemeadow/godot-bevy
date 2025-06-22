@@ -11,15 +11,8 @@ use godot::{
     prelude::{Callable, Variant},
 };
 use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::bridge::GodotNodeHandle;
-use crate::watchers::signal_watcher::GodotSignalWatcher;
-
-use super::SceneTreeRef;
-
-// Global channel for closure-based signal handling
-static GLOBAL_SIGNAL_CHANNEL: OnceLock<Arc<Mutex<Option<Sender<GodotSignal>>>>> = OnceLock::new();
 
 pub struct GodotSignalsPlugin;
 
@@ -47,6 +40,9 @@ pub struct GodotSignal {
 #[doc(hidden)]
 pub struct GodotSignalReader(pub std::sync::mpsc::Receiver<GodotSignal>);
 
+#[doc(hidden)]
+pub struct GodotSignalSender(pub std::sync::mpsc::Sender<GodotSignal>);
+
 fn write_godot_signal_events(
     events: NonSendMut<GodotSignalReader>,
     mut event_writer: EventWriter<GodotSignal>,
@@ -54,57 +50,32 @@ fn write_godot_signal_events(
     event_writer.write_batch(events.0.try_iter());
 }
 
-// Initialize the global signal channel for closure-based signal handling
-pub fn set_global_signal_channel(sender: Sender<GodotSignal>) {
-    let channel = Arc::new(Mutex::new(Some(sender)));
-    let _ = GLOBAL_SIGNAL_CHANNEL.set(channel);
-}
-
 pub fn connect_godot_signal(
     node: &mut GodotNodeHandle,
     signal_name: &str,
-    scene_tree: &mut SceneTreeRef,
+    signal_sender: Sender<GodotSignal>,
 ) {
     let mut node = node.get::<Node>();
-    let signal_watcher = scene_tree
-        .get()
-        .get_root()
-        .unwrap()
-        .get_node_as::<GodotSignalWatcher>("/root/BevyAppSingleton/SignalWatcher");
-
     let node_clone = node.clone();
     let signal_name_copy = signal_name.to_string();
     let node_id = node_clone.instance_id();
 
-    // Set up the global channel if we have access to the watcher's channel
-    let watcher_ref = signal_watcher.bind();
-    if let Some(channel) = &watcher_ref.notification_channel {
-        set_global_signal_channel(channel.clone());
-    }
-
     // TRULY UNIVERSAL closure that handles ANY number of arguments
     let closure = move |args: &[&Variant]| -> Result<Variant, ()> {
-        // Access the global signal channel
-        if let Some(global_channel) = GLOBAL_SIGNAL_CHANNEL.get() {
-            if let Ok(channel_guard) = global_channel.lock() {
-                if let Some(ref sender) = *channel_guard {
-                    // Convert all arguments to our signal argument format
-                    let arguments: Vec<GodotSignalArgument> = args
-                        .iter()
-                        .map(|&arg| variant_to_signal_argument(arg))
-                        .collect();
+        // Use captured sender directly - no global state needed!
+        let arguments: Vec<GodotSignalArgument> = args
+            .iter()
+            .map(|&arg| variant_to_signal_argument(arg))
+            .collect();
 
-                    let origin_handle = GodotNodeHandle::from_instance_id(node_id);
+        let origin_handle = GodotNodeHandle::from_instance_id(node_id);
 
-                    let _ = sender.send(GodotSignal {
-                        name: signal_name_copy.clone(),
-                        origin: origin_handle.clone(),
-                        target: origin_handle,
-                        arguments,
-                    });
-                }
-            }
-        }
+        let _ = signal_sender.send(GodotSignal {
+            name: signal_name_copy.clone(),
+            origin: origin_handle.clone(),
+            target: origin_handle,
+            arguments,
+        });
 
         Ok(Variant::nil())
     };

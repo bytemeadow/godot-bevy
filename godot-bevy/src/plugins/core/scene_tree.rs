@@ -88,6 +88,7 @@ pub fn initialize_scene_tree(
     mut scene_tree: SceneTreeRef,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
     config: Res<GodotTransformConfig>,
+    signal_sender: NonSendMut<super::signals::GodotSignalSender>,
 ) {
     fn traverse(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
         events.push(SceneTreeEvent {
@@ -110,6 +111,7 @@ pub fn initialize_scene_tree(
         &mut scene_tree,
         &mut entities,
         &config,
+        &signal_sender.0,
     );
 }
 
@@ -357,6 +359,7 @@ fn create_scene_tree_entity(
     scene_tree: &mut SceneTreeRef,
     entities: &mut Query<(&mut GodotNodeHandle, Entity)>,
     config: &GodotTransformConfig,
+    signal_sender: &std::sync::mpsc::Sender<super::signals::GodotSignal>,
 ) {
     let mut ent_mapping = entities
         .iter()
@@ -416,7 +419,7 @@ fn create_scene_tree_entity(
                             super::signals::connect_godot_signal(
                                 &mut node_handle,
                                 signal_name,
-                                scene_tree,
+                                signal_sender.clone(),
                             );
                         }
                     }
@@ -466,6 +469,7 @@ fn read_scene_tree_events(
     mut event_reader: EventReader<SceneTreeEvent>,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
     config: Res<GodotTransformConfig>,
+    signal_sender: NonSendMut<super::signals::GodotSignalSender>,
 ) {
     create_scene_tree_entity(
         &mut commands,
@@ -473,5 +477,6 @@ fn read_scene_tree_events(
         &mut scene_tree,
         &mut entities,
         &config,
+        &signal_sender.0,
     );
 }

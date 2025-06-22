@@ -4,10 +4,11 @@ use std::sync::{Mutex, mpsc::channel};
 
 use crate::watchers::input_watcher::GodotInputWatcher;
 use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
-use crate::watchers::signal_watcher::GodotSignalWatcher;
 use crate::{
     GodotPlugin,
-    plugins::core::{GodotSignalReader, InputEventReader, PhysicsDelta, PhysicsUpdate},
+    plugins::core::{
+        GodotSignalReader, GodotSignalSender, InputEventReader, PhysicsDelta, PhysicsUpdate,
+    },
     prelude::*,
 };
 
@@ -44,10 +45,9 @@ impl BevyApp {
 
     fn register_signal_watcher(&mut self, app: &mut App) {
         let (sender, receiver) = channel();
-        let mut signal_watcher = GodotSignalWatcher::new_alloc();
-        signal_watcher.bind_mut().notification_channel = Some(sender);
-        signal_watcher.set_name("SignalWatcher");
-        self.base_mut().add_child(&signal_watcher);
+        // We no longer need the SignalWatcher node since we use direct closures
+        // Just insert both sender and receiver as resources
+        app.insert_non_send_resource(GodotSignalSender(sender));
         app.insert_non_send_resource(GodotSignalReader(receiver));
     }
 
