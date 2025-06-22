@@ -5,7 +5,8 @@ use bevy::{
         system::ResMut,
     },
     input::{
-        ButtonInput,
+        Axis, ButtonInput,
+        gamepad::{GamepadAxis, GamepadButton},
         keyboard::KeyCode,
         mouse::{
             AccumulatedMouseMotion, AccumulatedMouseScroll, MouseButton as BevyMouseButton,
@@ -16,6 +17,7 @@ use bevy::{
 };
 
 use crate::plugins::core::input_event::{
+    GamepadAxisInput as GodotGamepadAxisInput, GamepadButtonInput as GodotGamepadButtonInput,
     KeyboardInput as GodotKeyboardInput, MouseButton as GodotMouseButton,
     MouseButtonInput as GodotMouseButtonInput, MouseMotion as GodotMouseMotion,
 };
@@ -30,6 +32,8 @@ impl Plugin for BevyInputBridgePlugin {
             .init_resource::<ButtonInput<BevyMouseButton>>()
             .init_resource::<AccumulatedMouseMotion>()
             .init_resource::<AccumulatedMouseScroll>()
+            .init_resource::<ButtonInput<GamepadButton>>()
+            .init_resource::<Axis<GamepadAxis>>()
             .add_event::<BevyMouseMotion>()
             .add_systems(
                 PreUpdate,
@@ -38,6 +42,8 @@ impl Plugin for BevyInputBridgePlugin {
                     bridge_mouse_button_input,
                     bridge_mouse_motion,
                     bridge_mouse_scroll,
+                    bridge_gamepad_button_input,
+                    bridge_gamepad_axis_input,
                 ),
             )
             .add_systems(PostUpdate, update_input_resources);
@@ -121,16 +127,45 @@ fn bridge_mouse_scroll(
     }
 }
 
+fn bridge_gamepad_button_input(
+    mut gamepad_button_events: EventReader<GodotGamepadButtonInput>,
+    mut gamepad_button_input: ResMut<ButtonInput<GamepadButton>>,
+) {
+    for event in gamepad_button_events.read() {
+        if let Some(bevy_button) = godot_button_to_bevy_button(event.button_index) {
+            if event.pressed {
+                gamepad_button_input.press(bevy_button);
+            } else {
+                gamepad_button_input.release(bevy_button);
+            }
+        }
+    }
+}
+
+fn bridge_gamepad_axis_input(
+    mut gamepad_axis_events: EventReader<GodotGamepadAxisInput>,
+    mut gamepad_axis_input: ResMut<Axis<GamepadAxis>>,
+) {
+    for event in gamepad_axis_events.read() {
+        if let Some(bevy_axis) = godot_axis_to_bevy_axis(event.axis) {
+            gamepad_axis_input.set(bevy_axis, event.value);
+        }
+    }
+}
+
 fn update_input_resources(
     mut keyboard_input: ResMut<ButtonInput<KeyCode>>,
     mut mouse_input: ResMut<ButtonInput<BevyMouseButton>>,
+    mut gamepad_button_input: ResMut<ButtonInput<GamepadButton>>,
 ) {
     // Clear just_pressed/just_released states at the end of each frame
     // This is what Bevy's InputPlugin normally does
     keyboard_input.clear();
     mouse_input.clear();
+    gamepad_button_input.clear();
     // Note: AccumulatedMouseMotion and AccumulatedMouseScroll are reset
     // at the beginning of each frame in their respective bridge systems
+    // Note: GamepadAxis doesn't need clearing as it's state-based, not event-based
 }
 
 // Conversion functions
@@ -217,5 +252,44 @@ fn godot_mouse_to_bevy_mouse(godot_button: GodotMouseButton) -> BevyMouseButton 
         GodotMouseButton::Extra2 => BevyMouseButton::Forward,
         // Note: Bevy doesn't have wheel events as buttons
         _ => BevyMouseButton::Other(255),
+    }
+}
+
+fn godot_button_to_bevy_button(button_index: i32) -> Option<GamepadButton> {
+    // Map Godot's JoyButton enum to Bevy's GamepadButton
+    // Reference: https://docs.godotengine.org/en/stable/classes/class_%40globalscope.html#enum-globalscope-joybutton
+    match button_index {
+        0 => Some(GamepadButton::South), // JOY_BUTTON_A / Bottom face button
+        1 => Some(GamepadButton::East),  // JOY_BUTTON_B / Right face button
+        2 => Some(GamepadButton::West),  // JOY_BUTTON_X / Left face button
+        3 => Some(GamepadButton::North), // JOY_BUTTON_Y / Top face button
+        4 => Some(GamepadButton::LeftTrigger), // JOY_BUTTON_LEFT_SHOULDER
+        5 => Some(GamepadButton::RightTrigger), // JOY_BUTTON_RIGHT_SHOULDER
+        6 => Some(GamepadButton::LeftTrigger2), // JOY_BUTTON_LEFT_TRIGGER
+        7 => Some(GamepadButton::RightTrigger2), // JOY_BUTTON_RIGHT_TRIGGER
+        8 => Some(GamepadButton::Select), // JOY_BUTTON_LEFT_STICK
+        9 => Some(GamepadButton::Start), // JOY_BUTTON_RIGHT_STICK
+        10 => Some(GamepadButton::LeftThumb), // JOY_BUTTON_LEFT_STICK
+        11 => Some(GamepadButton::RightThumb), // JOY_BUTTON_RIGHT_STICK
+        12 => Some(GamepadButton::DPadUp), // JOY_BUTTON_DPAD_UP
+        13 => Some(GamepadButton::DPadDown), // JOY_BUTTON_DPAD_DOWN
+        14 => Some(GamepadButton::DPadLeft), // JOY_BUTTON_DPAD_LEFT
+        15 => Some(GamepadButton::DPadRight), // JOY_BUTTON_DPAD_RIGHT
+        16 => Some(GamepadButton::Mode), // JOY_BUTTON_MISC1 (Guide/Home)
+        _ => Some(GamepadButton::Other(button_index as u8)), // Non-standard buttons
+    }
+}
+
+fn godot_axis_to_bevy_axis(axis: i32) -> Option<GamepadAxis> {
+    // Map Godot's JoyAxis enum to Bevy's GamepadAxis
+    // Reference: https://docs.godotengine.org/en/stable/classes/class_%40globalscope.html#enum-globalscope-joyaxis
+    match axis {
+        0 => Some(GamepadAxis::LeftStickX),        // JOY_AXIS_LEFT_X
+        1 => Some(GamepadAxis::LeftStickY),        // JOY_AXIS_LEFT_Y
+        2 => Some(GamepadAxis::RightStickX),       // JOY_AXIS_RIGHT_X
+        3 => Some(GamepadAxis::RightStickY),       // JOY_AXIS_RIGHT_Y
+        4 => Some(GamepadAxis::LeftZ),             // JOY_AXIS_TRIGGER_LEFT
+        5 => Some(GamepadAxis::RightZ),            // JOY_AXIS_TRIGGER_RIGHT
+        _ => Some(GamepadAxis::Other(axis as u8)), // Non-standard axes
     }
 }

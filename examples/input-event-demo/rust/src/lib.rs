@@ -1,5 +1,6 @@
 #![allow(clippy::type_complexity)]
 
+use bevy::input::gamepad::GamepadButton;
 use bevy::prelude::*;
 use godot::global::Key;
 use godot_bevy::prelude::{
@@ -31,6 +32,7 @@ enum PlayerAction {
     MoveLeft,
     MoveRight,
     Sprint,
+    GamepadAction,
 }
 
 #[bevy_app]
@@ -194,7 +196,10 @@ fn handle_action_input(mut action_events: EventReader<ActionInput>) {
 fn test_bevy_input_resources(
     keyboard_input: Res<bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>>,
     mouse_input: Res<bevy::input::ButtonInput<bevy::input::mouse::MouseButton>>,
+    gamepad_input: Res<bevy::input::ButtonInput<bevy::input::gamepad::GamepadButton>>,
+    gamepad_axes: Res<bevy::input::Axis<bevy::input::gamepad::GamepadAxis>>,
 ) {
+    use bevy::input::gamepad::{GamepadAxis, GamepadButton};
     use bevy::input::keyboard::KeyCode;
     use bevy::input::mouse::MouseButton;
 
@@ -216,6 +221,31 @@ fn test_bevy_input_resources(
     if keyboard_input.pressed(KeyCode::Space) {
         godot_print!("🧪 BRIDGE TEST: Space held via Bevy input system!");
     }
+
+    // Test gamepad inputs via Bevy's standard resources
+    if gamepad_input.just_pressed(GamepadButton::South) {
+        godot_print!(
+            "🧪 BRIDGE TEST: Gamepad A button detected via Bevy's ButtonInput<GamepadButton>!"
+        );
+    }
+
+    if gamepad_input.just_pressed(GamepadButton::East) {
+        godot_print!(
+            "🧪 BRIDGE TEST: Gamepad B button detected via Bevy's ButtonInput<GamepadButton>!"
+        );
+    }
+
+    // Test gamepad axes
+    let left_stick_x = gamepad_axes.get(GamepadAxis::LeftStickX).unwrap_or(0.0);
+    let left_stick_y = gamepad_axes.get(GamepadAxis::LeftStickY).unwrap_or(0.0);
+
+    if left_stick_x.abs() > 0.5 || left_stick_y.abs() > 0.5 {
+        godot_print!(
+            "🧪 BRIDGE TEST: Left stick via Bevy Axis: ({:.2}, {:.2})",
+            left_stick_x,
+            left_stick_y
+        );
+    }
 }
 
 #[derive(Component)]
@@ -224,14 +254,17 @@ struct Player;
 fn spawn_player(mut commands: Commands) {
     godot_print!("🎮 Spawning player with leafwing-input-manager!");
 
-    // Create input map using Bevy's KeyCode (which now works via our bridge!)
-    let input_map = InputMap::new([
+    // Create input map using Bevy's KeyCode and GamepadButton (which now works via our bridge!)
+    let mut input_map = InputMap::new([
         (PlayerAction::Jump, KeyCode::Space),
         (PlayerAction::Shoot, KeyCode::KeyF),
         (PlayerAction::MoveLeft, KeyCode::KeyA),
         (PlayerAction::MoveRight, KeyCode::KeyD),
         (PlayerAction::Sprint, KeyCode::ShiftLeft),
     ]);
+
+    // Add gamepad button mapping separately
+    input_map.insert(PlayerAction::GamepadAction, GamepadButton::South);
 
     commands.spawn((Player, input_map, ActionState::<PlayerAction>::default()));
 }
@@ -260,6 +293,10 @@ fn test_leafwing_input(query: Query<&ActionState<PlayerAction>, With<Player>>) {
 
     if action_state.pressed(&PlayerAction::Sprint) {
         godot_print!("🏃 LEAFWING: Sprinting!");
+    }
+
+    if action_state.just_pressed(&PlayerAction::GamepadAction) {
+        godot_print!("🎮 LEAFWING: Gamepad A button pressed via bridge!");
     }
 }
 
