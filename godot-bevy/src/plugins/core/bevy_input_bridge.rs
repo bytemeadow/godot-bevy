@@ -1,10 +1,16 @@
 use bevy::{
     app::{App, Plugin, PostUpdate, PreUpdate},
-    ecs::{event::EventReader, system::ResMut},
+    ecs::{
+        event::{EventReader, EventWriter},
+        system::ResMut,
+    },
     input::{
         ButtonInput,
         keyboard::KeyCode,
-        mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll, MouseButton as BevyMouseButton},
+        mouse::{
+            AccumulatedMouseMotion, AccumulatedMouseScroll, MouseButton as BevyMouseButton,
+            MouseMotion as BevyMouseMotion,
+        },
     },
     math::Vec2,
 };
@@ -19,11 +25,12 @@ pub struct BevyInputBridgePlugin;
 
 impl Plugin for BevyInputBridgePlugin {
     fn build(&self, app: &mut App) {
-        // Add Bevy's standard input resources
+        // Add Bevy's standard input resources and events
         app.init_resource::<ButtonInput<KeyCode>>()
             .init_resource::<ButtonInput<BevyMouseButton>>()
             .init_resource::<AccumulatedMouseMotion>()
             .init_resource::<AccumulatedMouseScroll>()
+            .add_event::<BevyMouseMotion>()
             .add_systems(
                 PreUpdate,
                 (
@@ -69,13 +76,18 @@ fn bridge_mouse_button_input(
 
 fn bridge_mouse_motion(
     mut mouse_motion_events: EventReader<GodotMouseMotion>,
+    mut bevy_mouse_motion_events: EventWriter<BevyMouseMotion>,
     mut accumulated_motion: ResMut<AccumulatedMouseMotion>,
 ) {
     // Reset accumulated motion at the start of the frame (like Bevy does)
     accumulated_motion.delta = Vec2::ZERO;
-    
-    // Accumulate mouse motion deltas for this frame
+
+    // Send individual Bevy MouseMotion events AND accumulate for the frame
     for event in mouse_motion_events.read() {
+        // Send individual MouseMotion event (for libraries that prefer events)
+        bevy_mouse_motion_events.send(BevyMouseMotion { delta: event.delta });
+
+        // Accumulate delta for the AccumulatedMouseMotion resource
         accumulated_motion.delta += event.delta;
     }
 }
@@ -86,7 +98,7 @@ fn bridge_mouse_scroll(
 ) {
     // Reset accumulated scroll at the start of the frame (like Bevy does)
     accumulated_scroll.delta = Vec2::ZERO;
-    
+
     // Convert wheel button events to scroll accumulation for this frame
     for event in mouse_button_events.read() {
         if event.pressed {
@@ -117,7 +129,7 @@ fn update_input_resources(
     // This is what Bevy's InputPlugin normally does
     keyboard_input.clear();
     mouse_input.clear();
-    // Note: AccumulatedMouseMotion and AccumulatedMouseScroll are reset 
+    // Note: AccumulatedMouseMotion and AccumulatedMouseScroll are reset
     // at the beginning of each frame in their respective bridge systems
 }
 
