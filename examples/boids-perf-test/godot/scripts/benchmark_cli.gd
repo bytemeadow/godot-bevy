@@ -19,6 +19,8 @@ var headless: bool = false
 var start_time: float = 0.0
 var frame_times: Array[float] = []
 var is_running: bool = false
+var warmup_time: float = 0.0
+var warmup_complete: bool = true  # Default to true, set to false when starting benchmark
 
 # References
 var main_controller: Control = null
@@ -127,10 +129,6 @@ func _start_headless_benchmark():
 	print("   Boid count: %d" % boid_count)
 	print("   Duration: %.1f seconds" % duration)
 	
-	is_running = true
-	start_time = Time.get_ticks_msec() / 1000.0
-	frame_times.clear()
-	
 	# Start the appropriate implementation
 	match implementation:
 		"godot":
@@ -150,8 +148,20 @@ func _start_headless_benchmark():
 		_:
 			push_error("Unknown implementation: %s" % implementation)
 			get_tree().quit(1)
+	
+	# Wait for boids to spawn before starting measurement
+	print("⏳ Waiting for boids to spawn...")
+	_wait_for_boid_spawn()
+
+func _wait_for_boid_spawn():
+	warmup_time = 0.0
+	warmup_complete = false
 
 func _process(delta: float):
+	if not warmup_complete:
+		_handle_warmup(delta)
+		return
+	
 	if not is_running:
 		return
 	
@@ -177,6 +187,37 @@ func _process(delta: float):
 	
 	if elapsed >= duration:
 		_complete_benchmark()
+
+func _handle_warmup(delta: float):
+	warmup_time += delta
+	
+	# Check current boid count
+	var current_boid_count = 0
+	match implementation:
+		"godot":
+			if godot_boids and godot_boids.has_method("get_boid_count"):
+				current_boid_count = godot_boids.get_boid_count()
+		"bevy", "rust":
+			if bevy_boids and bevy_boids.has_method("get_boid_count"):
+				current_boid_count = bevy_boids.get_boid_count()
+	
+	# Print progress every second during warmup
+	if int(warmup_time) != int(warmup_time - delta):
+		print("⏳ Warmup: %d/%d boids spawned (%.1fs)" % [current_boid_count, boid_count, warmup_time])
+	
+	# Check if we've reached target count or timeout
+	if current_boid_count >= boid_count:
+		print("✅ Target boid count reached! Starting measurement...")
+		warmup_complete = true
+		is_running = true
+		start_time = Time.get_ticks_msec() / 1000.0
+		frame_times.clear()
+	elif warmup_time > 30.0:  # 30 second timeout
+		print("⚠️  Warmup timeout! Only spawned %d/%d boids. Starting measurement anyway..." % [current_boid_count, boid_count])
+		warmup_complete = true
+		is_running = true
+		start_time = Time.get_ticks_msec() / 1000.0
+		frame_times.clear()
 
 func _complete_benchmark():
 	print("\n🏁 Benchmark complete!")
