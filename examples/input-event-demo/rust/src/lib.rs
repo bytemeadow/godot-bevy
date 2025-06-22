@@ -10,7 +10,8 @@ use leafwing_input_manager::prelude::*;
 
 // Import input event types directly to avoid naming conflicts
 use godot_bevy::plugins::core::input_event::{
-    ActionInput, KeyboardInput, MouseButton, MouseButtonInput, MouseMotion, TouchInput,
+    ActionInput, GamepadAxisInput, GamepadButtonInput, KeyboardInput, MouseButton,
+    MouseButtonInput, MouseMotion, TouchInput,
 };
 
 // This example demonstrates godot-bevy's input event system.
@@ -53,6 +54,8 @@ impl Plugin for InputEventPlugin {
                 handle_mouse_motion,
                 handle_touch_input,
                 handle_action_input,
+                handle_gamepad_button_input,
+                handle_gamepad_axis_input,
                 test_bevy_input_resources,
             ),
         );
@@ -257,5 +260,73 @@ fn test_leafwing_input(query: Query<&ActionState<PlayerAction>, With<Player>>) {
 
     if action_state.pressed(&PlayerAction::Sprint) {
         godot_print!("🏃 LEAFWING: Sprinting!");
+    }
+}
+
+fn handle_gamepad_button_input(mut gamepad_button_events: EventReader<GamepadButtonInput>) {
+    for event in gamepad_button_events.read() {
+        let state = if event.pressed { "pressed" } else { "released" };
+
+        godot_print!(
+            "🎮 Gamepad {}: Button {} {} (pressure: {:.2})",
+            event.device,
+            event.button_index,
+            state,
+            event.pressure
+        );
+
+        // Handle common buttons
+        match event.button_index {
+            0 => {
+                // A button (South)
+                if event.pressed {
+                    godot_print!("🔴 A button pressed - Jump/Confirm!");
+                }
+            }
+            1 => {
+                // B button (East)
+                if event.pressed {
+                    godot_print!("🔵 B button pressed - Back/Cancel!");
+                }
+            }
+            2 => {
+                // X button (West)
+                if event.pressed {
+                    godot_print!("🟩 X button pressed - Action!");
+                }
+            }
+            3 => {
+                // Y button (North)
+                if event.pressed {
+                    godot_print!("🟨 Y button pressed - Menu!");
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn handle_gamepad_axis_input(mut gamepad_axis_events: EventReader<GamepadAxisInput>) {
+    for event in gamepad_axis_events.read() {
+        // Only log significant axis movements to avoid spam
+        if event.value.abs() > 0.1 {
+            godot_print!(
+                "🕹️ Gamepad {}: Axis {} = {:.2}",
+                event.device,
+                event.axis,
+                event.value
+            );
+
+            // Handle common axes
+            match event.axis {
+                0 => godot_print!("⬅️➡️ Left stick X: {:.2}", event.value),
+                1 => godot_print!("⬆️⬇️ Left stick Y: {:.2}", event.value),
+                2 => godot_print!("⬅️➡️ Right stick X: {:.2}", event.value),
+                3 => godot_print!("⬆️⬇️ Right stick Y: {:.2}", event.value),
+                4 => godot_print!("🎯 Left trigger: {:.2}", event.value),
+                5 => godot_print!("🎯 Right trigger: {:.2}", event.value),
+                _ => {}
+            }
+        }
     }
 }

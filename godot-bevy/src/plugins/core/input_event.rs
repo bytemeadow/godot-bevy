@@ -10,11 +10,11 @@ use bevy::{
 };
 use godot::{
     classes::{
-        InputEvent as GodotInputEvent, InputEventKey, InputEventMouseButton, InputEventMouseMotion,
-        InputEventScreenTouch,
+        InputEvent as GodotInputEvent, InputEventJoypadButton, InputEventJoypadMotion,
+        InputEventKey, InputEventMouseButton, InputEventMouseMotion, InputEventScreenTouch,
     },
     global::Key,
-    obj::Gd,
+    obj::{EngineEnum, Gd},
 };
 
 pub struct GodotInputEventPlugin;
@@ -26,7 +26,9 @@ impl Plugin for GodotInputEventPlugin {
             .add_event::<MouseButtonInput>()
             .add_event::<MouseMotion>()
             .add_event::<TouchInput>()
-            .add_event::<ActionInput>();
+            .add_event::<ActionInput>()
+            .add_event::<GamepadButtonInput>()
+            .add_event::<GamepadAxisInput>();
     }
 }
 
@@ -70,6 +72,23 @@ pub struct ActionInput {
     pub strength: f32,
 }
 
+/// Gamepad button input event (from Godot InputEventJoypadButton)
+#[derive(Debug, Event, Clone)]
+pub struct GamepadButtonInput {
+    pub device: i32,
+    pub button_index: i32,
+    pub pressed: bool,
+    pub pressure: f32,
+}
+
+/// Gamepad axis input event (from Godot InputEventJoypadMotion)
+#[derive(Debug, Event, Clone)]
+pub struct GamepadAxisInput {
+    pub device: i32,
+    pub axis: i32,
+    pub value: f32,
+}
+
 /// Mouse button types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MouseButton {
@@ -108,6 +127,8 @@ fn write_input_events(
     mut mouse_motion_events: EventWriter<MouseMotion>,
     mut touch_events: EventWriter<TouchInput>,
     mut action_events: EventWriter<ActionInput>,
+    mut gamepad_button_events: EventWriter<GamepadButtonInput>,
+    mut gamepad_axis_events: EventWriter<GamepadAxisInput>,
 ) {
     for (event_type, input_event) in events.0.try_iter() {
         trace!("Processing {:?} input event", event_type);
@@ -125,6 +146,8 @@ fn write_input_events(
                     &mut mouse_button_events,
                     &mut mouse_motion_events,
                     &mut touch_events,
+                    &mut gamepad_button_events,
+                    &mut gamepad_axis_events,
                 );
             }
         }
@@ -146,6 +169,8 @@ fn extract_input_events_no_actions(
     mouse_button_events: &mut EventWriter<MouseButtonInput>,
     mouse_motion_events: &mut EventWriter<MouseMotion>,
     touch_events: &mut EventWriter<TouchInput>,
+    gamepad_button_events: &mut EventWriter<GamepadButtonInput>,
+    gamepad_axis_events: &mut EventWriter<GamepadAxisInput>,
 ) {
     extract_basic_input_events(
         input_event,
@@ -153,6 +178,8 @@ fn extract_input_events_no_actions(
         mouse_button_events,
         mouse_motion_events,
         touch_events,
+        gamepad_button_events,
+        gamepad_axis_events,
     );
 }
 
@@ -162,6 +189,8 @@ fn extract_basic_input_events(
     mouse_button_events: &mut EventWriter<MouseButtonInput>,
     mouse_motion_events: &mut EventWriter<MouseMotion>,
     touch_events: &mut EventWriter<TouchInput>,
+    gamepad_button_events: &mut EventWriter<GamepadButtonInput>,
+    gamepad_axis_events: &mut EventWriter<GamepadAxisInput>,
 ) {
     // Try to cast to specific input event types and extract data
 
@@ -199,6 +228,27 @@ fn extract_basic_input_events(
             finger_id: touch_event.get_index(),
             position: Vec2::new(position.x, position.y),
             pressed: touch_event.is_pressed(),
+        });
+    }
+    // Gamepad button input
+    else if let Ok(gamepad_button_event) =
+        input_event.clone().try_cast::<InputEventJoypadButton>()
+    {
+        gamepad_button_events.write(GamepadButtonInput {
+            device: gamepad_button_event.get_device(),
+            button_index: gamepad_button_event.get_button_index().ord(),
+            pressed: gamepad_button_event.is_pressed(),
+            pressure: gamepad_button_event.get_pressure(),
+        });
+    }
+    // Gamepad axis input
+    else if let Ok(gamepad_motion_event) =
+        input_event.clone().try_cast::<InputEventJoypadMotion>()
+    {
+        gamepad_axis_events.write(GamepadAxisInput {
+            device: gamepad_motion_event.get_device(),
+            axis: gamepad_motion_event.get_axis().ord(),
+            value: gamepad_motion_event.get_axis_value(),
         });
     }
 }
