@@ -22,6 +22,7 @@ pub use crate::plugins::{
         AudioStreamPlayer2DMarker,
         AudioStreamPlayer3DMarker,
         AudioStreamPlayerMarker,
+        BevyInputBridgePlugin,
         ButtonMarker,
         Camera2DMarker,
         Camera3DMarker,

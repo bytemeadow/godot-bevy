@@ -27,6 +27,9 @@ pub use signals::*;
 pub mod input_event;
 pub use input_event::*;
 
+pub mod bevy_input_bridge;
+pub use bevy_input_bridge::*;
+
 pub mod node_markers;
 pub use node_markers::*;
 
@@ -134,6 +137,7 @@ impl Plugin for GodotCorePlugin {
             .add_plugins(GodotCollisionsPlugin)
             .add_plugins(GodotSignalsPlugin)
             .add_plugins(GodotInputEventPlugin)
+            .add_plugins(BevyInputBridgePlugin)
             .init_resource::<PhysicsDelta>()
             .init_resource::<GodotTransformConfig>();
 

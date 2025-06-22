@@ -37,6 +37,7 @@ impl Plugin for InputEventPlugin {
                 handle_mouse_motion,
                 handle_touch_input,
                 handle_action_input,
+                test_bevy_input_resources,
             ),
         );
     }
@@ -168,5 +169,32 @@ fn handle_action_input(mut action_events: EventReader<ActionInput>) {
             }
             _ => {}
         }
+    }
+}
+
+fn test_bevy_input_resources(
+    keyboard_input: Res<bevy::input::ButtonInput<bevy::input::keyboard::KeyCode>>,
+    mouse_input: Res<bevy::input::ButtonInput<bevy::input::mouse::MouseButton>>,
+) {
+    use bevy::input::keyboard::KeyCode;
+    use bevy::input::mouse::MouseButton;
+
+    // Test some common keys using Bevy's standard input resources
+    if keyboard_input.just_pressed(KeyCode::KeyT) {
+        godot_print!("🧪 BRIDGE TEST: 'T' key detected via Bevy's ButtonInput<KeyCode>!");
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyB) {
+        godot_print!("🧪 BRIDGE TEST: 'B' key detected via Bevy's ButtonInput<KeyCode>!");
+    }
+
+    if mouse_input.just_pressed(MouseButton::Left) {
+        godot_print!(
+            "🧪 BRIDGE TEST: Left mouse button detected via Bevy's ButtonInput<MouseButton>!"
+        );
+    }
+
+    if keyboard_input.pressed(KeyCode::Space) {
+        godot_print!("🧪 BRIDGE TEST: Space held via Bevy input system!");
     }
 }

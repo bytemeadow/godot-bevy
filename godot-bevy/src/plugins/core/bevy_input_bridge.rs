@@ -1,0 +1,181 @@
+use bevy::{
+    app::{App, Plugin, PostUpdate, PreUpdate},
+    ecs::{event::EventReader, system::ResMut},
+    input::{
+        ButtonInput, keyboard::KeyCode, mouse::MouseButton as BevyMouseButton, touch::Touches,
+    },
+};
+
+use crate::plugins::core::input_event::{
+    KeyboardInput as GodotKeyboardInput, MouseButton as GodotMouseButton,
+    MouseButtonInput as GodotMouseButtonInput, TouchInput as GodotTouchInput,
+};
+
+/// Plugin that bridges godot-bevy's input events to Bevy's standard input resources.
+/// This allows libraries like leafwing-input-manager to work with godot-bevy.
+pub struct BevyInputBridgePlugin;
+
+impl Plugin for BevyInputBridgePlugin {
+    fn build(&self, app: &mut App) {
+        // Add Bevy's standard input resources
+        app.init_resource::<ButtonInput<KeyCode>>()
+            .init_resource::<ButtonInput<BevyMouseButton>>()
+            .init_resource::<Touches>()
+            .add_systems(
+                PreUpdate,
+                (
+                    bridge_keyboard_input,
+                    bridge_mouse_button_input,
+                    bridge_touch_input,
+                ),
+            )
+            .add_systems(PostUpdate, update_input_resources);
+    }
+}
+
+fn bridge_keyboard_input(
+    mut keyboard_events: EventReader<GodotKeyboardInput>,
+    mut key_code_input: ResMut<ButtonInput<KeyCode>>,
+) {
+    for event in keyboard_events.read() {
+        // Convert Godot Key to Bevy KeyCode
+        if let Some(bevy_key_code) = godot_key_to_bevy_keycode(event.keycode) {
+            if event.pressed {
+                key_code_input.press(bevy_key_code);
+            } else {
+                key_code_input.release(bevy_key_code);
+            }
+        }
+    }
+}
+
+fn bridge_mouse_button_input(
+    mut mouse_events: EventReader<GodotMouseButtonInput>,
+    mut mouse_input: ResMut<ButtonInput<BevyMouseButton>>,
+) {
+    for event in mouse_events.read() {
+        let bevy_button = godot_mouse_to_bevy_mouse(event.button);
+        if event.pressed {
+            mouse_input.press(bevy_button);
+        } else {
+            mouse_input.release(bevy_button);
+        }
+    }
+}
+
+fn bridge_touch_input(
+    mut touch_events: EventReader<GodotTouchInput>,
+    mut touches: ResMut<Touches>,
+) {
+    for event in touch_events.read() {
+        let id = event.finger_id as u64;
+
+        if event.pressed {
+            // Note: Bevy's Touches API doesn't expose direct add methods
+            // We need to send TouchInput events instead
+            // For now, we'll skip touch bridging until we can properly implement it
+        } else {
+            touches.release(id);
+        }
+    }
+}
+
+fn update_input_resources(
+    mut keyboard_input: ResMut<ButtonInput<KeyCode>>,
+    mut mouse_input: ResMut<ButtonInput<BevyMouseButton>>,
+    mut _touches: ResMut<Touches>,
+) {
+    // Clear just_pressed/just_released states at the end of each frame
+    // This is what Bevy's InputPlugin normally does
+    keyboard_input.clear();
+    mouse_input.clear();
+    // Note: Touches has a different API - it handles clearing internally via events
+    // For now we'll skip manual clearing since our touch implementation is incomplete
+}
+
+// Conversion functions
+fn godot_key_to_bevy_keycode(godot_key: godot::global::Key) -> Option<KeyCode> {
+    use KeyCode as BK;
+    use godot::global::Key as GK;
+
+    match godot_key {
+        GK::A => Some(BK::KeyA),
+        GK::B => Some(BK::KeyB),
+        GK::C => Some(BK::KeyC),
+        GK::D => Some(BK::KeyD),
+        GK::E => Some(BK::KeyE),
+        GK::F => Some(BK::KeyF),
+        GK::G => Some(BK::KeyG),
+        GK::H => Some(BK::KeyH),
+        GK::I => Some(BK::KeyI),
+        GK::J => Some(BK::KeyJ),
+        GK::K => Some(BK::KeyK),
+        GK::L => Some(BK::KeyL),
+        GK::M => Some(BK::KeyM),
+        GK::N => Some(BK::KeyN),
+        GK::O => Some(BK::KeyO),
+        GK::P => Some(BK::KeyP),
+        GK::Q => Some(BK::KeyQ),
+        GK::R => Some(BK::KeyR),
+        GK::S => Some(BK::KeyS),
+        GK::T => Some(BK::KeyT),
+        GK::U => Some(BK::KeyU),
+        GK::V => Some(BK::KeyV),
+        GK::W => Some(BK::KeyW),
+        GK::X => Some(BK::KeyX),
+        GK::Y => Some(BK::KeyY),
+        GK::Z => Some(BK::KeyZ),
+
+        GK::KEY_0 => Some(BK::Digit0),
+        GK::KEY_1 => Some(BK::Digit1),
+        GK::KEY_2 => Some(BK::Digit2),
+        GK::KEY_3 => Some(BK::Digit3),
+        GK::KEY_4 => Some(BK::Digit4),
+        GK::KEY_5 => Some(BK::Digit5),
+        GK::KEY_6 => Some(BK::Digit6),
+        GK::KEY_7 => Some(BK::Digit7),
+        GK::KEY_8 => Some(BK::Digit8),
+        GK::KEY_9 => Some(BK::Digit9),
+
+        GK::SPACE => Some(BK::Space),
+        GK::ENTER => Some(BK::Enter),
+        GK::ESCAPE => Some(BK::Escape),
+        GK::BACKSPACE => Some(BK::Backspace),
+        GK::TAB => Some(BK::Tab),
+        GK::SHIFT => Some(BK::ShiftLeft),
+        GK::CTRL => Some(BK::ControlLeft),
+        GK::ALT => Some(BK::AltLeft),
+
+        GK::LEFT => Some(BK::ArrowLeft),
+        GK::RIGHT => Some(BK::ArrowRight),
+        GK::UP => Some(BK::ArrowUp),
+        GK::DOWN => Some(BK::ArrowDown),
+
+        GK::F1 => Some(BK::F1),
+        GK::F2 => Some(BK::F2),
+        GK::F3 => Some(BK::F3),
+        GK::F4 => Some(BK::F4),
+        GK::F5 => Some(BK::F5),
+        GK::F6 => Some(BK::F6),
+        GK::F7 => Some(BK::F7),
+        GK::F8 => Some(BK::F8),
+        GK::F9 => Some(BK::F9),
+        GK::F10 => Some(BK::F10),
+        GK::F11 => Some(BK::F11),
+        GK::F12 => Some(BK::F12),
+
+        _ => None, // Many keys don't have direct equivalents
+    }
+}
+
+fn godot_mouse_to_bevy_mouse(godot_button: GodotMouseButton) -> BevyMouseButton {
+    match godot_button {
+        GodotMouseButton::Left => BevyMouseButton::Left,
+        GodotMouseButton::Right => BevyMouseButton::Right,
+        GodotMouseButton::Middle => BevyMouseButton::Middle,
+        GodotMouseButton::Extra1 => BevyMouseButton::Back,
+        GodotMouseButton::Extra2 => BevyMouseButton::Forward,
+        // Note: Bevy doesn't have wheel events as buttons
+        _ => BevyMouseButton::Other(255),
+    }
+}
