@@ -59,10 +59,10 @@ pub fn connect_godot_signal(
 
     let node_clone = node.clone();
 
-    // Revert to working approach but use correct binding for input_event
+    // Route to specific handlers for signals with arguments, generic handler for others
     match signal_name {
         "input_event" => {
-            // For input_event, use a callable that directly connects the signal arguments
+            // For input_event, use specific handler that captures all 3 signal arguments
             node.connect(
                 signal_name,
                 &signal_watcher
@@ -70,14 +70,32 @@ pub fn connect_godot_signal(
                     .bind(&[node_clone.to_variant()]),
             );
         }
+        "body_entered" => {
+            // For body_entered, use specific handler that captures the body argument
+            node.connect(
+                signal_name,
+                &signal_watcher
+                    .callable("body_entered")
+                    .bind(&[node_clone.to_variant()]),
+            );
+        }
+        "area_entered" => {
+            // For area_entered, use specific handler that captures the area argument
+            node.connect(
+                signal_name,
+                &signal_watcher
+                    .callable("area_entered")
+                    .bind(&[node_clone.to_variant()]),
+            );
+        }
         _ => {
-            // For other signals, use the standard event handler with binding
+            // For other signals without arguments, use generic event handler
             node.connect(
                 signal_name,
                 &signal_watcher.callable("event").bind(&[
-                    signal_watcher.to_variant(),
-                    node_clone.to_variant(),
-                    signal_name.to_variant(),
+                    node_clone.to_variant(),  // origin
+                    node_clone.to_variant(),  // target
+                    signal_name.to_variant(), // signal name
                 ]),
             );
         }

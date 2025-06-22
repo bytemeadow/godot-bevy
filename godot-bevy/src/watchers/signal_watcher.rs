@@ -38,6 +38,42 @@ impl GodotSignalWatcher {
     }
 
     #[func]
+    pub fn body_entered(&self, body: Gd<Node>, source_node: Gd<Node>) {
+        if let Some(channel) = self.notification_channel.as_ref() {
+            let args = vec![crate::plugins::core::variant_to_signal_argument(
+                &body.to_variant(),
+            )];
+
+            let source_handle = GodotNodeHandle::from_instance_id(source_node.instance_id());
+
+            let _ = channel.send(GodotSignal {
+                name: "body_entered".to_string(),
+                origin: source_handle.clone(),
+                target: source_handle,
+                arguments: args,
+            });
+        }
+    }
+
+    #[func]
+    pub fn area_entered(&self, area: Gd<Node>, source_node: Gd<Node>) {
+        if let Some(channel) = self.notification_channel.as_ref() {
+            let args = vec![crate::plugins::core::variant_to_signal_argument(
+                &area.to_variant(),
+            )];
+
+            let source_handle = GodotNodeHandle::from_instance_id(source_node.instance_id());
+
+            let _ = channel.send(GodotSignal {
+                name: "area_entered".to_string(),
+                origin: source_handle.clone(),
+                target: source_handle,
+                arguments: args,
+            });
+        }
+    }
+
+    #[func]
     pub fn handle_input_event(
         &self,
         viewport: Gd<Node>,
