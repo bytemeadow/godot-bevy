@@ -262,7 +262,7 @@ jobs:
         working-directory: examples/boids-perf-test
         run: |
           # Run quick benchmark for CI
-          if python3 regression_test.py --godot "$GODOT_EXECUTABLE"; then
+          if python3 regression_test.py --boids 500 1000 2000 5000 10000 20000 --godot "$GODOT_EXECUTABLE"; then
             echo "benchmark_success=true" >> $GITHUB_OUTPUT
           else
             echo "benchmark_success=false" >> $GITHUB_OUTPUT
@@ -279,7 +279,7 @@ jobs:
             if jq -e '.ci_metadata' main-baseline.json > /dev/null; then
               echo "Found CI-generated baseline from commit $(jq -r '.ci_metadata.commit' main-baseline.json)"
               echo "Checking for performance regression against main branch..."
-              python3 regression_test.py --baseline main-baseline.json --threshold 0.85 --godot "$GODOT_EXECUTABLE" || {
+              python3 regression_test.py --boids 500 1000 2000 5000 10000 20000 --baseline main-baseline.json --threshold 0.85 --godot "$GODOT_EXECUTABLE" || {
                 echo "::warning::Performance regression detected! Bevy implementation performance dropped more than 15%"
                 exit 1
               }
