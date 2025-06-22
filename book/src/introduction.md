@@ -1,6 +1,6 @@
 # Introduction
 
-Welcome to **godot-bevy**, a Rust library that brings [Bevy's](https://bevyengine.org/) powerful Entity Component System (ECS) to the versatile [Godot Game Engine](https://godotengine.org/). 
+Welcome to **godot-bevy**, a Rust library that brings [Bevy's](https://bevyengine.org/) powerful Entity Component System (ECS) to the versatile [Godot Game Engine](https://godotengine.org/).
 
 ## What is godot-bevy?
 
@@ -43,8 +43,8 @@ This library is ideal for:
 
 - **Discord**: Join our [community Discord](https://discord.gg/gqkeBsH93H)
 - **Documentation**: Check the [API docs](https://docs.rs/godot-bevy/latest/godot_bevy/)
-- **Examples**: Browse the [example projects](https://github.com/dcvz/godot-bevy/tree/main/examples)
-- **Issues**: Report bugs on [GitHub](https://github.com/dcvz/godot-bevy/issues)
+- **Examples**: Browse the [example projects](https://github.com/bytemeadow/godot-bevy/tree/main/examples)
+- **Issues**: Report bugs on [GitHub](https://github.com/bytemeadow/godot-bevy/issues)
 
 ## Ready to Get Started?
 

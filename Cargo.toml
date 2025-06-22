@@ -2,7 +2,7 @@
 version = "0.7.0"
 edition = "2024"
 authors = ["David Chavez <david@dcvz.io>"]
-repository = "https://github.com/dcvz/godot-bevy"
+repository = "https://github.com/bytemeadow/godot-bevy"
 keywords = ["godot", "game", "engine", "gamedev", "graphics"]
 categories = ["game-engines"]
 license = "MIT OR Apache-2.0"

@@ -87,6 +87,11 @@ echo ""
 # First ensure the Rust library is built
 echo "🔨 Building Rust library..."
 cd rust
+# for unknown reasons, both the debug and release dynamic libraries must be present;
+# otherwise, when we attempt to run the exported godot binary, we'll see spurious
+# warning messages despite the benchmark actually running fine; hence, we just
+# build both:
+cargo build
 cargo build --release
 cd ..
 

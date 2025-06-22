@@ -39,7 +39,7 @@ fn build_app(app: &mut App) {
     // parameter that is synchronized with the Godot `_physics_process` update cycle.
     //
     // Read more about other schedules provided by Godot-Bevy here:
-    // (https://github.com/dcvz/godot-bevy/blob/main/docs/TIMING_AND_SCHEDULES.md).
+    // (https://bytemeadow.github.io/godot-bevy/scene-tree/timing.html).
     app.add_systems(Update, (orbit_setup, orbit_system).chain());
 }
 

@@ -100,6 +100,12 @@ pub struct BoidsPlugin;
 
 impl Plugin for BoidsPlugin {
     fn build(&self, app: &mut App) {
+        if cfg!(debug_assertions) {
+            warn!("Running a debug build, performance will be significantly worse than release");
+        } else {
+            info!("Running a release build");
+        };
+
         app.add_plugins(
             AutomaticUpdate::<Boid>::new()
                 .with_spatial_ds(SpatialStructure::KDTree2)

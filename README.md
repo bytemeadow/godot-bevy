@@ -4,7 +4,7 @@
 [![Current Crates.io Version](https://img.shields.io/crates/v/godot-bevy.svg)](https://crates.io/crates/godot-bevy)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue)](https://docs.rs/godot-bevy/latest/godot_bevy/)
 [![Book](https://img.shields.io/badge/book-read-green)](https://godot-rust.github.io/godot-bevy)
-[![Test Status](https://github.com/dcvz/godot-bevy/actions/workflows/ci.yml/badge.svg)](https://github.com/dcvz/godot-bevy/actions/workflows/ci.yml)
+[![Test Status](https://github.com/bytemeadow/godot-bevy/actions/workflows/ci.yml/badge.svg)](https://github.com/bytemeadow/godot-bevy/actions/workflows/ci.yml)
 [![Rust Version](https://img.shields.io/badge/Rust-1.87.0+-blue)](https://releases.rs/docs/1.87.0)
 ![license](https://shields.io/badge/license-MIT%2FApache--2.0-blue)
 
@@ -28,11 +28,11 @@ _Special thanks to [Blaze](https://runblaze.dev) for their support of this proje
 
 ## 📚 Documentation
 
-**[Read the godot-bevy Book →](https://dcvz.github.io/godot-bevy)**
+**[Read the godot-bevy Book →](https://bytemeadow.github.io/godot-bevy)**
 
 The book covers everything you need to know:
 - Installation and setup
-- Core concepts and architecture  
+- Core concepts and architecture
 - Transform system and physics
 - Input handling
 - Examples and best practices
@@ -69,7 +69,7 @@ fn build_app(app: &mut App) {
     // It runs the system during Godot's `_process` update cycle.
     //
     // Read more about other schedules provided by Godot-Bevy here:
-    // (https://github.com/dcvz/godot-bevy/blob/main/docs/TIMING_AND_SCHEDULES.md).
+    // (https://github.com/bytemeadow/godot-bevy/blob/main/docs/TIMING_AND_SCHEDULES.md).
     app.add_systems(Update, position_system);
 }
 
@@ -103,7 +103,7 @@ Check out the [examples](./examples) directory:
 
 This library is inspired by and builds upon the work of [bevy_godot](https://github.com/rand0m-cloud/bevy_godot), which provided similar functionality for Godot 3. `godot-bevy` extends this concept to support Godot 4 and Bevy 0.16.
 
-**Alternative**: If you're looking for a different approach to `godot-bevy`, check out [bevy_godot4](https://github.com/jrockett6/bevy_godot4). For a comparison of the differences between these libraries, see [Issue #2](https://github.com/dcvz/godot-bevy/issues/2).
+**Alternative**: If you're looking for a different approach to `godot-bevy`, check out [bevy_godot4](https://github.com/jrockett6/bevy_godot4). For a comparison of the differences between these libraries, see [Issue #2](https://github.com/bytemeadow/godot-bevy/issues/2).
 
 ## ⊹ Version Compatibility Matrix
 
@@ -117,7 +117,7 @@ The minimum supported Rust version is 1.87.0.
 
 The MSRV is the minimum Rust version that can be used to compile each crate.
 
-## 📕 License 
+## 📕 License
 
 godot-bevy is distributed under the terms of both the MIT license and the Apache License (Version 2.0).
 See [LICENSE-APACHE](./LICENSE-APACHE) and [LICENSE-MIT](./LICENSE-MIT) for details. Opening a pull
