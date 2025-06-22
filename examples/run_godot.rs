@@ -66,7 +66,7 @@ fn update_gdextension_for_release(path: &Path) -> Result<String, std::io::Error>
         }
     }
 
-    let modified_content = lines.join("\n");
+    let modified_content = lines.join("\n") + "\n";
     fs::write(path, &modified_content)?;
 
     Ok(original_content)
