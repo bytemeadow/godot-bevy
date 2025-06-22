@@ -93,13 +93,51 @@ jobs:
             target/release/deps/*rust*${{ matrix.extension }}
           if-no-files-found: error
 
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      benchmark: ${{ steps.filter.outputs.benchmark }}
+      dodge-the-creeps-2d: ${{ steps.filter.outputs.dodge-the-creeps-2d }}
+      platformer-2d: ${{ steps.filter.outputs.platformer-2d }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            benchmark:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/boids-perf-test/**'
+              - '.github/workflows/ci.yml'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            dodge-the-creeps-2d:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/dodge-the-creeps-2d/**'
+              - '.github/workflows/ci.yml'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            platformer-2d:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/platformer-2d/**'
+              - '.github/workflows/ci.yml'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+
   examples:
     name: build / ${{ matrix.example }}
     runs-on: blaze/macos-latest
-    needs: rust
+    needs: [rust, changes]
+    if: |
+      needs.changes.outputs.dodge-the-creeps-2d == 'true' ||
+      needs.changes.outputs.platformer-2d == 'true'
     strategy:
       matrix:
-        example: [dodge-the-creeps-2d, platformer-2d]
+        example: ${{ fromJson(needs.changes.outputs.dodge-the-creeps-2d == 'true' && needs.changes.outputs.platformer-2d == 'true' && '["dodge-the-creeps-2d", "platformer-2d"]' || needs.changes.outputs.dodge-the-creeps-2d == 'true' && '["dodge-the-creeps-2d"]' || '["platformer-2d"]') }}
 
     steps:
       - name: Checkout code
@@ -154,23 +192,6 @@ jobs:
           name: ${{ matrix.example }}-exports
           path: examples/${{ matrix.example }}/godot/exports/
           if-no-files-found: error
-
-  changes:
-    name: detect changes
-    runs-on: ubuntu-latest
-    outputs:
-      benchmark: ${{ steps.filter.outputs.benchmark }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            benchmark:
-              - 'godot-bevy/**'
-              - 'godot-bevy-macros/**'
-              - 'examples/boids-perf-test/**'
-              - '.github/workflows/ci.yml'
 
   benchmark:
     name: performance / boids benchmark
@@ -248,7 +269,7 @@ jobs:
             exit 1
           fi
 
-      - name: Check for regression  
+      - name: Check for regression
         if: github.event_name == 'pull_request' && steps.benchmark.outputs.benchmark_success == 'true'
         working-directory: examples/boids-perf-test
         run: |
