@@ -8,7 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  GODOT_VERSION: "4.3"
+  GODOT_VERSION: "4.4.1"
 
 permissions:
   contents: read
