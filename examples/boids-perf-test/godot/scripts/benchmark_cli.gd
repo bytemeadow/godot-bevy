@@ -212,12 +212,16 @@ func _handle_warmup(delta: float):
 		is_running = true
 		start_time = Time.get_ticks_msec() / 1000.0
 		frame_times.clear()
-	elif warmup_time > 30.0:  # 30 second timeout
+	elif warmup_time > _get_warmup_timeout():
 		print("⚠️  Warmup timeout! Only spawned %d/%d boids. Starting measurement anyway..." % [current_boid_count, boid_count])
 		warmup_complete = true
 		is_running = true
 		start_time = Time.get_ticks_msec() / 1000.0
 		frame_times.clear()
+
+func _get_warmup_timeout() -> float:
+	# Scale timeout based on boid count - larger counts need more time
+	return min(120.0, max(30.0, boid_count / 200.0))  # 30-120s based on boid count
 
 func _complete_benchmark():
 	print("\n🏁 Benchmark complete!")
