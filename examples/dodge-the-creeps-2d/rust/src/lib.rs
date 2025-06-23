@@ -8,6 +8,7 @@ use godot_bevy::prelude::{
     *,
 };
 
+mod commands;
 mod gameplay;
 mod main_menu;
 mod nodes;
@@ -27,6 +28,7 @@ fn build_app(app: &mut App) {
                 .load_collection::<GameAudio>(),
         )
         .init_resource::<Score>()
+        .add_plugins(commands::CommandSystemPlugin)
         .add_plugins(main_menu::MainMenuPlugin)
         .add_plugins(gameplay::GameplayPlugin);
 }

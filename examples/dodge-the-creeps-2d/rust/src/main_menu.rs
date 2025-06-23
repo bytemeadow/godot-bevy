@@ -1,18 +1,25 @@
 use bevy::{
     app::{App, Plugin, Update},
-    ecs::{event::EventReader, resource::Resource, schedule::IntoScheduleConfigs, system::ResMut},
+    ecs::{
+        event::{EventReader, EventWriter},
+        resource::Resource,
+        schedule::IntoScheduleConfigs,
+        system::ResMut,
+    },
     state::{
         condition::in_state,
         state::{NextState, OnEnter, OnExit},
     },
 };
-use godot::classes::Button;
 use godot_bevy::{
     bridge::GodotNodeHandle,
-    prelude::{GodotSignal, GodotSignals, NodeTreeView, SceneTreeRef},
+    prelude::{connect_godot_signal, GodotSignal, MainThreadAccess, NodeTreeView, SceneTreeRef},
 };
 
-use crate::GameState;
+use crate::{
+    commands::{UICommand, UIElement, UIHandles},
+    GameState,
+};
 
 #[derive(Resource, Default)]
 pub struct MenuAssets {
@@ -52,16 +59,34 @@ pub struct MenuUi {
     pub score_label: GodotNodeHandle,
 }
 
-fn init_menu_assets(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTreeRef) {
+fn init_menu_assets(
+    mut menu_assets: ResMut<MenuAssets>,
+    mut ui_handles: ResMut<UIHandles>,
+    mut scene_tree: SceneTreeRef,
+    _main_thread: MainThreadAccess,
+) {
     let menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap());
 
     menu_assets.message_label = Some(menu_ui.message_label.clone());
     menu_assets.start_button = Some(menu_ui.start_button.clone());
     menu_assets.score_label = Some(menu_ui.score_label.clone());
+
+    // Initialize UI handles for command system
+    ui_handles.start_button = Some(menu_ui.start_button.clone());
+    ui_handles.score_label = Some(menu_ui.score_label.clone());
+    ui_handles.message_label = Some(menu_ui.message_label.clone());
 }
 
-fn connect_start_button(mut menu_assets: ResMut<MenuAssets>, signals: GodotSignals) {
-    signals.connect(menu_assets.start_button.as_mut().unwrap(), "pressed");
+fn connect_start_button(
+    mut menu_assets: ResMut<MenuAssets>,
+    mut scene_tree: SceneTreeRef,
+    _main_thread: MainThreadAccess,
+) {
+    connect_godot_signal(
+        menu_assets.start_button.as_mut().unwrap(),
+        "pressed",
+        &mut scene_tree,
+    );
 }
 
 fn listen_for_start_button(
@@ -75,14 +100,16 @@ fn listen_for_start_button(
     }
 }
 
-fn hide_play_button(menu_assets: ResMut<MenuAssets>) {
-    if let Some(mut start_button) = menu_assets.start_button.clone() {
-        start_button.get::<Button>().set_visible(false);
-    }
+fn hide_play_button(mut ui_commands: EventWriter<UICommand>) {
+    ui_commands.write(UICommand::SetVisible {
+        target: UIElement::StartButton,
+        visible: false,
+    });
 }
 
-fn show_play_button(menu_assets: ResMut<MenuAssets>) {
-    if let Some(mut start_button) = menu_assets.start_button.clone() {
-        start_button.get::<Button>().set_visible(true);
-    }
+fn show_play_button(mut ui_commands: EventWriter<UICommand>) {
+    ui_commands.write(UICommand::SetVisible {
+        target: UIElement::StartButton,
+        visible: true,
+    });
 }

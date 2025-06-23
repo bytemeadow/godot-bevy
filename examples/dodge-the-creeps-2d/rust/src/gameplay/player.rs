@@ -3,11 +3,15 @@ use bevy::prelude::*;
 use bevy_asset_loader::asset_collection::AssetCollection;
 use godot::{
     builtin::{StringName, Vector2},
-    classes::{AnimatedSprite2D, Input, Node2D},
+    classes::{Input, Node2D},
 };
 use godot_bevy::{plugins::core::PhysicsDelta, prelude::*};
 
-use crate::{nodes::player::Player as GodotPlayerNode, GameState};
+use crate::{
+    commands::{AnimationState, CachedScreenSize, VisibilityState},
+    nodes::player::Player as GodotPlayerNode,
+    GameState,
+};
 
 #[derive(AssetCollection, Resource, Debug)]
 pub struct PlayerAssets {
@@ -57,27 +61,38 @@ fn player_on_ready(
         (Entity, &mut Player, &mut GodotNodeHandle),
         (With<Player>, Without<PlayerInitialized>),
     >,
+    _main_thread: MainThreadAccess,
 ) -> Result {
     if let Ok((entity, mut player_data, mut player)) = player.single_mut() {
-        let mut player = player.get::<GodotPlayerNode>();
-        player.set_visible(false);
+        let player = player.get::<GodotPlayerNode>();
+        let screen_size = player.get_viewport_rect().size;
         player_data.speed = player.bind().get_speed();
 
-        // Mark as initialized
-        commands.entity(entity).insert(PlayerInitialized);
+        // Mark as initialized and add command system components
+        commands
+            .entity(entity)
+            .insert(PlayerInitialized)
+            .insert(VisibilityState {
+                visible: false,
+                dirty: true,
+            })
+            .insert(AnimationState::default())
+            .insert(CachedScreenSize { size: screen_size });
     }
 
     Ok(())
 }
 
 fn setup_player(
-    mut player: Query<(&mut GodotNodeHandle, &mut Transform2D), With<Player>>,
+    mut player: Query<(Entity, &mut VisibilityState, &mut Transform2D), With<Player>>,
     mut entities: Query<(&Name, &mut GodotNodeHandle), Without<Player>>,
+    _main_thread: MainThreadAccess,
 ) -> Result {
-    if let Ok((mut player, mut transform)) = player.single_mut() {
-        let mut player = player.get::<GodotPlayerNode>();
-        player.set_visible(true);
+    if let Ok((_entity, mut visibility, mut transform)) = player.single_mut() {
+        // Set player visible using command system
+        visibility.set_visible(true);
 
+        // Still need main thread access for getting start position
         let start_position = entities
             .iter_mut()
             .find_entity_by_name("StartPosition")
@@ -91,14 +106,18 @@ fn setup_player(
 }
 
 fn move_player(
-    mut player: Query<(&Player, &mut GodotNodeHandle, &mut Transform2D)>,
+    mut player: Query<(
+        &Player,
+        &CachedScreenSize,
+        &mut Transform2D,
+        &mut AnimationState,
+    )>,
     physics_delta: Res<PhysicsDelta>,
 ) -> Result {
-    if let Ok((player_data, mut player, mut transform)) = player.single_mut() {
-        let player = player.get::<GodotPlayerNode>();
-        let screen_size = player.get_viewport_rect().size;
+    if let Ok((player_data, screen_cache, mut transform, mut anim_state)) = player.single_mut() {
         let mut velocity = Vector2::ZERO;
 
+        // Input handling - can be done without Godot API calls by caching input state
         if Input::singleton().is_action_pressed("move_right") {
             velocity.x += 1.0;
         }
@@ -115,43 +134,43 @@ fn move_player(
             velocity.y -= 1.0;
         }
 
-        let mut sprite = player.get_node_as::<AnimatedSprite2D>("AnimatedSprite2D");
-
+        // Animation logic using command system
         if velocity.length() > 0.0 {
             velocity = velocity.normalized() * player_data.speed;
-            sprite.play();
 
             if velocity.x != 0.0 {
-                sprite.set_animation(&StringName::from("walk"));
-                sprite.set_flip_v(false);
-                sprite.set_flip_h(velocity.x < 0.0);
+                anim_state.play(Some(StringName::from("walk")));
+                anim_state.set_flip(velocity.x < 0.0, false);
             } else if velocity.y != 0.0 {
-                sprite.set_animation(&StringName::from("up"));
-                sprite.set_flip_v(velocity.y > 0.0);
+                anim_state.play(Some(StringName::from("up")));
+                anim_state.set_flip(false, velocity.y > 0.0);
             }
         } else {
-            sprite.stop();
+            anim_state.stop();
         }
 
+        // Transform update using cached screen size
         let mut godot_transform = transform.as_godot_mut();
         godot_transform.origin += velocity * physics_delta.delta_seconds;
-        godot_transform.origin.x = f32::min(f32::max(0.0, godot_transform.origin.x), screen_size.x);
-        godot_transform.origin.y = f32::min(f32::max(0.0, godot_transform.origin.y), screen_size.y);
+        godot_transform.origin.x =
+            f32::min(f32::max(0.0, godot_transform.origin.x), screen_cache.size.x);
+        godot_transform.origin.y =
+            f32::min(f32::max(0.0, godot_transform.origin.y), screen_cache.size.y);
     }
 
     Ok(())
 }
 
 fn check_player_death(
-    mut player: Query<(&mut GodotNodeHandle, &Collisions), With<Player>>,
+    mut player: Query<(&mut VisibilityState, &Collisions), With<Player>>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
-    if let Ok((mut player, collisions)) = player.single_mut() {
+    if let Ok((mut visibility, collisions)) = player.single_mut() {
         if collisions.colliding().is_empty() {
             return;
         }
 
-        player.get::<Node2D>().set_visible(false);
+        visibility.set_visible(false);
         next_state.set(GameState::GameOver);
     }
 }

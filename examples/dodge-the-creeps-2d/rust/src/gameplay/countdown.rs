@@ -1,6 +1,8 @@
 use bevy::{
     app::{App, Plugin, Update},
     ecs::{
+        entity::Entity,
+        event::EventWriter,
         resource::Resource,
         schedule::IntoScheduleConfigs,
         system::{Commands, Query, Res, ResMut},
@@ -11,10 +13,12 @@ use bevy::{
     },
     time::{Time, Timer, TimerMode},
 };
-use godot::classes::{Label, Node};
-use godot_bevy::{bridge::GodotNodeHandle, prelude::Groups};
+use godot_bevy::prelude::Groups;
 
-use crate::{main_menu::MenuAssets, GameState};
+use crate::{
+    commands::{NodeCommand, UICommand},
+    GameState,
+};
 
 pub struct CountdownPlugin;
 impl Plugin for CountdownPlugin {
@@ -33,34 +37,34 @@ impl Plugin for CountdownPlugin {
 #[derive(Resource)]
 pub struct CountdownTimer(Timer);
 
-fn setup_countdown(mut commands: Commands, menu_assets: Res<MenuAssets>) {
+fn setup_countdown(mut commands: Commands, mut ui_commands: EventWriter<UICommand>) {
     commands.insert_resource(CountdownTimer(Timer::from_seconds(1.0, TimerMode::Once)));
 
-    if let Some(mut message_label) = menu_assets.message_label.clone() {
-        message_label.get::<Label>().set_text("Get Ready");
-    }
+    ui_commands.write(UICommand::ShowMessage {
+        text: "Get Ready".to_string(),
+    });
 }
 
 fn update_countdown(
     mut timer: ResMut<CountdownTimer>,
     time: Res<Time>,
     mut next_state: ResMut<NextState<GameState>>,
-    menu_assets: Res<MenuAssets>,
+    mut ui_commands: EventWriter<UICommand>,
 ) {
     timer.0.tick(time.delta());
     if timer.0.just_finished() {
         next_state.set(GameState::InGame);
 
-        if let Some(mut message_label) = menu_assets.message_label.clone() {
-            message_label.get::<Label>().set_text("");
-        }
+        ui_commands.write(UICommand::ShowMessage {
+            text: "".to_string(),
+        });
     }
 }
 
-fn kill_all_mobs(mut entities: Query<(&Groups, &mut GodotNodeHandle)>) {
-    for (group, mut reference) in entities.iter_mut() {
+fn kill_all_mobs(entities: Query<(Entity, &Groups)>, mut node_commands: EventWriter<NodeCommand>) {
+    for (entity, group) in entities.iter() {
         if group.is("mobs") {
-            reference.get::<Node>().queue_free();
+            node_commands.write(NodeCommand::Destroy { entity });
         }
     }
 }

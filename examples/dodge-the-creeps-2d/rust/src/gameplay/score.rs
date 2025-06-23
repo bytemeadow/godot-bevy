@@ -2,6 +2,7 @@ use bevy::{
     app::{App, Plugin, Update},
     ecs::{
         change_detection::DetectChanges,
+        event::EventWriter,
         resource::Resource,
         schedule::IntoScheduleConfigs,
         system::{Res, ResMut},
@@ -9,9 +10,11 @@ use bevy::{
     state::{condition::in_state, state::OnEnter},
     time::{Time, Timer, TimerMode},
 };
-use godot::classes::Label;
 
-use crate::{main_menu::MenuAssets, GameState, Score};
+use crate::{
+    commands::{UICommand, UIElement},
+    GameState, Score,
+};
 
 pub struct ScorePlugin;
 impl Plugin for ScorePlugin {
@@ -30,11 +33,12 @@ fn reset_score(mut score: ResMut<Score>) {
     score.0 = 0;
 }
 
-fn update_score_counter(score: Res<Score>, menu_assets: Res<MenuAssets>) {
+fn update_score_counter(score: Res<Score>, mut ui_commands: EventWriter<UICommand>) {
     if score.is_changed() {
-        if let Some(mut score_label) = menu_assets.score_label.clone() {
-            score_label.get::<Label>().set_text(&score.0.to_string());
-        }
+        ui_commands.write(UICommand::SetText {
+            target: UIElement::ScoreLabel,
+            text: score.0.to_string(),
+        });
     }
 }
 

@@ -1,6 +1,7 @@
 use bevy::{
     app::{Plugin, Update},
     ecs::{
+        event::EventWriter,
         resource::Resource,
         schedule::IntoScheduleConfigs,
         system::{Commands, Res, ResMut},
@@ -11,9 +12,8 @@ use bevy::{
     },
     time::{Time, Timer, TimerMode},
 };
-use godot::classes::Label;
 
-use crate::{main_menu::MenuAssets, GameState};
+use crate::{commands::UICommand, GameState};
 
 pub struct GameoverPlugin;
 impl Plugin for GameoverPlugin {
@@ -29,19 +29,19 @@ impl Plugin for GameoverPlugin {
 #[derive(Resource)]
 pub struct GameoverTimer(Timer);
 
-fn setup_gameover(mut commands: Commands, menu_assets: Res<MenuAssets>) {
+fn setup_gameover(mut commands: Commands, mut ui_commands: EventWriter<UICommand>) {
     commands.insert_resource(GameoverTimer(Timer::from_seconds(2.0, TimerMode::Once)));
 
-    if let Some(mut message_label) = menu_assets.message_label.clone() {
-        message_label.get::<Label>().set_text("Game Over");
-    }
+    ui_commands.write(UICommand::ShowMessage {
+        text: "Game Over".to_string(),
+    });
 }
 
 fn update_gameover_timer(
     mut timer: ResMut<GameoverTimer>,
     time: Res<Time>,
     mut next_state: ResMut<NextState<GameState>>,
-    menu_assets: Res<MenuAssets>,
+    mut ui_commands: EventWriter<UICommand>,
 ) {
     timer.0.tick(time.delta());
     if !timer.0.just_finished() {
@@ -50,7 +50,7 @@ fn update_gameover_timer(
 
     next_state.set(GameState::MainMenu);
 
-    if let Some(mut message_label) = menu_assets.message_label.clone() {
-        message_label.get::<Label>().set_text("Dodge the Creeps");
-    }
+    ui_commands.write(UICommand::ShowMessage {
+        text: "Dodge the Creeps".to_string(),
+    });
 }

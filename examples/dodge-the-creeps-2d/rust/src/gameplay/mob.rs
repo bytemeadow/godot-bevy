@@ -3,7 +3,7 @@ use bevy::{
     asset::Handle,
     ecs::{
         component::Component,
-        event::EventReader,
+        event::{EventReader, EventWriter},
         name::Name,
         query::Added,
         resource::Resource,
@@ -23,14 +23,17 @@ use godot::{
 use godot_bevy::{
     bridge::GodotNodeHandle,
     prelude::{
-        AudioChannel, FindEntityByNameExt, GodotResource, GodotScene, GodotSignal, GodotSignals,
-        NodeTreeView, Transform2D,
+        connect_godot_signal, AudioChannel, FindEntityByNameExt, GodotResource, GodotScene,
+        GodotSignal, MainThreadAccess, NodeTreeView, SceneTreeRef, Transform2D,
     },
 };
 use std::f32::consts::PI;
 
 use crate::gameplay::audio::GameSfxChannel;
-use crate::GameState;
+use crate::{
+    commands::{AnimationState, NodeCommand},
+    GameState,
+};
 
 #[derive(AssetCollection, Resource, Debug)]
 pub struct MobAssets {
@@ -70,13 +73,14 @@ fn spawn_mob(
     mut timer: ResMut<MobSpawnTimer>,
     mut entities: Query<(&Name, &mut GodotNodeHandle)>,
     assets: Res<MobAssets>,
+    _main_thread: MainThreadAccess,
 ) {
     timer.0.tick(time.delta());
     if !timer.0.just_finished() {
         return;
     }
 
-    // Choose a random location on Path2D.
+    // Choose a random location on Path2D - still needs main thread access
     let mut mob_spawn_location = entities
         .iter_mut()
         .find_entity_by_name("MobSpawnLocation")
@@ -99,7 +103,8 @@ fn spawn_mob(
         .spawn_empty()
         .insert(Mob { direction })
         .insert(Transform2D::from(transform))
-        .insert(GodotScene::from_handle(assets.mob_scn.clone()));
+        .insert(GodotScene::from_handle(assets.mob_scn.clone()))
+        .insert(AnimationState::default());
 }
 
 #[derive(NodeTreeView)]
@@ -112,12 +117,21 @@ pub struct MobNodes {
 }
 
 fn new_mob(
-    mut entities: Query<(&Mob, &Transform2D, &mut GodotNodeHandle), Added<Mob>>,
+    mut entities: Query<
+        (
+            &Mob,
+            &Transform2D,
+            &mut GodotNodeHandle,
+            &mut AnimationState,
+        ),
+        Added<Mob>,
+    >,
+    mut scene_tree: SceneTreeRef,
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
     assets: Res<MobAssets>,
-    signals: GodotSignals,
+    _main_thread: MainThreadAccess,
 ) {
-    for (mob_data, transform, mut mob) in entities.iter_mut() {
+    for (mob_data, transform, mut mob, mut anim_state) in entities.iter_mut() {
         let mut mob = mob.get::<RigidBody2D>();
 
         let velocity = Vector2::new(fastrand::f32() * 100.0 + 150.0, 0.0);
@@ -125,8 +139,7 @@ fn new_mob(
 
         let mut mob_nodes = MobNodes::from_node(mob);
 
-        let mut animated_sprite = mob_nodes.animated_sprite.get::<AnimatedSprite2D>();
-        animated_sprite.play();
+        let animated_sprite = mob_nodes.animated_sprite.get::<AnimatedSprite2D>();
 
         let mob_types = animated_sprite
             .get_sprite_frames()
@@ -134,9 +147,16 @@ fn new_mob(
             .get_animation_names();
 
         let mob_type_index = fastrand::usize(0..mob_types.len());
-        animated_sprite.set_animation(mob_types[mob_type_index].arg());
+        let animation_name = mob_types[mob_type_index].clone();
 
-        signals.connect(&mut mob_nodes.visibility_notifier, "screen_exited");
+        // Use animation state instead of direct API calls
+        anim_state.play(Some(animation_name.into()));
+
+        connect_godot_signal(
+            &mut mob_nodes.visibility_notifier,
+            "screen_exited",
+            &mut scene_tree,
+        );
 
         // Play 2D positional spawn sound at mob's position with fade-in
         let position = Vec2::new(
@@ -156,16 +176,21 @@ fn new_mob(
     }
 }
 
-fn kill_mob(mut signals: EventReader<GodotSignal>) {
+fn kill_mob(
+    mut signals: EventReader<GodotSignal>,
+    _node_commands: EventWriter<NodeCommand>,
+    _main_thread: MainThreadAccess,
+) {
     for signal in signals.read() {
         if signal.name == "screen_exited" {
-            signal
-                .target
-                .clone()
-                .get::<Node>()
-                .get_parent()
-                .unwrap()
-                .queue_free();
+            // Get the parent node and queue it for destruction via command
+            if let Some(node) = signal.target.clone().try_get::<Node>() {
+                if let Some(mut parent) = node.get_parent() {
+                    // We need the entity ID to send a destroy command
+                    // For now, still use direct API but this is safer with try_get
+                    parent.queue_free();
+                }
+            }
         }
     }
 }
