@@ -1,12 +1,10 @@
 use bevy::prelude::*;
-use godot_bevy::prelude::godot_prelude::godot_print;
 
 pub struct BevyInputTestPlugin;
 
 impl Plugin for BevyInputTestPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_systems(Update, gamepad_system);
+        app.add_systems(Update, gamepad_system);
     }
 }
 

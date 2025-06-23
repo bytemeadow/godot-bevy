@@ -3,14 +3,11 @@ use bevy::{
     ecs::{
         entity::Entity,
         event::{EventReader, EventWriter},
-        system::{Commands, ResMut},
+        system::ResMut,
     },
     input::{
-        Axis, ButtonInput, ButtonState, InputPlugin,
-        gamepad::{
-            RawGamepadAxisChangedEvent, RawGamepadButtonChangedEvent, RawGamepadEvent,
-            GamepadAxis, GamepadButton,
-        },
+        ButtonInput, ButtonState, InputPlugin,
+        gamepad::{GamepadAxis, GamepadButton},
         keyboard::KeyCode,
         mouse::{
             AccumulatedMouseMotion, AccumulatedMouseScroll, MouseButton as BevyMouseButton,
@@ -18,12 +15,10 @@ use bevy::{
         },
     },
     math::Vec2,
-    prelude::{Resource, GilrsPlugin},
+    prelude::GilrsPlugin,
 };
-use std::collections::HashMap;
 
 use crate::plugins::core::input_event::{
-    GamepadAxisInput as GodotGamepadAxisInput, GamepadButtonInput as GodotGamepadButtonInput,
     KeyboardInput as GodotKeyboardInput, MouseButton as GodotMouseButton,
     MouseButtonInput as GodotMouseButtonInput, MouseMotion as GodotMouseMotion,
 };
@@ -33,8 +28,7 @@ pub struct BevyInputBridgePlugin;
 
 impl Plugin for BevyInputBridgePlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_plugins(InputPlugin)
+        app.add_plugins(InputPlugin)
             .add_plugins(GilrsPlugin)
             // .init_resource::<ButtonInput<GamepadButton>>()
             // .init_resource::<Axis<GamepadAxis>>()
