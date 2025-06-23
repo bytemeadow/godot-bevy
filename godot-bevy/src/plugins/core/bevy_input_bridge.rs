@@ -5,15 +5,17 @@ use bevy::{
         system::ResMut,
     },
     input::{
-        Axis, ButtonInput,
+        Axis, ButtonInput, ButtonState,
         gamepad::{GamepadAxis, GamepadButton},
         keyboard::KeyCode,
         mouse::{
             AccumulatedMouseMotion, AccumulatedMouseScroll, MouseButton as BevyMouseButton,
-            MouseMotion as BevyMouseMotion,
+            MouseButtonInput as BevyMouseButtonInput, MouseMotion as BevyMouseMotion,
+            mouse_button_input_system,
         },
     },
     math::Vec2,
+    prelude::Entity,
 };
 
 use crate::plugins::core::input_event::{
@@ -35,6 +37,7 @@ impl Plugin for BevyInputBridgePlugin {
             .init_resource::<ButtonInput<GamepadButton>>()
             .init_resource::<Axis<GamepadAxis>>()
             .add_event::<BevyMouseMotion>()
+            .add_event::<BevyMouseButtonInput>()
             .add_systems(
                 PreUpdate,
                 (
@@ -44,6 +47,8 @@ impl Plugin for BevyInputBridgePlugin {
                     bridge_mouse_scroll,
                     bridge_gamepad_button_input,
                     bridge_gamepad_axis_input,
+                    // Add Bevy's mouse_button_input_system to process MouseButtonInput events
+                    mouse_button_input_system,
                 ),
             )
             .add_systems(Last, update_input_resources);
@@ -68,15 +73,31 @@ fn bridge_keyboard_input(
 
 fn bridge_mouse_button_input(
     mut mouse_events: EventReader<GodotMouseButtonInput>,
-    mut mouse_input: ResMut<ButtonInput<BevyMouseButton>>,
+    mut bevy_mouse_button_events: EventWriter<BevyMouseButtonInput>,
 ) {
     for event in mouse_events.read() {
-        let bevy_button = godot_mouse_to_bevy_mouse(event.button);
-        if event.pressed {
-            mouse_input.press(bevy_button);
-        } else {
-            mouse_input.release(bevy_button);
+        // Skip wheel events - they're handled separately in bridge_mouse_scroll
+        match event.button {
+            GodotMouseButton::WheelUp
+            | GodotMouseButton::WheelDown
+            | GodotMouseButton::WheelLeft
+            | GodotMouseButton::WheelRight => continue,
+            _ => {}
         }
+        
+        let bevy_button = godot_mouse_to_bevy_mouse(event.button);
+        let state = if event.pressed {
+            ButtonState::Pressed
+        } else {
+            ButtonState::Released
+        };
+        
+        // Send MouseButtonInput event that Bevy's mouse_button_input_system will process
+        bevy_mouse_button_events.send(BevyMouseButtonInput {
+            button: bevy_button,
+            state,
+            window: Entity::PLACEHOLDER,
+        });
     }
 }
 
@@ -155,14 +176,13 @@ fn bridge_gamepad_axis_input(
 
 fn update_input_resources(
     mut keyboard_input: ResMut<ButtonInput<KeyCode>>,
-    mut mouse_input: ResMut<ButtonInput<BevyMouseButton>>,
     mut gamepad_button_input: ResMut<ButtonInput<GamepadButton>>,
 ) {
     // Clear just_pressed/just_released states at the end of each frame
     // This is what Bevy's InputPlugin normally does
     keyboard_input.clear();
-    mouse_input.clear();
     gamepad_button_input.clear();
+    // Note: Mouse input is handled by Bevy's mouse_button_input_system
     // Note: AccumulatedMouseMotion and AccumulatedMouseScroll are reset
     // at the beginning of each frame in their respective bridge systems
     // Note: GamepadAxis doesn't need clearing as it's state-based, not event-based
