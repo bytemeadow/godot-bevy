@@ -33,10 +33,10 @@ fn build_app(app: &mut App) {
     // Enable/disable plugins as needed for testing:
 
     // Plugin 1: Raw Godot Input Events - shows direct Godot input
-    // app.add_plugins(GodotInputPlugin);
+    app.add_plugins(GodotInputPlugin);
 
     // Plugin 2: Bevy Input Bridge Test - shows if bridge is working
-    // app.add_plugins(BevyInputTestPlugin);
+    app.add_plugins(BevyInputTestPlugin);
 
     // Plugin 3: Leafwing Input Manager - shows if leafwing integration works
     app.add_plugins(LeafwingInputTestPlugin);

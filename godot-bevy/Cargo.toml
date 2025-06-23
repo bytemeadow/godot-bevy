@@ -14,6 +14,7 @@ bevy = { version = "0.16", default-features = false, features = [
     "bevy_asset",
     "bevy_state",
     "bevy_log",
+    "bevy_gilrs",
 ] }
 godot = { version = "0.3.0", features = ["experimental-threads"] }
 godot-bevy-macros.workspace = true

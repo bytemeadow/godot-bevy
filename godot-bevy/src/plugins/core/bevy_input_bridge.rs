@@ -3,24 +3,22 @@ use bevy::{
     ecs::{
         entity::Entity,
         event::{EventReader, EventWriter},
-        system::{Commands, Res, ResMut},
+        system::{Commands, ResMut},
     },
     input::{
-        Axis, ButtonInput, ButtonState,
+        Axis, ButtonInput, ButtonState, InputPlugin,
         gamepad::{
-            Gamepad, GamepadAxis, GamepadButton, GamepadConnection, GamepadConnectionEvent,
             RawGamepadAxisChangedEvent, RawGamepadButtonChangedEvent, RawGamepadEvent,
-            gamepad_connection_system, gamepad_event_processing_system,
+            GamepadAxis, GamepadButton,
         },
         keyboard::KeyCode,
         mouse::{
             AccumulatedMouseMotion, AccumulatedMouseScroll, MouseButton as BevyMouseButton,
             MouseButtonInput as BevyMouseButtonInput, MouseMotion as BevyMouseMotion,
-            mouse_button_input_system,
         },
     },
     math::Vec2,
-    prelude::Resource,
+    prelude::{Resource, GilrsPlugin},
 };
 use std::collections::HashMap;
 
@@ -33,31 +31,13 @@ use crate::plugins::core::input_event::{
 /// Plugin that bridges godot-bevy's input events to Bevy's standard input resources.
 pub struct BevyInputBridgePlugin;
 
-/// Resource to track mapping between Godot device IDs and Bevy Gamepad entities
-#[derive(Resource, Default)]
-struct GamepadEntityMap {
-    /// Maps Godot device ID to Bevy Gamepad entity
-    device_to_entity: HashMap<i32, Entity>,
-    /// Maps Bevy entity to Godot device ID
-    entity_to_device: HashMap<Entity, i32>,
-}
-
 impl Plugin for BevyInputBridgePlugin {
     fn build(&self, app: &mut App) {
-        // Add Bevy's standard input resources and events
-        app.init_resource::<ButtonInput<KeyCode>>()
-            .init_resource::<ButtonInput<BevyMouseButton>>()
-            .init_resource::<AccumulatedMouseMotion>()
-            .init_resource::<AccumulatedMouseScroll>()
-            .init_resource::<ButtonInput<GamepadButton>>()
-            .init_resource::<Axis<GamepadAxis>>()
-            .init_resource::<GamepadEntityMap>()
-            .add_event::<BevyMouseMotion>()
-            .add_event::<BevyMouseButtonInput>()
-            .add_event::<GamepadConnectionEvent>()
-            .add_event::<RawGamepadEvent>()
-            .add_event::<RawGamepadButtonChangedEvent>()
-            .add_event::<RawGamepadAxisChangedEvent>()
+        app
+            .add_plugins(InputPlugin)
+            .add_plugins(GilrsPlugin)
+            // .init_resource::<ButtonInput<GamepadButton>>()
+            // .init_resource::<Axis<GamepadAxis>>()
             .add_systems(
                 PreUpdate,
                 (
@@ -65,20 +45,9 @@ impl Plugin for BevyInputBridgePlugin {
                     bridge_mouse_button_input,
                     bridge_mouse_motion,
                     bridge_mouse_scroll,
-                    mouse_button_input_system,
                 ),
             )
-            .add_systems(
-                PreUpdate,
-                (
-                    manage_gamepad_connections,
-                    bridge_gamepad_button_input,
-                    bridge_gamepad_axis_input,
-                    gamepad_connection_system,
-                    gamepad_event_processing_system,
-                ),
-            )
-            .add_systems(Last, update_input_resources);
+            .add_systems(Last, clear_keyboard_input);
     }
 }
 
@@ -175,119 +144,10 @@ fn bridge_mouse_scroll(
     }
 }
 
-fn manage_gamepad_connections(
-    mut gamepad_button_events: EventReader<GodotGamepadButtonInput>,
-    mut gamepad_axis_events: EventReader<GodotGamepadAxisInput>,
-    mut gamepad_map: ResMut<GamepadEntityMap>,
-    mut commands: Commands,
-    mut connection_events: EventWriter<GamepadConnectionEvent>,
-) {
-    // Track which device IDs we've seen this frame
-    let mut seen_devices = std::collections::HashSet::new();
-
-    // Check button events for new devices
-    for event in gamepad_button_events.read() {
-        seen_devices.insert(event.device);
-    }
-
-    // Check axis events for new devices
-    for event in gamepad_axis_events.read() {
-        seen_devices.insert(event.device);
-    }
-
-    // Create Gamepad entities for new devices
-    for device_id in seen_devices {
-        if !gamepad_map.device_to_entity.contains_key(&device_id) {
-            // Create Gamepad component with default settings
-            let gamepad = Gamepad::default();
-            let gamepad_entity = commands.spawn(gamepad).id();
-
-            gamepad_map
-                .device_to_entity
-                .insert(device_id, gamepad_entity);
-            gamepad_map
-                .entity_to_device
-                .insert(gamepad_entity, device_id);
-
-            // Send connection event
-            connection_events.send(GamepadConnectionEvent {
-                gamepad: gamepad_entity,
-                connection: GamepadConnection::Connected {
-                    name: format!("Godot Gamepad {}", device_id),
-                    vendor_id: None,
-                    product_id: None,
-                },
-            });
-        }
-    }
-}
-
-fn bridge_gamepad_button_input(
-    mut gamepad_button_events: EventReader<GodotGamepadButtonInput>,
-    gamepad_map: Res<GamepadEntityMap>,
-    mut raw_gamepad_events: EventWriter<RawGamepadEvent>,
-    mut raw_button_events: EventWriter<RawGamepadButtonChangedEvent>,
-) {
-    for event in gamepad_button_events.read() {
-        if let Some(bevy_button) = godot_button_to_bevy_button(event.button_index) {
-            // Get the entity for this device
-            if let Some(&gamepad_entity) = gamepad_map.device_to_entity.get(&event.device) {
-                let value = if event.pressed { 1.0 } else { 0.0 };
-
-                // Send raw gamepad button event
-                let raw_button_event = RawGamepadButtonChangedEvent {
-                    gamepad: gamepad_entity,
-                    button: bevy_button,
-                    value,
-                };
-
-                raw_button_events.send(raw_button_event);
-
-                // Also send the general RawGamepadEvent
-                raw_gamepad_events.send(RawGamepadEvent::Button(raw_button_event));
-            }
-        }
-    }
-}
-
-fn bridge_gamepad_axis_input(
-    mut gamepad_axis_events: EventReader<GodotGamepadAxisInput>,
-    gamepad_map: Res<GamepadEntityMap>,
-    mut raw_gamepad_events: EventWriter<RawGamepadEvent>,
-    mut raw_axis_events: EventWriter<RawGamepadAxisChangedEvent>,
-) {
-    for event in gamepad_axis_events.read() {
-        if let Some(bevy_axis) = godot_axis_to_bevy_axis(event.axis) {
-            // Get the entity for this device
-            if let Some(&gamepad_entity) = gamepad_map.device_to_entity.get(&event.device) {
-                // Send raw gamepad axis event
-                let raw_axis_event = RawGamepadAxisChangedEvent {
-                    gamepad: gamepad_entity,
-                    axis: bevy_axis,
-                    value: event.value,
-                };
-
-                raw_axis_events.send(raw_axis_event);
-
-                // Also send the general RawGamepadEvent
-                raw_gamepad_events.send(RawGamepadEvent::Axis(raw_axis_event));
-            }
-        }
-    }
-}
-
-fn update_input_resources(
-    mut keyboard_input: ResMut<ButtonInput<KeyCode>>,
-    mut gamepad_button_input: ResMut<ButtonInput<GamepadButton>>,
-) {
+fn clear_keyboard_input(mut keyboard_input: ResMut<ButtonInput<KeyCode>>) {
     // Clear just_pressed/just_released states at the end of each frame
-    // This is what Bevy's InputPlugin normally does
+    // This is what Bevy's InputPlugin normally does for gamepads, but we handle keyboard manually
     keyboard_input.clear();
-    gamepad_button_input.clear();
-    // Note: Mouse input is handled by Bevy's mouse_button_input_system
-    // Note: AccumulatedMouseMotion and AccumulatedMouseScroll are reset
-    // at the beginning of each frame in their respective bridge systems
-    // Note: GamepadAxis doesn't need clearing as it's state-based, not event-based
 }
 
 // Conversion functions
