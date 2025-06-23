@@ -7,7 +7,6 @@ use bevy::{
     },
     input::{
         ButtonInput, ButtonState, InputPlugin,
-        gamepad::{GamepadAxis, GamepadButton},
         keyboard::KeyCode,
         mouse::{
             AccumulatedMouseMotion, AccumulatedMouseScroll, MouseButton as BevyMouseButton,
@@ -228,44 +227,5 @@ fn godot_mouse_to_bevy_mouse(godot_button: GodotMouseButton) -> BevyMouseButton 
         GodotMouseButton::Extra2 => BevyMouseButton::Forward,
         // Note: Bevy doesn't have wheel events as buttons
         _ => BevyMouseButton::Other(255),
-    }
-}
-
-fn godot_button_to_bevy_button(button_index: i32) -> Option<GamepadButton> {
-    // Map Godot's JoyButton enum to Bevy's GamepadButton
-    // Reference: https://docs.godotengine.org/en/stable/classes/class_%40globalscope.html#enum-globalscope-joybutton
-    match button_index {
-        0 => Some(GamepadButton::South), // JOY_BUTTON_A / Bottom face button
-        1 => Some(GamepadButton::East),  // JOY_BUTTON_B / Right face button
-        2 => Some(GamepadButton::West),  // JOY_BUTTON_X / Left face button
-        3 => Some(GamepadButton::North), // JOY_BUTTON_Y / Top face button
-        4 => Some(GamepadButton::LeftTrigger), // JOY_BUTTON_LEFT_SHOULDER
-        5 => Some(GamepadButton::RightTrigger), // JOY_BUTTON_RIGHT_SHOULDER
-        6 => Some(GamepadButton::LeftTrigger2), // JOY_BUTTON_LEFT_TRIGGER
-        7 => Some(GamepadButton::RightTrigger2), // JOY_BUTTON_RIGHT_TRIGGER
-        8 => Some(GamepadButton::Select), // JOY_BUTTON_LEFT_STICK
-        9 => Some(GamepadButton::Start), // JOY_BUTTON_RIGHT_STICK
-        10 => Some(GamepadButton::LeftThumb), // JOY_BUTTON_LEFT_STICK
-        11 => Some(GamepadButton::RightThumb), // JOY_BUTTON_RIGHT_STICK
-        12 => Some(GamepadButton::DPadUp), // JOY_BUTTON_DPAD_UP
-        13 => Some(GamepadButton::DPadDown), // JOY_BUTTON_DPAD_DOWN
-        14 => Some(GamepadButton::DPadLeft), // JOY_BUTTON_DPAD_LEFT
-        15 => Some(GamepadButton::DPadRight), // JOY_BUTTON_DPAD_RIGHT
-        16 => Some(GamepadButton::Mode), // JOY_BUTTON_MISC1 (Guide/Home)
-        _ => Some(GamepadButton::Other(button_index as u8)), // Non-standard buttons
-    }
-}
-
-fn godot_axis_to_bevy_axis(axis: i32) -> Option<GamepadAxis> {
-    // Map Godot's JoyAxis enum to Bevy's GamepadAxis
-    // Reference: https://docs.godotengine.org/en/stable/classes/class_%40globalscope.html#enum-globalscope-joyaxis
-    match axis {
-        0 => Some(GamepadAxis::LeftStickX),        // JOY_AXIS_LEFT_X
-        1 => Some(GamepadAxis::LeftStickY),        // JOY_AXIS_LEFT_Y
-        2 => Some(GamepadAxis::RightStickX),       // JOY_AXIS_RIGHT_X
-        3 => Some(GamepadAxis::RightStickY),       // JOY_AXIS_RIGHT_Y
-        4 => Some(GamepadAxis::LeftZ),             // JOY_AXIS_TRIGGER_LEFT
-        5 => Some(GamepadAxis::RightZ),            // JOY_AXIS_TRIGGER_RIGHT
-        _ => Some(GamepadAxis::Other(axis as u8)), // Non-standard axes
     }
 }
