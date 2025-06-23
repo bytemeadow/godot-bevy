@@ -1,11 +1,6 @@
 use bevy::{
     app::{App, Plugin, Update},
-    ecs::{
-        event::EventReader,
-        resource::Resource,
-        schedule::IntoScheduleConfigs,
-        system::{NonSendMut, ResMut},
-    },
+    ecs::{event::EventReader, resource::Resource, schedule::IntoScheduleConfigs, system::ResMut},
     state::{
         condition::in_state,
         state::{NextState, OnEnter, OnExit},
@@ -14,7 +9,7 @@ use bevy::{
 use godot::classes::Button;
 use godot_bevy::{
     bridge::GodotNodeHandle,
-    prelude::{connect_godot_signal, GodotSignal, GodotSignalSender, NodeTreeView, SceneTreeRef},
+    prelude::{GodotSignal, GodotSignals, NodeTreeView, SceneTreeRef},
 };
 
 use crate::GameState;
@@ -65,15 +60,8 @@ fn init_menu_assets(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTr
     menu_assets.score_label = Some(menu_ui.score_label.clone());
 }
 
-fn connect_start_button(
-    mut menu_assets: ResMut<MenuAssets>,
-    signal_sender: NonSendMut<GodotSignalSender>,
-) {
-    connect_godot_signal(
-        menu_assets.start_button.as_mut().unwrap(),
-        "pressed",
-        signal_sender.0.clone(),
-    );
+fn connect_start_button(mut menu_assets: ResMut<MenuAssets>, signals: GodotSignals) {
+    signals.connect(menu_assets.start_button.as_mut().unwrap(), "pressed");
 }
 
 fn listen_for_start_button(

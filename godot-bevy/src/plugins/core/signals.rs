@@ -3,7 +3,7 @@ use bevy::{
     ecs::{
         event::{Event, EventWriter, event_update_system},
         schedule::IntoScheduleConfigs,
-        system::NonSendMut,
+        system::{NonSendMut, SystemParam},
     },
 };
 use godot::{
@@ -42,6 +42,19 @@ pub struct GodotSignalReader(pub std::sync::mpsc::Receiver<GodotSignal>);
 
 #[doc(hidden)]
 pub struct GodotSignalSender(pub std::sync::mpsc::Sender<GodotSignal>);
+
+/// Clean API for connecting Godot signals - hides implementation details from users
+#[derive(SystemParam)]
+pub struct GodotSignals<'w> {
+    signal_sender: NonSendMut<'w, GodotSignalSender>,
+}
+
+impl<'w> GodotSignals<'w> {
+    /// Connect a Godot signal to be forwarded to Bevy's event system
+    pub fn connect(&self, node: &mut GodotNodeHandle, signal_name: &str) {
+        connect_godot_signal(node, signal_name, self.signal_sender.0.clone());
+    }
+}
 
 fn write_godot_signal_events(
     events: NonSendMut<GodotSignalReader>,

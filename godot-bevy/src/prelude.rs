@@ -40,7 +40,7 @@ pub use crate::plugins::{
         GodotCorePlugin,
         GodotSignal,
         GodotSignalArgument,
-        GodotSignalSender,
+        GodotSignals,
         GodotTransformConfig,
         Groups,
         KeyboardInput,

@@ -43,10 +43,10 @@ impl BevyApp {
         app.insert_non_send_resource(SceneTreeEventReader(receiver));
     }
 
-    fn register_signal_watcher(&mut self, app: &mut App) {
+    fn register_signal_system(&mut self, app: &mut App) {
         let (sender, receiver) = channel();
-        // We no longer need the SignalWatcher node since we use direct closures
-        // Just insert both sender and receiver as resources
+        // Create channel for Godot signals and insert as resources
+        // Signals are connected directly using closures in the signals module
         app.insert_non_send_resource(GodotSignalSender(sender));
         app.insert_non_send_resource(GodotSignalReader(receiver));
     }
@@ -81,7 +81,7 @@ impl INode for BevyApp {
         (BEVY_INIT_FUNC.lock().unwrap().as_mut().unwrap())(&mut app);
 
         self.register_scene_tree_watcher(&mut app);
-        self.register_signal_watcher(&mut app);
+        self.register_signal_system(&mut app);
         self.register_input_event_watcher(&mut app);
         app.init_resource::<PhysicsDelta>();
         self.app = Some(app);
