@@ -1,5 +1,5 @@
 use bevy::{
-    app::{App, Plugin, PostUpdate, PreUpdate},
+    app::{App, Plugin, PreUpdate, Last},
     ecs::{
         event::{EventReader, EventWriter},
         system::ResMut,
@@ -46,7 +46,7 @@ impl Plugin for BevyInputBridgePlugin {
                     bridge_gamepad_axis_input,
                 ),
             )
-            .add_systems(PostUpdate, update_input_resources);
+            .add_systems(Last, update_input_resources);
     }
 }
 
