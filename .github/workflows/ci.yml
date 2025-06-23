@@ -230,6 +230,13 @@ jobs:
             . -> target
             examples/*/rust -> target
 
+      - name: Cache and install Linux dependencies
+        if: runner.os == 'linux'
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libasound2-dev libudev-dev pkg-config
+          version: 1.0
+
       - name: Download Rust libraries
         uses: actions/download-artifact@v4
         with:
