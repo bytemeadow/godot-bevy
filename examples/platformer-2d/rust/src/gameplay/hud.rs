@@ -73,6 +73,7 @@ fn setup_hud_on_level_loaded(
     mut scene_tree: SceneTreeRef,
     mut hud_update_events: EventWriter<HudUpdateEvent>,
     gems_collected: Res<GemsCollected>,
+    _main_thread: MainThreadAccess,
 ) {
     for event in events.read() {
         // Try to get HUD node handles - this is the only SceneTreeRef access in HUD
@@ -114,6 +115,7 @@ fn generate_hud_update_events(
 fn handle_hud_update_events(
     mut hud_events: EventReader<HudUpdateEvent>,
     hud_handles: Res<HudHandles>,
+    _main_thread: MainThreadAccess,
 ) {
     for event in hud_events.read() {
         match event {

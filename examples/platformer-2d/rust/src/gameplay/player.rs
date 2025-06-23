@@ -95,6 +95,7 @@ impl Plugin for PlayerPlugin {
 fn detect_player_input(
     mut player: Query<&mut GodotNodeHandle, With<Player>>,
     mut input_events: EventWriter<PlayerInputEvent>,
+    _main_thread: MainThreadAccess,
 ) {
     if let Ok(mut handle) = player.single_mut() {
         // Use try_get to handle case where Godot node might be invalid during scene transitions
@@ -127,6 +128,7 @@ fn apply_player_movement(
     physics_delta: Res<PhysicsDelta>,
     mut sfx_events: EventWriter<PlaySfxEvent>,
     mut movement_events: EventWriter<PlayerMovementEvent>,
+    _main_thread: MainThreadAccess,
 ) {
     if let Ok((mut handle, speed, jump_velocity, gravity)) = player.single_mut() {
         let Some(mut character_body) = handle.try_get::<CharacterBody2D>() else {
@@ -189,6 +191,7 @@ fn apply_player_movement(
 fn update_player_animation(
     mut movement_events: EventReader<PlayerMovementEvent>,
     mut player: Query<&mut GodotNodeHandle, With<Player>>,
+    _main_thread: MainThreadAccess,
 ) {
     if let Ok(mut handle) = player.single_mut() {
         let Some(character_body) = handle.try_get::<CharacterBody2D>() else {

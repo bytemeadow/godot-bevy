@@ -36,6 +36,7 @@ fn process_scene_operations(
     mut scene_tree: SceneTreeRef,
     mut operation_events: EventReader<SceneOperationEvent>,
     mut assets: ResMut<Assets<GodotResource>>,
+    _main_thread: MainThreadAccess,
 ) {
     for event in operation_events.read() {
         match event {
