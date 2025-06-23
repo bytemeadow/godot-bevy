@@ -1,5 +1,5 @@
 use bevy::{
-    app::{App, Plugin, PreUpdate, Last},
+    app::{App, Last, Plugin, PreUpdate},
     ecs::{
         event::{EventReader, EventWriter},
         system::ResMut,
@@ -84,14 +84,14 @@ fn bridge_mouse_button_input(
             | GodotMouseButton::WheelRight => continue,
             _ => {}
         }
-        
+
         let bevy_button = godot_mouse_to_bevy_mouse(event.button);
         let state = if event.pressed {
             ButtonState::Pressed
         } else {
             ButtonState::Released
         };
-        
+
         // Send MouseButtonInput event that Bevy's mouse_button_input_system will process
         bevy_mouse_button_events.send(BevyMouseButtonInput {
             button: bevy_button,

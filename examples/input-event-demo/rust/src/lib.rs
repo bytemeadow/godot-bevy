@@ -6,12 +6,12 @@ use godot_bevy::prelude::{
     *,
 };
 
-mod godot_input;
 mod bevy_input;
+mod godot_input;
 mod leafwing_input;
 
-use godot_input::GodotInputPlugin;
 use bevy_input::BevyInputTestPlugin;
+use godot_input::GodotInputPlugin;
 use leafwing_input::LeafwingInputTestPlugin;
 
 // This example demonstrates godot-bevy's input event system with three separate plugins:
