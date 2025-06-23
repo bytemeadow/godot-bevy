@@ -12,6 +12,20 @@ path = "../../run_godot.rs"
 name = "dodge_the_creeps"
 
 [dependencies]
+avian3d = { version= "0.3", default-features = false, features = [
+    # this is the default feature list for avian3d
+    # ref https://github.com/Jondolf/avian/blob/main/crates/avian3d/Cargo.toml#L15
+    "3d",
+    "f32",
+    "parry-f32",
+    "collider-from-mesh",
+    "bevy_scene",
+    "bevy_picking",
+    "debug-plugin",
+    # uncommenting the following line causes errors when running this example
+    # (errors are only visible in godot's editor under debugger > errors)
+    "parallel",
+]}
 bevy = { version = "0.16", default-features = false }
 bevy_asset_loader = "0.23.0"
 fastrand = { version = "2.3.0" }

@@ -1,18 +1,21 @@
+use crate::container::{BevyBoids, BoidsContainer};
 use bevy::{
     ecs::{
         component::Component,
         system::{Commands, Query, Res, ResMut},
     },
     math::Vec2,
-    prelude::*,
+    prelude::{
+        info, warn, App, AssetServer, Entity, Handle, IntoScheduleConfigs, Plugin, Resource,
+        Startup, Time, Transform, Update, Vec, Vec3Swizzles, With,
+    },
 };
 use bevy_spatial::{kdtree::KDTree2, AutomaticUpdate, SpatialAccess, SpatialStructure};
-
-use godot::prelude::*;
-use godot_bevy::plugins::core::Transform2D;
-use godot_bevy::prelude::*;
-
-use crate::container::{BevyBoids, BoidsContainer};
+use godot::{
+    builtin::Color,
+    prelude::{Node, Node2D, Vector2},
+};
+use godot_bevy::prelude::{GodotNodeHandle, GodotResource, GodotScene, Transform2D};
 
 // Type alias for our spatial tree
 type BoidTree = KDTree2<Boid>;
