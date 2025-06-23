@@ -298,6 +298,7 @@ fn update_simulation_state(
 fn colorize_new_boids(
     mut commands: Commands,
     new_boids: Query<(Entity, &GodotNodeHandle), With<NeedsColorization>>,
+    _main_thread: MainThreadAccess,
 ) {
     for (entity, handle) in new_boids.iter() {
         let mut handle_clone = handle.clone();
