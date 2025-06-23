@@ -1,8 +1,8 @@
 use super::{Node2DMarker, Node3DMarker, SceneTreeRef};
 use crate::bridge::GodotNodeHandle;
 use bevy::app::{App, Last, Plugin, PreUpdate};
-use bevy::ecs::change_detection::DetectChanges;
 use bevy::ecs::query::{Added, Changed, Or, With};
+use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::Query;
 use bevy::math::Quat;
 use bevy::math::Vec3;
@@ -104,17 +104,37 @@ pub struct GodotTransformsPlugin;
 impl Plugin for GodotTransformsPlugin {
     fn build(&self, app: &mut App) {
         // Always add writing systems
-        app.add_systems(Last, post_update_godot_transforms_3d)
-            .add_systems(Last, post_update_godot_transforms_2d);
+        app.add_systems(
+            Last,
+            (
+                post_update_godot_transforms_3d,
+                post_update_godot_transforms_2d,
+            )
+                .run_if(transform_sync_enabled),
+        );
 
         // Always add reading systems, but they'll check the config at runtime
-        app.add_systems(PreUpdate, pre_update_godot_transforms_3d)
-            .add_systems(PreUpdate, pre_update_godot_transforms_2d);
+        app.add_systems(
+            PreUpdate,
+            (
+                pre_update_godot_transforms_3d,
+                pre_update_godot_transforms_2d,
+            )
+                .run_if(transform_sync_twoway_enabled),
+        );
     }
 }
 
+fn transform_sync_enabled(config: Res<super::GodotTransformConfig>) -> bool {
+    // aka one way or two way
+    config.sync_mode != super::TransformSyncMode::Disabled
+}
+
+fn transform_sync_twoway_enabled(config: Res<super::GodotTransformConfig>) -> bool {
+    config.sync_mode == super::TransformSyncMode::TwoWay
+}
+
 fn post_update_godot_transforms_3d(
-    config: Res<super::GodotTransformConfig>,
     _scene_tree: SceneTreeRef,
     mut entities: Query<
         (&BevyTransform, &mut GodotNodeHandle),
@@ -124,12 +144,6 @@ fn post_update_godot_transforms_3d(
         ),
     >,
 ) {
-    // Early return if transform syncing is disabled
-    // TODO move this to system run conditional
-    if config.sync_mode == super::TransformSyncMode::Disabled {
-        return;
-    }
-
     for (transform, mut reference) in entities.iter_mut() {
         let mut obj = reference.get::<Node3D>();
         obj.set_transform(transform.to_godot_transform());
@@ -137,30 +151,16 @@ fn post_update_godot_transforms_3d(
 }
 
 fn pre_update_godot_transforms_3d(
-    config: Res<super::GodotTransformConfig>,
     _scene_tree: SceneTreeRef,
     mut entities: Query<(&mut BevyTransform, &mut GodotNodeHandle), With<Node3DMarker>>,
 ) {
-    // Early return if transform syncing is disabled
-    // TODO move this to system run conditional
-    if config.sync_mode == super::TransformSyncMode::Disabled {
-        return;
-    }
-
     for (mut transform, mut reference) in entities.iter_mut() {
-        // Skip entities that were changed recently (e.g., by PhysicsUpdate systems)
-        // TODO do we really need this?
-        if transform.is_changed() {
-            continue;
-        }
-
         let godot_transform = reference.get::<Node3D>().get_transform();
         *transform = godot_transform.to_bevy_transform();
     }
 }
 
 fn post_update_godot_transforms_2d(
-    config: Res<super::GodotTransformConfig>,
     _scene_tree: SceneTreeRef,
     mut entities: Query<
         (&BevyTransform, &mut GodotNodeHandle),
@@ -170,63 +170,18 @@ fn post_update_godot_transforms_2d(
         ),
     >,
 ) {
-    // Early return if transform syncing is disabled
-    if config.sync_mode == super::TransformSyncMode::Disabled {
-        return;
-    }
-
-    // let count = entities.iter().count();
-    // godot::global::godot_print!("visiting: {}", count);
-
-    // entities.iter_mut().for_each(|(transform, mut reference)| {
-    //     let mut obj = reference.get::<Node2D>();
-    //     obj.set_transform(transform.to_godot_transform_2d());
-    // });
-
-    // entities
-    //     .par_iter_mut()
-    //     .for_each(|(transform, mut reference)| {
-    //         let mut obj = reference.get::<Node2D>();
-    //         obj.set_transform(transform.to_godot_transform_2d());
-    //     });
-
     for (transform, mut reference) in entities.iter_mut() {
         let mut obj = reference.get::<Node2D>();
-
-        // TODO why isn't this baked into transform.to_godot_transform_2d() ?
-        // let mut obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
-        // obj_transform = obj_transform.rotated(obj.get_rotation());
-        // obj_transform = obj_transform.scaled(obj.get_scale());
-
         obj.set_transform(transform.to_godot_transform_2d());
     }
 }
 
 fn pre_update_godot_transforms_2d(
-    config: Res<super::GodotTransformConfig>,
     _scene_tree: SceneTreeRef,
     mut entities: Query<(&mut BevyTransform, &mut GodotNodeHandle), With<Node2DMarker>>,
 ) {
-    // TODO move this to system run conditional, test to see if changed doesn't fire!
-    // Early return if transform syncing is disabled
-    if config.sync_mode != super::TransformSyncMode::TwoWay {
-        return;
-    }
-
     for (mut transform, mut reference) in entities.iter_mut() {
-        // Skip entities that were changed recently (e.g., by PhysicsUpdate systems)
-        if transform.is_changed() {
-            continue;
-        }
-
         let obj = reference.get::<Node2D>();
-
-        // let obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
-        // obj_transform = obj_transform.rotated(obj.get_rotation());
-        // obj_transform = obj_transform.scaled(obj.get_scale());
-        // my_godot_transform_copy.xform = obj_transform;
-
-        // TODO why is this expensive in debug builds but not in release
         *transform = obj.get_transform().to_bevy_transform();
     }
 }
