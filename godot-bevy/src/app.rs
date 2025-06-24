@@ -77,7 +77,7 @@ impl INode for BevyApp {
         Self {
             base,
             app: Default::default(),
-            enabled: false,  // Start disabled by default
+            enabled: false, // Start disabled by default
         }
     }
 
