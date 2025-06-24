@@ -22,6 +22,7 @@
 # Input Handling
 
 - [Bevy vs Godot Input](./input/bevy-vs-godot.md)
+- [Signal Handling](./input/signals.md)
 
 # Timing & Schedules
 
