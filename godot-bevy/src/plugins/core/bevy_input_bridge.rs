@@ -29,8 +29,6 @@ impl Plugin for BevyInputBridgePlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(InputPlugin)
             .add_plugins(GilrsPlugin)
-            // .init_resource::<ButtonInput<GamepadButton>>()
-            // .init_resource::<Axis<GamepadAxis>>()
             .add_systems(
                 PreUpdate,
                 (
