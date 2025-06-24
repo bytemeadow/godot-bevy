@@ -13,7 +13,7 @@ use bevy::{
 };
 use godot_bevy::{
     bridge::GodotNodeHandle,
-    prelude::{GodotSignal, GodotSignals, MainThreadAccess, NodeTreeView, SceneTreeRef},
+    prelude::{godot_main_thread, GodotSignal, GodotSignals, NodeTreeView, SceneTreeRef},
 };
 
 use crate::{
@@ -59,11 +59,11 @@ pub struct MenuUi {
     pub score_label: GodotNodeHandle,
 }
 
+#[godot_main_thread]
 fn init_menu_assets(
     mut menu_assets: ResMut<MenuAssets>,
     mut ui_handles: ResMut<UIHandles>,
     mut scene_tree: SceneTreeRef,
-    _main_thread: MainThreadAccess,
 ) {
     let menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap());
 

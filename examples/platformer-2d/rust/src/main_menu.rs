@@ -66,11 +66,8 @@ fn reset_menu_assets(mut menu_assets: ResMut<MenuAssets>) {
     menu_assets.signals_connected = false;
 }
 
-fn init_menu_assets(
-    mut menu_assets: ResMut<MenuAssets>,
-    mut scene_tree: SceneTreeRef,
-    _main_thread: MainThreadAccess,
-) {
+#[godot_main_thread]
+fn init_menu_assets(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTreeRef) {
     // Try to find menu nodes, but handle failure gracefully
     if let Some(root) = scene_tree.get().get_root() {
         // Try to create MenuUi - this might fail if nodes aren't ready yet
@@ -126,12 +123,12 @@ fn connect_buttons(mut menu_assets: ResMut<MenuAssets>, signals: GodotSignals) {
     }
 }
 
+#[godot_main_thread]
 fn listen_for_button_press(
     menu_assets: Res<MenuAssets>,
     mut events: EventReader<GodotSignal>,
     mut app_state: ResMut<NextState<GameState>>,
     mut level_load_events: EventWriter<LoadLevelEvent>,
-    _main_thread: MainThreadAccess,
 ) {
     for evt in events.read() {
         // Skip events for freed nodes - check if target node still exists

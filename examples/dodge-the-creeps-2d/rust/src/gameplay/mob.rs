@@ -23,8 +23,8 @@ use godot::{
 use godot_bevy::{
     bridge::GodotNodeHandle,
     prelude::{
-        AudioChannel, FindEntityByNameExt, GodotResource, GodotScene, GodotSignal, GodotSignals,
-        MainThreadAccess, NodeTreeView, Transform2D,
+        godot_main_thread, AudioChannel, FindEntityByNameExt, GodotResource, GodotScene,
+        GodotSignal, GodotSignals, NodeTreeView, Transform2D,
     },
 };
 use std::f32::consts::PI;
@@ -67,13 +67,13 @@ pub struct Mob {
 #[derive(Resource)]
 pub struct MobSpawnTimer(Timer);
 
+#[godot_main_thread]
 fn spawn_mob(
     mut commands: Commands,
     time: Res<Time>,
     mut timer: ResMut<MobSpawnTimer>,
     mut entities: Query<(&Name, &mut GodotNodeHandle)>,
     assets: Res<MobAssets>,
-    _main_thread: MainThreadAccess,
 ) {
     timer.0.tick(time.delta());
     if !timer.0.just_finished() {
@@ -116,6 +116,7 @@ pub struct MobNodes {
     visibility_notifier: GodotNodeHandle,
 }
 
+#[godot_main_thread]
 fn new_mob(
     mut entities: Query<
         (
@@ -128,7 +129,6 @@ fn new_mob(
     >,
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
     assets: Res<MobAssets>,
-    _main_thread: MainThreadAccess,
     signals: GodotSignals,
 ) {
     for (mob_data, transform, mut mob, mut anim_state) in entities.iter_mut() {
@@ -172,11 +172,8 @@ fn new_mob(
     }
 }
 
-fn kill_mob(
-    mut signals: EventReader<GodotSignal>,
-    _node_commands: EventWriter<NodeCommand>,
-    _main_thread: MainThreadAccess,
-) {
+#[godot_main_thread]
+fn kill_mob(mut signals: EventReader<GodotSignal>, _node_commands: EventWriter<NodeCommand>) {
     for signal in signals.read() {
         if signal.name == "screen_exited" {
             // Get the parent node and queue it for destruction via command

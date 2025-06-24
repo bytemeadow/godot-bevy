@@ -32,11 +32,11 @@ impl Plugin for SceneManagementPlugin {
 /// Central system that processes scene tree operations
 ///
 /// This system reduces SceneTreeRef conflicts by handling scene operations centrally.
+#[godot_main_thread]
 fn process_scene_operations(
     mut scene_tree: SceneTreeRef,
     mut operation_events: EventReader<SceneOperationEvent>,
     mut assets: ResMut<Assets<GodotResource>>,
-    _main_thread: MainThreadAccess,
 ) {
     for event in operation_events.read() {
         match event {

@@ -90,18 +90,6 @@ impl Default for GodotTransformConfig {
     }
 }
 
-/// Resource marker to ensure systems accessing Godot APIs run on the main thread
-#[derive(Resource, Default)]
-pub struct MainThreadMarker;
-
-/// SystemParam that forces systems to run on the main thread for safe Godot API access
-#[allow(dead_code)]
-#[derive(SystemParam)]
-pub struct MainThreadAccess<'w, 's> {
-    marker: NonSend<'w, MainThreadMarker>,
-    phantom: PhantomData<&'s ()>,
-}
-
 impl GodotTransformConfig {
     /// Disable all transform syncing - use direct Godot physics instead
     pub fn disabled() -> Self {
@@ -151,8 +139,7 @@ impl Plugin for GodotCorePlugin {
             .add_plugins(GodotInputEventPlugin)
             .add_plugins(BevyInputBridgePlugin)
             .init_resource::<PhysicsDelta>()
-            .init_resource::<GodotTransformConfig>()
-            .init_non_send_resource::<MainThreadMarker>();
+            .init_resource::<GodotTransformConfig>();
 
         // Add the PhysicsUpdate schedule
         app.add_schedule(Schedule::new(PhysicsUpdate));

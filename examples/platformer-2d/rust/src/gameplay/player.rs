@@ -92,10 +92,10 @@ impl Plugin for PlayerPlugin {
 ///
 /// Runs in InputDetection set and can execute in parallel with other input systems.
 /// Only reads input and writes events, enabling better parallelization.
+#[godot_main_thread]
 fn detect_player_input(
     mut player: Query<&mut GodotNodeHandle, With<Player>>,
     mut input_events: EventWriter<PlayerInputEvent>,
-    _main_thread: MainThreadAccess,
 ) {
     if let Ok(mut handle) = player.single_mut() {
         // Use try_get to handle case where Godot node might be invalid during scene transitions
@@ -122,13 +122,13 @@ fn detect_player_input(
 ///
 /// Runs in Movement set after input detection. Handles all physics calculations
 /// and movement execution separately from input detection.
+#[godot_main_thread]
 fn apply_player_movement(
     mut input_events: EventReader<PlayerInputEvent>,
     mut player: Query<(&mut GodotNodeHandle, &Speed, &JumpVelocity, &Gravity), With<Player>>,
     physics_delta: Res<PhysicsDelta>,
     mut sfx_events: EventWriter<PlaySfxEvent>,
     mut movement_events: EventWriter<PlayerMovementEvent>,
-    _main_thread: MainThreadAccess,
 ) {
     if let Ok((mut handle, speed, jump_velocity, gravity)) = player.single_mut() {
         let Some(mut character_body) = handle.try_get::<CharacterBody2D>() else {
@@ -188,10 +188,10 @@ fn apply_player_movement(
 ///
 /// Runs in Animation set after movement. Handles all animation state
 /// separately from physics and input.
+#[godot_main_thread]
 fn update_player_animation(
     mut movement_events: EventReader<PlayerMovementEvent>,
     mut player: Query<&mut GodotNodeHandle, With<Player>>,
-    _main_thread: MainThreadAccess,
 ) {
     if let Ok(mut handle) = player.single_mut() {
         let Some(character_body) = handle.try_get::<CharacterBody2D>() else {

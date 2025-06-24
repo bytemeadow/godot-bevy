@@ -401,10 +401,7 @@ fn remove_and_free_audio_node(handle: &mut GodotNodeHandle) {
 
 /// System that updates active audio tweens
 #[godot_main_thread]
-fn update_audio_tweens(
-    mut audio_output: ResMut<AudioOutput>,
-    time: Res<Time>,
-) {
+fn update_audio_tweens(mut audio_output: ResMut<AudioOutput>, time: Res<Time>) {
     let delta = time.delta();
     let mut completed_tweens = Vec::new();
     let mut sounds_to_stop = Vec::new();

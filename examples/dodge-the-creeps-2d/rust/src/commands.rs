@@ -14,7 +14,7 @@ use godot_bevy::prelude::*;
 pub enum UICommand {
     /// Set text on a UI element
     SetText { target: UIElement, text: String },
-    /// Set visibility of a UI element  
+    /// Set visibility of a UI element
     SetVisible { target: UIElement, visible: bool },
     /// Show a temporary message
     ShowMessage { text: String },
@@ -166,11 +166,8 @@ impl Plugin for CommandSystemPlugin {
 }
 
 /// Main thread system that processes UI commands
-fn process_ui_commands(
-    mut ui_commands: EventReader<UICommand>,
-    ui_handles: Res<UIHandles>,
-    _main_thread: MainThreadAccess,
-) {
+#[godot_main_thread]
+fn process_ui_commands(mut ui_commands: EventReader<UICommand>, ui_handles: Res<UIHandles>) {
     use godot::classes::{Button, Label};
 
     for command in ui_commands.read() {
@@ -201,11 +198,11 @@ fn process_ui_commands(
 }
 
 /// Main thread system that processes node commands
+#[godot_main_thread]
 fn process_node_commands(
     mut node_commands: EventReader<NodeCommand>,
     mut nodes: Query<&mut GodotNodeHandle>,
     mut commands: Commands,
-    _main_thread: MainThreadAccess,
 ) {
     use godot::classes::{CanvasItem, Node};
 
@@ -238,10 +235,10 @@ fn process_node_commands(
 }
 
 /// Main thread system that processes animation commands
+#[godot_main_thread]
 fn process_animation_commands(
     mut animation_commands: EventReader<AnimationCommand>,
     mut nodes: Query<&mut GodotNodeHandle>,
-    _main_thread: MainThreadAccess,
 ) {
     use godot::classes::AnimatedSprite2D;
 
@@ -269,9 +266,9 @@ fn process_animation_commands(
 }
 
 /// Main thread system that syncs visibility state to Godot nodes
+#[godot_main_thread]
 fn sync_visibility_state(
     mut nodes: Query<(&mut GodotNodeHandle, &mut VisibilityState), Changed<VisibilityState>>,
-    _main_thread: MainThreadAccess,
 ) {
     use godot::classes::CanvasItem;
 
@@ -286,9 +283,9 @@ fn sync_visibility_state(
 }
 
 /// Main thread system that syncs animation state to Godot sprites
+#[godot_main_thread]
 fn sync_animation_state(
     mut nodes: Query<(&mut GodotNodeHandle, &mut AnimationState), Changed<AnimationState>>,
-    _main_thread: MainThreadAccess,
 ) {
     use godot::classes::AnimatedSprite2D;
 

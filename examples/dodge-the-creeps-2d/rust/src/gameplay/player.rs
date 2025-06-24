@@ -5,7 +5,10 @@ use godot::{
     builtin::{StringName, Vector2},
     classes::{Input, Node2D},
 };
-use godot_bevy::{plugins::core::PhysicsDelta, prelude::*};
+use godot_bevy::{
+    plugins::core::PhysicsDelta,
+    prelude::{godot_main_thread, *},
+};
 
 use crate::{
     commands::{AnimationState, CachedScreenSize, VisibilityState},
@@ -55,13 +58,13 @@ fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
         .insert(Player { speed: 0.0 });
 }
 
+#[godot_main_thread]
 fn player_on_ready(
     mut commands: Commands,
     mut player: Query<
         (Entity, &mut Player, &mut GodotNodeHandle),
         (With<Player>, Without<PlayerInitialized>),
     >,
-    _main_thread: MainThreadAccess,
 ) -> Result {
     if let Ok((entity, mut player_data, mut player)) = player.single_mut() {
         let player = player.get::<GodotPlayerNode>();
@@ -83,10 +86,10 @@ fn player_on_ready(
     Ok(())
 }
 
+#[godot_main_thread]
 fn setup_player(
     mut player: Query<(Entity, &mut VisibilityState, &mut Transform2D), With<Player>>,
     mut entities: Query<(&Name, &mut GodotNodeHandle), Without<Player>>,
-    _main_thread: MainThreadAccess,
 ) -> Result {
     if let Ok((_entity, mut visibility, mut transform)) = player.single_mut() {
         // Set player visible using command system
@@ -105,6 +108,7 @@ fn setup_player(
     Ok(())
 }
 
+#[godot_main_thread]
 fn move_player(
     mut player: Query<(
         &Player,
@@ -113,7 +117,6 @@ fn move_player(
         &mut AnimationState,
     )>,
     physics_delta: Res<PhysicsDelta>,
-    _main_thread: MainThreadAccess,
 ) -> Result {
     if let Ok((player_data, screen_cache, mut transform, mut anim_state)) = player.single_mut() {
         let mut velocity = Vector2::ZERO;
@@ -162,10 +165,10 @@ fn move_player(
     Ok(())
 }
 
+#[godot_main_thread]
 fn check_player_death(
     mut player: Query<(&mut VisibilityState, &Collisions), With<Player>>,
     mut next_state: ResMut<NextState<GameState>>,
-    _main_thread: MainThreadAccess,
 ) {
     if let Ok((mut visibility, collisions)) = player.single_mut() {
         if collisions.colliding().is_empty() {
