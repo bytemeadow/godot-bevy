@@ -13,7 +13,7 @@ use bevy::{
 };
 use godot_bevy::{
     bridge::GodotNodeHandle,
-    prelude::{connect_godot_signal, GodotSignal, MainThreadAccess, NodeTreeView, SceneTreeRef},
+    prelude::{GodotSignal, GodotSignals, MainThreadAccess, NodeTreeView, SceneTreeRef},
 };
 
 use crate::{
@@ -77,16 +77,8 @@ fn init_menu_assets(
     ui_handles.message_label = Some(menu_ui.message_label.clone());
 }
 
-fn connect_start_button(
-    mut menu_assets: ResMut<MenuAssets>,
-    mut scene_tree: SceneTreeRef,
-    _main_thread: MainThreadAccess,
-) {
-    connect_godot_signal(
-        menu_assets.start_button.as_mut().unwrap(),
-        "pressed",
-        &mut scene_tree,
-    );
+fn connect_start_button(mut menu_assets: ResMut<MenuAssets>, signals: GodotSignals) {
+    signals.connect(menu_assets.start_button.as_mut().unwrap(), "pressed");
 }
 
 fn listen_for_start_button(

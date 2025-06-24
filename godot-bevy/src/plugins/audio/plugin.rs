@@ -6,7 +6,7 @@ use crate::plugins::audio::{
     ActiveTween, AudioChannel, AudioChannelMarker, AudioCommand, AudioOutput, AudioPlayerType,
     AudioSettings, ChannelId, ChannelState, MainAudioTrack, PlayCommand, SoundId, TweenType,
 };
-use crate::plugins::core::SceneTreeRef;
+use crate::plugins::core::{MainThreadAccess, SceneTreeRef};
 use bevy::app::{App, Plugin, Update};
 use bevy::asset::Assets;
 use bevy::ecs::system::ResMut;
@@ -351,10 +351,7 @@ fn start_audio_playback(handle: &mut GodotNodeHandle) {
 }
 
 /// System that cleans up finished sounds
-fn cleanup_finished_sounds(
-    mut audio_output: ResMut<AudioOutput>,
-    _main_thread: crate::plugins::core::MainThreadAccess,
-) {
+fn cleanup_finished_sounds(mut audio_output: ResMut<AudioOutput>, _main_thread: MainThreadAccess) {
     let mut finished_sounds = Vec::new();
 
     for (&sound_id, handle) in audio_output.playing_sounds.iter_mut() {
@@ -404,7 +401,7 @@ fn remove_and_free_audio_node(handle: &mut GodotNodeHandle) {
 fn update_audio_tweens(
     mut audio_output: ResMut<AudioOutput>,
     time: Res<Time>,
-    _main_thread: crate::plugins::core::MainThreadAccess,
+    _main_thread: MainThreadAccess,
 ) {
     let delta = time.delta();
     let mut completed_tweens = Vec::new();

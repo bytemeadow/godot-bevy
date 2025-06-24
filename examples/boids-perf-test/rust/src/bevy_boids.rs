@@ -157,6 +157,7 @@ fn sync_container_params(
     mut config: ResMut<BoidsConfig>,
     mut simulation_state: ResMut<SimulationState>,
     container_query: Query<&GodotNodeHandle, With<BoidsContainer>>,
+    _main_thread: MainThreadAccess,
 ) {
     for handle in container_query.iter() {
         let mut handle_clone = handle.clone();
@@ -280,6 +281,7 @@ fn update_simulation_state(
     simulation_state: Res<SimulationState>,
     mut commands: Commands,
     boids: Query<(Entity, &GodotNodeHandle), With<Boid>>,
+    _main_thread: MainThreadAccess,
 ) {
     // If simulation was just stopped, clean up all boids
     if !simulation_state.is_running && boids.iter().count() > 0 {
@@ -356,6 +358,9 @@ fn boids_calculate_neighborhood_forces(
         With<Boid>,
     >,
     config: Res<BoidsConfig>,
+    // NOTE: While this doesn't _need_ to be on the main thread, we see a
+    // significant performance impact (75 -> 53 fps drop) when not on main
+    _main_thread: MainThreadAccess,
 ) {
     pending_velocity_update_query.iter_mut().for_each(
         |(entity, transform, mut boid_force, velocity)| {

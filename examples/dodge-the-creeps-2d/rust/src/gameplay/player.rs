@@ -113,6 +113,7 @@ fn move_player(
         &mut AnimationState,
     )>,
     physics_delta: Res<PhysicsDelta>,
+    _main_thread: MainThreadAccess,
 ) -> Result {
     if let Ok((player_data, screen_cache, mut transform, mut anim_state)) = player.single_mut() {
         let mut velocity = Vector2::ZERO;
@@ -164,6 +165,7 @@ fn move_player(
 fn check_player_death(
     mut player: Query<(&mut VisibilityState, &Collisions), With<Player>>,
     mut next_state: ResMut<NextState<GameState>>,
+    _main_thread: MainThreadAccess,
 ) {
     if let Ok((mut visibility, collisions)) = player.single_mut() {
         if collisions.colliding().is_empty() {

@@ -1,5 +1,10 @@
-use std::{collections::HashMap, marker::PhantomData};
-
+use super::collisions::ALL_COLLISION_SIGNALS;
+use super::node_markers::*;
+use super::{GodotTransformConfig, TransformSyncMode};
+use crate::prelude::MainThreadAccess;
+use crate::prelude::{Transform2D, Transform3D};
+use crate::{bridge::GodotNodeHandle, prelude::Collisions};
+use bevy::ecs::system::Res;
 use bevy::{
     app::{App, First, Plugin, PreStartup},
     ecs::{
@@ -27,18 +32,8 @@ use godot::{
     obj::{Gd, Inherits},
     prelude::GodotConvert,
 };
-
-use crate::{
-    bridge::GodotNodeHandle,
-    prelude::{Collisions, Transform2D, Transform3D},
-};
-
-use super::node_markers::*;
-use bevy::ecs::system::Res;
-
-use super::{GodotTransformConfig, TransformSyncMode};
-
-use super::collisions::ALL_COLLISION_SIGNALS;
+use std::collections::HashMap;
+use std::marker::PhantomData;
 
 pub struct GodotSceneTreePlugin;
 
@@ -89,6 +84,7 @@ pub fn initialize_scene_tree(
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
     config: Res<GodotTransformConfig>,
     signal_sender: NonSendMut<super::signals::GodotSignalSender>,
+    _main_thread: MainThreadAccess,
 ) {
     fn traverse(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
         events.push(SceneTreeEvent {
@@ -129,7 +125,7 @@ pub enum SceneTreeEventType {
     NodeRenamed,
 }
 
-fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
+fn connect_scene_tree(mut scene_tree: SceneTreeRef, _main_thread: MainThreadAccess) {
     let mut scene_tree_gd = scene_tree.get();
 
     let watcher = scene_tree_gd
@@ -407,8 +403,8 @@ fn create_scene_tree_entity(
                     .any(|&signal| node.has_signal(signal));
 
                 if has_collision_signals {
-                    debug!(target: "godot_scene_tree_collisions", 
-                           node_id = node.instance_id().to_string(), 
+                    debug!(target: "godot_scene_tree_collisions",
+                           node_id = node.instance_id().to_string(),
                            "has collision signals");
 
                     // Connect all available collision signals using the universal handler
@@ -470,6 +466,7 @@ fn read_scene_tree_events(
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
     config: Res<GodotTransformConfig>,
     signal_sender: NonSendMut<super::signals::GodotSignalSender>,
+    _main_thread: MainThreadAccess,
 ) {
     create_scene_tree_entity(
         &mut commands,
