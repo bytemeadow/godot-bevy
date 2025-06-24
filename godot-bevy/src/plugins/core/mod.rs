@@ -56,6 +56,10 @@ impl PhysicsDelta {
     }
 }
 
+/// Resource marker to ensure systems accessing Godot APIs run on the main thread
+#[derive(Resource, Default)]
+pub struct MainThreadMarker;
+
 /// Transform synchronization modes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransformSyncMode {
@@ -139,7 +143,8 @@ impl Plugin for GodotCorePlugin {
             .add_plugins(GodotInputEventPlugin)
             .add_plugins(BevyInputBridgePlugin)
             .init_resource::<PhysicsDelta>()
-            .init_resource::<GodotTransformConfig>();
+            .init_resource::<GodotTransformConfig>()
+            .init_non_send_resource::<MainThreadMarker>();
 
         // Add the PhysicsUpdate schedule
         app.add_schedule(Schedule::new(PhysicsUpdate));

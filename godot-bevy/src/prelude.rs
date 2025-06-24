@@ -46,6 +46,7 @@ pub use crate::plugins::{
         KeyboardInput,
         LabelMarker,
         LineEditMarker,
+        MainThreadMarker,
         MeshInstance2DMarker,
         MeshInstance3DMarker,
         MouseButtonInput,

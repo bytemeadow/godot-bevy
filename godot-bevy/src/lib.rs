@@ -1,6 +1,9 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::needless_lifetimes)]
 
+// Allow the macro to reference the crate externally even from within itself
+extern crate self as godot_bevy;
+
 use bevy::app::{App, Plugin};
 
 pub mod app;
