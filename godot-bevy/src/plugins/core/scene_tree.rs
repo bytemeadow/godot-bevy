@@ -1,7 +1,7 @@
 use super::collisions::ALL_COLLISION_SIGNALS;
 use super::node_markers::*;
 use super::{GodotTransformConfig, TransformSyncMode};
-use crate::prelude::MainThreadAccess;
+use crate::prelude::godot_main_thread;
 use crate::prelude::{Transform2D, Transform3D};
 use crate::{bridge::GodotNodeHandle, prelude::Collisions};
 use bevy::ecs::system::Res;
@@ -78,13 +78,13 @@ impl Default for SceneTreeRefImpl {
     }
 }
 
+#[godot_main_thread]
 pub fn initialize_scene_tree(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
     config: Res<GodotTransformConfig>,
     signal_sender: NonSendMut<super::signals::GodotSignalSender>,
-    _main_thread: MainThreadAccess,
 ) {
     fn traverse(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
         events.push(SceneTreeEvent {
@@ -125,7 +125,8 @@ pub enum SceneTreeEventType {
     NodeRenamed,
 }
 
-fn connect_scene_tree(mut scene_tree: SceneTreeRef, _main_thread: MainThreadAccess) {
+#[godot_main_thread]
+fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
     let mut scene_tree_gd = scene_tree.get();
 
     let watcher = scene_tree_gd
@@ -459,6 +460,7 @@ fn create_scene_tree_entity(
     }
 }
 
+#[godot_main_thread]
 fn read_scene_tree_events(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
@@ -466,7 +468,6 @@ fn read_scene_tree_events(
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
     config: Res<GodotTransformConfig>,
     signal_sender: NonSendMut<super::signals::GodotSignalSender>,
-    _main_thread: MainThreadAccess,
 ) {
     create_scene_tree_entity(
         &mut commands,

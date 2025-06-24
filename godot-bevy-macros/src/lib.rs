@@ -7,6 +7,41 @@ use syn::{
     Data, DeriveInput, Error, Field, Fields, Ident, LitStr, Result, Token, parse_macro_input,
 };
 
+/// Simple marker type for the #[godot_main_thread] macro.
+/// This type is !Send, forcing systems that use it to run on the main thread.
+/// We define it directly in the generated code to avoid proc-macro export restrictions.
+#[proc_macro_attribute]
+pub fn godot_main_thread(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut input_fn = parse_macro_input!(item as syn::ItemFn);
+    let fn_name = &input_fn.sig.ident;
+
+    // Create a unique marker type name based on the function name
+    let marker_name = syn::Ident::new(
+        &format!("GodotMainThreadMarker_{}", fn_name),
+        fn_name.span(),
+    );
+
+    // Add a simple NonSend resource parameter that forces main thread execution
+    let main_thread_param: syn::FnArg = syn::parse_quote! {
+        _main_thread: bevy::ecs::system::NonSend<#marker_name>
+    };
+    input_fn.sig.inputs.push(main_thread_param);
+
+    // Return the modified function with the unique marker type definition
+    let expanded = quote! {
+        // Define the marker type locally with unique name (pub to match function visibility)
+        #[allow(non_camel_case_types)]
+        #[derive(Debug, Default)]
+        pub struct #marker_name {
+            _private: std::marker::PhantomData<*const ()>,
+        }
+
+        #input_fn
+    };
+
+    expanded.into()
+}
+
 #[proc_macro_attribute]
 pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as syn::ItemFn);
