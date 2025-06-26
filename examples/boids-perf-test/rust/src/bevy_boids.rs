@@ -81,22 +81,6 @@ impl Default for BoidsConfig {
     }
 }
 
-/// Resource for performance tracking
-#[derive(Resource)]
-pub struct PerformanceTracker {
-    pub frame_count: u32,
-    pub last_log_time: f32,
-}
-
-impl Default for PerformanceTracker {
-    fn default() -> Self {
-        Self {
-            frame_count: 0,
-            last_log_time: 0.0,
-        }
-    }
-}
-
 /// Plugin for boids simulation
 pub struct BoidsPlugin;
 
@@ -116,7 +100,6 @@ impl Plugin for BoidsPlugin {
         .init_resource::<BoidsConfig>()
         .init_resource::<SimulationState>()
         .init_resource::<BoidCount>()
-        .init_resource::<PerformanceTracker>()
         .add_systems(Startup, load_assets)
         // Game logic systems
         .add_systems(
@@ -382,9 +365,7 @@ fn boids_apply_forces(
     >,
     time: Res<Time>,
     config: Res<BoidsConfig>,
-    mut performance: ResMut<PerformanceTracker>,
 ) {
-    performance.frame_count += 1;
     let delta = time.delta_secs();
 
     boid_transform_query
