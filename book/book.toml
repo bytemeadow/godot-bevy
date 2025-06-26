@@ -4,3 +4,7 @@ language = "en"
 multilingual = false
 src = "src"
 title = "The godot-bevy Book 👾"
+
+[output.html]
+git-repository-url = "https://github.com/bytemeadow/godot-bevy"
+edit-url-template = "https://github.com/bytemeadow/godot-bevy/edit/main/book/{path}"
