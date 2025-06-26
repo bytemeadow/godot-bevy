@@ -17,7 +17,7 @@ fn main() -> Result<(), std::io::Error> {
         "release"
     };
 
-    println!("Running with Rust build profile: {}", profile);
+    println!("Running with Rust build profile: {profile}");
 
     // Update gdextension file if running in release mode
     let gdextension_path = Path::new(&run_dir).join("rust.gdextension");
