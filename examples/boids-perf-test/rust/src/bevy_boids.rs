@@ -124,9 +124,8 @@ impl Plugin for BoidsPlugin {
             (
                 sync_container_params,
                 handle_boid_count,
-                update_simulation_state,
+                stop_simulation,
                 colorize_new_boids,
-                log_performance,
             )
                 .chain(),
         )
@@ -194,14 +193,14 @@ fn handle_boid_count(
     config: Res<BoidsConfig>,
     boid_scene: Res<BoidScene>,
 ) {
-    // Count current boids
-    let current_count = boids.iter().count() as i32;
-    boid_count.current = current_count;
-
     // Skip spawning/despawning if simulation isn't running
     if !simulation_state.is_running {
         return;
     }
+
+    // Count current boids
+    let current_count = boids.iter().count() as i32;
+    boid_count.current = current_count;
 
     let target_count = boid_count.target;
 
@@ -278,7 +277,7 @@ fn despawn_boids(
 
 /// Update simulation state and manage cleanup on stop
 #[godot_main_thread]
-fn update_simulation_state(
+fn stop_simulation(
     simulation_state: Res<SimulationState>,
     mut commands: Commands,
     boids: Query<(Entity, &GodotNodeHandle), With<Boid>>,
@@ -565,26 +564,4 @@ fn apply_boundary_constraints(pos: Vec2, config: &BoidsConfig) -> Vec2 {
             pos.y
         },
     )
-}
-
-/// Log performance metrics
-fn log_performance(
-    mut performance: ResMut<PerformanceTracker>,
-    time: Res<Time>,
-    _boids: Query<&Transform2D, With<Boid>>,
-) {
-    let current_time = time.elapsed_secs();
-    if current_time - performance.last_log_time >= 1.0 {
-        // Performance logging disabled for accurate benchmarking
-        // let fps = performance.frame_count as f32 / (current_time - performance.last_log_time);
-        // let actual_boid_count = boids.iter().count();
-        // godot_print!(
-        //     "🎮 Bevy Boids: {} boids | FPS: {:.1}",
-        //     actual_boid_count,
-        //     fps
-        // );
-
-        performance.last_log_time = current_time;
-        performance.frame_count = 0;
-    }
 }

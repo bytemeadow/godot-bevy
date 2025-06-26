@@ -19,7 +19,6 @@ extends Control
 
 @onready var godot_boids: Node2D = $GodotBoidsContainer
 @onready var bevy_boids: Node2D = $BevyBoidsContainer
-@onready var bevy_app_singleton: Node = get_node("/root/BevyAppSingleton")
 
 enum Implementation {
 	GODOT = 0,
@@ -45,10 +44,6 @@ func _ready():
 
 	# Set up performance tracking
 	reset_performance_metrics()
-
-	# Ensure BevyApp starts disabled
-	if bevy_app_singleton and bevy_app_singleton.has_method("set_enabled"):
-		bevy_app_singleton.set_enabled(false)
 
 	print("🎮 Boids Performance Benchmark Ready!")
 	print("   - Switch between Godot (GDScript) and godot-bevy (Rust + ECS)")
@@ -125,14 +120,8 @@ func _on_implementation_changed(index: int):
 	match current_implementation:
 		Implementation.GODOT:
 			_update_status("Switched to Godot (GDScript)")
-			# Disable BevyApp when switching to Godot
-			if bevy_app_singleton and bevy_app_singleton.has_method("set_enabled"):
-				bevy_app_singleton.set_enabled(false)
 		Implementation.BEVY:
 			_update_status("Switched to godot-bevy (Rust + ECS)")
-			# Enable BevyApp when switching to Bevy
-			if bevy_app_singleton and bevy_app_singleton.has_method("set_enabled"):
-				bevy_app_singleton.set_enabled(true)
 
 func _on_boid_count_changed(value: float):
 	target_boid_count = int(value)
@@ -194,9 +183,6 @@ func _start_godot_benchmark():
 
 func _start_bevy_benchmark():
 	_update_status("Running godot-bevy benchmark...")
-	# Ensure BevyApp is enabled
-	if bevy_app_singleton and bevy_app_singleton.has_method("set_enabled"):
-		bevy_app_singleton.set_enabled(true)
 	bevy_boids.start_benchmark(target_boid_count)
 
 func _stop_current_benchmark():
@@ -235,4 +221,3 @@ func print_performance_summary():
 	print("   Max FPS: %.1f" % summary.max_fps)
 	print("   Duration: %.1f seconds" % summary.duration_seconds)
 	print("   Samples: %d" % summary.sample_count)
-
