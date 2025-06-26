@@ -68,25 +68,35 @@ fn update_godot_collisions(
     // Process collision signals
     for signal in signal_events.read() {
         let signal_name = signal.name.as_str();
-        let (event_type, origin, target) = if COLLISION_START_SIGNALS.contains(&signal_name) {
-            (CollisionEventType::Started, &signal.origin, &signal.target)
+        let event_type = if COLLISION_START_SIGNALS.contains(&signal_name) {
+            CollisionEventType::Started
         } else if COLLISION_END_SIGNALS.contains(&signal_name) {
-            (CollisionEventType::Ended, &signal.origin, &signal.target)
+            CollisionEventType::Ended
         } else {
             continue; // Skip non-collision signals
         };
 
+        // The colliding body/area is passed as the first argument to collision signals
+        let target_node_handle = match signal.arguments.first() {
+            Some(arg) => match &arg.instance_id {
+                Some(instance_id) => GodotNodeHandle::from_instance_id(*instance_id),
+                None => continue, // Skip if first argument is not an object with instance ID
+            },
+            None => continue, // Skip if no arguments
+        };
+
         trace!(target: "godot_collisions_update", signal = ?signal, event_type = ?event_type);
 
-        let target_entity =
-            all_entities.iter().find_map(
-                |(ent, reference)| {
-                    if reference == target { Some(ent) } else { None }
-                },
-            );
+        let target_entity = all_entities.iter().find_map(|(ent, reference)| {
+            if *reference == target_node_handle {
+                Some(ent)
+            } else {
+                None
+            }
+        });
 
         let collisions = entities.iter_mut().find_map(|(reference, collisions)| {
-            if reference == origin {
+            if reference == &signal.origin {
                 Some(collisions)
             } else {
                 None

@@ -23,7 +23,6 @@ lazy_static::lazy_static! {
 pub struct BevyApp {
     base: Base<Node>,
     app: Option<App>,
-    enabled: bool,
 }
 
 impl BevyApp {
@@ -33,15 +32,6 @@ impl BevyApp {
 
     pub fn get_app_mut(&mut self) -> Option<&mut App> {
         self.app.as_mut()
-    }
-
-    pub fn shutdown(&mut self) {
-        // Clean up the Bevy app
-        if let Some(mut app) = self.app.take() {
-            // Trigger cleanup of all resources
-            app.cleanup();
-        }
-        self.app = None;
     }
 
     fn register_scene_tree_watcher(&mut self, app: &mut App) {
@@ -77,7 +67,6 @@ impl INode for BevyApp {
         Self {
             base,
             app: Default::default(),
-            enabled: false, // Start disabled by default
         }
     }
 
@@ -105,10 +94,6 @@ impl INode for BevyApp {
             return;
         }
 
-        if !self.enabled {
-            return;
-        }
-
         if let Some(app) = self.app.as_mut() {
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
                 // Run the full Bevy update cycle - much simpler!
@@ -129,10 +114,6 @@ impl INode for BevyApp {
             return;
         }
 
-        if !self.enabled {
-            return;
-        }
-
         if let Some(app) = self.app.as_mut() {
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
                 // Update physics delta resource with Godot's delta
@@ -147,33 +128,5 @@ impl INode for BevyApp {
                 resume_unwind(e);
             }
         }
-    }
-
-    fn exit_tree(&mut self) {
-        // Clean up when the node is removed from the tree
-        self.shutdown();
-    }
-}
-
-#[godot_api]
-impl BevyApp {
-    #[func]
-    pub fn shutdown_bevy(&mut self) {
-        self.shutdown();
-    }
-
-    #[func]
-    pub fn set_enabled(&mut self, enabled: bool) {
-        self.enabled = enabled;
-        if enabled {
-            godot_print!("BevyApp enabled - Bevy systems will now run");
-        } else {
-            godot_print!("BevyApp disabled - Bevy systems will not run");
-        }
-    }
-
-    #[func]
-    pub fn is_enabled(&self) -> bool {
-        self.enabled
     }
 }

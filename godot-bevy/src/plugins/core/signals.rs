@@ -7,7 +7,8 @@ use bevy::{
     },
 };
 use godot::{
-    classes::Node,
+    classes::{Node, Object},
+    obj::{Gd, InstanceId},
     prelude::{Callable, Variant},
 };
 use std::sync::mpsc::Sender;
@@ -27,6 +28,7 @@ impl Plugin for GodotSignalsPlugin {
 pub struct GodotSignalArgument {
     pub type_name: String,
     pub value: String,
+    pub instance_id: Option<InstanceId>,
 }
 
 #[derive(Debug, Event)]
@@ -116,5 +118,19 @@ pub fn variant_to_signal_argument(variant: &Variant) -> GodotSignalArgument {
 
     let value = variant.stringify().to_string();
 
-    GodotSignalArgument { type_name, value }
+    // Extract instance ID for objects
+    let instance_id = if variant.get_type() == godot::prelude::VariantType::OBJECT {
+        variant
+            .try_to::<Gd<Object>>()
+            .ok()
+            .map(|obj| obj.instance_id())
+    } else {
+        None
+    };
+
+    GodotSignalArgument {
+        type_name,
+        value,
+        instance_id,
+    }
 }
