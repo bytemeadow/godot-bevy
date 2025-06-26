@@ -348,8 +348,9 @@ fn sync_transforms(mut query: Query<(&Transform2D, &mut Transform), With<Boid>>)
             *vanilla_transform = *encapsulated_transform.as_bevy()
         });
 }
-
 // system to calculate/store neighborhood forces
+// NOTE: While this doesn't _need_ to be on the main thread, we see a
+// significant performance impact (75 -> 53 fps drop) when not on main
 #[godot_main_thread]
 fn boids_calculate_neighborhood_forces(
     spatial_tree: Res<BoidTree>,
@@ -359,8 +360,6 @@ fn boids_calculate_neighborhood_forces(
         With<Boid>,
     >,
     config: Res<BoidsConfig>,
-    // NOTE: While this doesn't _need_ to be on the main thread, we see a
-    // significant performance impact (75 -> 53 fps drop) when not on main
 ) {
     pending_velocity_update_query.iter_mut().for_each(
         |(entity, transform, mut boid_force, velocity)| {
