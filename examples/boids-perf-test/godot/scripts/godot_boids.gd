@@ -265,20 +265,20 @@ func _calculate_cohesion_optimized(boid_pos: Vector2, boid_vel: Vector2, nearby_
 	var desired = (center_of_mass - boid_pos).normalized() * max_speed
 	return (desired - boid_vel).limit_length(max_force)
 
-func _calculate_boundary_avoidance_optimized(position: Vector2, velocity: Vector2) -> Vector2:
+func _calculate_boundary_avoidance_optimized(pos: Vector2, velocity: Vector2) -> Vector2:
 	var steer = Vector2.ZERO
 	var margin = 100.0
 
 	# Calculate boundary forces
-	if position.x < margin:
-		steer.x += margin - position.x
-	elif position.x > world_bounds.x - margin:
-		steer.x -= position.x - (world_bounds.x - margin)
+	if pos.x < margin:
+		steer.x += margin - pos.x
+	elif pos.x > world_bounds.x - margin:
+		steer.x -= pos.x - (world_bounds.x - margin)
 
-	if position.y < margin:
-		steer.y += margin - position.y
-	elif position.y > world_bounds.y - margin:
-		steer.y -= position.y - (world_bounds.y - margin)
+	if pos.y < margin:
+		steer.y += margin - pos.y
+	elif pos.y > world_bounds.y - margin:
+		steer.y -= pos.y - (world_bounds.y - margin)
 
 	if steer.length_squared() > 0:
 		steer = steer.normalized() * max_speed - velocity
@@ -288,7 +288,7 @@ func _calculate_boundary_avoidance_optimized(position: Vector2, velocity: Vector
 
 func _update_boid_physics_optimized(boid_index: int, force: Vector2, delta: float):
 	var velocity = boid_velocities[boid_index]
-	var position = boid_positions[boid_index]
+	var pos = boid_positions[boid_index]
 
 	# Debug logging removed for performance
 
@@ -299,19 +299,19 @@ func _update_boid_physics_optimized(boid_index: int, force: Vector2, delta: floa
 	# Debug output removed
 
 	# Update position
-	position += velocity * delta
+	pos += velocity * delta
 
 	# Wrap around boundaries (toroidal world)
-	position.x = fmod(position.x + world_bounds.x, world_bounds.x)
-	position.y = fmod(position.y + world_bounds.y, world_bounds.y)
+	pos.x = fmod(pos.x + world_bounds.x, world_bounds.x)
+	pos.y = fmod(pos.y + world_bounds.y, world_bounds.y)
 
 	# Store back to arrays
 	boid_velocities[boid_index] = velocity
-	boid_positions[boid_index] = position
+	boid_positions[boid_index] = pos
 
 	# Update visual node position and rotation
 	var boid = boid_nodes[boid_index]
-	boid.position = position
+	boid.position = pos
 	if velocity.length_squared() > 0:
 		boid.rotation = velocity.angle()
 

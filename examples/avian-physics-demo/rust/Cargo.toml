@@ -1,0 +1,26 @@
+[package]
+name = "avian_physics_test"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+
+[lib]
+crate-type = ["cdylib"]
+
+[[bin]]
+path = "../../run_godot.rs"
+name = "avian_physics_test"
+
+[dependencies]
+avian3d = "0.3"
+bevy = { version = "0.16", default-features = false, features = [
+    "bevy_asset",
+    "bevy_state",
+    "bevy_log",
+    "bevy_gilrs",
+    "multi_threaded",
+] }
+bevy_asset_loader = "0.23.0"
+godot = "0.3"
+godot-bevy = { path = "../../../godot-bevy" }
+which = "8"

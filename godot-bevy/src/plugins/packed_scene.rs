@@ -1,7 +1,5 @@
-use super::core::{SceneTreeRef, Transform2D, Transform3D};
-use crate::bridge::GodotNodeHandle;
-use crate::plugins::assets::GodotResource;
-use crate::prelude::godot_main_thread;
+use std::str::FromStr;
+
 use bevy::{
     app::{App, Plugin, PostUpdate},
     asset::{Assets, Handle},
@@ -12,12 +10,17 @@ use bevy::{
         system::{Commands, Query, ResMut},
     },
     log::tracing,
+    transform::components::Transform,
 };
 use godot::{
     builtin::GString,
     classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader},
 };
-use std::str::FromStr;
+
+use crate::plugins::{assets::GodotResource, core::transforms::IntoGodotTransform2D};
+use crate::{bridge::GodotNodeHandle, plugins::core::transforms::IntoGodotTransform};
+
+use super::core::SceneTreeRef;
 
 pub struct PackedScenePlugin;
 impl Plugin for PackedScenePlugin {
@@ -69,22 +72,17 @@ impl GodotScene {
 #[derive(Component, Debug, Default)]
 struct GodotSceneSpawned;
 
-#[godot_main_thread]
 fn spawn_scene(
     mut commands: Commands,
     mut new_scenes: Query<
-        (
-            &mut GodotScene,
-            Entity,
-            Option<&Transform2D>,
-            Option<&Transform3D>,
-        ),
+        (&mut GodotScene, Entity, Option<&Transform>),
         Without<GodotSceneSpawned>,
     >,
     mut scene_tree: SceneTreeRef,
     mut assets: ResMut<Assets<GodotResource>>,
 ) {
-    for (mut scene, ent, transform2d, transform3d) in new_scenes.iter_mut() {
+    // godot::global::godot_print!("spawning scene: {}", new_scenes.iter().count());
+    for (mut scene, ent, transform) in new_scenes.iter_mut() {
         let packed_scene = match &scene.resource {
             GodotSceneResource::Handle(handle) => assets
                 .get_mut(handle)
@@ -112,21 +110,15 @@ fn spawn_scene(
             }
         };
 
-        if let Some(transform) = transform2d {
-            match instance.clone().try_cast::<Node2D>().ok() {
-                Some(mut node2d) => node2d.set_global_transform(*transform.as_godot()),
-                None => tracing::error!(
-                    "attempted to spawn a scene with a transform on Node that did not inherit from Node2D, the transform was not set"
-                ),
-            }
-        }
-
-        if let Some(transform) = transform3d {
-            match instance.clone().try_cast::<Node3D>().ok() {
-                Some(mut node3d) => node3d.set_global_transform(*transform.as_godot()),
-                None => tracing::error!(
-                    "attempted to spawn a scene with a transform on Node that did not inherit from Node3D, the transform was not set"
-                ),
+        if let Some(transform) = transform {
+            if let Ok(mut node) = instance.clone().try_cast::<Node3D>() {
+                node.set_global_transform(transform.to_godot_transform());
+            } else if let Ok(mut node) = instance.clone().try_cast::<Node2D>() {
+                node.set_global_transform(transform.to_godot_transform_2d());
+            } else {
+                tracing::error!(
+                    "attempted to spawn a scene with a transform on Node that did not inherit from Node, the transform was not set"
+                )
             }
         }
 

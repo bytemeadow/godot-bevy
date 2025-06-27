@@ -30,13 +30,13 @@ var bevy_boids: Node2D = null
 func _ready():
 	# Parse command line arguments
 	_parse_command_line()
-	
+
 	# Check if we're in headless mode
 	headless = OS.has_feature("headless") or args.has("headless") or DisplayServer.get_name() == "headless"
-	
+
 	print("🔍 Headless mode: %s" % headless)
 	print("🔍 Args found: %s" % args)
-	
+
 	if headless or args.size() > 0:
 		print("🚀 Running in benchmark mode")
 		_setup_headless_benchmark()
@@ -44,7 +44,7 @@ func _ready():
 func _parse_command_line():
 	var cmd_args = OS.get_cmdline_args()
 	print("📋 Command line args: %s" % cmd_args)
-	
+
 	# Godot includes the script arguments in the cmdline args
 	# Look for our custom arguments that start with "--"
 	for arg in cmd_args:
@@ -57,20 +57,20 @@ func _parse_command_line():
 				if key in ["implementation", "boid-count", "duration", "output", "headless"]:
 					args[key] = value
 					print("   Found arg: %s = %s" % [key, value])
-	
+
 	# Apply parsed arguments
 	if args.has("implementation"):
 		implementation = args["implementation"].to_lower()
-	
+
 	if args.has("boid-count"):
 		boid_count = args["boid-count"].to_int()
-	
+
 	if args.has("duration"):
 		duration = args["duration"].to_float()
-	
+
 	if args.has("output"):
 		output_file = args["output"]
-	
+
 	print("📋 Benchmark Configuration:")
 	print("   Implementation: %s" % implementation)
 	print("   Boid Count: %d" % boid_count)
@@ -80,7 +80,7 @@ func _parse_command_line():
 
 func _setup_headless_benchmark():
 	print("📍 Setting up headless benchmark...")
-	
+
 	# In headless mode, we need to load the main scene manually
 	if headless:
 		var main_scene = load("res://scenes/main.tscn")
@@ -95,31 +95,31 @@ func _setup_headless_benchmark():
 			push_error("Could not load main scene!")
 			get_tree().quit(1)
 			return
-	
+
 	# Wait another frame for everything to initialize
 	await get_tree().process_frame
-	
+
 	# Find the boids implementations
 	print("📍 Looking for boids containers...")
 	godot_boids = get_node_or_null("/root/Main/GodotBoidsContainer")
 	bevy_boids = get_node_or_null("/root/Main/BevyBoidsContainer")
-	
+
 	if not godot_boids:
 		print("❌ Could not find GodotBoidsContainer at /root/Main/GodotBoidsContainer")
 		# Try alternative paths
 		for node in get_tree().get_nodes_in_group("_boids_containers"):
 			print("   Found node in group: %s" % node.get_path())
-	
+
 	if not bevy_boids:
 		print("❌ Could not find BevyBoidsContainer at /root/Main/BevyBoidsContainer")
-	
+
 	if not godot_boids or not bevy_boids:
 		push_error("Could not find boids containers!")
 		get_tree().quit(1)
 		return
-	
+
 	print("✅ Found both containers")
-	
+
 	# Start the benchmark
 	_start_headless_benchmark()
 
@@ -128,7 +128,7 @@ func _start_headless_benchmark():
 	print("   Implementation: %s" % implementation)
 	print("   Boid count: %d" % boid_count)
 	print("   Duration: %.1f seconds" % duration)
-	
+
 	# Start the appropriate implementation
 	match implementation:
 		"godot":
@@ -148,7 +148,7 @@ func _start_headless_benchmark():
 		_:
 			push_error("Unknown implementation: %s" % implementation)
 			get_tree().quit(1)
-	
+
 	# Wait for boids to spawn before starting measurement
 	print("⏳ Waiting for boids to spawn...")
 	_wait_for_boid_spawn()
@@ -161,16 +161,16 @@ func _process(delta: float):
 	if not warmup_complete:
 		_handle_warmup(delta)
 		return
-	
+
 	if not is_running:
 		return
-	
+
 	# Track frame time
 	frame_times.append(delta)
-	
+
 	# Check if benchmark is complete
 	var elapsed = (Time.get_ticks_msec() / 1000.0) - start_time
-	
+
 	# Print progress every second
 	if int(elapsed) != int(elapsed - delta):
 		var current_boid_count = 0
@@ -181,16 +181,16 @@ func _process(delta: float):
 			"bevy", "rust":
 				if bevy_boids and bevy_boids.has_method("get_boid_count"):
 					current_boid_count = bevy_boids.get_boid_count()
-		
+
 		var fps = 1.0 / delta if delta > 0 else 0.0
 		print("⏱️  Progress: %.1f/%d seconds | Boids: %d | FPS: %.1f" % [elapsed, duration, current_boid_count, fps])
-	
+
 	if elapsed >= duration:
 		_complete_benchmark()
 
 func _handle_warmup(delta: float):
 	warmup_time += delta
-	
+
 	# Check current boid count
 	var current_boid_count = 0
 	match implementation:
@@ -200,11 +200,11 @@ func _handle_warmup(delta: float):
 		"bevy", "rust":
 			if bevy_boids and bevy_boids.has_method("get_boid_count"):
 				current_boid_count = bevy_boids.get_boid_count()
-	
+
 	# Print progress every second during warmup
 	if int(warmup_time) != int(warmup_time - delta):
 		print("⏳ Warmup: %d/%d boids spawned (%.1fs)" % [current_boid_count, boid_count, warmup_time])
-	
+
 	# Check if we've reached target count or timeout
 	if current_boid_count >= boid_count:
 		print("✅ Target boid count reached! Starting measurement...")
@@ -226,7 +226,7 @@ func _get_warmup_timeout() -> float:
 func _complete_benchmark():
 	print("\n🏁 Benchmark complete!")
 	is_running = false
-	
+
 	# Stop the benchmark
 	match implementation:
 		"godot":
@@ -235,16 +235,16 @@ func _complete_benchmark():
 		"bevy", "rust":
 			if bevy_boids and bevy_boids.has_method("stop_benchmark"):
 				bevy_boids.stop_benchmark()
-	
+
 	# Calculate results
 	var results = _calculate_results()
-	
+
 	# Output results
 	_output_results(results)
-	
+
 	# Emit completion signal
 	benchmark_completed.emit(results)
-	
+
 	# Quit if in headless mode
 	if headless:
 		print("👋 Exiting...")
@@ -253,34 +253,34 @@ func _complete_benchmark():
 func _calculate_results() -> Dictionary:
 	# Remove first few frames to account for startup
 	var adjusted_frame_times = frame_times.slice(10) if frame_times.size() > 10 else frame_times
-	
+
 	# Calculate statistics
 	var total_time = 0.0
 	var min_frame_time = INF
 	var max_frame_time = 0.0
-	
+
 	for frame_time in adjusted_frame_times:
 		total_time += frame_time
 		min_frame_time = min(min_frame_time, frame_time)
 		max_frame_time = max(max_frame_time, frame_time)
-	
+
 	var avg_frame_time = total_time / adjusted_frame_times.size() if adjusted_frame_times.size() > 0 else 0.0
-	
+
 	# Calculate FPS values
 	var avg_fps = 1.0 / avg_frame_time if avg_frame_time > 0 else 0.0
 	var min_fps = 1.0 / max_frame_time if max_frame_time > 0 else 0.0
 	var max_fps = 1.0 / min_frame_time if min_frame_time > 0 else 0.0
-	
+
 	# Calculate percentiles
 	var sorted_times = adjusted_frame_times.duplicate()
 	sorted_times.sort()
-	
+
 	var p95_index = int(sorted_times.size() * 0.95)
 	var p99_index = int(sorted_times.size() * 0.99)
-	
+
 	var p95_frame_time = sorted_times[p95_index] if p95_index < sorted_times.size() else 0.0
 	var p99_frame_time = sorted_times[p99_index] if p99_index < sorted_times.size() else 0.0
-	
+
 	return {
 		"implementation": implementation,
 		"boid_count": boid_count,
@@ -313,7 +313,7 @@ func _output_results(results: Dictionary):
 	print("   Average: %.2f ms" % results.avg_frame_time_ms)
 	print("   Min: %.2f ms" % results.min_frame_time_ms)
 	print("   Max: %.2f ms" % results.max_frame_time_ms)
-	
+
 	# Save to file if requested
 	if output_file:
 		_save_results_to_file(results)
@@ -326,17 +326,16 @@ func _save_results_to_file(results: Dictionary):
 		if output_dir != "" and not dir.dir_exists(output_dir):
 			print("📁 Creating directory: %s" % output_dir)
 			dir.make_dir_recursive(output_dir)
-	
+
 	# Save the file
 	var file = FileAccess.open(output_file, FileAccess.WRITE)
 	if file:
 		# Save as JSON
-		var json = JSON.new()
-		json.stringify(results, "\t")
-		file.store_string(json.stringify(results, "\t"))
+		JSON.stringify(results, "\t")
+		file.store_string(JSON.stringify(results, "\t"))
 		file.close()
 		print("\n💾 Results saved to: %s" % output_file)
-		
+
 		# Double-check file exists
 		if FileAccess.file_exists(output_file):
 			print("✅ File verified at: %s" % output_file)

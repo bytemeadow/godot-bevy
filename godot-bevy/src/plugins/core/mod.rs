@@ -19,7 +19,6 @@ pub mod scene_tree;
 pub use scene_tree::*;
 
 pub mod transforms;
-pub use transforms::{Transform2D, Transform3D};
 
 pub mod signals;
 pub use signals::*;
@@ -81,17 +80,9 @@ impl Default for TransformSyncMode {
 }
 
 /// Configuration resource for transform syncing behavior
-#[derive(Resource, Debug, Clone)]
+#[derive(Resource, Debug, Clone, Default)]
 pub struct GodotTransformConfig {
     pub sync_mode: TransformSyncMode,
-}
-
-impl Default for GodotTransformConfig {
-    fn default() -> Self {
-        Self {
-            sync_mode: TransformSyncMode::OneWay,
-        }
-    }
 }
 
 impl GodotTransformConfig {

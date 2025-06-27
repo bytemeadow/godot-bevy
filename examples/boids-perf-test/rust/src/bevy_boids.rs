@@ -1,20 +1,22 @@
+use crate::container::{BevyBoids, BoidsContainer};
 use bevy::{
     ecs::{
         component::Component,
         system::{Commands, Query, Res, ResMut},
     },
     math::Vec2,
-    prelude::*,
+    prelude::{
+        info, vec3, warn, App, AssetServer, Entity, Handle, IntoScheduleConfigs, Plugin, Resource,
+        Startup, Time, Transform, Update, Vec, Vec3, Vec3Swizzles, With,
+    },
 };
 use bevy_spatial::{kdtree::KDTree2, AutomaticUpdate, SpatialAccess, SpatialStructure};
-
-use godot::builtin::Color as GodotColor;
-use godot::classes::Node as GodotNode;
-use godot::prelude::*;
-use godot_bevy::plugins::core::Transform2D;
-use godot_bevy::prelude::*;
-
-use crate::container::{BevyBoids, BoidsContainer};
+use godot::{
+    builtin::Color as GodotColor,
+    classes::Node as GodotNode,
+    prelude::{Node2D, Vector2},
+};
+use godot_bevy::prelude::{godot_main_thread, GodotNodeHandle, GodotResource, GodotScene};
 
 // Type alias for our spatial tree
 type BoidTree = KDTree2<Boid>;
@@ -115,11 +117,7 @@ impl Plugin for BoidsPlugin {
         // Movement systems
         .add_systems(
             Update,
-            (
-                sync_transforms,
-                boids_calculate_neighborhood_forces,
-                boids_apply_forces,
-            )
+            (boids_calculate_neighborhood_forces, boids_apply_forces)
                 .chain()
                 .run_if(|state: Res<SimulationState>| state.is_running)
                 .after(sync_container_params),
@@ -203,30 +201,21 @@ fn handle_boid_count(
 fn spawn_boids(commands: &mut Commands, count: i32, config: &BoidsConfig, boid_scene: &BoidScene) {
     for _ in 0..count {
         // Create position and velocity
-        let pos = Vector2::new(
+        let transform = Transform::default().with_translation(vec3(
             fastrand::f32() * config.world_bounds.x,
             fastrand::f32() * config.world_bounds.y,
-        );
+            0.,
+        ));
 
         let velocity = Vector2::new(
             (fastrand::f32() - 0.5) * 200.0,
             (fastrand::f32() - 0.5) * 200.0,
         );
 
-        // Create a transform using Godot's Transform2D
-        let godot_transform = godot::prelude::Transform2D::IDENTITY.translated(pos);
-        let transform = Transform2D::from(godot_transform);
-
         let entity = commands
             .spawn_empty()
             .insert(GodotScene::from_handle(boid_scene.0.clone()))
-            .insert((
-                Boid,
-                Velocity(velocity),
-                transform,
-                Transform::default(),
-                BoidForce::default(),
-            ))
+            .insert((Boid, Velocity(velocity), transform, BoidForce::default()))
             .id();
 
         // We'll set the color after the entity is spawned in the next frame
@@ -318,18 +307,6 @@ fn colorize_new_boids(
     }
 }
 
-// system to copy transform
-fn sync_transforms(mut query: Query<(&Transform2D, &mut Transform), With<Boid>>) {
-    query
-        .par_iter_mut()
-        .for_each(|(encapsulated_transform, mut vanilla_transform)| {
-            // for bevy_spatial's Kd tree to work properly, we need to have a Bevy Transform component
-            // directly in entity (as opposed to our  Transform2D which encapsulates bevy and godot
-            // transforms). so we replicate Transform2D's internal one to a location friendly for
-            // bevy_spatial:
-            *vanilla_transform = *encapsulated_transform.as_bevy()
-        });
-}
 // system to calculate/store neighborhood forces
 // NOTE: While this doesn't _need_ to be on the main thread, we see a
 // significant performance impact (75 -> 53 fps drop) when not on main
@@ -360,7 +337,7 @@ fn boids_calculate_neighborhood_forces(
 // system to apply forces
 fn boids_apply_forces(
     mut boid_transform_query: Query<
-        (Entity, &mut Transform2D, &mut Velocity, &BoidForce),
+        (Entity, &mut Transform, &mut Velocity, &BoidForce),
         With<Boid>,
     >,
     time: Res<Time>,
@@ -378,18 +355,9 @@ fn boids_apply_forces(
                 velocity.0 = velocity.0.normalized() * config.max_speed;
             }
 
-            // Read current position from Transform2D
-            let current_pos =
-                Vec2::new(transform.as_godot().origin.x, transform.as_godot().origin.y);
-
             // Calculate new position
-            let new_pos = current_pos + Vec2::new(velocity.0.x, velocity.0.y) * delta;
-            let bounded_pos = apply_boundary_constraints(new_pos, &config);
-
-            // Write new position to Transform2D
-            let mut godot_transform = *transform.as_godot();
-            godot_transform.origin = Vector2::new(bounded_pos.x, bounded_pos.y);
-            *transform = Transform2D::from(godot_transform);
+            transform.translation += vec3(velocity.0.x, velocity.0.y, 0.) * delta;
+            apply_boundary_constraints(&mut transform.translation, &config);
         });
 }
 
@@ -528,21 +496,20 @@ fn calculate_boundary_avoidance(pos: Vec2, velocity: Vector2, config: &BoidsConf
 }
 
 /// Apply boundary constraints with wraparound behavior
-fn apply_boundary_constraints(pos: Vec2, config: &BoidsConfig) -> Vec2 {
-    Vec2::new(
-        if pos.x < 0.0 {
-            config.world_bounds.x + pos.x
-        } else if pos.x > config.world_bounds.x {
-            pos.x - config.world_bounds.x
-        } else {
-            pos.x
-        },
-        if pos.y < 0.0 {
-            config.world_bounds.y + pos.y
-        } else if pos.y > config.world_bounds.y {
-            pos.y - config.world_bounds.y
-        } else {
-            pos.y
-        },
-    )
+fn apply_boundary_constraints(pos: &mut Vec3, config: &BoidsConfig) {
+    pos.x = if pos.x < 0.0 {
+        config.world_bounds.x + pos.x
+    } else if pos.x > config.world_bounds.x {
+        pos.x - config.world_bounds.x
+    } else {
+        pos.x
+    };
+
+    pos.y = if pos.y < 0.0 {
+        config.world_bounds.y + pos.y
+    } else if pos.y > config.world_bounds.y {
+        pos.y - config.world_bounds.y
+    } else {
+        pos.y
+    };
 }

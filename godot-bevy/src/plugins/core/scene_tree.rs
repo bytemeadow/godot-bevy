@@ -1,8 +1,8 @@
 use super::collisions::ALL_COLLISION_SIGNALS;
 use super::node_markers::*;
 use super::{GodotTransformConfig, TransformSyncMode};
+use crate::plugins::core::transforms::IntoBevyTransform;
 use crate::prelude::godot_main_thread;
-use crate::prelude::{Transform2D, Transform3D};
 use crate::{bridge::GodotNodeHandle, prelude::Collisions};
 use bevy::ecs::system::Res;
 use bevy::{
@@ -32,6 +32,7 @@ use godot::{
     obj::{Gd, Inherits},
     prelude::GodotConvert,
 };
+use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
@@ -104,7 +105,6 @@ pub fn initialize_scene_tree(
     create_scene_tree_entity(
         &mut commands,
         events,
-        &mut scene_tree,
         &mut entities,
         &config,
         &signal_sender.0,
@@ -353,7 +353,6 @@ fn write_scene_tree_events(
 fn create_scene_tree_entity(
     commands: &mut Commands,
     events: impl IntoIterator<Item = SceneTreeEvent>,
-    scene_tree: &mut SceneTreeRef,
     entities: &mut Query<(&mut GodotNodeHandle, Entity)>,
     config: &GodotTransformConfig,
     signal_sender: &std::sync::mpsc::Sender<super::signals::GodotSignal>,
@@ -362,7 +361,6 @@ fn create_scene_tree_entity(
         .iter()
         .map(|(reference, ent)| (reference.instance_id(), ent))
         .collect::<HashMap<_, _>>();
-    let scene_root = scene_tree.get().get_root().unwrap();
 
     for event in events.into_iter() {
         trace!(target: "godot_scene_tree_events", event = ?event);
@@ -378,21 +376,23 @@ fn create_scene_tree_entity(
                     commands.spawn_empty()
                 };
 
-                ent.insert(GodotNodeHandle::clone(&node))
-                    .insert(Name::from(node.get::<Node>().get_name().to_string()));
+                // insert_if_new so we avoid stomping on user-provided data
+                ent.insert_if_new(GodotNodeHandle::clone(&node))
+                    .insert_if_new(Name::from(node.get::<Node>().get_name().to_string()));
 
                 // Add node type marker components
                 add_node_type_markers(&mut ent, &mut node);
 
                 // Only add transform components if sync mode is not disabled
                 if config.sync_mode != TransformSyncMode::Disabled {
-                    if let Some(node3d) = node.try_get::<Node3D>() {
-                        ent.insert(Transform3D::from(node3d.get_transform()));
-                    }
-
-                    if let Some(node2d) = node.try_get::<Node2D>() {
-                        let transform = node2d.get_transform();
-                        ent.insert(Transform2D::from(transform));
+                    if node.type_id() == TypeId::of::<Node3D>() {
+                        // Only insert a Transform if it doesn't exist already, i.e.,
+                        // users may have already added a Transform
+                        ent.insert_if_new(node.get::<Node3D>().get_transform().to_bevy_transform());
+                    } else if node.type_id() == TypeId::of::<Node2D>() {
+                        // Only insert a Transform if it doesn't exist already, i.e.,
+                        // users may have already added a Transform
+                        ent.insert_if_new(node.get::<Node2D>().get_transform().to_bevy_transform());
                     }
                 }
 
@@ -431,13 +431,6 @@ fn create_scene_tree_entity(
 
                 // Try to add any registered bundles for this node type
                 crate::autosync::try_add_bundles_for_node(commands, ent, &event.node);
-
-                if node.instance_id() != scene_root.instance_id() {
-                    let parent = node.get_parent().unwrap().instance_id();
-                    commands
-                        .entity(*ent_mapping.get(&parent).unwrap())
-                        .add_children(&[ent]);
-                }
             }
             SceneTreeEventType::NodeRemoved => {
                 if let Some(ent) = ent {
@@ -463,7 +456,6 @@ fn create_scene_tree_entity(
 #[godot_main_thread]
 fn read_scene_tree_events(
     mut commands: Commands,
-    mut scene_tree: SceneTreeRef,
     mut event_reader: EventReader<SceneTreeEvent>,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
     config: Res<GodotTransformConfig>,
@@ -472,7 +464,6 @@ fn read_scene_tree_events(
     create_scene_tree_entity(
         &mut commands,
         event_reader.read().cloned(),
-        &mut scene_tree,
         &mut entities,
         &config,
         &signal_sender.0,
