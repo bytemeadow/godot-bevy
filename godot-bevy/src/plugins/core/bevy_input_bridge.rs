@@ -212,6 +212,24 @@ fn godot_key_to_bevy_keycode(godot_key: godot::global::Key) -> Option<KeyCode> {
         GK::F11 => Some(BK::F11),
         GK::F12 => Some(BK::F12),
 
+        // Numpad keys
+        GK::KP_0 => Some(BK::Numpad0),
+        GK::KP_1 => Some(BK::Numpad1),
+        GK::KP_2 => Some(BK::Numpad2),
+        GK::KP_3 => Some(BK::Numpad3),
+        GK::KP_4 => Some(BK::Numpad4),
+        GK::KP_5 => Some(BK::Numpad5),
+        GK::KP_6 => Some(BK::Numpad6),
+        GK::KP_7 => Some(BK::Numpad7),
+        GK::KP_8 => Some(BK::Numpad8),
+        GK::KP_9 => Some(BK::Numpad9),
+        GK::KP_ADD => Some(BK::NumpadAdd),
+        GK::KP_SUBTRACT => Some(BK::NumpadSubtract),
+        GK::KP_MULTIPLY => Some(BK::NumpadMultiply),
+        GK::KP_DIVIDE => Some(BK::NumpadDivide),
+        GK::KP_PERIOD => Some(BK::NumpadDecimal),
+        GK::KP_ENTER => Some(BK::NumpadEnter),
+
         _ => None, // Many keys don't have direct equivalents
     }
 }
