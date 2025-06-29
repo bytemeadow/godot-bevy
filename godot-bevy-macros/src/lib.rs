@@ -10,13 +10,13 @@ use syn::{
 /// Attribute macro that ensures a system runs on the main thread by adding a NonSend<MainThreadMarker> parameter.
 /// This is required for systems that need to access Godot APIs.
 #[proc_macro_attribute]
-pub fn godot_main_thread(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn main_thread_system(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input_fn = parse_macro_input!(item as syn::ItemFn);
     let fn_name = &input_fn.sig.ident;
 
     // Create a unique type alias name for this function
     let type_alias_name = syn::Ident::new(
-        &format!("__GodotMainThreadMarker_{fn_name}"),
+        &format!("__MainThreadSystemMarker_{fn_name}"),
         fn_name.span(),
     );
 

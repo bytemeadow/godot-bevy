@@ -1,7 +1,7 @@
 use super::core::{SceneTreeRef, Transform2D, Transform3D};
 use crate::bridge::GodotNodeHandle;
 use crate::plugins::assets::GodotResource;
-use crate::prelude::godot_main_thread;
+use crate::prelude::main_thread_system;
 use bevy::{
     app::{App, Plugin, PostUpdate},
     asset::{Assets, Handle},
@@ -69,7 +69,7 @@ impl GodotScene {
 #[derive(Component, Debug, Default)]
 struct GodotSceneSpawned;
 
-#[godot_main_thread]
+#[main_thread_system]
 fn spawn_scene(
     mut commands: Commands,
     mut new_scenes: Query<

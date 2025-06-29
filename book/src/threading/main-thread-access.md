@@ -13,14 +13,14 @@ Any system that interacts with Godot APIs—such as calling methods on `Node`, a
 - Input handling via Godot's `Input` singleton
 - File I/O operations through Godot's resource system
 
-## The `#[godot_main_thread]` Macro
+## The `#[main_thread_system]` Macro
 
-The `#[godot_main_thread]` attribute macro provides a clean way to mark systems that require main thread execution:
+The `#[main_thread_system]` attribute macro provides a clean way to mark systems that require main thread execution:
 
 ```rust
 use godot_bevy::prelude::*;
 
-#[godot_main_thread]
+#[main_thread_system]
 fn update_ui_labels(
     mut query: Query<&mut GodotNodeHandle, With<PlayerStats>>,
     stats: Res<GameStats>,
@@ -37,7 +37,7 @@ The macro automatically adds a `NonSend<MainThreadMarker>` parameter to the syst
 
 ## Best Practices: Minimize Systems That Call Godot APIs
 
-While the `#[godot_main_thread]` macro makes Godot API access convenient, systems assigned to the main thread cannot execute in parallel with other main thread-assigned systems. This can become a performance bottleneck in complex applications, as all systems requiring Godot API access must wait their turn to execute sequentially on this single thread.
+While the `#[main_thread_system]` macro makes Godot API access convenient, systems assigned to the main thread cannot execute in parallel with other main thread-assigned systems. This can become a performance bottleneck in complex applications, as all systems requiring Godot API access must wait their turn to execute sequentially on this single thread.
 
 ### Recommended Architecture
 

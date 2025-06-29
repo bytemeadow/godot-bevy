@@ -14,7 +14,7 @@ use godot::classes::{Node2D, Node3D};
 use godot::prelude::Transform3D as GodotTransform3D;
 
 use crate::bridge::GodotNodeHandle;
-use crate::prelude::godot_main_thread;
+use crate::prelude::main_thread_system;
 
 use super::{Node2DMarker, Node3DMarker};
 
@@ -332,7 +332,7 @@ impl Plugin for GodotTransformsPlugin {
     }
 }
 
-#[godot_main_thread]
+#[main_thread_system]
 fn post_update_godot_transforms_3d(
     config: Res<super::GodotTransformConfig>,
     mut entities: Query<
@@ -357,7 +357,7 @@ fn post_update_godot_transforms_3d(
     }
 }
 
-#[godot_main_thread]
+#[main_thread_system]
 fn pre_update_godot_transforms_3d(
     config: Res<super::GodotTransformConfig>,
     mut entities: Query<(&mut Transform3D, &mut GodotNodeHandle), With<Node3DMarker>>,
@@ -380,7 +380,7 @@ fn pre_update_godot_transforms_3d(
     }
 }
 
-#[godot_main_thread]
+#[main_thread_system]
 fn post_update_godot_transforms_2d(
     config: Res<super::GodotTransformConfig>,
     mut entities: Query<
@@ -409,7 +409,7 @@ fn post_update_godot_transforms_2d(
     }
 }
 
-#[godot_main_thread]
+#[main_thread_system]
 fn pre_update_godot_transforms_2d(
     config: Res<super::GodotTransformConfig>,
     mut entities: Query<(&mut Transform2D, &mut GodotNodeHandle), With<Node2DMarker>>,

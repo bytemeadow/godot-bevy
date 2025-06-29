@@ -66,7 +66,7 @@ fn reset_menu_assets(mut menu_assets: ResMut<MenuAssets>) {
     menu_assets.signals_connected = false;
 }
 
-#[godot_main_thread]
+#[main_thread_system]
 fn init_menu_assets(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTreeRef) {
     // Try to find menu nodes, but handle failure gracefully
     if let Some(root) = scene_tree.get().get_root() {
@@ -123,7 +123,7 @@ fn connect_buttons(mut menu_assets: ResMut<MenuAssets>, signals: GodotSignals) {
     }
 }
 
-#[godot_main_thread]
+#[main_thread_system]
 fn listen_for_button_press(
     menu_assets: Res<MenuAssets>,
     mut events: EventReader<GodotSignal>,

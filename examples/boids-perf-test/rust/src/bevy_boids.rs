@@ -134,7 +134,7 @@ fn load_assets(mut commands: Commands, server: Res<AssetServer>) {
 }
 
 /// Synchronize parameters from the container to Bevy resources
-#[godot_main_thread]
+#[main_thread_system]
 fn sync_container_params(
     mut boid_count: ResMut<BoidCount>,
     mut config: ResMut<BoidsConfig>,
@@ -259,7 +259,7 @@ fn despawn_boids(
 }
 
 /// Update simulation state and manage cleanup on stop
-#[godot_main_thread]
+#[main_thread_system]
 fn stop_simulation(
     simulation_state: Res<SimulationState>,
     mut commands: Commands,
@@ -279,7 +279,7 @@ fn stop_simulation(
 }
 
 /// Colorize newly spawned boids (matches GDScript behavior)
-#[godot_main_thread]
+#[main_thread_system]
 fn colorize_new_boids(
     mut commands: Commands,
     new_boids: Query<(Entity, &GodotNodeHandle), With<NeedsColorization>>,
@@ -333,7 +333,7 @@ fn sync_transforms(mut query: Query<(&Transform2D, &mut Transform), With<Boid>>)
 // system to calculate/store neighborhood forces
 // NOTE: While this doesn't _need_ to be on the main thread, we see a
 // significant performance impact (75 -> 53 fps drop) when not on main
-#[godot_main_thread]
+#[main_thread_system]
 fn boids_calculate_neighborhood_forces(
     spatial_tree: Res<BoidTree>,
     all_boids: Query<(&Transform, &Velocity), With<Boid>>,

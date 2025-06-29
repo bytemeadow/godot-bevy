@@ -60,7 +60,7 @@ impl Plugin for GemPlugin {
 ///
 /// This system only handles collision detection and event firing,
 /// allowing it to run independently of gem counting logic.
-#[godot_main_thread]
+#[main_thread_system]
 fn detect_gem_player_collision(
     mut gems: Query<(Entity, &mut GodotNodeHandle, &Collisions), With<Gem>>,
     players: Query<Entity, With<Player>>,

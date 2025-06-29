@@ -23,7 +23,7 @@ use godot::{
 use godot_bevy::{
     bridge::GodotNodeHandle,
     prelude::{
-        godot_main_thread, AudioChannel, FindEntityByNameExt, GodotResource, GodotScene,
+        main_thread_system, AudioChannel, FindEntityByNameExt, GodotResource, GodotScene,
         GodotSignal, GodotSignals, NodeTreeView, Transform2D,
     },
 };
@@ -67,7 +67,7 @@ pub struct Mob {
 #[derive(Resource)]
 pub struct MobSpawnTimer(Timer);
 
-#[godot_main_thread]
+#[main_thread_system]
 fn spawn_mob(
     mut commands: Commands,
     time: Res<Time>,
@@ -116,7 +116,7 @@ pub struct MobNodes {
     visibility_notifier: GodotNodeHandle,
 }
 
-#[godot_main_thread]
+#[main_thread_system]
 fn new_mob(
     mut entities: Query<
         (
@@ -172,7 +172,7 @@ fn new_mob(
     }
 }
 
-#[godot_main_thread]
+#[main_thread_system]
 fn kill_mob(mut signals: EventReader<GodotSignal>, _node_commands: EventWriter<NodeCommand>) {
     for signal in signals.read() {
         if signal.name == "screen_exited" {

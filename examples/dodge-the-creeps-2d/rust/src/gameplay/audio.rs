@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use bevy::state::state::{OnEnter, OnExit};
 use bevy_asset_loader::asset_collection::AssetCollection;
 use godot_bevy::prelude::{
-    godot_main_thread, AudioApp, AudioChannel, AudioChannelMarker, GodotResource,
+    main_thread_system, AudioApp, AudioChannel, AudioChannelMarker, GodotResource,
 };
 
 use crate::GameState;
@@ -48,7 +48,7 @@ pub struct GameAudio {
 }
 
 /// System that starts background music
-#[godot_main_thread]
+#[main_thread_system]
 fn start_background_music(
     music_channel: Res<AudioChannel<GameMusicChannel>>,
     game_audio: Res<GameAudio>,
@@ -63,14 +63,14 @@ fn start_background_music(
 }
 
 /// System that stops background music
-#[godot_main_thread]
+#[main_thread_system]
 fn stop_background_music(music_channel: Res<AudioChannel<GameMusicChannel>>) {
     music_channel.stop();
     info!("Stopped background music");
 }
 
 /// System that plays game over sound
-#[godot_main_thread]
+#[main_thread_system]
 fn play_game_over_sound(
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
     game_audio: Res<GameAudio>,
