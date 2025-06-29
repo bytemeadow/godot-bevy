@@ -230,6 +230,32 @@ fn godot_key_to_bevy_keycode(godot_key: godot::global::Key) -> Option<KeyCode> {
         GK::KP_PERIOD => Some(BK::NumpadDecimal),
         GK::KP_ENTER => Some(BK::NumpadEnter),
 
+        // Additional common keys
+        GK::DELETE => Some(BK::Delete),
+        GK::INSERT => Some(BK::Insert),
+        GK::HOME => Some(BK::Home),
+        GK::END => Some(BK::End),
+        GK::PAGEUP => Some(BK::PageUp),
+        GK::PAGEDOWN => Some(BK::PageDown),
+        GK::CAPSLOCK => Some(BK::CapsLock),
+        GK::NUMLOCK => Some(BK::NumLock),
+        GK::SCROLLLOCK => Some(BK::ScrollLock),
+        GK::PAUSE => Some(BK::Pause),
+        GK::PRINT => Some(BK::PrintScreen),
+
+        // Punctuation and symbols
+        GK::COMMA => Some(BK::Comma),
+        GK::PERIOD => Some(BK::Period),
+        GK::SLASH => Some(BK::Slash),
+        GK::SEMICOLON => Some(BK::Semicolon),
+        GK::APOSTROPHE => Some(BK::Quote),
+        GK::BRACKETLEFT => Some(BK::BracketLeft),
+        GK::BRACKETRIGHT => Some(BK::BracketRight),
+        GK::BACKSLASH => Some(BK::Backslash),
+        GK::QUOTELEFT => Some(BK::Backquote),
+        GK::MINUS => Some(BK::Minus),
+        GK::EQUAL => Some(BK::Equal),
+
         _ => None, // Many keys don't have direct equivalents
     }
 }
