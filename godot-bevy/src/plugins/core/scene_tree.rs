@@ -433,10 +433,12 @@ fn create_scene_tree_entity(
                 crate::autosync::try_add_bundles_for_node(commands, ent, &event.node);
 
                 if node.instance_id() != scene_root.instance_id() {
-                    let parent = node.get_parent().unwrap().instance_id();
-                    commands
-                        .entity(*ent_mapping.get(&parent).unwrap())
-                        .add_children(&[ent]);
+                    if let Some(parent) = node.get_parent() {
+                        let parent_id = parent.instance_id();
+                        if let Some(&parent_entity) = ent_mapping.get(&parent_id) {
+                            commands.entity(parent_entity).add_children(&[ent]);
+                        }
+                    }
                 }
             }
             SceneTreeEventType::NodeRemoved => {
