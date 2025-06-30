@@ -37,5 +37,6 @@ pub use crate::plugins::{
     // Transforms
     transforms::{GodotTransformSyncPlugin, Transform2D, Transform3D},
 };
+pub use bevy::prelude as bevy_prelude;
 pub use godot::prelude as godot_prelude;
 pub use godot_bevy_macros::*;
