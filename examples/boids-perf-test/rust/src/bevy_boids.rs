@@ -11,8 +11,9 @@ use bevy_spatial::{kdtree::KDTree2, AutomaticUpdate, SpatialAccess, SpatialStruc
 use godot::builtin::Color as GodotColor;
 use godot::classes::Node as GodotNode;
 use godot::prelude::*;
-use godot_bevy::plugins::core::Transform2D;
 use godot_bevy::prelude::*;
+// Explicitly use godot-bevy's Transform2D to disambiguate
+use godot_bevy::prelude::Transform2D;
 
 use crate::container::{BevyBoids, BoidsContainer};
 

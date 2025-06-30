@@ -23,9 +23,7 @@ pub use crate::plugins::{
         SystemDeltaTimer, TransformSyncMode,
     },
     // Input
-    input_event::{
-        ActionInput, GodotInputEventPlugin, KeyboardInput, MouseButtonInput, MouseMotion,
-    },
+    input::{ActionInput, GodotInputPlugin, KeyboardInput, MouseButtonInput, MouseMotion},
     // Node markers - all node type marker components for type-safe ECS queries
     node_markers::{
         AnimatedSprite2DMarker, AnimatedSprite3DMarker, AnimationPlayerMarker, AnimationTreeMarker,

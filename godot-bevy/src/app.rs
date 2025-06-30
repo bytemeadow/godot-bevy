@@ -8,7 +8,7 @@ use crate::{
     GodotPlugin,
     plugins::{
         core::{PhysicsDelta, PhysicsUpdate},
-        input_event::InputEventReader,
+        input::InputEventReader,
         scene_tree::SceneTreeEventReader,
         signals::{GodotSignalReader, GodotSignalSender},
     },

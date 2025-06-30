@@ -5,7 +5,7 @@ pub mod audio;
 pub mod bevy_input_bridge;
 pub mod collisions;
 pub mod core;
-pub mod input_event;
+pub mod input;
 pub mod node_markers;
 pub mod packed_scene;
 pub mod scene_tree;
@@ -17,7 +17,7 @@ pub use audio::GodotAudioPlugin;
 pub use bevy_input_bridge::BevyInputBridgePlugin;
 pub use collisions::GodotCollisionsPlugin;
 pub use core::GodotBaseCorePlugin;
-pub use input_event::GodotInputEventPlugin;
+pub use input::GodotInputPlugin;
 pub use packed_scene::GodotPackedScenePlugin;
 pub use scene_tree::{
     GodotSceneTreeEventsPlugin, GodotSceneTreeMirroringPlugin, GodotSceneTreeRefPlugin,
@@ -39,7 +39,7 @@ plugin_group! {
     pub struct GodotDefaultPlugins {
         :GodotCollisionsPlugin,
         :GodotSignalsPlugin,
-        :GodotInputEventPlugin,
+        :GodotInputPlugin,
         :BevyInputBridgePlugin,
         audio:::GodotAudioPlugin,
         packed_scene:::GodotPackedScenePlugin

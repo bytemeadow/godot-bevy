@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use godot::classes::Node;
 use godot::prelude::*;
-use godot_bevy::plugins::core::scene_tree::{SceneTreeEvent, SceneTreeEventType};
+use godot_bevy::plugins::scene_tree::{SceneTreeEvent, SceneTreeEventType};
 use godot_bevy::prelude::*;
 
 use crate::scene_management::SceneOperationEvent;

@@ -18,9 +18,9 @@ use godot::{
 };
 
 #[derive(Default)]
-pub struct GodotInputEventPlugin;
+pub struct GodotInputPlugin;
 
-impl Plugin for GodotInputEventPlugin {
+impl Plugin for GodotInputPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(First, write_input_events.before(event_update_system))
             .add_event::<KeyboardInput>()
