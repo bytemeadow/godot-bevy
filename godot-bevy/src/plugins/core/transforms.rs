@@ -318,10 +318,25 @@ impl<'a, T> Drop for Transform2DMutGuard<'a, T> {
     }
 }
 
-pub struct GodotTransformsPlugin;
+pub struct GodotTransformSyncPlugin {
+    pub sync_mode: super::TransformSyncMode,
+}
 
-impl Plugin for GodotTransformsPlugin {
+impl Default for GodotTransformSyncPlugin {
+    fn default() -> Self {
+        Self {
+            sync_mode: super::TransformSyncMode::OneWay,
+        }
+    }
+}
+
+impl Plugin for GodotTransformSyncPlugin {
     fn build(&self, app: &mut App) {
+        // Register the transform configuration resource with the plugin's config
+        app.insert_resource(super::GodotTransformConfig {
+            sync_mode: self.sync_mode,
+        });
+
         // Always add writing systems
         app.add_systems(Last, post_update_godot_transforms_3d)
             .add_systems(Last, post_update_godot_transforms_2d);

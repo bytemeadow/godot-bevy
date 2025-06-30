@@ -21,7 +21,7 @@ pub use scene_tree::{
 };
 
 pub mod transforms;
-pub use transforms::{GodotTransformsPlugin, Transform2D, Transform3D};
+pub use transforms::{GodotTransformSyncPlugin, Transform2D, Transform3D};
 
 pub mod signals;
 pub use signals::*;
@@ -142,7 +142,6 @@ impl Plugin for GodotBaseCorePlugin {
             .add_plugins(bevy::diagnostic::DiagnosticsPlugin)
             .add_plugins(GodotSceneTreeRefPlugin)
             .init_resource::<PhysicsDelta>()
-            .init_resource::<GodotTransformConfig>()
             .init_non_send_resource::<MainThreadMarker>();
 
         // Add the PhysicsUpdate schedule

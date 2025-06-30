@@ -47,7 +47,7 @@ pub use crate::plugins::{
         GodotSignals,
         GodotSignalsPlugin,
         GodotTransformConfig,
-        GodotTransformsPlugin,
+        GodotTransformSyncPlugin,
         Groups,
         KeyboardInput,
         LabelMarker,

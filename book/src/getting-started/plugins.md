@@ -41,7 +41,8 @@ All other features must be explicitly added as plugins.
 
 ### Optional Feature Plugins
 
-- **`GodotTransformsPlugin`**: Transform synchronization between Bevy and Godot
+- **`GodotTransformSyncPlugin`**: Transform synchronization between Bevy and Godot
+  - Configure sync mode: `Disabled`, `OneWay` (default), or `TwoWay`
   - Add if you want to position/move Godot nodes from Bevy systems
   
 - **`GodotAudioPlugin`**: Audio system with channels and spatial audio
@@ -92,10 +93,12 @@ Add only the plugins you need:
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotSceneTreeMirroringPlugin)  // Auto-create entities
-        .add_plugins(GodotTransformsPlugin)         // Transform sync
-        .add_plugins(GodotAudioPlugin)              // Audio system
-        .add_plugins(GodotSignalsPlugin);           // UI signals
+    app.add_plugins(GodotSceneTreeMirroringPlugin {
+            add_transforms: true,
+        })
+        .add_plugins(GodotTransformSyncPlugin::default())  // OneWay sync
+        .add_plugins(GodotAudioPlugin)                     // Audio system
+        .add_plugins(GodotSignalsPlugin);                  // UI signals
     
     app.add_systems(Update, my_game_systems);
 }
@@ -119,9 +122,11 @@ fn build_app(app: &mut App) {
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotSceneTreeMirroringPlugin)  // Auto-create entities
-        .add_plugins(GodotTransformsPlugin)         // Move entities
-        .add_plugins(GodotAudioPlugin);             // Play sounds
+    app.add_plugins(GodotSceneTreeMirroringPlugin {
+            add_transforms: true,
+        })
+        .add_plugins(GodotTransformSyncPlugin::default())  // OneWay sync
+        .add_plugins(GodotAudioPlugin);                    // Play sounds
     // Skip collision/signals for pure ECS approach
 }
 ```
@@ -130,11 +135,13 @@ fn build_app(app: &mut App) {
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotSceneTreeMirroringPlugin)  // Auto-create entities
+    app.add_plugins(GodotSceneTreeMirroringPlugin {
+            add_transforms: false,  // Use Godot physics instead
+        })
         .add_plugins(GodotCollisionsPlugin)         // Detect collisions
         .add_plugins(GodotSignalsPlugin)            // Handle signals
         .add_plugins(GodotAudioPlugin);             // Play sounds
-    // Skip transforms - use Godot physics directly via GodotNodeHandle
+    // Use Godot physics directly via GodotNodeHandle
 }
 ```
 
@@ -142,10 +149,10 @@ fn build_app(app: &mut App) {
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotSceneTreeMirroringPlugin)  // Auto-create entities
-        .add_plugins(GodotSignalsPlugin)            // Button clicks, etc.
-        .add_plugins(BevyInputBridgePlugin)         // Input handling
-        .add_plugins(GodotAudioPlugin);             // UI sounds
+    app.add_plugins(GodotSceneTreeMirroringPlugin::default())  // No transforms needed
+        .add_plugins(GodotSignalsPlugin)                       // Button clicks, etc.
+        .add_plugins(BevyInputBridgePlugin)                    // Input handling
+        .add_plugins(GodotAudioPlugin);                        // UI sounds
     // Focus on UI interactions and input
 }
 ```
@@ -158,6 +165,41 @@ Some plugins automatically include their dependencies:
 - `BevyInputBridgePlugin` → automatically includes `GodotInputEventPlugin`
 
 This means you don't need to manually add the dependencies if you're already using the higher-level plugin.
+
+## Plugin Configuration
+
+Some plugins can be configured when added, similar to Bevy's `AssetPlugin`:
+
+### Transform Sync Configuration
+
+```rust
+#[bevy_app]
+fn build_app(app: &mut App) {
+    app.add_plugins(GodotTransformSyncPlugin {
+        sync_mode: TransformSyncMode::TwoWay,  // Bevy ↔ Godot
+    });
+    // Or use the default (OneWay: Bevy → Godot)
+    app.add_plugins(GodotTransformSyncPlugin::default());
+}
+```
+
+**Sync Modes:**
+- `Disabled`: No transform syncing (use Godot physics directly)
+- `OneWay`: Bevy → Godot only (default, best for pure ECS games)
+- `TwoWay`: Bevy ↔ Godot (best for hybrid apps migrating from GDScript)
+
+### Scene Tree Mirroring Configuration
+
+```rust
+#[bevy_app]
+fn build_app(app: &mut App) {
+    app.add_plugins(GodotSceneTreeMirroringPlugin {
+        add_transforms: true,  // Include Transform components
+    });
+    // Or use the default (no transforms)
+    app.add_plugins(GodotSceneTreeMirroringPlugin::default());
+}
+```
 
 ## Benefits
 
@@ -179,7 +221,7 @@ New optional features can be added without affecting existing minimal builds.
 
 1. **Do I want entities automatically created for scene tree nodes?** → Add `GodotSceneTreeMirroringPlugin`
 2. **Do I want to monitor scene tree changes without automatic entities?** → Add `GodotSceneTreeEventsPlugin`
-3. **Do I want to move/position nodes from Bevy?** → Add `GodotTransformsPlugin`
+3. **Do I want to move/position nodes from Bevy?** → Add `GodotTransformSyncPlugin`
 4. **Do I want to play sounds and music?** → Add `GodotAudioPlugin`  
 5. **Do I want to respond to button clicks or other Godot signals?** → Add `GodotSignalsPlugin`
 6. **Do I want to detect collisions and physics events?** → Add `GodotCollisionsPlugin`

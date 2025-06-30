@@ -15,7 +15,7 @@ fn main() {
     // Option 2: Add specific functionality you need
     App::new()
         .add_plugins(GodotCorePlugins)
-        .add_plugins(GodotTransformsPlugin)    // Transform sync between Bevy and Godot
+        .add_plugins(GodotTransformSyncPlugin::default())    // Transform sync between Bevy and Godot
         .add_plugins(GodotAudioPlugin)         // Audio system
         .add_plugins(GodotSignalsPlugin)       // Godot signal → Bevy event bridge
         .add_plugins(BevyInputBridgePlugin)    // Input (auto-includes GodotInputEventPlugin)
@@ -32,7 +32,7 @@ fn main() {
     App::new()
         .add_plugins(GodotCorePlugins)
         .add_plugins((
-            GodotTransformsPlugin,
+            GodotTransformSyncPlugin::default(),
             GodotCollisionsPlugin,
             // Skip audio and input for a lightweight physics simulation
         ))

@@ -1,10 +1,8 @@
 use super::collisions::ALL_COLLISION_SIGNALS;
 use super::node_markers::*;
-use super::{GodotTransformConfig, TransformSyncMode};
 use crate::prelude::main_thread_system;
 use crate::prelude::{Transform2D, Transform3D};
 use crate::{bridge::GodotNodeHandle, prelude::Collisions};
-use bevy::ecs::system::Res;
 use bevy::{
     app::{App, First, Plugin, PreStartup},
     ecs::{
@@ -13,9 +11,10 @@ use bevy::{
         event::{Event, EventReader, EventWriter, event_update_system},
         name::Name,
         schedule::IntoScheduleConfigs,
-        system::{Commands, NonSendMut, Query, SystemParam},
+        system::{Commands, NonSendMut, Query, Res, SystemParam},
     },
     log::{debug, trace},
+    prelude::Resource,
 };
 use godot::{
     builtin::GString,
@@ -60,11 +59,31 @@ impl Plugin for GodotSceneTreeEventsPlugin {
 
 /// Automatic scene tree mirroring - creates entities for scene tree nodes.
 /// Requires GodotSceneTreeEventsPlugin.
-pub struct GodotSceneTreeMirroringPlugin;
+pub struct GodotSceneTreeMirroringPlugin {
+    /// Whether to automatically add Transform components to entities
+    pub add_transforms: bool,
+}
+
+impl Default for GodotSceneTreeMirroringPlugin {
+    fn default() -> Self {
+        Self {
+            add_transforms: true, // Default to adding transforms
+        }
+    }
+}
+
+/// Internal configuration resource for scene tree mirroring
+#[derive(Resource)]
+pub(crate) struct SceneTreeMirroringConfig {
+    add_transforms: bool,
+}
 
 impl Plugin for GodotSceneTreeMirroringPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(GodotSceneTreeEventsPlugin)
+            .insert_resource(SceneTreeMirroringConfig {
+                add_transforms: self.add_transforms,
+            })
             .add_systems(PreStartup, initialize_scene_tree)
             .add_systems(First, read_scene_tree_events.before(event_update_system));
     }
@@ -102,11 +121,11 @@ impl Default for SceneTreeRefImpl {
 }
 
 #[main_thread_system]
-pub fn initialize_scene_tree(
+fn initialize_scene_tree(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
-    config: Res<GodotTransformConfig>,
+    config: Res<SceneTreeMirroringConfig>,
     signal_sender: NonSendMut<super::signals::GodotSignalSender>,
 ) {
     fn traverse(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
@@ -129,7 +148,7 @@ pub fn initialize_scene_tree(
         events,
         &mut scene_tree,
         &mut entities,
-        &config,
+        &*config,
         &signal_sender.0,
     );
 }
@@ -378,7 +397,7 @@ fn create_scene_tree_entity(
     events: impl IntoIterator<Item = SceneTreeEvent>,
     scene_tree: &mut SceneTreeRef,
     entities: &mut Query<(&mut GodotNodeHandle, Entity)>,
-    config: &GodotTransformConfig,
+    config: &SceneTreeMirroringConfig,
     signal_sender: &std::sync::mpsc::Sender<super::signals::GodotSignal>,
 ) {
     let mut ent_mapping = entities
@@ -412,8 +431,8 @@ fn create_scene_tree_entity(
                 // Add node type marker components
                 add_node_type_markers(&mut ent, &mut node);
 
-                // Only add transform components if sync mode is not disabled
-                if config.sync_mode != TransformSyncMode::Disabled {
+                // Add transform components if configured to do so
+                if config.add_transforms {
                     if let Some(node3d) = node.try_get::<Node3D>() {
                         ent.insert(Transform3D::from(node3d.get_transform()));
                     }
@@ -500,7 +519,7 @@ fn read_scene_tree_events(
     mut scene_tree: SceneTreeRef,
     mut event_reader: EventReader<SceneTreeEvent>,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
-    config: Res<GodotTransformConfig>,
+    config: Res<SceneTreeMirroringConfig>,
     signal_sender: NonSendMut<super::signals::GodotSignalSender>,
 ) {
     create_scene_tree_entity(
@@ -508,7 +527,7 @@ fn read_scene_tree_events(
         event_reader.read().cloned(),
         &mut scene_tree,
         &mut entities,
-        &config,
+        &*config,
         &signal_sender.0,
     );
 }

@@ -10,7 +10,7 @@ pub use audio::GodotAudioPlugin;
 pub use core::{
     BevyInputBridgePlugin, GodotCollisionsPlugin, GodotInputEventPlugin,
     GodotSceneTreeEventsPlugin, GodotSceneTreeMirroringPlugin, GodotSceneTreeRefPlugin,
-    GodotSignalsPlugin, GodotTransformsPlugin,
+    GodotSignalsPlugin, GodotTransformSyncPlugin,
 };
 pub use packed_scene::GodotPackedScenePlugin;
 
@@ -32,8 +32,10 @@ pub struct GodotDefaultPlugins;
 impl Plugin for GodotDefaultPlugins {
     fn build(&self, app: &mut App) {
         app.add_plugins(GodotCorePlugins)
-            .add_plugins(GodotSceneTreeMirroringPlugin) // Add automatic scene tree mirroring
-            .add_plugins(GodotTransformsPlugin)
+            .add_plugins(GodotSceneTreeMirroringPlugin {
+                add_transforms: true,
+            })
+            .add_plugins(GodotTransformSyncPlugin::default())
             .add_plugins(GodotCollisionsPlugin)
             .add_plugins(GodotSignalsPlugin)
             .add_plugins(GodotInputEventPlugin)
