@@ -17,7 +17,7 @@ use bevy::{
     prelude::GilrsPlugin,
 };
 
-use crate::plugins::core::input_event::{
+use crate::plugins::input_event::{
     KeyboardInput as GodotKeyboardInput, MouseButton as GodotMouseButton,
     MouseButtonInput as GodotMouseButtonInput, MouseMotion as GodotMouseMotion,
 };
@@ -84,7 +84,7 @@ fn bridge_mouse_button_input(
         };
 
         // Send MouseButtonInput event that Bevy's mouse_button_input_system will process
-        bevy_mouse_button_events.send(BevyMouseButtonInput {
+        bevy_mouse_button_events.write(BevyMouseButtonInput {
             button: bevy_button,
             state,
             window: Entity::PLACEHOLDER,
@@ -103,7 +103,7 @@ fn bridge_mouse_motion(
     // Send individual Bevy MouseMotion events AND accumulate for the frame
     for event in mouse_motion_events.read() {
         // Send individual MouseMotion event (for libraries that prefer events)
-        bevy_mouse_motion_events.send(BevyMouseMotion { delta: event.delta });
+        bevy_mouse_motion_events.write(BevyMouseMotion { delta: event.delta });
 
         // Accumulate delta for the AccumulatedMouseMotion resource
         accumulated_motion.delta += event.delta;

@@ -6,9 +6,11 @@ use crate::watchers::input_watcher::GodotInputWatcher;
 use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
 use crate::{
     GodotPlugin,
-    plugins::core::{
-        GodotSignalReader, GodotSignalSender, InputEventReader, PhysicsDelta, PhysicsUpdate,
+    plugins::{
+        core::{PhysicsDelta, PhysicsUpdate},
+        input_event::InputEventReader,
         scene_tree::SceneTreeEventReader,
+        signals::{GodotSignalReader, GodotSignalSender},
     },
 };
 

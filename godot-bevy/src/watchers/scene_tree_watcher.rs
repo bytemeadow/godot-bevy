@@ -5,7 +5,7 @@ use std::sync::mpsc::Sender;
 
 use crate::{
     bridge::GodotNodeHandle,
-    plugins::core::{SceneTreeEvent, SceneTreeEventType},
+    plugins::scene_tree::{SceneTreeEvent, SceneTreeEventType},
 };
 
 #[derive(GodotClass)]

@@ -5,7 +5,7 @@ use crate::plugins::audio::{
     ActiveTween, AudioChannel, AudioChannelMarker, AudioCommand, AudioOutput, AudioPlayerType,
     AudioSettings, ChannelId, ChannelState, MainAudioTrack, PlayCommand, SoundId, TweenType,
 };
-use crate::plugins::core::SceneTreeRef;
+use crate::plugins::scene_tree::SceneTreeRef;
 use crate::prelude::main_thread_system;
 use bevy::app::{App, Plugin, Update};
 use bevy::asset::Assets;

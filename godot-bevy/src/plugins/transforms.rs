@@ -16,7 +16,7 @@ use godot::prelude::Transform3D as GodotTransform3D;
 use crate::bridge::GodotNodeHandle;
 use crate::prelude::main_thread_system;
 
-use super::{Node2DMarker, Node3DMarker};
+use super::node_markers::{Node2DMarker, Node3DMarker};
 
 #[derive(Debug, Component, Default, Copy, Clone)]
 pub struct Transform3D {
@@ -319,13 +319,13 @@ impl<'a, T> Drop for Transform2DMutGuard<'a, T> {
 }
 
 pub struct GodotTransformSyncPlugin {
-    pub sync_mode: super::TransformSyncMode,
+    pub sync_mode: crate::plugins::core::TransformSyncMode,
 }
 
 impl Default for GodotTransformSyncPlugin {
     fn default() -> Self {
         Self {
-            sync_mode: super::TransformSyncMode::OneWay,
+            sync_mode: crate::plugins::core::TransformSyncMode::OneWay,
         }
     }
 }
@@ -333,7 +333,7 @@ impl Default for GodotTransformSyncPlugin {
 impl Plugin for GodotTransformSyncPlugin {
     fn build(&self, app: &mut App) {
         // Register the transform configuration resource with the plugin's config
-        app.insert_resource(super::GodotTransformConfig {
+        app.insert_resource(crate::plugins::core::GodotTransformConfig {
             sync_mode: self.sync_mode,
         });
 
@@ -349,7 +349,7 @@ impl Plugin for GodotTransformSyncPlugin {
 
 #[main_thread_system]
 fn post_update_godot_transforms_3d(
-    config: Res<super::GodotTransformConfig>,
+    config: Res<crate::plugins::core::GodotTransformConfig>,
     mut entities: Query<
         (&Transform3D, &mut GodotNodeHandle),
         (
@@ -359,7 +359,7 @@ fn post_update_godot_transforms_3d(
     >,
 ) {
     // Early return if transform syncing is disabled
-    if config.sync_mode == super::TransformSyncMode::Disabled {
+    if config.sync_mode == crate::plugins::core::TransformSyncMode::Disabled {
         return;
     }
 
@@ -374,11 +374,11 @@ fn post_update_godot_transforms_3d(
 
 #[main_thread_system]
 fn pre_update_godot_transforms_3d(
-    config: Res<super::GodotTransformConfig>,
+    config: Res<crate::plugins::core::GodotTransformConfig>,
     mut entities: Query<(&mut Transform3D, &mut GodotNodeHandle), With<Node3DMarker>>,
 ) {
     // Early return if not using two-way sync
-    if config.sync_mode != super::TransformSyncMode::TwoWay {
+    if config.sync_mode != crate::plugins::core::TransformSyncMode::TwoWay {
         return;
     }
 
@@ -397,7 +397,7 @@ fn pre_update_godot_transforms_3d(
 
 #[main_thread_system]
 fn post_update_godot_transforms_2d(
-    config: Res<super::GodotTransformConfig>,
+    config: Res<crate::plugins::core::GodotTransformConfig>,
     mut entities: Query<
         (&Transform2D, &mut GodotNodeHandle),
         (
@@ -407,7 +407,7 @@ fn post_update_godot_transforms_2d(
     >,
 ) {
     // Early return if transform syncing is disabled
-    if config.sync_mode == super::TransformSyncMode::Disabled {
+    if config.sync_mode == crate::plugins::core::TransformSyncMode::Disabled {
         return;
     }
 
@@ -426,11 +426,11 @@ fn post_update_godot_transforms_2d(
 
 #[main_thread_system]
 fn pre_update_godot_transforms_2d(
-    config: Res<super::GodotTransformConfig>,
+    config: Res<crate::plugins::core::GodotTransformConfig>,
     mut entities: Query<(&mut Transform2D, &mut GodotNodeHandle), With<Node2DMarker>>,
 ) {
     // Early return if not using two-way sync
-    if config.sync_mode != super::TransformSyncMode::TwoWay {
+    if config.sync_mode != crate::plugins::core::TransformSyncMode::TwoWay {
         return;
     }
 

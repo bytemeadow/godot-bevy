@@ -5,7 +5,7 @@ use bevy::{
 };
 use godot::prelude::*;
 
-use super::GodotSignal;
+use super::signals::GodotSignal;
 use crate::bridge::GodotNodeHandle;
 
 #[derive(Default)]

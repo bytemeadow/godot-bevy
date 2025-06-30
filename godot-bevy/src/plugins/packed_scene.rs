@@ -1,4 +1,7 @@
-use super::core::{SceneTreeRef, Transform2D, Transform3D};
+use super::{
+    scene_tree::SceneTreeRef,
+    transforms::{Transform2D, Transform3D},
+};
 use crate::bridge::GodotNodeHandle;
 use crate::plugins::assets::GodotResource;
 use crate::prelude::main_thread_system;

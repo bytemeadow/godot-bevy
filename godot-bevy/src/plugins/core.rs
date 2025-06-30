@@ -11,30 +11,6 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
-pub mod collisions;
-pub use collisions::*;
-
-pub mod scene_tree;
-pub use scene_tree::{
-    GodotSceneTreeEventsPlugin, GodotSceneTreeMirroringPlugin, GodotSceneTreeRefPlugin, Groups,
-    SceneTreeEvent, SceneTreeEventType, SceneTreeRef,
-};
-
-pub mod transforms;
-pub use transforms::{GodotTransformSyncPlugin, Transform2D, Transform3D};
-
-pub mod signals;
-pub use signals::*;
-
-pub mod input_event;
-pub use input_event::*;
-
-pub mod bevy_input_bridge;
-pub use bevy_input_bridge::*;
-
-pub mod node_markers;
-pub use node_markers::*;
-
 /// Schedule that runs during Godot's physics_process at physics frame rate.
 /// Use this for movement, physics, and systems that need to sync with Godot's physics timing.
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
@@ -141,7 +117,7 @@ impl Plugin for GodotBaseCorePlugin {
             })
             .add_plugins(bevy::log::LogPlugin::default())
             .add_plugins(bevy::diagnostic::DiagnosticsPlugin)
-            .add_plugins(GodotSceneTreeRefPlugin)
+            .add_plugins(crate::plugins::scene_tree::GodotSceneTreeRefPlugin)
             .init_resource::<PhysicsDelta>()
             .init_non_send_resource::<MainThreadMarker>();
 
