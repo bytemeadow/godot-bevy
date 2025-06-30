@@ -2,10 +2,10 @@ use bevy::app::plugin_group;
 
 pub mod assets;
 pub mod audio;
-pub mod bevy_input_bridge;
 pub mod collisions;
 pub mod core;
 pub mod input;
+pub mod input_bridge;
 pub mod packed_scene;
 pub mod scene_tree;
 pub mod signals;
@@ -13,10 +13,10 @@ pub mod transforms;
 
 // Re-export all plugins for convenience
 pub use audio::GodotAudioPlugin;
-pub use bevy_input_bridge::BevyInputBridgePlugin;
 pub use collisions::GodotCollisionsPlugin;
 pub use core::GodotBaseCorePlugin;
 pub use input::GodotInputPlugin;
+pub use input_bridge::BevyInputBridgePlugin;
 pub use packed_scene::GodotPackedScenePlugin;
 pub use scene_tree::{
     GodotSceneTreeEventsPlugin, GodotSceneTreeMirroringPlugin, GodotSceneTreeRefPlugin,

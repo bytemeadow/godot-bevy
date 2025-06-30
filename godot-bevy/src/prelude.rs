@@ -11,7 +11,6 @@ pub use crate::plugins::{
         AudioPlayerType, AudioSettings, AudioTween, GodotAudioChannels, GodotAudioPlugin,
         MainAudioTrack, PlayAudioCommand, SoundId,
     },
-    bevy_input_bridge::BevyInputBridgePlugin,
     // Collisions
     collisions::{
         ALL_COLLISION_SIGNALS, AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED,
@@ -24,6 +23,7 @@ pub use crate::plugins::{
     },
     // Input
     input::{ActionInput, GodotInputPlugin, KeyboardInput, MouseButtonInput, MouseMotion},
+    input_bridge::BevyInputBridgePlugin,
     packed_scene::{GodotPackedScenePlugin, GodotScene},
     // Scene tree
     scene_tree::{
