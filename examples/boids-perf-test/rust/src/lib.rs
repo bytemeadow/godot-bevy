@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 use godot_bevy::prelude::{
     godot_prelude::{gdextension, ExtensionLibrary},
-    *,
+    GodotTransformsPlugin, *,
 };
 
 use crate::bevy_boids::BoidsPlugin;
@@ -18,5 +18,7 @@ mod container;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins((BoidsPlugin,));
+    // This example uses transforms and assets (for loading boid scenes)
+    app.add_plugins(GodotTransformsPlugin)
+        .add_plugins((BoidsPlugin,));
 }

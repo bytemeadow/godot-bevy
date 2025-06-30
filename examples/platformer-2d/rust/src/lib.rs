@@ -3,7 +3,7 @@ use bevy_asset_loader::prelude::*;
 use gameplay::audio::GameAudio;
 use godot_bevy::prelude::{
     godot_prelude::{gdextension, ExtensionLibrary},
-    *,
+    GodotDefaultPlugins, *,
 };
 
 mod components;
@@ -14,7 +14,9 @@ mod scene_management;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(StatesPlugin)
+    // This example uses most godot-bevy features
+    app.add_plugins(GodotDefaultPlugins)
+        .add_plugins(StatesPlugin)
         .init_state::<GameState>()
         .add_loading_state(
             LoadingState::new(GameState::Loading)

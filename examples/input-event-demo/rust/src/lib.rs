@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 use godot_bevy::prelude::{
     godot_prelude::{gdextension, ExtensionLibrary},
-    *,
+    BevyInputBridgePlugin, *,
 };
 
 mod bevy_input;
@@ -31,6 +31,10 @@ use leafwing_input::LeafwingInputTestPlugin;
 #[bevy_app]
 fn build_app(app: &mut App) {
     // Enable/disable plugins as needed for testing:
+
+    // Add the input plugin this example needs
+    // BevyInputBridgePlugin automatically includes GodotInputEventPlugin
+    app.add_plugins(BevyInputBridgePlugin);
 
     // Plugin 1: Raw Godot Input Events - shows direct Godot input
     app.add_plugins(GodotInputPlugin);

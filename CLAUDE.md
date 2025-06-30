@@ -54,29 +54,38 @@ cargo build --release --manifest-path examples/{example}/rust/Cargo.toml
 
 ### Plugin Architecture
 
-**Opt-in Plugin System**: Following Bevy's philosophy, godot-bevy now provides granular plugin control:
+**Opt-in Plugin System**: Following Bevy's philosophy, godot-bevy now provides granular plugin control. By default, only minimal core functionality is included.
 
-- **`GodotCorePlugins`**: Minimal required functionality (scene tree, assets, basic setup)
-- **`GodotDefaultPlugins`**: All functionality enabled (equivalent to old behavior)
-- **Individual plugins**: `GodotTransformsPlugin`, `GodotAudioPlugin`, `GodotSignalsPlugin`, `GodotCollisionsPlugin`, `GodotInputEventPlugin`, `BevyInputBridgePlugin`, `PackedScenePlugin`
+- **`GodotPlugin`**: Now minimal by default - only includes `GodotCorePlugins` (scene tree, assets, basic setup)
+- **`GodotCorePlugins`**: Minimal required functionality 
+- **`GodotDefaultPlugins`**: All functionality enabled (use for easy migration)
+- **Individual plugins**: `GodotTransformsPlugin`, `GodotAudioPlugin`, `GodotSignalsPlugin`, `GodotCollisionsPlugin`, `GodotInputEventPlugin`, `BevyInputBridgePlugin` (includes `GodotInputEventPlugin`), `PackedScenePlugin`
 
 **Example usage:**
 ```rust
-// Minimal setup
-app.add_plugins(GodotCorePlugins);
+// Default (minimal) - only core functionality
+#[bevy_app]
+fn build_app(app: &mut App) {
+    // GodotPlugin is already added by #[bevy_app]
+    // Only scene tree and assets are available
+}
 
-// Add specific features
-app.add_plugins((
-    GodotCorePlugins,
-    GodotTransformsPlugin,
-    GodotAudioPlugin,
-));
+// Add specific features as needed
+#[bevy_app]
+fn build_app(app: &mut App) {
+    app.add_plugins(GodotTransformsPlugin)      // Transform sync
+        .add_plugins(GodotAudioPlugin)          // Audio system
+        .add_plugins(BevyInputBridgePlugin);    // Input (auto-includes GodotInputEventPlugin)
+}
 
-// Everything (old behavior)
-app.add_plugins(GodotDefaultPlugins);
+// Everything (for easy migration from older versions)
+#[bevy_app]
+fn build_app(app: &mut App) {
+    app.add_plugins(GodotDefaultPlugins);
+}
 ```
 
-**GodotPlugin**: Main plugin that registers `GodotDefaultPlugins` and auto-discovers `AutoSyncBundle` plugins for custom Godot node types.
+**Breaking Change**: `GodotPlugin` now only includes core functionality by default. If your code stops working after upgrading, add `app.add_plugins(GodotDefaultPlugins)` for the old behavior, or better yet, add only the specific plugins you need.
 
 **Audio System** (`godot-bevy/src/plugins/audio/`): Channel-based audio API with spatial audio support using Godot's audio engine. Add with `GodotAudioPlugin`.
 

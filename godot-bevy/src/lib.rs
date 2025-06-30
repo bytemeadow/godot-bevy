@@ -22,7 +22,9 @@ pub struct GodotPlugin;
 
 impl Plugin for GodotPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(plugins::GodotDefaultPlugins);
+        // Only add minimal core functionality by default
+        // Users must explicitly opt-in to additional features
+        app.add_plugins(plugins::GodotCorePlugins);
 
         // Auto-register all discovered AutoSyncBundle plugins
         autosync::register_all_autosync_bundles(app);

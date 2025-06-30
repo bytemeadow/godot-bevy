@@ -23,11 +23,14 @@ use crate::plugins::core::input_event::{
 };
 
 /// Plugin that bridges godot-bevy's input events to Bevy's standard input resources.
+/// This plugin automatically includes GodotInputEventPlugin as a dependency.
 pub struct BevyInputBridgePlugin;
 
 impl Plugin for BevyInputBridgePlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(InputPlugin)
+        // Add the dependency - we need Godot input events to bridge them
+        app.add_plugins(super::input_event::GodotInputEventPlugin)
+            .add_plugins(InputPlugin)
             .add_plugins(GilrsPlugin)
             .add_systems(
                 PreUpdate,

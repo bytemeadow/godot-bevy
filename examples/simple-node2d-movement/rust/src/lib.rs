@@ -8,7 +8,8 @@ use godot::global::godot_print;
 use godot_bevy::prelude::godot_prelude::gdextension;
 use godot_bevy::prelude::godot_prelude::ExtensionLibrary;
 use godot_bevy::prelude::{
-    bevy_app, main_thread_system, GodotNodeHandle, Sprite2DMarker, Transform2D,
+    bevy_app, main_thread_system, GodotNodeHandle, GodotTransformsPlugin, Sprite2DMarker,
+    Transform2D,
 };
 use std::f32::consts::PI;
 
@@ -27,6 +28,9 @@ fn build_app(app: &mut App) {
     // Print to the Godot console:
     // (https://docs.rs/godot-core/0.3.1/godot_core/macro.godot_print.html)
     godot_print!("Hello from Godot-Bevy!");
+
+    // Add the transforms plugin since we're using Transform2D
+    app.add_plugins(GodotTransformsPlugin);
 
     // A system is a normal Rust function.
     //
