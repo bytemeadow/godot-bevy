@@ -6,7 +6,6 @@ pub mod bevy_input_bridge;
 pub mod collisions;
 pub mod core;
 pub mod input;
-pub mod node_markers;
 pub mod packed_scene;
 pub mod scene_tree;
 pub mod signals;

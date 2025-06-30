@@ -6,7 +6,7 @@ use bevy::{
 use godot::prelude::*;
 
 use super::signals::GodotSignal;
-use crate::bridge::GodotNodeHandle;
+use crate::interop::GodotNodeHandle;
 
 #[derive(Default)]
 pub struct GodotCollisionsPlugin;

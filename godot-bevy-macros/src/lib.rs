@@ -197,7 +197,7 @@ fn create_direct_path_expr(
                 base_node.has_node(#node_path)
                     .then(|| {
                         let node_ref = base_node.get_node_as::<godot::classes::Node>(#node_path);
-                        godot_bevy::bridge::GodotNodeHandle::new(node_ref)
+                        godot_bevy::interop::GodotNodeHandle::new(node_ref)
                     })
             }
         }
@@ -206,7 +206,7 @@ fn create_direct_path_expr(
             {
                 let base_node = &node;
                 let node_ref = base_node.get_node_as::<godot::classes::Node>(#node_path);
-                godot_bevy::bridge::GodotNodeHandle::new(node_ref)
+                godot_bevy::interop::GodotNodeHandle::new(node_ref)
             }
         }
     };
@@ -223,7 +223,7 @@ fn create_pattern_matching_expr(
             {
                 let base_node = &node;
                 godot_bevy::node_tree_view::find_node_by_pattern(base_node, #path_pattern)
-                    .map(|node_ref| godot_bevy::bridge::GodotNodeHandle::new(node_ref))
+                    .map(|node_ref| godot_bevy::interop::GodotNodeHandle::new(node_ref))
             }
         }
     } else {
@@ -233,7 +233,7 @@ fn create_pattern_matching_expr(
                 let pattern = #path_pattern;
                 let node_ref = godot_bevy::node_tree_view::find_node_by_pattern(base_node, pattern)
                     .unwrap_or_else(|| panic!("Could not find node matching pattern: {pattern}"));
-                godot_bevy::bridge::GodotNodeHandle::new(node_ref)
+                godot_bevy::interop::GodotNodeHandle::new(node_ref)
             }
         }
     };
@@ -495,7 +495,7 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
         fn #create_bundle_fn_name(
             commands: &mut bevy::ecs::system::Commands,
             entity: bevy::ecs::entity::Entity,
-            handle: &godot_bevy::bridge::GodotNodeHandle,
+            handle: &godot_bevy::interop::GodotNodeHandle,
         ) -> bool {
             // Try to get the node as the correct type
             if let Some(godot_node) = handle.clone().try_get::<#struct_name>() {

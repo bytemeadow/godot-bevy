@@ -13,7 +13,7 @@ use godot::{
 };
 use std::sync::mpsc::Sender;
 
-use crate::bridge::GodotNodeHandle;
+use crate::interop::GodotNodeHandle;
 
 #[derive(Default)]
 pub struct GodotSignalsPlugin;

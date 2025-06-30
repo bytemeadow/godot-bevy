@@ -1,6 +1,6 @@
 //! Audio output management and sound tracking
 
-use crate::bridge::GodotNodeHandle;
+use crate::interop::GodotNodeHandle;
 use crate::plugins::audio::{AudioTween, ChannelId};
 use bevy::prelude::*;
 use godot::classes::{AudioStreamPlayer, AudioStreamPlayer2D, AudioStreamPlayer3D};

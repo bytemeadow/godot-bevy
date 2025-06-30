@@ -1,6 +1,6 @@
 pub use crate::GodotPlugin;
 pub use crate::autosync::AutoSyncBundleRegistry;
-pub use crate::bridge::*;
+pub use crate::interop::*;
 pub use crate::node_tree_view::NodeTreeView;
 pub use crate::plugins::{
     GodotCorePlugins,
@@ -24,19 +24,6 @@ pub use crate::plugins::{
     },
     // Input
     input::{ActionInput, GodotInputPlugin, KeyboardInput, MouseButtonInput, MouseMotion},
-    // Node markers - all node type marker components for type-safe ECS queries
-    node_markers::{
-        AnimatedSprite2DMarker, AnimatedSprite3DMarker, AnimationPlayerMarker, AnimationTreeMarker,
-        Area2DMarker, Area3DMarker, AudioStreamPlayer2DMarker, AudioStreamPlayer3DMarker,
-        AudioStreamPlayerMarker, ButtonMarker, Camera2DMarker, Camera3DMarker, CanvasItemMarker,
-        CharacterBody2DMarker, CharacterBody3DMarker, CollisionPolygon2DMarker,
-        CollisionPolygon3DMarker, CollisionShape2DMarker, CollisionShape3DMarker, ControlMarker,
-        DirectionalLight3DMarker, LabelMarker, LineEditMarker, MeshInstance2DMarker,
-        MeshInstance3DMarker, Node2DMarker, Node3DMarker, NodeMarker, PanelMarker, Path2DMarker,
-        Path3DMarker, PathFollow2DMarker, PathFollow3DMarker, RigidBody2DMarker, RigidBody3DMarker,
-        SpotLight3DMarker, Sprite2DMarker, Sprite3DMarker, StaticBody2DMarker, StaticBody3DMarker,
-        TextEditMarker, TimerMarker,
-    },
     packed_scene::{GodotPackedScenePlugin, GodotScene},
     // Scene tree
     scene_tree::{

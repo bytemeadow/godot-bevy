@@ -1,5 +1,5 @@
 //! Main audio plugin and systems
-use crate::bridge::GodotNodeHandle;
+use crate::interop::GodotNodeHandle;
 use crate::plugins::assets::GodotResource;
 use crate::plugins::audio::{
     ActiveTween, AudioChannel, AudioChannelMarker, AudioCommand, AudioOutput, AudioPlayerType,

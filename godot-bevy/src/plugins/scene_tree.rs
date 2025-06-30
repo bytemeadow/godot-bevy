@@ -1,8 +1,8 @@
 use super::collisions::ALL_COLLISION_SIGNALS;
-use super::node_markers::*;
+use crate::interop::node_markers::*;
 use crate::plugins::transforms::{Transform2D, Transform3D};
 use crate::prelude::main_thread_system;
-use crate::{bridge::GodotNodeHandle, plugins::collisions::Collisions};
+use crate::{interop::GodotNodeHandle, plugins::collisions::Collisions};
 use bevy::{
     app::{App, First, Plugin, PreStartup},
     ecs::{

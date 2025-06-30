@@ -15,7 +15,7 @@ use bevy::{
 };
 use std::sync::RwLock;
 
-use crate::bridge::GodotNodeHandle;
+use crate::interop::GodotNodeHandle;
 
 /// Function type for creating bundles from Godot nodes
 pub type BundleCreatorFn = fn(&mut Commands, Entity, &GodotNodeHandle) -> bool;

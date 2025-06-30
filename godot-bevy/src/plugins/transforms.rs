@@ -13,10 +13,10 @@ use godot::builtin::{Basis, Quaternion, Vector3};
 use godot::classes::{Node2D, Node3D};
 use godot::prelude::Transform3D as GodotTransform3D;
 
-use crate::bridge::GodotNodeHandle;
+use crate::interop::GodotNodeHandle;
 use crate::prelude::main_thread_system;
 
-use super::node_markers::{Node2DMarker, Node3DMarker};
+use crate::interop::node_markers::{Node2DMarker, Node3DMarker};
 
 #[derive(Debug, Component, Default, Copy, Clone)]
 pub struct Transform3D {

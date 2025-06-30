@@ -21,7 +21,7 @@ use godot::{
     classes::{AnimatedSprite2D, Node, PathFollow2D, RigidBody2D},
 };
 use godot_bevy::{
-    bridge::GodotNodeHandle,
+    interop::GodotNodeHandle,
     prelude::{
         main_thread_system, AudioChannel, FindEntityByNameExt, GodotResource, GodotScene,
         GodotSignal, GodotSignals, NodeTreeView, Transform2D,

@@ -12,7 +12,7 @@ use bevy::{
     },
 };
 use godot_bevy::{
-    bridge::GodotNodeHandle,
+    interop::GodotNodeHandle,
     prelude::{main_thread_system, GodotSignal, GodotSignals, NodeTreeView, SceneTreeRef},
 };
 
