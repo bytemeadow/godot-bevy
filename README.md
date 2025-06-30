@@ -33,6 +33,7 @@ _Special thanks to [Blaze](https://runblaze.dev) for their support of this proje
 The book covers everything you need to know:
 - Installation and setup
 - Core concepts and architecture
+- **Plugin system** (opt-in features)
 - Transform system and physics
 - Input handling
 - Examples and best practices
@@ -43,7 +44,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-godot-bevy = "0.7.0"
+godot-bevy = "0.8.0"  # Latest with opt-in plugin system
 bevy = { version = "0.16", default-features = false }
 godot = "0.3"
 ```
@@ -56,20 +57,14 @@ use godot_bevy::prelude::*;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
-    // Print to the Godot console:
-    // (https://docs.rs/godot-core/0.3.1/godot_core/macro.godot_print.html)
+    // Add the features you need (v0.8+ opt-in plugin system)
+    app.add_plugins(GodotTransformsPlugin)  // Transform sync
+        .add_plugins(GodotAudioPlugin);     // Audio system
+    
+    // Print to the Godot console
     godot_print!("Hello from Godot-Bevy!");
 
-    // This line runs the `position_system` function every Godot render frame.
-    //
-    // Read more about Bevy "Systems" here:
-    // (https://bevy.org/learn/quick-start/getting-started/ecs/).
-    //
-    // The `Update` schedule parameter is provided by Godot-Bevy.
-    // It runs the system during Godot's `_process` update cycle.
-    //
-    // Read more about other schedules provided by Godot-Bevy here:
-    // (https://github.com/bytemeadow/godot-bevy/blob/main/docs/TIMING_AND_SCHEDULES.md).
+    // Add your game systems
     app.add_systems(Update, position_system);
 }
 
@@ -92,6 +87,35 @@ fn position_system(mut transform: Query<&mut Transform2D>) {
 
 ```
 
+## 🔧 Plugin System (v0.8+)
+
+godot-bevy now uses an **opt-in plugin system** for maximum efficiency:
+
+```rust
+// Minimal setup - only core features
+#[bevy_app]
+fn build_app(app: &mut App) {
+    // Scene tree and assets included by default
+    app.add_systems(Update, my_systems);
+}
+
+// Add specific features as needed
+#[bevy_app]
+fn build_app(app: &mut App) {
+    app.add_plugins(GodotTransformsPlugin)  // Transform sync
+        .add_plugins(GodotAudioPlugin)      // Audio system
+        .add_plugins(BevyInputBridgePlugin); // Input handling
+}
+
+// Or everything at once (like v0.7.x)
+#[bevy_app]
+fn build_app(app: &mut App) {
+    app.add_plugins(GodotDefaultPlugins);
+}
+```
+
+**Benefits**: Smaller binaries, better performance, clearer dependencies. See the [Plugin System Guide](https://bytemeadow.github.io/godot-bevy/getting-started/plugins.html) for details.
+
 ## 🎮 Examples
 
 Check out the [examples](./examples) directory:
@@ -109,6 +133,7 @@ This library is inspired by and builds upon the work of [bevy_godot](https://git
 
 | `godot-bevy` | Bevy | Godot-Rust | Godot |
 |------------|------|------------|-------|
+| 0.8.x      | 0.16 | 0.3      | 4.4.x |
 | 0.7.x      | 0.16 | 0.3      | 4.4.x |
 
 ## 🦀 MSRV

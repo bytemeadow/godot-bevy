@@ -35,15 +35,38 @@ use godot::{
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-pub struct GodotSceneTreePlugin;
+/// Basic scene tree access - provides SceneTreeRef resource.
+/// This is the minimal functionality that other plugins depend on.
+pub struct GodotSceneTreeRefPlugin;
 
-impl Plugin for GodotSceneTreePlugin {
+impl Plugin for GodotSceneTreeRefPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreStartup, (initialize_scene_tree, connect_scene_tree))
+        app.init_non_send_resource::<SceneTreeRefImpl>();
+    }
+}
+
+/// Scene tree event monitoring - emits events when nodes are added/removed.
+/// Does not create entities automatically.
+/// Note: The SceneTreeEventReader resource is created by BevyApp when initializing the SceneTreeWatcher.
+pub struct GodotSceneTreeEventsPlugin;
+
+impl Plugin for GodotSceneTreeEventsPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(PreStartup, connect_scene_tree)
             .add_systems(First, write_scene_tree_events.before(event_update_system))
-            .add_systems(First, read_scene_tree_events.before(event_update_system))
-            .add_event::<SceneTreeEvent>()
-            .init_non_send_resource::<SceneTreeRefImpl>();
+            .add_event::<SceneTreeEvent>();
+    }
+}
+
+/// Automatic scene tree mirroring - creates entities for scene tree nodes.
+/// Requires GodotSceneTreeEventsPlugin.
+pub struct GodotSceneTreeMirroringPlugin;
+
+impl Plugin for GodotSceneTreeMirroringPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(GodotSceneTreeEventsPlugin)
+            .add_systems(PreStartup, initialize_scene_tree)
+            .add_systems(First, read_scene_tree_events.before(event_update_system));
     }
 }
 

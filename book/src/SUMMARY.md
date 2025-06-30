@@ -6,6 +6,7 @@
 
 - [Installation](./getting-started/installation.md)
 - [Basic Concepts](./getting-started/basic-concepts.md)
+- [Plugin System](./getting-started/plugins.md)
 - [Examples](./getting-started/examples.md)
 
 # Scene Tree

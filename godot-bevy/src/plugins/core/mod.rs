@@ -15,7 +15,10 @@ pub mod collisions;
 pub use collisions::*;
 
 pub mod scene_tree;
-pub use scene_tree::*;
+pub use scene_tree::{
+    GodotSceneTreeEventsPlugin, GodotSceneTreeMirroringPlugin, GodotSceneTreeRefPlugin, Groups,
+    SceneTreeEvent, SceneTreeEventType, SceneTreeRef,
+};
 
 pub mod transforms;
 pub use transforms::{GodotTransformsPlugin, Transform2D, Transform3D};
@@ -137,27 +140,13 @@ impl Plugin for GodotBaseCorePlugin {
             })
             .add_plugins(bevy::log::LogPlugin::default())
             .add_plugins(bevy::diagnostic::DiagnosticsPlugin)
-            .add_plugins(GodotSceneTreePlugin)
+            .add_plugins(GodotSceneTreeRefPlugin)
             .init_resource::<PhysicsDelta>()
             .init_resource::<GodotTransformConfig>()
             .init_non_send_resource::<MainThreadMarker>();
 
         // Add the PhysicsUpdate schedule
         app.add_schedule(Schedule::new(PhysicsUpdate));
-    }
-}
-
-/// @deprecated Use individual plugins instead: GodotTransformsPlugin, GodotCollisionsPlugin, etc.
-pub struct GodotCorePlugin;
-
-impl Plugin for GodotCorePlugin {
-    fn build(&self, app: &mut App) {
-        app.add_plugins(GodotBaseCorePlugin)
-            .add_plugins(GodotTransformsPlugin)
-            .add_plugins(GodotCollisionsPlugin)
-            .add_plugins(GodotSignalsPlugin)
-            .add_plugins(GodotInputEventPlugin)
-            .add_plugins(BevyInputBridgePlugin);
     }
 }
 

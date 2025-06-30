@@ -2,7 +2,6 @@ pub use crate::GodotPlugin;
 pub use crate::autosync::AutoSyncBundleRegistry;
 pub use crate::bridge::*;
 pub use crate::node_tree_view::NodeTreeView;
-#[allow(deprecated)]
 pub use crate::plugins::{
     GodotCorePlugins, GodotDefaultPlugins,
     assets::{GodotAssetsPlugin, GodotResource},
@@ -39,8 +38,10 @@ pub use crate::plugins::{
         DirectionalLight3DMarker,
         FindEntityByNameExt,
         GodotCollisionsPlugin,
-        GodotCorePlugin,
         GodotInputEventPlugin,
+        GodotSceneTreeEventsPlugin,
+        GodotSceneTreeMirroringPlugin,
+        GodotSceneTreeRefPlugin,
         GodotSignal,
         GodotSignalArgument,
         GodotSignals,
@@ -68,7 +69,6 @@ pub use crate::plugins::{
         PhysicsUpdate,
         RigidBody2DMarker,
         RigidBody3DMarker,
-        SceneTreeEventReader,
         SceneTreeRef,
         SpotLight3DMarker,
         Sprite2DMarker,
@@ -87,7 +87,7 @@ pub use crate::plugins::{
         },
         connect_godot_signal,
     },
-    packed_scene::{GodotScene, GodotPackedScenePlugin},
+    packed_scene::{GodotPackedScenePlugin, GodotScene},
 };
 pub use godot::prelude as godot_prelude;
 pub use godot_bevy_macros::*;

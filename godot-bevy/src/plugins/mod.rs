@@ -8,8 +8,9 @@ pub mod packed_scene;
 // Re-export all plugins for convenience
 pub use audio::GodotAudioPlugin;
 pub use core::{
-    BevyInputBridgePlugin, GodotCollisionsPlugin, GodotInputEventPlugin, GodotSignalsPlugin,
-    GodotTransformsPlugin,
+    BevyInputBridgePlugin, GodotCollisionsPlugin, GodotInputEventPlugin,
+    GodotSceneTreeEventsPlugin, GodotSceneTreeMirroringPlugin, GodotSceneTreeRefPlugin,
+    GodotSignalsPlugin, GodotTransformsPlugin,
 };
 pub use packed_scene::GodotPackedScenePlugin;
 
@@ -31,6 +32,7 @@ pub struct GodotDefaultPlugins;
 impl Plugin for GodotDefaultPlugins {
     fn build(&self, app: &mut App) {
         app.add_plugins(GodotCorePlugins)
+            .add_plugins(GodotSceneTreeMirroringPlugin) // Add automatic scene tree mirroring
             .add_plugins(GodotTransformsPlugin)
             .add_plugins(GodotCollisionsPlugin)
             .add_plugins(GodotSignalsPlugin)
@@ -38,14 +40,5 @@ impl Plugin for GodotDefaultPlugins {
             .add_plugins(BevyInputBridgePlugin)
             .add_plugins(GodotAudioPlugin)
             .add_plugins(GodotPackedScenePlugin);
-    }
-}
-
-/// @deprecated Use GodotDefaultPlugins instead
-pub struct DefaultGodotPlugin;
-
-impl Plugin for DefaultGodotPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_plugins(GodotDefaultPlugins);
     }
 }

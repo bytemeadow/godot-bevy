@@ -8,8 +8,8 @@ use crate::{
     GodotPlugin,
     plugins::core::{
         GodotSignalReader, GodotSignalSender, InputEventReader, PhysicsDelta, PhysicsUpdate,
+        scene_tree::SceneTreeEventReader,
     },
-    prelude::*,
 };
 
 lazy_static::lazy_static! {
