@@ -15,6 +15,7 @@ use std::sync::mpsc::Sender;
 
 use crate::bridge::GodotNodeHandle;
 
+#[derive(Default)]
 pub struct GodotSignalsPlugin;
 
 impl Plugin for GodotSignalsPlugin {

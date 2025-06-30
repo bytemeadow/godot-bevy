@@ -36,6 +36,7 @@ use std::marker::PhantomData;
 
 /// Basic scene tree access - provides SceneTreeRef resource.
 /// This is the minimal functionality that other plugins depend on.
+#[derive(Default)]
 pub struct GodotSceneTreeRefPlugin;
 
 impl Plugin for GodotSceneTreeRefPlugin {
@@ -47,6 +48,7 @@ impl Plugin for GodotSceneTreeRefPlugin {
 /// Scene tree event monitoring - emits events when nodes are added/removed.
 /// Does not create entities automatically.
 /// Note: The SceneTreeEventReader resource is created by BevyApp when initializing the SceneTreeWatcher.
+#[derive(Default)]
 pub struct GodotSceneTreeEventsPlugin;
 
 impl Plugin for GodotSceneTreeEventsPlugin {

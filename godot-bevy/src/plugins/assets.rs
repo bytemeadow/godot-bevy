@@ -64,6 +64,7 @@ use crate::bridge::GodotResourceHandle;
 /// - Unified system for all Godot resource types
 ///
 /// This works identically in development and exported builds, including with .pck files.
+#[derive(Default)]
 pub struct GodotAssetsPlugin;
 
 impl Plugin for GodotAssetsPlugin {

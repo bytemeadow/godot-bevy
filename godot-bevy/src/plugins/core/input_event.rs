@@ -17,6 +17,7 @@ use godot::{
     obj::{EngineEnum, Gd},
 };
 
+#[derive(Default)]
 pub struct GodotInputEventPlugin;
 
 impl Plugin for GodotInputEventPlugin {

@@ -8,6 +8,7 @@ use godot::prelude::*;
 use super::GodotSignal;
 use crate::bridge::GodotNodeHandle;
 
+#[derive(Default)]
 pub struct GodotCollisionsPlugin;
 
 // Collision signal constants

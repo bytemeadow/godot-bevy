@@ -19,6 +19,7 @@ use godot::{
 };
 use std::str::FromStr;
 
+#[derive(Default)]
 pub struct GodotPackedScenePlugin;
 impl Plugin for GodotPackedScenePlugin {
     fn build(&self, app: &mut App) {

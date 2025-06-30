@@ -121,6 +121,7 @@ impl GodotTransformConfig {
 
 /// Minimal core plugin with only essential Godot-Bevy integration.
 /// This includes scene tree management, basic Bevy setup, and core resources.
+#[derive(Default)]
 pub struct GodotBaseCorePlugin;
 
 impl Plugin for GodotBaseCorePlugin {

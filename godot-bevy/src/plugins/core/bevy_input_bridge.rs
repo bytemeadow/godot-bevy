@@ -24,6 +24,7 @@ use crate::plugins::core::input_event::{
 
 /// Plugin that bridges godot-bevy's input events to Bevy's standard input resources.
 /// This plugin automatically includes GodotInputEventPlugin as a dependency.
+#[derive(Default)]
 pub struct BevyInputBridgePlugin;
 
 impl Plugin for BevyInputBridgePlugin {

@@ -18,6 +18,7 @@ use thiserror::Error;
 
 /// Plugin that provides a comprehensive audio API using Godot's audio system.
 /// Supports 2D, 3D, and non-positional audio with channels, tweening, and spatial features.
+#[derive(Default)]
 pub struct GodotAudioPlugin;
 
 impl Plugin for GodotAudioPlugin {

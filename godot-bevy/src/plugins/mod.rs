@@ -1,4 +1,4 @@
-use bevy::app::{App, Plugin};
+use bevy::app::plugin_group;
 
 pub mod assets;
 pub mod audio;
@@ -14,33 +14,23 @@ pub use core::{
 };
 pub use packed_scene::GodotPackedScenePlugin;
 
-/// Minimal core functionality required for Godot-Bevy integration.
-/// This includes scene tree management, asset loading, and basic bridge components.
-pub struct GodotCorePlugins;
-
-impl Plugin for GodotCorePlugins {
-    fn build(&self, app: &mut App) {
-        app.add_plugins(core::GodotBaseCorePlugin)
-            .add_plugins(assets::GodotAssetsPlugin);
+plugin_group! {
+    /// Minimal core functionality required for Godot-Bevy integration.
+    /// This includes scene tree management, asset loading, and basic bridge components.
+    pub struct GodotCorePlugins {
+        core:::GodotBaseCorePlugin,
+        assets:::GodotAssetsPlugin
     }
 }
 
-/// All plugins bundled together for convenience - equivalent to the old DefaultGodotPlugin.
-/// Use this if you want all functionality enabled by default.
-pub struct GodotDefaultPlugins;
-
-impl Plugin for GodotDefaultPlugins {
-    fn build(&self, app: &mut App) {
-        app.add_plugins(GodotCorePlugins)
-            .add_plugins(GodotSceneTreeMirroringPlugin {
-                add_transforms: true,
-            })
-            .add_plugins(GodotTransformSyncPlugin::default())
-            .add_plugins(GodotCollisionsPlugin)
-            .add_plugins(GodotSignalsPlugin)
-            .add_plugins(GodotInputEventPlugin)
-            .add_plugins(BevyInputBridgePlugin)
-            .add_plugins(GodotAudioPlugin)
-            .add_plugins(GodotPackedScenePlugin);
+plugin_group! {
+    /// This plugin group will add all the default plugins for a *godot-bevy* application:
+    pub struct GodotDefaultPlugins {
+        core:::GodotCollisionsPlugin,
+        core:::GodotSignalsPlugin,
+        core:::GodotInputEventPlugin,
+        core:::BevyInputBridgePlugin,
+        audio:::GodotAudioPlugin,
+        packed_scene:::GodotPackedScenePlugin
     }
 }
