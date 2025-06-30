@@ -22,7 +22,7 @@ pub struct GodotPlugin;
 
 impl Plugin for GodotPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(plugins::DefaultGodotPlugin);
+        app.add_plugins(plugins::GodotDefaultPlugins);
 
         // Auto-register all discovered AutoSyncBundle plugins
         autosync::register_all_autosync_bundles(app);

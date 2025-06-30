@@ -4,6 +4,7 @@ pub use crate::bridge::*;
 pub use crate::node_tree_view::NodeTreeView;
 #[allow(deprecated)]
 pub use crate::plugins::{
+    GodotCorePlugins, GodotDefaultPlugins,
     assets::{GodotAssetsPlugin, GodotResource},
     audio::{
         Audio, AudioApp, AudioChannel, AudioChannelMarker, AudioEasing, AudioError, AudioOutput,
@@ -37,11 +38,15 @@ pub use crate::plugins::{
         ControlMarker,
         DirectionalLight3DMarker,
         FindEntityByNameExt,
+        GodotCollisionsPlugin,
         GodotCorePlugin,
+        GodotInputEventPlugin,
         GodotSignal,
         GodotSignalArgument,
         GodotSignals,
+        GodotSignalsPlugin,
         GodotTransformConfig,
+        GodotTransformsPlugin,
         Groups,
         KeyboardInput,
         LabelMarker,

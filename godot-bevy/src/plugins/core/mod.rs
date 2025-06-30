@@ -10,7 +10,6 @@ use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
-use transforms::GodotTransformsPlugin;
 
 pub mod collisions;
 pub use collisions::*;
@@ -19,7 +18,7 @@ pub mod scene_tree;
 pub use scene_tree::*;
 
 pub mod transforms;
-pub use transforms::{Transform2D, Transform3D};
+pub use transforms::{GodotTransformsPlugin, Transform2D, Transform3D};
 
 pub mod signals;
 pub use signals::*;
@@ -117,9 +116,11 @@ impl GodotTransformConfig {
     }
 }
 
-pub struct GodotCorePlugin;
+/// Minimal core plugin with only essential Godot-Bevy integration.
+/// This includes scene tree management, basic Bevy setup, and core resources.
+pub struct GodotBaseCorePlugin;
 
-impl Plugin for GodotCorePlugin {
+impl Plugin for GodotBaseCorePlugin {
     fn build(&self, app: &mut App) {
         // IMPORTANT: Register custom AssetReader BEFORE setting up AssetPlugin
         app.register_asset_source(
@@ -137,17 +138,26 @@ impl Plugin for GodotCorePlugin {
             .add_plugins(bevy::log::LogPlugin::default())
             .add_plugins(bevy::diagnostic::DiagnosticsPlugin)
             .add_plugins(GodotSceneTreePlugin)
-            .add_plugins(GodotTransformsPlugin)
-            .add_plugins(GodotCollisionsPlugin)
-            .add_plugins(GodotSignalsPlugin)
-            .add_plugins(GodotInputEventPlugin)
-            .add_plugins(BevyInputBridgePlugin)
             .init_resource::<PhysicsDelta>()
             .init_resource::<GodotTransformConfig>()
             .init_non_send_resource::<MainThreadMarker>();
 
         // Add the PhysicsUpdate schedule
         app.add_schedule(Schedule::new(PhysicsUpdate));
+    }
+}
+
+/// @deprecated Use individual plugins instead: GodotTransformsPlugin, GodotCollisionsPlugin, etc.
+pub struct GodotCorePlugin;
+
+impl Plugin for GodotCorePlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(GodotBaseCorePlugin)
+            .add_plugins(GodotTransformsPlugin)
+            .add_plugins(GodotCollisionsPlugin)
+            .add_plugins(GodotSignalsPlugin)
+            .add_plugins(GodotInputEventPlugin)
+            .add_plugins(BevyInputBridgePlugin);
     }
 }
 

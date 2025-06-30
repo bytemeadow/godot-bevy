@@ -54,11 +54,33 @@ cargo build --release --manifest-path examples/{example}/rust/Cargo.toml
 
 ### Plugin Architecture
 
-**GodotPlugin**: Main plugin that registers all core systems and auto-discovers `AutoSyncBundle` plugins for custom Godot node types.
+**Opt-in Plugin System**: Following Bevy's philosophy, godot-bevy now provides granular plugin control:
 
-**Audio System** (`godot-bevy/src/plugins/audio/`): Channel-based audio API with spatial audio support using Godot's audio engine.
+- **`GodotCorePlugins`**: Minimal required functionality (scene tree, assets, basic setup)
+- **`GodotDefaultPlugins`**: All functionality enabled (equivalent to old behavior)
+- **Individual plugins**: `GodotTransformsPlugin`, `GodotAudioPlugin`, `GodotSignalsPlugin`, `GodotCollisionsPlugin`, `GodotInputEventPlugin`, `BevyInputBridgePlugin`, `PackedScenePlugin`
 
-**Asset Management** (`godot-bevy/src/plugins/assets.rs`): Unified asset loading that abstracts differences between development and exported game environments.
+**Example usage:**
+```rust
+// Minimal setup
+app.add_plugins(GodotCorePlugins);
+
+// Add specific features
+app.add_plugins((
+    GodotCorePlugins,
+    GodotTransformsPlugin,
+    GodotAudioPlugin,
+));
+
+// Everything (old behavior)
+app.add_plugins(GodotDefaultPlugins);
+```
+
+**GodotPlugin**: Main plugin that registers `GodotDefaultPlugins` and auto-discovers `AutoSyncBundle` plugins for custom Godot node types.
+
+**Audio System** (`godot-bevy/src/plugins/audio/`): Channel-based audio API with spatial audio support using Godot's audio engine. Add with `GodotAudioPlugin`.
+
+**Asset Management** (`godot-bevy/src/plugins/assets.rs`): Unified asset loading that abstracts differences between development and exported game environments. Always included in `GodotCorePlugins`.
 
 ### AutoSync System
 
