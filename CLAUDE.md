@@ -59,7 +59,7 @@ cargo build --release --manifest-path examples/{example}/rust/Cargo.toml
 - **`GodotPlugin`**: Now minimal by default - only includes `GodotCorePlugins` (scene tree, assets, basic setup)
 - **`GodotCorePlugins`**: Minimal required functionality 
 - **`GodotDefaultPlugins`**: All functionality enabled (use for easy migration)
-- **Individual plugins**: `GodotTransformsPlugin`, `GodotAudioPlugin`, `GodotSignalsPlugin`, `GodotCollisionsPlugin`, `GodotInputEventPlugin`, `BevyInputBridgePlugin` (includes `GodotInputEventPlugin`), `PackedScenePlugin`
+- **Individual plugins**: `GodotTransformsPlugin`, `GodotAudioPlugin`, `GodotSignalsPlugin`, `GodotCollisionsPlugin`, `GodotInputEventPlugin`, `BevyInputBridgePlugin` (includes `GodotInputEventPlugin`), `GodotPackedScenePlugin`
 
 **Example usage:**
 ```rust

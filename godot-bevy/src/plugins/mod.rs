@@ -11,7 +11,7 @@ pub use core::{
     BevyInputBridgePlugin, GodotCollisionsPlugin, GodotInputEventPlugin, GodotSignalsPlugin,
     GodotTransformsPlugin,
 };
-pub use packed_scene::PackedScenePlugin;
+pub use packed_scene::GodotPackedScenePlugin;
 
 /// Minimal core functionality required for Godot-Bevy integration.
 /// This includes scene tree management, asset loading, and basic bridge components.
@@ -37,7 +37,7 @@ impl Plugin for GodotDefaultPlugins {
             .add_plugins(GodotInputEventPlugin)
             .add_plugins(BevyInputBridgePlugin)
             .add_plugins(GodotAudioPlugin)
-            .add_plugins(PackedScenePlugin);
+            .add_plugins(GodotPackedScenePlugin);
     }
 }
 

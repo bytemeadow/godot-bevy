@@ -87,7 +87,7 @@ pub use crate::plugins::{
         },
         connect_godot_signal,
     },
-    packed_scene::{GodotScene, PackedScenePlugin},
+    packed_scene::{GodotScene, GodotPackedScenePlugin},
 };
 pub use godot::prelude as godot_prelude;
 pub use godot_bevy_macros::*;

@@ -19,8 +19,8 @@ use godot::{
 };
 use std::str::FromStr;
 
-pub struct PackedScenePlugin;
-impl Plugin for PackedScenePlugin {
+pub struct GodotPackedScenePlugin;
+impl Plugin for GodotPackedScenePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(PostUpdate, spawn_scene);
     }
