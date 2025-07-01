@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Boids Performance Benchmark Runner
 # This script runs automated benchmarks comparing Godot and Bevy implementations
@@ -95,9 +95,9 @@ cargo build
 cargo build --release
 cd ..
 
+echo "🔨 Exporting a godot release build..."
 EXPORT_DIR="$OUTPUT_DIR/export"
 BENCHMARK_BINARY="$EXPORT_DIR/boids"
-echo "🔨 Exporting a godot release build to $BENCHMARK_BINARY ..."
 mkdir -p "$EXPORT_DIR"
 cd godot
 PLATFORM=""
@@ -117,6 +117,8 @@ cd ..
 # Run the benchmark
 echo "🚀 Starting benchmark..."
 $FHS_BINARY "$BENCHMARK_BINARY" --headless \
+steam-run "$BENCHMARK_BINARY" --headless \
+"$BENCHMARK_BINARY" --headless \
     --implementation="$IMPLEMENTATION" \
     --boid-count="$BOID_COUNT" \
     --duration="$DURATION" \
