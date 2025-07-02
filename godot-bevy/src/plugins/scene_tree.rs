@@ -34,60 +34,50 @@ use godot::{
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-/// Basic scene tree access - provides SceneTreeRef resource.
-/// This is the minimal functionality that other plugins depend on.
-#[derive(Default)]
-pub struct GodotSceneTreeRefPlugin;
-
-impl Plugin for GodotSceneTreeRefPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_non_send_resource::<SceneTreeRefImpl>();
-    }
-}
-
-/// Scene tree event monitoring - emits events when nodes are added/removed.
-/// Does not create entities automatically.
-/// Note: The SceneTreeEventReader resource is created by BevyApp when initializing the SceneTreeWatcher.
-#[derive(Default)]
-pub struct GodotSceneTreeEventsPlugin;
-
-impl Plugin for GodotSceneTreeEventsPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(PreStartup, connect_scene_tree)
-            .add_systems(First, write_scene_tree_events.before(event_update_system))
-            .add_event::<SceneTreeEvent>();
-    }
-}
-
-/// Automatic scene tree mirroring - creates entities for scene tree nodes.
-/// Requires GodotSceneTreeEventsPlugin.
-pub struct GodotSceneTreeMirroringPlugin {
+/// Unified scene tree plugin that provides:
+/// - SceneTreeRef for accessing the Godot scene tree
+/// - Scene tree events (NodeAdded, NodeRemoved, NodeRenamed)
+/// - Automatic entity creation and mirroring for scene tree nodes
+///
+/// This plugin is always included in the core plugins and provides
+/// complete scene tree integration out of the box.
+pub struct GodotSceneTreePlugin {
     /// Whether to automatically add Transform components to entities
     pub add_transforms: bool,
 }
 
-impl Default for GodotSceneTreeMirroringPlugin {
+impl Default for GodotSceneTreePlugin {
     fn default() -> Self {
         Self {
-            add_transforms: true, // Default to adding transforms
+            add_transforms: true,
         }
     }
 }
 
-/// Internal configuration resource for scene tree mirroring
+/// Configuration resource for scene tree behavior
 #[derive(Resource)]
-pub(crate) struct SceneTreeMirroringConfig {
+pub(crate) struct SceneTreeConfig {
     add_transforms: bool,
 }
 
-impl Plugin for GodotSceneTreeMirroringPlugin {
+impl Plugin for GodotSceneTreePlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(GodotSceneTreeEventsPlugin)
-            .insert_resource(SceneTreeMirroringConfig {
+        app.init_non_send_resource::<SceneTreeRefImpl>()
+            .insert_resource(SceneTreeConfig {
                 add_transforms: self.add_transforms,
             })
-            .add_systems(PreStartup, initialize_scene_tree)
-            .add_systems(First, read_scene_tree_events.before(event_update_system));
+            .add_event::<SceneTreeEvent>()
+            .add_systems(
+                PreStartup,
+                (connect_scene_tree, initialize_scene_tree).chain(),
+            )
+            .add_systems(
+                First,
+                (
+                    write_scene_tree_events.before(event_update_system),
+                    read_scene_tree_events.before(event_update_system),
+                ),
+            );
     }
 }
 
@@ -127,7 +117,7 @@ fn initialize_scene_tree(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
-    config: Res<SceneTreeMirroringConfig>,
+    config: Res<SceneTreeConfig>,
     signal_sender: NonSendMut<crate::plugins::signals::GodotSignalSender>,
 ) {
     fn traverse(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
@@ -399,7 +389,7 @@ fn create_scene_tree_entity(
     events: impl IntoIterator<Item = SceneTreeEvent>,
     scene_tree: &mut SceneTreeRef,
     entities: &mut Query<(&mut GodotNodeHandle, Entity)>,
-    config: &SceneTreeMirroringConfig,
+    config: &SceneTreeConfig,
     signal_sender: &std::sync::mpsc::Sender<crate::plugins::signals::GodotSignal>,
 ) {
     let mut ent_mapping = entities
@@ -521,7 +511,7 @@ fn read_scene_tree_events(
     mut scene_tree: SceneTreeRef,
     mut event_reader: EventReader<SceneTreeEvent>,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
-    config: Res<SceneTreeMirroringConfig>,
+    config: Res<SceneTreeConfig>,
     signal_sender: NonSendMut<crate::plugins::signals::GodotSignalSender>,
 ) {
     create_scene_tree_entity(

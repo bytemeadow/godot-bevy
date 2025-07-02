@@ -26,10 +26,7 @@ pub use crate::plugins::{
     input_bridge::BevyInputBridgePlugin,
     packed_scene::{GodotPackedScenePlugin, GodotScene},
     // Scene tree
-    scene_tree::{
-        GodotSceneTreeEventsPlugin, GodotSceneTreeMirroringPlugin, GodotSceneTreeRefPlugin, Groups,
-        SceneTreeRef,
-    },
+    scene_tree::{GodotSceneTreePlugin, Groups, SceneTreeRef},
     // Signals
     signals::{
         GodotSignal, GodotSignalArgument, GodotSignals, GodotSignalsPlugin, connect_godot_signal,

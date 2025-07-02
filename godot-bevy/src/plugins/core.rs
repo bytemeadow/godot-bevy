@@ -117,7 +117,7 @@ impl Plugin for GodotBaseCorePlugin {
             })
             .add_plugins(bevy::log::LogPlugin::default())
             .add_plugins(bevy::diagnostic::DiagnosticsPlugin)
-            .add_plugins(crate::plugins::scene_tree::GodotSceneTreeRefPlugin)
+            .add_plugins(crate::plugins::scene_tree::GodotSceneTreePlugin::default())
             .init_resource::<PhysicsDelta>()
             .init_non_send_resource::<MainThreadMarker>();
 
