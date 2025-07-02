@@ -291,6 +291,7 @@ impl Parse for BevyBundleAttr {
                 // Single field mapping: (Component: field)
                 let _colon: Token![:] = component_content.parse()?;
                 let field: Ident = component_content.parse()?;
+
                 ComponentMapping::SingleField(field)
             } else if component_content.peek(syn::token::Brace) {
                 // Multiple field mapping: (Component { bevy_field: godot_field, ... })
@@ -344,6 +345,45 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
 
     let attr_args: BevyBundleAttr = bevy_attr.parse_args()?;
 
+    // Get struct fields to check for transform_with attributes
+    let fields = match &input.data {
+        Data::Struct(data) => &data.fields,
+        _ => {
+            return Err(Error::new_spanned(
+                &input,
+                "BevyBundle can only be used on structs",
+            ));
+        }
+    };
+
+    // Helper function to extract transform_with from doc comments
+    let extract_transform_with = |field_name: &Ident| -> Option<syn::Path> {
+        for field in fields {
+            if let Some(fname) = &field.ident {
+                if fname == field_name {
+                    for attr in &field.attrs {
+                        if attr.path().is_ident("doc") {
+                            // Extract doc comment content
+                            if let Ok(lit) = attr.parse_args::<LitStr>() {
+                                let doc_content = lit.value();
+                                // Look for "bevy_transform_with: <path>"
+                                if let Some(transform_part) =
+                                    doc_content.strip_prefix("bevy_transform_with:")
+                                {
+                                    let transform_str = transform_part.trim();
+                                    if let Ok(path) = syn::parse_str::<syn::Path>(transform_str) {
+                                        return Some(path);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
+    };
+
     // Auto-generate bundle name from struct name
     let bundle_name = syn::Ident::new(&format!("{struct_name}Bundle"), struct_name.span());
 
@@ -386,8 +426,15 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
                 }
                 ComponentMapping::SingleField(source_field) => {
                     // Component with single field mapping (tuple struct)
-                    quote! {
-                        #field_ident: #component_name(node.bind().#source_field)
+                    // Check if this field has a transform_with attribute
+                    if let Some(transformer) = extract_transform_with(source_field) {
+                        quote! {
+                            #field_ident: #component_name(#transformer(node.bind().#source_field.clone()))
+                        }
+                    } else {
+                        quote! {
+                            #field_ident: #component_name(node.bind().#source_field)
+                        }
                     }
                 }
                 ComponentMapping::MultipleFields(field_mappings) => {
@@ -395,8 +442,15 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
                     let field_inits: Vec<_> = field_mappings
                         .iter()
                         .map(|(bevy_field, godot_field)| {
-                            quote! {
-                                #bevy_field: node.bind().#godot_field
+                            // Check if this field has a transform_with attribute
+                            if let Some(transformer) = extract_transform_with(godot_field) {
+                                quote! {
+                                    #bevy_field: #transformer(node.bind().#godot_field.clone())
+                                }
+                            } else {
+                                quote! {
+                                    #bevy_field: node.bind().#godot_field
+                                }
                             }
                         })
                         .collect();
