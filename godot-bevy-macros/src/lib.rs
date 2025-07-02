@@ -4,7 +4,8 @@ use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::{
-    Data, DeriveInput, Error, Field, Fields, Ident, LitStr, Result, Token, parse_macro_input,
+    Data, DeriveInput, Error, Field, Fields, Ident, LitStr, Result, Token, braced,
+    parse_macro_input,
 };
 
 /// Attribute macro that ensures a system runs on the main thread by adding a NonSend<MainThreadMarker> parameter.
@@ -264,7 +265,14 @@ struct BevyBundleAttr {
 
 struct ComponentSpec {
     component_name: Ident,
-    source_field: Option<Ident>,
+    mapping: ComponentMapping,
+}
+
+#[derive(Debug, Clone)]
+enum ComponentMapping {
+    Default,                             // (Component)
+    SingleField(Ident),                  // (Component: field)
+    MultipleFields(Vec<(Ident, Ident)>), // (Component { bevy_field: godot_field })
 }
 
 impl Parse for BevyBundleAttr {
@@ -278,17 +286,41 @@ impl Parse for BevyBundleAttr {
 
             let component_name: Ident = component_content.parse()?;
 
-            // Check if there's a colon and source field mapping
-            let source_field = if component_content.peek(Token![:]) {
+            // Determine the mapping type
+            let mapping = if component_content.peek(Token![:]) {
+                // Single field mapping: (Component: field)
                 let _colon: Token![:] = component_content.parse()?;
-                Some(component_content.parse()?)
+                let field: Ident = component_content.parse()?;
+                ComponentMapping::SingleField(field)
+            } else if component_content.peek(syn::token::Brace) {
+                // Multiple field mapping: (Component { bevy_field: godot_field, ... })
+                let field_content;
+                braced!(field_content in component_content);
+
+                let mut field_mappings = Vec::new();
+
+                while !field_content.is_empty() {
+                    let bevy_field: Ident = field_content.parse()?;
+                    let _colon: Token![:] = field_content.parse()?;
+                    let godot_field: Ident = field_content.parse()?;
+
+                    field_mappings.push((bevy_field, godot_field));
+
+                    // Handle optional trailing comma
+                    if field_content.peek(Token![,]) {
+                        let _comma: Token![,] = field_content.parse()?;
+                    }
+                }
+
+                ComponentMapping::MultipleFields(field_mappings)
             } else {
-                None
+                // Default mapping: (Component)
+                ComponentMapping::Default
             };
 
             components.push(ComponentSpec {
                 component_name,
-                source_field,
+                mapping,
             });
 
             if !input.is_empty() {
@@ -345,15 +377,36 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
             let field_name = format!("{component_name}").to_lowercase();
             let field_ident = syn::Ident::new(&field_name, component_name.span());
 
-            if let Some(source_field) = &spec.source_field {
-                // Component with field mapping
-                quote! {
-                    #field_ident: #component_name(node.bind().#source_field)
+            match &spec.mapping {
+                ComponentMapping::Default => {
+                    // Marker component with no field mapping - use default
+                    quote! {
+                        #field_ident: #component_name::default()
+                    }
                 }
-            } else {
-                // Marker component with no field mapping - use default
-                quote! {
-                    #field_ident: #component_name::default()
+                ComponentMapping::SingleField(source_field) => {
+                    // Component with single field mapping (tuple struct)
+                    quote! {
+                        #field_ident: #component_name(node.bind().#source_field)
+                    }
+                }
+                ComponentMapping::MultipleFields(field_mappings) => {
+                    // Component with multiple field mappings (struct initialization)
+                    let field_inits: Vec<_> = field_mappings
+                        .iter()
+                        .map(|(bevy_field, godot_field)| {
+                            quote! {
+                                #bevy_field: node.bind().#godot_field
+                            }
+                        })
+                        .collect();
+
+                    quote! {
+                        #field_ident: #component_name {
+                            #(#field_inits),*,
+                            ..Default::default()
+                        }
+                    }
                 }
             }
         })
