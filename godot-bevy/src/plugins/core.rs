@@ -108,6 +108,21 @@ impl Plugin for GodotBaseCorePlugin {
             AssetSource::build()
                 .with_reader(|| Box::new(crate::plugins::assets::GodotAssetReader::new())),
         );
+        app.register_asset_source(
+            AssetSourceId::new(Some("res")),
+            AssetSource::build()
+                .with_reader(|| Box::new(crate::plugins::assets::GodotAssetReader::new())),
+        );
+        app.register_asset_source(
+            AssetSourceId::new(Some("user")),
+            AssetSource::build()
+                .with_reader(|| Box::new(crate::plugins::assets::GodotAssetReader::new())),
+        );
+        app.register_asset_source(
+            AssetSourceId::new(Some("uid")),
+            AssetSource::build()
+                .with_reader(|| Box::new(crate::plugins::assets::GodotAssetReader::new())),
+        );
 
         app.add_plugins(MinimalPlugins.build().disable::<ScheduleRunnerPlugin>())
             // Configure AssetPlugin to bypass path verification for Godot resources

@@ -184,8 +184,7 @@ impl AssetLoader for GodotResourceAssetLoader {
         _settings: &(),
         load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
-        let path = load_context.path();
-        let godot_path = ensure_godot_path(path);
+        let godot_path = load_context.asset_path().to_string();
 
         {
             let mut resource_loader = ResourceLoader::singleton();
@@ -275,15 +274,5 @@ impl AssetLoader for GodotResourceAssetLoader {
             "jpg", "jpeg", "png", // Images
             "wav", "mp3", "ogg", "aac", // Audio
         ]
-    }
-}
-
-/// Ensures a path has the proper Godot resource prefix.
-fn ensure_godot_path(path: &Path) -> String {
-    let path_str = path.to_string_lossy();
-    if path_str.starts_with("res://") || path_str.starts_with("user://") {
-        path_str.to_string()
-    } else {
-        format!("res://{path_str}")
     }
 }
