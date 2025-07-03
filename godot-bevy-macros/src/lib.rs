@@ -356,23 +356,25 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
         }
     };
 
-    // Helper function to extract transform_with from doc comments
+    // Helper function to extract transform_with from field attributes
     let extract_transform_with = |field_name: &Ident| -> Option<syn::Path> {
         for field in fields {
             if let Some(fname) = &field.ident {
                 if fname == field_name {
                     for attr in &field.attrs {
-                        if attr.path().is_ident("doc") {
-                            // Extract doc comment content
-                            if let Ok(lit) = attr.parse_args::<LitStr>() {
-                                let doc_content = lit.value();
-                                // Look for "bevy_transform_with: <path>"
-                                if let Some(transform_part) =
-                                    doc_content.strip_prefix("bevy_transform_with:")
-                                {
-                                    let transform_str = transform_part.trim();
-                                    if let Ok(path) = syn::parse_str::<syn::Path>(transform_str) {
-                                        return Some(path);
+                        if attr.path().is_ident("bundle") {
+                            // Parse the bundle attribute
+                            if let Ok(syn::Meta::NameValue(name_value)) = attr.parse_args::<syn::Meta>() {
+                                if name_value.path.is_ident("transform_with") {
+                                    if let syn::Expr::Lit(expr_lit) = &name_value.value {
+                                        if let syn::Lit::Str(lit_str) = &expr_lit.lit {
+                                            let transform_str = lit_str.value();
+                                            if let Ok(path) =
+                                                syn::parse_str::<syn::Path>(&transform_str)
+                                            {
+                                                return Some(path);
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -520,4 +522,132 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
     };
 
     Ok(expanded)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::parse_quote;
+
+    #[test]
+    fn test_bevy_bundle_basic_syntax() {
+        let input: DeriveInput = parse_quote! {
+            #[bevy_bundle((TestComponent: test_field))]
+            struct TestNode {
+                test_field: String,
+            }
+        };
+
+        let result = bevy_bundle(input);
+        assert!(result.is_ok(), "Basic syntax should parse successfully");
+    }
+
+    #[test]
+    fn test_bevy_bundle_with_transform() {
+        let input: DeriveInput = parse_quote! {
+            #[bevy_bundle((TestComponent: test_field))]
+            struct TestNode {
+                #[bundle(transform_with = "String::from")]
+                test_field: String,
+            }
+        };
+
+        let result = bevy_bundle(input);
+        assert!(result.is_ok(), "Transform syntax should parse successfully");
+
+        let output = result.unwrap();
+        let output_str = output.to_string();
+
+        // Check that the transformer function is called in the generated code
+        assert!(
+            output_str.contains("String :: from"),
+            "Should contain the transformer function"
+        );
+    }
+
+    #[test]
+    fn test_bevy_bundle_multiple_fields() {
+        let input: DeriveInput = parse_quote! {
+            #[bevy_bundle((TestComponent { name: test_name, value: test_value }))]
+            struct TestNode {
+                #[bundle(transform_with = "String::from")]
+                test_name: String,
+                test_value: i32,
+            }
+        };
+
+        let result = bevy_bundle(input);
+        assert!(
+            result.is_ok(),
+            "Multiple fields syntax should parse successfully"
+        );
+
+        let output = result.unwrap();
+        let output_str = output.to_string();
+
+        // Check that the transformer is only applied to the specified field
+        assert!(
+            output_str.contains("String :: from"),
+            "Should contain the transformer function"
+        );
+        assert!(
+            output_str.contains("test_name"),
+            "Should contain the field name"
+        );
+        assert!(
+            output_str.contains("test_value"),
+            "Should contain the other field"
+        );
+    }
+
+    #[test]
+    fn test_bevy_bundle_default_component() {
+        let input: DeriveInput = parse_quote! {
+            #[bevy_bundle((MarkerComponent))]
+            struct TestNode {
+                test_field: String,
+            }
+        };
+
+        let result = bevy_bundle(input);
+        assert!(
+            result.is_ok(),
+            "Default component syntax should parse successfully"
+        );
+
+        let output = result.unwrap();
+        let output_str = output.to_string();
+
+        // Check that default() is called for marker components
+        assert!(
+            output_str.contains("MarkerComponent :: default ()"),
+            "Should use default for marker components"
+        );
+    }
+
+    #[test]
+    fn test_extract_transform_with_function() {
+        // Test the helper function directly by creating a more complex scenario
+        let input: DeriveInput = parse_quote! {
+            #[bevy_bundle((TestComponent: test_field))]
+            struct TestNode {
+                #[bundle(transform_with = "custom_transformer")]
+                test_field: String,
+                other_field: i32,
+            }
+        };
+
+        let result = bevy_bundle(input);
+        assert!(result.is_ok());
+
+        let output = result.unwrap().to_string();
+        assert!(
+            output.contains("custom_transformer"),
+            "Should call the custom transformer function"
+        );
+        assert!(
+            output.contains("node . bind () . test_field . clone ()"),
+            "Should access the field correctly"
+        );
+    }
 }
