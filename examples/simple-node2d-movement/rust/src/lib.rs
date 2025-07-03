@@ -7,7 +7,9 @@ use godot::classes::Sprite2D;
 use godot::global::godot_print;
 use godot_bevy::prelude::godot_prelude::gdextension;
 use godot_bevy::prelude::godot_prelude::ExtensionLibrary;
-use godot_bevy::prelude::{bevy_app, GodotNodeHandle, Sprite2DMarker, Transform2D};
+use godot_bevy::prelude::{
+    bevy_app, main_thread_system, GodotNodeHandle, Sprite2DMarker, Transform2D,
+};
 use std::f32::consts::PI;
 
 // The build_app function runs at your game's startup.
@@ -61,6 +63,7 @@ struct Orbiter {
 struct NodeInitialized;
 
 // This system initializes Sprite2Ds with the required components to allow the orbit_system to manipulate them.
+#[main_thread_system]
 fn orbit_setup(
     // Bevy Commands allow us to modify the state of the world, such as adding components to entities.
     mut commands: Commands,
