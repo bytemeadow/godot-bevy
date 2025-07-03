@@ -437,7 +437,7 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
                         }
                     } else {
                         quote! {
-                            #field_ident: #component_name(node.bind().#source_field)
+                            #field_ident: #component_name(node.bind().#source_field.clone())
                         }
                     }
                 }
@@ -453,7 +453,7 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
                                 }
                             } else {
                                 quote! {
-                                    #bevy_field: node.bind().#godot_field
+                                    #bevy_field: node.bind().#godot_field.clone()
                                 }
                             }
                         })
