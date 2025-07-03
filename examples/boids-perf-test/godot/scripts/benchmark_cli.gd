@@ -21,6 +21,7 @@ var frame_times: Array[float] = []
 var is_running: bool = false
 var warmup_time: float = 0.0
 var warmup_complete: bool = true  # Default to true, set to false when starting benchmark
+var last_process_call: float = 0.0
 
 # References
 var main_controller: Control = null
@@ -157,7 +158,14 @@ func _wait_for_boid_spawn():
 	warmup_time = 0.0
 	warmup_complete = false
 
-func _process(delta: float):
+func _process(_delta: float):
+	# You can't always trust the delta passed into _process to calculate FPS and frame times since it
+	# becomes innacurate at very low fps due to https://github.com/godotengine/godot/issues/24624,
+	# a good way to demonstrate this is to set godot's max fps to 1 and observe the values
+	var delta = (Time.get_ticks_msec() - last_process_call) / 1000.0;
+	last_process_call = Time.get_ticks_msec();
+	# print("official: %.3f  ours %.3f" % [_delta, delta]);
+
 	if not warmup_complete:
 		_handle_warmup(delta)
 		return
@@ -182,7 +190,7 @@ func _process(delta: float):
 				if bevy_boids and bevy_boids.has_method("get_boid_count"):
 					current_boid_count = bevy_boids.get_boid_count()
 		
-		var fps = 1.0 / delta if delta > 0 else 0.0
+		var fps = Engine.get_frames_per_second()
 		print("⏱️  Progress: %.1f/%d seconds | Boids: %d | FPS: %.1f" % [elapsed, duration, current_boid_count, fps])
 	
 	if elapsed >= duration:
@@ -251,20 +259,17 @@ func _complete_benchmark():
 		get_tree().quit(0)
 
 func _calculate_results() -> Dictionary:
-	# Remove first few frames to account for startup
-	var adjusted_frame_times = frame_times.slice(10) if frame_times.size() > 10 else frame_times
-	
 	# Calculate statistics
 	var total_time = 0.0
 	var min_frame_time = INF
 	var max_frame_time = 0.0
 	
-	for frame_time in adjusted_frame_times:
+	for frame_time in frame_times:
 		total_time += frame_time
 		min_frame_time = min(min_frame_time, frame_time)
 		max_frame_time = max(max_frame_time, frame_time)
 	
-	var avg_frame_time = total_time / adjusted_frame_times.size() if adjusted_frame_times.size() > 0 else 0.0
+	var avg_frame_time = total_time / frame_times.size() if frame_times.size() > 0 else 0.0
 	
 	# Calculate FPS values
 	var avg_fps = 1.0 / avg_frame_time if avg_frame_time > 0 else 0.0
@@ -272,12 +277,14 @@ func _calculate_results() -> Dictionary:
 	var max_fps = 1.0 / min_frame_time if min_frame_time > 0 else 0.0
 	
 	# Calculate percentiles
-	var sorted_times = adjusted_frame_times.duplicate()
+	var sorted_times = frame_times.duplicate()
 	sorted_times.sort()
 	
+	var p50_index = int(sorted_times.size() * 0.5)
 	var p95_index = int(sorted_times.size() * 0.95)
 	var p99_index = int(sorted_times.size() * 0.99)
 	
+	var p50_frame_time = sorted_times[p50_index] if p50_index < sorted_times.size() else 0.0
 	var p95_frame_time = sorted_times[p95_index] if p95_index < sorted_times.size() else 0.0
 	var p99_frame_time = sorted_times[p99_index] if p99_index < sorted_times.size() else 0.0
 	
@@ -285,10 +292,11 @@ func _calculate_results() -> Dictionary:
 		"implementation": implementation,
 		"boid_count": boid_count,
 		"duration": duration,
-		"frame_count": adjusted_frame_times.size(),
+		"frame_count": frame_times.size(),
 		"avg_fps": avg_fps,
 		"min_fps": min_fps,
 		"max_fps": max_fps,
+		"p50_fps": 1.0 / p50_frame_time if p50_frame_time > 0 else 0.0,
 		"p95_fps": 1.0 / p95_frame_time if p95_frame_time > 0 else 0.0,
 		"p99_fps": 1.0 / p99_frame_time if p99_frame_time > 0 else 0.0,
 		"avg_frame_time_ms": avg_frame_time * 1000.0,
@@ -307,6 +315,7 @@ func _output_results(results: Dictionary):
 	print("   Average FPS: %.1f" % results.avg_fps)
 	print("   Min FPS: %.1f" % results.min_fps)
 	print("   Max FPS: %.1f" % results.max_fps)
+	print("   Median (p50) FPS: %.1f" % results.p50_fps)
 	print("   95th Percentile FPS: %.1f" % results.p95_fps)
 	print("   99th Percentile FPS: %.1f" % results.p99_fps)
 	print("\n   Frame Times:")
