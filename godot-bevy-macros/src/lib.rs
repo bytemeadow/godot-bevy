@@ -364,7 +364,9 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
                     for attr in &field.attrs {
                         if attr.path().is_ident("bundle") {
                             // Parse the bundle attribute
-                            if let Ok(syn::Meta::NameValue(name_value)) = attr.parse_args::<syn::Meta>() {
+                            if let Ok(syn::Meta::NameValue(name_value)) =
+                                attr.parse_args::<syn::Meta>()
+                            {
                                 if name_value.path.is_ident("transform_with") {
                                     if let syn::Expr::Lit(expr_lit) = &name_value.value {
                                         if let syn::Lit::Str(lit_str) = &expr_lit.lit {
