@@ -44,8 +44,8 @@ enum GodotSceneResource {
 }
 
 impl GodotScene {
-    /// Instantiate the godot scene from a Bevy Handle<GodotResource>.
-    /// This is the preferred method when using Bevy's asset system.
+    /// Instantiate the godot scene from a Bevy Handle<GodotResource> and add it to the
+    /// scene tree root. This is the preferred method when using Bevy's asset system.
     pub fn from_handle(handle: Handle<GodotResource>) -> Self {
         Self {
             resource: GodotSceneResource::Handle(handle),
@@ -53,7 +53,16 @@ impl GodotScene {
         }
     }
 
-    /// Instantiate the godot scene from the given path.
+    /// Instantiate the godot scene from a Bevy Handle<GodotResource> and add it as a child
+    /// of the given parent. This is the preferred method when using Bevy's asset system.
+    pub fn from_handle_with_parent(handle: Handle<GodotResource>, parent: GodotNodeHandle) -> Self {
+        Self {
+            resource: GodotSceneResource::Handle(handle),
+            parent: Some(parent),
+        }
+    }
+
+    /// Instantiate the godot scene from the given path and add it to the scene tree root.
     ///
     /// Note that this will call [`ResourceLoader`].load() - which is a blocking load.
     /// If you want async loading, you should load your resources through Bevy's AssetServer
@@ -62,6 +71,18 @@ impl GodotScene {
         Self {
             resource: GodotSceneResource::Path(path.to_string()),
             parent: None,
+        }
+    }
+
+    /// Instantiate the godot scene from the given path and add it as a child of the given parent.
+    ///
+    /// Note that this will call [`ResourceLoader`].load() - which is a blocking load.
+    /// If you want async loading, you should load your resources through Bevy's AssetServer
+    /// and use from_handle_with_parent().
+    pub fn from_path_with_parent(path: &str, parent: GodotNodeHandle) -> Self {
+        Self {
+            resource: GodotSceneResource::Path(path.to_string()),
+            parent: Some(parent),
         }
     }
 }
