@@ -19,7 +19,7 @@ pub use crate::plugins::{
     // Core functionality
     core::{
         FindEntityByNameExt, GodotTransformConfig, MainThreadMarker, PhysicsDelta, PhysicsUpdate,
-        SystemDeltaTimer, TransformSyncMode,
+        TransformSyncMode,
     },
     // Input
     input::{ActionInput, GodotInputPlugin, KeyboardInput, MouseButtonInput, MouseMotion},

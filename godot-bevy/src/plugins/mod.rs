@@ -18,9 +18,7 @@ pub use core::GodotBaseCorePlugin;
 pub use input::GodotInputPlugin;
 pub use input_bridge::BevyInputBridgePlugin;
 pub use packed_scene::GodotPackedScenePlugin;
-pub use scene_tree::{
-    GodotSceneTreeEventsPlugin, GodotSceneTreeMirroringPlugin, GodotSceneTreeRefPlugin,
-};
+pub use scene_tree::GodotSceneTreePlugin;
 pub use signals::GodotSignalsPlugin;
 pub use transforms::GodotTransformSyncPlugin;
 
