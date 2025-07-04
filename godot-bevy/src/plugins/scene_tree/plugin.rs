@@ -1,5 +1,5 @@
-use super::collisions::ALL_COLLISION_SIGNALS;
 use crate::interop::node_markers::*;
+use crate::plugins::collisions::ALL_COLLISION_SIGNALS;
 use crate::plugins::transforms::{Transform2D, Transform3D};
 use crate::prelude::main_thread_system;
 use crate::{interop::GodotNodeHandle, plugins::collisions::Collisions};
@@ -62,6 +62,9 @@ pub(crate) struct SceneTreeConfig {
 
 impl Plugin for GodotSceneTreePlugin {
     fn build(&self, app: &mut App) {
+        // Auto-register all discovered AutoSyncBundle plugins
+        super::autosync::register_all_autosync_bundles(app);
+
         app.init_non_send_resource::<SceneTreeRefImpl>()
             .insert_resource(SceneTreeConfig {
                 add_transforms: self.add_transforms,
@@ -140,7 +143,7 @@ fn initialize_scene_tree(
         events,
         &mut scene_tree,
         &mut entities,
-        &*config,
+        &config,
         &signal_sender.0,
     );
 }
@@ -469,7 +472,7 @@ fn create_scene_tree_entity(
                 ent_mapping.insert(node.instance_id(), ent);
 
                 // Try to add any registered bundles for this node type
-                crate::autosync::try_add_bundles_for_node(commands, ent, &event.node);
+                super::autosync::try_add_bundles_for_node(commands, ent, &event.node);
 
                 if node.instance_id() != scene_root.instance_id() {
                     if let Some(parent) = node.get_parent() {
@@ -519,7 +522,7 @@ fn read_scene_tree_events(
         event_reader.read().cloned(),
         &mut scene_tree,
         &mut entities,
-        &*config,
+        &config,
         &signal_sender.0,
     );
 }

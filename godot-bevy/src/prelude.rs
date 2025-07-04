@@ -1,5 +1,4 @@
 pub use crate::GodotPlugin;
-pub use crate::autosync::AutoSyncBundleRegistry;
 pub use crate::interop::*;
 pub use crate::node_tree_view::NodeTreeView;
 pub use crate::plugins::{
@@ -28,7 +27,7 @@ pub use crate::plugins::{
     },
     packed_scene::{GodotPackedScenePlugin, GodotScene},
     // Scene tree
-    scene_tree::{GodotSceneTreePlugin, Groups, SceneTreeRef},
+    scene_tree::{AutoSyncBundleRegistry, GodotSceneTreePlugin, Groups, SceneTreeRef},
     // Signals
     signals::{
         GodotSignal, GodotSignalArgument, GodotSignals, GodotSignalsPlugin, connect_godot_signal,

@@ -7,7 +7,6 @@ extern crate self as godot_bevy;
 use bevy::app::{App, Plugin};
 
 pub mod app;
-pub mod autosync;
 pub mod interop;
 pub mod node_tree_view;
 pub mod plugins;
@@ -25,8 +24,5 @@ impl Plugin for GodotPlugin {
         // Only add minimal core functionality by default
         // Users must explicitly opt-in to additional features
         app.add_plugins(plugins::GodotCorePlugins);
-
-        // Auto-register all discovered AutoSyncBundle plugins
-        autosync::register_all_autosync_bundles(app);
     }
 }
