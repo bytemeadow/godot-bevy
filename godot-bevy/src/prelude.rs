@@ -22,8 +22,10 @@ pub use crate::plugins::{
         TransformSyncMode,
     },
     // Input
-    input::{ActionInput, GodotInputPlugin, KeyboardInput, MouseButtonInput, MouseMotion},
-    input_bridge::BevyInputBridgePlugin,
+    input::{
+        ActionInput, BevyInputBridgePlugin, GodotInputEventPlugin, KeyboardInput, MouseButtonInput,
+        MouseMotion,
+    },
     packed_scene::{GodotPackedScenePlugin, GodotScene},
     // Scene tree
     scene_tree::{GodotSceneTreePlugin, Groups, SceneTreeRef},

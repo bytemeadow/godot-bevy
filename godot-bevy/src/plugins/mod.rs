@@ -5,7 +5,6 @@ pub mod audio;
 pub mod collisions;
 pub mod core;
 pub mod input;
-pub mod input_bridge;
 pub mod packed_scene;
 pub mod scene_tree;
 pub mod signals;
@@ -16,12 +15,15 @@ pub use assets::GodotAssetsPlugin;
 pub use audio::GodotAudioPlugin;
 pub use collisions::GodotCollisionsPlugin;
 pub use core::GodotBaseCorePlugin;
-pub use input::GodotInputPlugin;
-pub use input_bridge::BevyInputBridgePlugin;
+pub use input::{BevyInputBridgePlugin, GodotInputEventPlugin};
 pub use packed_scene::GodotPackedScenePlugin;
 pub use scene_tree::GodotSceneTreePlugin;
 pub use signals::GodotSignalsPlugin;
 pub use transforms::GodotTransformSyncPlugin;
+
+// Re-export for backwards compatibility
+#[deprecated(note = "Use GodotInputEventPlugin instead")]
+pub use input::GodotInputEventPlugin as GodotInputPlugin;
 
 plugin_group! {
     /// Minimal core functionality required for Godot-Bevy integration.

@@ -17,20 +17,20 @@ use bevy::{
     prelude::GilrsPlugin,
 };
 
-use crate::plugins::input::{
+use crate::plugins::input::events::{
     KeyboardInput as GodotKeyboardInput, MouseButton as GodotMouseButton,
     MouseButtonInput as GodotMouseButtonInput, MouseMotion as GodotMouseMotion,
 };
 
 /// Plugin that bridges godot-bevy's input events to Bevy's standard input resources.
-/// This plugin automatically includes GodotInputPlugin as a dependency.
+/// This plugin automatically includes GodotInputEventPlugin as a dependency.
 #[derive(Default)]
 pub struct BevyInputBridgePlugin;
 
 impl Plugin for BevyInputBridgePlugin {
     fn build(&self, app: &mut App) {
         // Add the dependency - we need Godot input events to bridge them
-        app.add_plugins(super::input::GodotInputPlugin)
+        app.add_plugins(super::events::GodotInputEventPlugin)
             .add_plugins(InputPlugin)
             .add_plugins(GilrsPlugin)
             .add_systems(

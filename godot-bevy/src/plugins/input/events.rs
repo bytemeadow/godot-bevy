@@ -17,10 +17,20 @@ use godot::{
     obj::{EngineEnum, Gd},
 };
 
+/// Plugin that handles Godot input events and converts them to Bevy events.
+/// This is the base input plugin that provides raw input event types.
+///
+/// For higher-level input handling, consider using:
+/// - `BevyInputBridgePlugin` for Bevy's standard input resources
+/// - Custom input handling systems that read these events
 #[derive(Default)]
-pub struct GodotInputPlugin;
+pub struct GodotInputEventPlugin;
 
-impl Plugin for GodotInputPlugin {
+/// Alias for backwards compatibility
+#[deprecated(note = "Use GodotInputEventPlugin instead")]
+pub type GodotInputPlugin = GodotInputEventPlugin;
+
+impl Plugin for GodotInputEventPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(First, write_input_events.before(event_update_system))
             .add_event::<KeyboardInput>()
