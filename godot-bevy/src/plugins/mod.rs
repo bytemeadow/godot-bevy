@@ -12,6 +12,7 @@ pub mod signals;
 pub mod transforms;
 
 // Re-export all plugins for convenience
+pub use assets::GodotAssetsPlugin;
 pub use audio::GodotAudioPlugin;
 pub use collisions::GodotCollisionsPlugin;
 pub use core::GodotBaseCorePlugin;
@@ -27,7 +28,8 @@ plugin_group! {
     /// This includes scene tree management, asset loading, and basic bridge components.
     pub struct GodotCorePlugins {
         :GodotBaseCorePlugin,
-        assets:::GodotAssetsPlugin
+        :GodotSceneTreePlugin,
+        :GodotAssetsPlugin,
     }
 }
 
@@ -36,9 +38,8 @@ plugin_group! {
     pub struct GodotDefaultPlugins {
         :GodotCollisionsPlugin,
         :GodotSignalsPlugin,
-        :GodotInputPlugin,
         :BevyInputBridgePlugin,
-        audio:::GodotAudioPlugin,
-        packed_scene:::GodotPackedScenePlugin
+        :GodotAudioPlugin,
+        :GodotPackedScenePlugin,
     }
 }

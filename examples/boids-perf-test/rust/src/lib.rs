@@ -18,7 +18,9 @@ mod container;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
-    // This example uses transforms and assets (for loading boid scenes)
-    app.add_plugins(GodotTransformSyncPlugin::default())
-        .add_plugins((BoidsPlugin,));
+    app.add_plugins(GodotPackedScenePlugin)
+        .add_plugins(GodotTransformSyncPlugin {
+            sync_mode: TransformSyncMode::OneWay,
+        })
+        .add_plugins(BoidsPlugin);
 }
