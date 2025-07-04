@@ -442,6 +442,10 @@ fn create_scene_tree_entity(
                         let parent_id = parent.instance_id();
                         if let Some(&parent_entity) = ent_mapping.get(&parent_id) {
                             commands.entity(parent_entity).add_children(&[ent]);
+                        } else {
+                            bevy::log::warn!(target: "godot_scene_tree_events", 
+                                "Parent entity with ID {} not found in ent_mapping. This might indicate a missing or incorrect mapping.", 
+                                parent_id);
                         }
                     }
                 }
