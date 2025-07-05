@@ -458,7 +458,6 @@ fn create_scene_tree_entity(
                            node_id = node.instance_id().to_string(),
                            "is collision body");
 
-                    // Find the CollisionWatcher node
                     let node_clone = node.clone();
 
                     if node.has_signal(BODY_ENTERED) {
