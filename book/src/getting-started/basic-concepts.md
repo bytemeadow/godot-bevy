@@ -192,10 +192,8 @@ fn spawn_enemy(
     enemy_spawner: Single<&GodotNodeHandle, With<EnemySpawner>>,
 ) {
     commands.spawn((
-        GodotScene::from_handle_with_parent(
-            enemy_scene.0.clone(),
-            enemy_spawner.into_inner().clone(),
-        ),
+        GodotScene::from_handle(enemy_scene.0.clone())
+            .with_parent(enemy_spawner.into_inner().clone()),
         Enemy { health: 100 },
         Transform2D::default(),
     ));

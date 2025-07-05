@@ -53,15 +53,6 @@ impl GodotScene {
         }
     }
 
-    /// Instantiate the godot scene from a Bevy Handle<GodotResource> and add it as a child
-    /// of the given parent. This is the preferred method when using Bevy's asset system.
-    pub fn from_handle_with_parent(handle: Handle<GodotResource>, parent: GodotNodeHandle) -> Self {
-        Self {
-            resource: GodotSceneResource::Handle(handle),
-            parent: Some(parent),
-        }
-    }
-
     /// Instantiate the godot scene from the given path and add it to the scene tree root.
     ///
     /// Note that this will call [`ResourceLoader`].load() - which is a blocking load.
@@ -74,16 +65,10 @@ impl GodotScene {
         }
     }
 
-    /// Instantiate the godot scene from the given path and add it as a child of the given parent.
-    ///
-    /// Note that this will call [`ResourceLoader`].load() - which is a blocking load.
-    /// If you want async loading, you should load your resources through Bevy's AssetServer
-    /// and use from_handle_with_parent().
-    pub fn from_path_with_parent(path: &str, parent: GodotNodeHandle) -> Self {
-        Self {
-            resource: GodotSceneResource::Path(path.to_string()),
-            parent: Some(parent),
-        }
+    /// Set the parent node for this scene when spawned.
+    pub fn with_parent(mut self, parent: GodotNodeHandle) -> Self {
+        self.parent = Some(parent);
+        self
     }
 }
 
