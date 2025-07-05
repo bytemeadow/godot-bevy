@@ -12,8 +12,8 @@ pub use crate::plugins::{
     },
     // Collisions
     collisions::{
-        ALL_COLLISION_SIGNALS, AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED,
-        COLLISION_END_SIGNALS, COLLISION_START_SIGNALS, Collisions, GodotCollisionsPlugin,
+        AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED, COLLISION_START_SIGNALS,
+        CollisionEvent, CollisionEventType, Collisions, GodotCollisionsPlugin,
     },
     // Core functionality
     core::{

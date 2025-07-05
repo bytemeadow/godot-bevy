@@ -1,8 +1,13 @@
 use crate::interop::node_markers::*;
-use crate::plugins::collisions::ALL_COLLISION_SIGNALS;
 use crate::plugins::transforms::{Transform2D, Transform3D};
 use crate::prelude::main_thread_system;
-use crate::{interop::GodotNodeHandle, plugins::collisions::Collisions};
+use crate::{
+    interop::GodotNodeHandle,
+    plugins::collisions::{
+        AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED, COLLISION_START_SIGNALS,
+        CollisionEventType, Collisions,
+    },
+};
 use bevy::{
     app::{App, First, Plugin, PreStartup},
     ecs::{
@@ -121,7 +126,6 @@ fn initialize_scene_tree(
     mut scene_tree: SceneTreeRef,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
     config: Res<SceneTreeConfig>,
-    signal_sender: NonSendMut<crate::plugins::signals::GodotSignalSender>,
 ) {
     fn traverse(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
         events.push(SceneTreeEvent {
@@ -144,7 +148,6 @@ fn initialize_scene_tree(
         &mut scene_tree,
         &mut entities,
         &config,
-        &signal_sender.0,
     );
 }
 
@@ -393,13 +396,17 @@ fn create_scene_tree_entity(
     scene_tree: &mut SceneTreeRef,
     entities: &mut Query<(&mut GodotNodeHandle, Entity)>,
     config: &SceneTreeConfig,
-    signal_sender: &std::sync::mpsc::Sender<crate::plugins::signals::GodotSignal>,
 ) {
     let mut ent_mapping = entities
         .iter()
         .map(|(reference, ent)| (reference.instance_id(), ent))
         .collect::<HashMap<_, _>>();
     let scene_root = scene_tree.get().get_root().unwrap();
+    let collision_watcher = scene_tree
+        .get()
+        .get_root()
+        .unwrap()
+        .get_node_as::<Node>("/root/BevyAppSingleton/CollisionWatcher");
 
     for event in events.into_iter() {
         trace!(target: "godot_scene_tree_events", event = ?event);
@@ -438,31 +445,63 @@ fn create_scene_tree_entity(
                     }
                 }
 
-                let node = node.get::<Node>();
+                let mut node = node.get::<Node>();
 
-                // Check for any collision-related signals and connect them
-                let has_collision_signals = ALL_COLLISION_SIGNALS
+                // Check if the node is a collision body (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.)
+                // These nodes typically have collision detection capabilities
+                let is_collision_body = COLLISION_START_SIGNALS
                     .iter()
                     .any(|&signal| node.has_signal(signal));
 
-                if has_collision_signals {
+                if is_collision_body {
                     debug!(target: "godot_scene_tree_collisions",
                            node_id = node.instance_id().to_string(),
-                           "has collision signals");
+                           "is collision body");
 
-                    // Connect all available collision signals using the universal handler
-                    for &signal_name in ALL_COLLISION_SIGNALS {
-                        if node.has_signal(signal_name) {
-                            let mut node_handle =
-                                GodotNodeHandle::from_instance_id(node.instance_id());
-                            crate::plugins::signals::connect_godot_signal(
-                                &mut node_handle,
-                                signal_name,
-                                signal_sender.clone(),
-                            );
-                        }
+                    // Find the CollisionWatcher node
+                    let node_clone = node.clone();
+
+                    if node.has_signal(BODY_ENTERED) {
+                        node.connect(
+                            BODY_ENTERED,
+                            &collision_watcher.callable("collision_event").bind(&[
+                                node_clone.to_variant(),
+                                CollisionEventType::Started.to_variant(),
+                            ]),
+                        );
                     }
 
+                    if node.has_signal(BODY_EXITED) {
+                        node.connect(
+                            BODY_EXITED,
+                            &collision_watcher.callable("collision_event").bind(&[
+                                node_clone.to_variant(),
+                                CollisionEventType::Ended.to_variant(),
+                            ]),
+                        );
+                    }
+
+                    if node.has_signal(AREA_ENTERED) {
+                        node.connect(
+                            AREA_ENTERED,
+                            &collision_watcher.callable("collision_event").bind(&[
+                                node_clone.to_variant(),
+                                CollisionEventType::Started.to_variant(),
+                            ]),
+                        );
+                    }
+
+                    if node.has_signal(AREA_EXITED) {
+                        node.connect(
+                            AREA_EXITED,
+                            &collision_watcher.callable("collision_event").bind(&[
+                                node_clone.to_variant(),
+                                CollisionEventType::Ended.to_variant(),
+                            ]),
+                        );
+                    }
+
+                    // Add Collisions component to track collision state
                     ent.insert(Collisions::default());
                 }
 
@@ -515,7 +554,6 @@ fn read_scene_tree_events(
     mut event_reader: EventReader<SceneTreeEvent>,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
     config: Res<SceneTreeConfig>,
-    signal_sender: NonSendMut<crate::plugins::signals::GodotSignalSender>,
 ) {
     create_scene_tree_entity(
         &mut commands,
@@ -523,6 +561,5 @@ fn read_scene_tree_events(
         &mut scene_tree,
         &mut entities,
         &config,
-        &signal_sender.0,
     );
 }

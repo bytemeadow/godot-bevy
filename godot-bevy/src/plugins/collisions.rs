@@ -1,11 +1,17 @@
 use bevy::{
-    app::{App, Plugin, PreUpdate},
-    ecs::{component::Component, entity::Entity, event::EventReader, system::Query},
+    app::{App, First, Plugin, PreUpdate},
+    ecs::{
+        component::Component,
+        entity::Entity,
+        event::{Event, EventReader, EventWriter, event_update_system},
+        schedule::IntoScheduleConfigs,
+        system::{NonSendMut, Query},
+    },
     log::trace,
 };
 use godot::prelude::*;
+use std::sync::mpsc::Receiver;
 
-use super::signals::GodotSignal;
 use crate::interop::GodotNodeHandle;
 
 #[derive(Default)]
@@ -20,15 +26,24 @@ pub const AREA_EXITED: &str = "area_exited";
 /// All collision signals that indicate collision start
 pub const COLLISION_START_SIGNALS: &[&str] = &[BODY_ENTERED, AREA_ENTERED];
 
-/// All collision signals that indicate collision end
-pub const COLLISION_END_SIGNALS: &[&str] = &[BODY_EXITED, AREA_EXITED];
+#[doc(hidden)]
+pub struct CollisionEventReader(pub Receiver<CollisionEvent>);
 
-/// All collision signals (both start and end)
-pub const ALL_COLLISION_SIGNALS: &[&str] = &[BODY_ENTERED, BODY_EXITED, AREA_ENTERED, AREA_EXITED];
+#[derive(Debug, Event)]
+pub struct CollisionEvent {
+    pub event_type: CollisionEventType,
+    pub origin: GodotNodeHandle,
+    pub target: GodotNodeHandle,
+}
 
 impl Plugin for GodotCollisionsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreUpdate, update_godot_collisions);
+        app.add_systems(PreUpdate, update_godot_collisions)
+            .add_systems(
+                First,
+                write_godot_collision_events.before(event_update_system),
+            )
+            .add_event::<CollisionEvent>();
     }
 }
 
@@ -57,39 +72,19 @@ pub enum CollisionEventType {
 }
 
 fn update_godot_collisions(
-    mut signal_events: EventReader<GodotSignal>,
+    mut events: EventReader<CollisionEvent>,
     mut entities: Query<(&GodotNodeHandle, &mut Collisions)>,
     all_entities: Query<(Entity, &GodotNodeHandle)>,
 ) {
-    // Clear recent collisions for all entities
     for (_, mut collisions) in entities.iter_mut() {
         collisions.recent_collisions = vec![];
     }
 
-    // Process collision signals
-    for signal in signal_events.read() {
-        let signal_name = signal.name.as_str();
-        let event_type = if COLLISION_START_SIGNALS.contains(&signal_name) {
-            CollisionEventType::Started
-        } else if COLLISION_END_SIGNALS.contains(&signal_name) {
-            CollisionEventType::Ended
-        } else {
-            continue; // Skip non-collision signals
-        };
+    for event in events.read() {
+        trace!(target: "godot_collisions_update", event = ?event);
 
-        // The colliding body/area is passed as the first argument to collision signals
-        let target_node_handle = match signal.arguments.first() {
-            Some(arg) => match &arg.instance_id {
-                Some(instance_id) => GodotNodeHandle::from_instance_id(*instance_id),
-                None => continue, // Skip if first argument is not an object with instance ID
-            },
-            None => continue, // Skip if no arguments
-        };
-
-        trace!(target: "godot_collisions_update", signal = ?signal, event_type = ?event_type);
-
-        let target_entity = all_entities.iter().find_map(|(ent, reference)| {
-            if *reference == target_node_handle {
+        let target = all_entities.iter().find_map(|(ent, reference)| {
+            if reference == &event.target {
                 Some(ent)
             } else {
                 None
@@ -97,26 +92,31 @@ fn update_godot_collisions(
         });
 
         let collisions = entities.iter_mut().find_map(|(reference, collisions)| {
-            if reference == &signal.origin {
+            if reference == &event.origin {
                 Some(collisions)
             } else {
                 None
             }
         });
 
-        let (target_entity, mut collisions) = match (target_entity, collisions) {
+        let (target, mut collisions) = match (target, collisions) {
             (Some(target), Some(collisions)) => (target, collisions),
             _ => continue,
         };
 
-        match event_type {
+        match event.event_type {
             CollisionEventType::Started => {
-                collisions.colliding_entities.push(target_entity);
-                collisions.recent_collisions.push(target_entity);
+                collisions.colliding_entities.push(target);
+                collisions.recent_collisions.push(target);
             }
-            CollisionEventType::Ended => collisions
-                .colliding_entities
-                .retain(|x| *x != target_entity),
+            CollisionEventType::Ended => collisions.colliding_entities.retain(|x| *x != target),
         };
     }
+}
+
+fn write_godot_collision_events(
+    events: NonSendMut<CollisionEventReader>,
+    mut event_writer: EventWriter<CollisionEvent>,
+) {
+    event_writer.write_batch(events.0.try_iter());
 }
