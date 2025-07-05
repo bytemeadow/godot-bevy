@@ -43,5 +43,6 @@ plugin_group! {
         :BevyInputBridgePlugin,
         :GodotAudioPlugin,
         :GodotPackedScenePlugin,
+        :GodotTransformSyncPlugin,
     }
 }
