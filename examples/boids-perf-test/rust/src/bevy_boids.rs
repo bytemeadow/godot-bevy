@@ -6,7 +6,9 @@ use bevy::{
     math::Vec2,
     prelude::*,
 };
-use bevy_spatial::{kdtree::KDTree2, AutomaticUpdate, SpatialAccess, SpatialStructure};
+use bevy_spatial::{
+    kdtree::KDTree2, AutomaticUpdate, SpatialAccess, SpatialSet, SpatialStructure, TransformMode,
+};
 
 use godot::builtin::Color as GodotColor;
 use godot::classes::Node as GodotNode;
@@ -96,7 +98,13 @@ impl Plugin for BoidsPlugin {
         app.add_plugins(
             AutomaticUpdate::<Boid>::new()
                 .with_spatial_ds(SpatialStructure::KDTree2)
-                .with_frequency(std::time::Duration::from_millis(16)), // Update every 16ms (roughly 60fps)
+                .with_frequency(std::time::Duration::from_millis(16)) // Update every 16ms (roughly 60fps)
+                // While the following 3 settings are the default, we set them
+                // explicitly here to make it easier to understand why sync_transforms
+                // is scheduled the way that it is
+                .with_schedule(Update)
+                .with_set(SpatialSet)
+                .with_transform(TransformMode::Transform),
         )
         .init_resource::<BoidsConfig>()
         .init_resource::<SimulationState>()
@@ -113,14 +121,14 @@ impl Plugin for BoidsPlugin {
             )
                 .chain(),
         )
+        // Our KDTree is getting updated every frame (from the automatic update specified above),
+        // so we must ensure it has valid data to work on - namely, the native Bevy Transforms
+        // are updated
+        .add_systems(PreUpdate, sync_transforms.in_set(SpatialSet))
         // Movement systems
         .add_systems(
             Update,
-            (
-                sync_transforms,
-                boids_calculate_neighborhood_forces,
-                boids_apply_forces,
-            )
+            (boids_calculate_neighborhood_forces, boids_apply_forces)
                 .chain()
                 .run_if(|state: Res<SimulationState>| state.is_running)
                 .after(sync_container_params),

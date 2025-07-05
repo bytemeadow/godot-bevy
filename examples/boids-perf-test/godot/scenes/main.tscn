@@ -1,7 +1,6 @@
-[gd_scene load_steps=4 format=3 uid="uid://c7q8xvbgkktxh"]
+[gd_scene load_steps=3 format=3 uid="uid://c7q8xvbgkktxh"]
 
 [ext_resource type="Script" uid="uid://cy8hdccl6jgw3" path="res://scripts/main.gd" id="1_0x8vg"]
-[ext_resource type="PackedScene" uid="uid://bjsfwt816j4tp" path="res://scenes/bevy_app_singleton.tscn" id="2_3x8vg"]
 [ext_resource type="Script" uid="uid://dr1wry58o81eo" path="res://scripts/godot_boids.gd" id="3_4x8vg"]
 
 [node name="Main" type="Control"]
@@ -12,9 +11,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_0x8vg")
-
-[node name="BevyAppSingleton" parent="." instance=ExtResource("2_3x8vg")]
-process_mode = 4
 
 [node name="UI" type="Control" parent="."]
 layout_mode = 1
