@@ -28,10 +28,10 @@ pub fn post_update_godot_transforms_3d(
     }
 
     for (transform, mut reference) in entities.iter_mut() {
-        let mut obj = reference.get::<Node3D>();
-
-        if obj.get_transform() != *transform.as_godot() {
-            obj.set_transform(*transform.as_godot());
+        if let Some(mut obj) = reference.try_get::<Node3D>() {
+            if obj.get_transform() != *transform.as_godot() {
+                obj.set_transform(*transform.as_godot());
+            }
         }
     }
 }
@@ -52,9 +52,11 @@ pub fn pre_update_godot_transforms_3d(
             continue;
         }
 
-        let godot_transform = reference.get::<Node3D>().get_transform();
-        if *transform.as_godot() != godot_transform {
-            *transform.as_godot_mut() = godot_transform;
+        if let Some(godot_node) = reference.try_get::<Node3D>() {
+            let godot_transform = godot_node.get_transform();
+            if *transform.as_godot() != godot_transform {
+                *transform.as_godot_mut() = godot_transform;
+            }
         }
     }
 }
@@ -76,14 +78,14 @@ pub fn post_update_godot_transforms_2d(
     }
 
     for (transform, mut reference) in entities.iter_mut() {
-        let mut obj = reference.get::<Node2D>();
+        if let Some(mut obj) = reference.try_get::<Node2D>() {
+            let mut obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
+            obj_transform = obj_transform.rotated(obj.get_rotation());
+            obj_transform = obj_transform.scaled(obj.get_scale());
 
-        let mut obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
-        obj_transform = obj_transform.rotated(obj.get_rotation());
-        obj_transform = obj_transform.scaled(obj.get_scale());
-
-        if obj_transform != *transform.as_godot() {
-            obj.set_transform(*transform.as_godot());
+            if obj_transform != *transform.as_godot() {
+                obj.set_transform(*transform.as_godot());
+            }
         }
     }
 }
@@ -104,14 +106,14 @@ pub fn pre_update_godot_transforms_2d(
             continue;
         }
 
-        let obj = reference.get::<Node2D>();
+        if let Some(obj) = reference.try_get::<Node2D>() {
+            let mut obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
+            obj_transform = obj_transform.rotated(obj.get_rotation());
+            obj_transform = obj_transform.scaled(obj.get_scale());
 
-        let mut obj_transform = GodotTransform2D::IDENTITY.translated(obj.get_position());
-        obj_transform = obj_transform.rotated(obj.get_rotation());
-        obj_transform = obj_transform.scaled(obj.get_scale());
-
-        if obj_transform != *transform.as_godot() {
-            *transform.as_godot_mut() = obj_transform;
+            if obj_transform != *transform.as_godot() {
+                *transform.as_godot_mut() = obj_transform;
+            }
         }
     }
 }
