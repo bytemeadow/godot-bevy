@@ -117,8 +117,6 @@ cd ..
 # Run the benchmark
 echo "🚀 Starting benchmark..."
 $FHS_BINARY "$BENCHMARK_BINARY" --headless \
-steam-run "$BENCHMARK_BINARY" --headless \
-"$BENCHMARK_BINARY" --headless \
     --implementation="$IMPLEMENTATION" \
     --boid-count="$BOID_COUNT" \
     --duration="$DURATION" \
