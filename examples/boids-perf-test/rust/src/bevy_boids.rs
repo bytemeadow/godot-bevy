@@ -10,13 +10,15 @@ use bevy::{
         Startup, Time, Transform, Update, Vec, Vec3, Vec3Swizzles, With,
     },
 };
-use bevy_spatial::{kdtree::KDTree2, AutomaticUpdate, SpatialAccess, SpatialStructure};
-use godot::{
-    builtin::Color as GodotColor,
+use bevy_spatial::{
+    kdtree::KDTree2, AutomaticUpdate, SpatialAccess, SpatialSet, SpatialStructure, TransformMode,
+};
     classes::Node as GodotNode,
     prelude::{Node2D, Vector2},
 };
 use godot_bevy::prelude::{godot_main_thread, GodotNodeHandle, GodotResource, GodotScene};
+// Explicitly use godot-bevy's Transform2D to disambiguate
+use godot_bevy::prelude::Transform2D;
 
 // Type alias for our spatial tree
 type BoidTree = KDTree2<Boid>;
@@ -97,7 +99,13 @@ impl Plugin for BoidsPlugin {
         app.add_plugins(
             AutomaticUpdate::<Boid>::new()
                 .with_spatial_ds(SpatialStructure::KDTree2)
-                .with_frequency(std::time::Duration::from_millis(16)), // Update every 16ms (roughly 60fps)
+                .with_frequency(std::time::Duration::from_millis(16)) // Update every 16ms (roughly 60fps)
+                // While the following 3 settings are the default, we set them
+                // explicitly here to make it easier to understand why sync_transforms
+                // is scheduled the way that it is
+                .with_schedule(Update)
+                .with_set(SpatialSet)
+                .with_transform(TransformMode::Transform),
         )
         .init_resource::<BoidsConfig>()
         .init_resource::<SimulationState>()
@@ -114,6 +122,10 @@ impl Plugin for BoidsPlugin {
             )
                 .chain(),
         )
+        // Our KDTree is getting updated every frame (from the automatic update specified above),
+        // so we must ensure it has valid data to work on - namely, the native Bevy Transforms
+        // are updated
+        .add_systems(PreUpdate, sync_transforms.in_set(SpatialSet))
         // Movement systems
         .add_systems(
             Update,
@@ -132,7 +144,7 @@ fn load_assets(mut commands: Commands, server: Res<AssetServer>) {
 }
 
 /// Synchronize parameters from the container to Bevy resources
-#[godot_main_thread]
+#[main_thread_system]
 fn sync_container_params(
     mut boid_count: ResMut<BoidCount>,
     mut config: ResMut<BoidsConfig>,
@@ -248,7 +260,7 @@ fn despawn_boids(
 }
 
 /// Update simulation state and manage cleanup on stop
-#[godot_main_thread]
+#[main_thread_system]
 fn stop_simulation(
     simulation_state: Res<SimulationState>,
     mut commands: Commands,
@@ -268,7 +280,7 @@ fn stop_simulation(
 }
 
 /// Colorize newly spawned boids (matches GDScript behavior)
-#[godot_main_thread]
+#[main_thread_system]
 fn colorize_new_boids(
     mut commands: Commands,
     new_boids: Query<(Entity, &GodotNodeHandle), With<NeedsColorization>>,
@@ -310,7 +322,7 @@ fn colorize_new_boids(
 // system to calculate/store neighborhood forces
 // NOTE: While this doesn't _need_ to be on the main thread, we see a
 // significant performance impact (75 -> 53 fps drop) when not on main
-#[godot_main_thread]
+#[main_thread_system]
 fn boids_calculate_neighborhood_forces(
     spatial_tree: Res<BoidTree>,
     all_boids: Query<(&Transform, &Velocity), With<Boid>>,

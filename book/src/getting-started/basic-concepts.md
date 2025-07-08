@@ -155,12 +155,45 @@ fn handle_button_press(
 
 ### Spawning Godot Scenes
 ```rust
+# use bevy::app::{App, Plugin, Startup, Update};
+# use bevy::asset::{AssetServer, Handle};
+# use bevy::prelude::{Commands, Component, Res, Resource, Single, With};
+# use godot_bevy::bridge::GodotNodeHandle;
+# use godot_bevy::prelude::{GodotResource, GodotScene, Transform2D};
+# 
+# struct EnemyPlugin;
+# 
+# impl Plugin for EnemyPlugin {
+#     fn build(&self, app: &mut App) {
+#         app.add_systems(Startup, load_assets);
+#         app.add_systems(Update, spawn_enemy);
+#     }
+# }
+# 
+# #[derive(Resource, Debug)]
+# struct EnemyScene(Handle<GodotResource>);
+# 
+# #[derive(Component, Debug)]
+# struct Enemy {
+#     health: i32,
+# }
+# 
+# #[derive(Component, Debug)]
+# struct EnemySpawner;
+# 
+# fn load_assets(mut commands: Commands, server: Res<AssetServer>) {
+#     let handle: Handle<GodotResource> = server.load("scenes/enemy.tscn");
+#     commands.insert_resource(EnemyScene(handle));
+# }
+# 
 fn spawn_enemy(
     mut commands: Commands,
     enemy_scene: Res<EnemyScene>,
+    enemy_spawner: Single<&GodotNodeHandle, With<EnemySpawner>>,
 ) {
     commands.spawn((
-        GodotScene::from_handle(enemy_scene.0.clone()),
+        GodotScene::from_handle(enemy_scene.0.clone())
+            .with_parent(enemy_spawner.into_inner().clone()),
         Enemy { health: 100 },
         Transform2D::default(),
     ));

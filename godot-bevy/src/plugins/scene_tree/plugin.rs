@@ -1,10 +1,13 @@
-use super::collisions::ALL_COLLISION_SIGNALS;
-use super::node_markers::*;
-use super::{GodotTransformConfig, TransformSyncMode};
-use crate::plugins::core::transforms::IntoBevyTransform;
-use crate::prelude::godot_main_thread;
-use crate::{bridge::GodotNodeHandle, prelude::Collisions};
-use bevy::ecs::system::Res;
+use crate::interop::node_markers::*;
+use crate::plugins::transforms::{Transform2D, Transform3D};
+use crate::prelude::main_thread_system;
+use crate::{
+    interop::GodotNodeHandle,
+    plugins::collisions::{
+        AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED, COLLISION_START_SIGNALS,
+        CollisionEventType, Collisions,
+    },
+};
 use bevy::{
     app::{App, First, Plugin, PreStartup},
     ecs::{
@@ -13,9 +16,10 @@ use bevy::{
         event::{Event, EventReader, EventWriter, event_update_system},
         name::Name,
         schedule::IntoScheduleConfigs,
-        system::{Commands, NonSendMut, Query, SystemParam},
+        system::{Commands, NonSendMut, Query, Res, SystemParam},
     },
     log::{debug, trace},
+    prelude::Resource,
 };
 use godot::{
     builtin::GString,
@@ -32,19 +36,56 @@ use godot::{
     obj::{Gd, Inherits},
     prelude::GodotConvert,
 };
-use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-pub struct GodotSceneTreePlugin;
+/// Unified scene tree plugin that provides:
+/// - SceneTreeRef for accessing the Godot scene tree
+/// - Scene tree events (NodeAdded, NodeRemoved, NodeRenamed)
+/// - Automatic entity creation and mirroring for scene tree nodes
+///
+/// This plugin is always included in the core plugins and provides
+/// complete scene tree integration out of the box.
+pub struct GodotSceneTreePlugin {
+    /// Whether to automatically add Transform components to entities
+    pub add_transforms: bool,
+}
+
+impl Default for GodotSceneTreePlugin {
+    fn default() -> Self {
+        Self {
+            add_transforms: true,
+        }
+    }
+}
+
+/// Configuration resource for scene tree behavior
+#[derive(Resource)]
+pub(crate) struct SceneTreeConfig {
+    add_transforms: bool,
+}
 
 impl Plugin for GodotSceneTreePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreStartup, (initialize_scene_tree, connect_scene_tree))
-            .add_systems(First, write_scene_tree_events.before(event_update_system))
-            .add_systems(First, read_scene_tree_events.before(event_update_system))
+        // Auto-register all discovered AutoSyncBundle plugins
+        super::autosync::register_all_autosync_bundles(app);
+
+        app.init_non_send_resource::<SceneTreeRefImpl>()
+            .insert_resource(SceneTreeConfig {
+                add_transforms: self.add_transforms,
+            })
             .add_event::<SceneTreeEvent>()
-            .init_non_send_resource::<SceneTreeRefImpl>();
+            .add_systems(
+                PreStartup,
+                (connect_scene_tree, initialize_scene_tree).chain(),
+            )
+            .add_systems(
+                First,
+                (
+                    write_scene_tree_events.before(event_update_system),
+                    read_scene_tree_events.before(event_update_system),
+                ),
+            );
     }
 }
 
@@ -79,13 +120,12 @@ impl Default for SceneTreeRefImpl {
     }
 }
 
-#[godot_main_thread]
-pub fn initialize_scene_tree(
+#[main_thread_system]
+fn initialize_scene_tree(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
-    config: Res<GodotTransformConfig>,
-    signal_sender: NonSendMut<super::signals::GodotSignalSender>,
+    config: Res<SceneTreeConfig>,
 ) {
     fn traverse(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
         events.push(SceneTreeEvent {
@@ -105,9 +145,9 @@ pub fn initialize_scene_tree(
     create_scene_tree_entity(
         &mut commands,
         events,
+        &mut scene_tree,
         &mut entities,
         &config,
-        &signal_sender.0,
     );
 }
 
@@ -125,7 +165,7 @@ pub enum SceneTreeEventType {
     NodeRenamed,
 }
 
-#[godot_main_thread]
+#[main_thread_system]
 fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
     let mut scene_tree_gd = scene_tree.get();
 
@@ -353,14 +393,20 @@ fn write_scene_tree_events(
 fn create_scene_tree_entity(
     commands: &mut Commands,
     events: impl IntoIterator<Item = SceneTreeEvent>,
+    scene_tree: &mut SceneTreeRef,
     entities: &mut Query<(&mut GodotNodeHandle, Entity)>,
-    config: &GodotTransformConfig,
-    signal_sender: &std::sync::mpsc::Sender<super::signals::GodotSignal>,
+    config: &SceneTreeConfig,
 ) {
     let mut ent_mapping = entities
         .iter()
         .map(|(reference, ent)| (reference.instance_id(), ent))
         .collect::<HashMap<_, _>>();
+    let scene_root = scene_tree.get().get_root().unwrap();
+    let collision_watcher = scene_tree
+        .get()
+        .get_root()
+        .unwrap()
+        .get_node_as::<Node>("/root/BevyAppSingleton/CollisionWatcher");
 
     for event in events.into_iter() {
         trace!(target: "godot_scene_tree_events", event = ?event);
@@ -370,57 +416,91 @@ fn create_scene_tree_entity(
 
         match event.event_type {
             SceneTreeEventType::NodeAdded => {
+                // Skip nodes that have been freed before we process them (can happen in tests)
+                if !node.instance_id().lookup_validity() {
+                    continue;
+                }
+
                 let mut ent = if let Some(ent) = ent {
                     commands.entity(ent)
                 } else {
                     commands.spawn_empty()
                 };
 
-                // insert_if_new so we avoid stomping on user-provided data
-                ent.insert_if_new(GodotNodeHandle::clone(&node))
-                    .insert_if_new(Name::from(node.get::<Node>().get_name().to_string()));
+                ent.insert(GodotNodeHandle::clone(&node))
+                    .insert(Name::from(node.get::<Node>().get_name().to_string()));
 
                 // Add node type marker components
                 add_node_type_markers(&mut ent, &mut node);
 
-                // Only add transform components if sync mode is not disabled
-                if config.sync_mode != TransformSyncMode::Disabled {
-                    if node.type_id() == TypeId::of::<Node3D>() {
-                        // Only insert a Transform if it doesn't exist already, i.e.,
-                        // users may have already added a Transform
-                        ent.insert_if_new(node.get::<Node3D>().get_transform().to_bevy_transform());
-                    } else if node.type_id() == TypeId::of::<Node2D>() {
-                        // Only insert a Transform if it doesn't exist already, i.e.,
-                        // users may have already added a Transform
-                        ent.insert_if_new(node.get::<Node2D>().get_transform().to_bevy_transform());
+                // Add transform components if configured to do so
+                if config.add_transforms {
+                    if let Some(node3d) = node.try_get::<Node3D>() {
+                        ent.insert(Transform3D::from(node3d.get_transform()));
+                    }
+
+                    if let Some(node2d) = node.try_get::<Node2D>() {
+                        let transform = node2d.get_transform();
+                        ent.insert(Transform2D::from(transform));
                     }
                 }
 
-                let node = node.get::<Node>();
+                let mut node = node.get::<Node>();
 
-                // Check for any collision-related signals and connect them
-                let has_collision_signals = ALL_COLLISION_SIGNALS
+                // Check if the node is a collision body (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.)
+                // These nodes typically have collision detection capabilities
+                let is_collision_body = COLLISION_START_SIGNALS
                     .iter()
                     .any(|&signal| node.has_signal(signal));
 
-                if has_collision_signals {
+                if is_collision_body {
                     debug!(target: "godot_scene_tree_collisions",
                            node_id = node.instance_id().to_string(),
-                           "has collision signals");
+                           "is collision body");
 
-                    // Connect all available collision signals using the universal handler
-                    for &signal_name in ALL_COLLISION_SIGNALS {
-                        if node.has_signal(signal_name) {
-                            let mut node_handle =
-                                GodotNodeHandle::from_instance_id(node.instance_id());
-                            super::signals::connect_godot_signal(
-                                &mut node_handle,
-                                signal_name,
-                                signal_sender.clone(),
-                            );
-                        }
+                    let node_clone = node.clone();
+
+                    if node.has_signal(BODY_ENTERED) {
+                        node.connect(
+                            BODY_ENTERED,
+                            &collision_watcher.callable("collision_event").bind(&[
+                                node_clone.to_variant(),
+                                CollisionEventType::Started.to_variant(),
+                            ]),
+                        );
                     }
 
+                    if node.has_signal(BODY_EXITED) {
+                        node.connect(
+                            BODY_EXITED,
+                            &collision_watcher.callable("collision_event").bind(&[
+                                node_clone.to_variant(),
+                                CollisionEventType::Ended.to_variant(),
+                            ]),
+                        );
+                    }
+
+                    if node.has_signal(AREA_ENTERED) {
+                        node.connect(
+                            AREA_ENTERED,
+                            &collision_watcher.callable("collision_event").bind(&[
+                                node_clone.to_variant(),
+                                CollisionEventType::Started.to_variant(),
+                            ]),
+                        );
+                    }
+
+                    if node.has_signal(AREA_EXITED) {
+                        node.connect(
+                            AREA_EXITED,
+                            &collision_watcher.callable("collision_event").bind(&[
+                                node_clone.to_variant(),
+                                CollisionEventType::Ended.to_variant(),
+                            ]),
+                        );
+                    }
+
+                    // Add Collisions component to track collision state
                     ent.insert(Collisions::default());
                 }
 
@@ -430,7 +510,20 @@ fn create_scene_tree_entity(
                 ent_mapping.insert(node.instance_id(), ent);
 
                 // Try to add any registered bundles for this node type
-                crate::autosync::try_add_bundles_for_node(commands, ent, &event.node);
+                super::autosync::try_add_bundles_for_node(commands, ent, &event.node);
+
+                if node.instance_id() != scene_root.instance_id() {
+                    if let Some(parent) = node.get_parent() {
+                        let parent_id = parent.instance_id();
+                        if let Some(&parent_entity) = ent_mapping.get(&parent_id) {
+                            commands.entity(parent_entity).add_children(&[ent]);
+                        } else {
+                            bevy::log::warn!(target: "godot_scene_tree_events",
+                                "Parent entity with ID {} not found in ent_mapping. This might indicate a missing or incorrect mapping.",
+                                parent_id);
+                        }
+                    }
+                }
             }
             SceneTreeEventType::NodeRemoved => {
                 if let Some(ent) = ent {
@@ -453,19 +546,19 @@ fn create_scene_tree_entity(
     }
 }
 
-#[godot_main_thread]
+#[main_thread_system]
 fn read_scene_tree_events(
     mut commands: Commands,
+    mut scene_tree: SceneTreeRef,
     mut event_reader: EventReader<SceneTreeEvent>,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
-    config: Res<GodotTransformConfig>,
-    signal_sender: NonSendMut<super::signals::GodotSignalSender>,
+    config: Res<SceneTreeConfig>,
 ) {
     create_scene_tree_entity(
         &mut commands,
         event_reader.read().cloned(),
+        &mut scene_tree,
         &mut entities,
         &config,
-        &signal_sender.0,
     );
 }

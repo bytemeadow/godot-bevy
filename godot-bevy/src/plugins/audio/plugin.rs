@@ -1,12 +1,12 @@
 //! Main audio plugin and systems
-use crate::bridge::GodotNodeHandle;
+use crate::interop::GodotNodeHandle;
 use crate::plugins::assets::GodotResource;
 use crate::plugins::audio::{
     ActiveTween, AudioChannel, AudioChannelMarker, AudioCommand, AudioOutput, AudioPlayerType,
     AudioSettings, ChannelId, ChannelState, MainAudioTrack, PlayCommand, SoundId, TweenType,
 };
-use crate::plugins::core::SceneTreeRef;
-use crate::prelude::godot_main_thread;
+use crate::plugins::scene_tree::SceneTreeRef;
+use crate::prelude::main_thread_system;
 use bevy::app::{App, Plugin, Update};
 use bevy::asset::Assets;
 use bevy::ecs::system::ResMut;
@@ -18,6 +18,7 @@ use thiserror::Error;
 
 /// Plugin that provides a comprehensive audio API using Godot's audio system.
 /// Supports 2D, 3D, and non-positional audio with channels, tweening, and spatial features.
+#[derive(Default)]
 pub struct GodotAudioPlugin;
 
 impl Plugin for GodotAudioPlugin {
@@ -351,7 +352,7 @@ fn start_audio_playback(handle: &mut GodotNodeHandle) {
 }
 
 /// System that cleans up finished sounds
-#[godot_main_thread]
+#[main_thread_system]
 fn cleanup_finished_sounds(mut audio_output: ResMut<AudioOutput>) {
     let mut finished_sounds = Vec::new();
 
@@ -399,7 +400,7 @@ fn remove_and_free_audio_node(handle: &mut GodotNodeHandle) {
 }
 
 /// System that updates active audio tweens
-#[godot_main_thread]
+#[main_thread_system]
 fn update_audio_tweens(mut audio_output: ResMut<AudioOutput>, time: Res<Time>) {
     let delta = time.delta();
     let mut completed_tweens = Vec::new();

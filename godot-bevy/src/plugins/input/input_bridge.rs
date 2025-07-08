@@ -17,17 +17,21 @@ use bevy::{
     prelude::GilrsPlugin,
 };
 
-use crate::plugins::core::input_event::{
+use crate::plugins::input::events::{
     KeyboardInput as GodotKeyboardInput, MouseButton as GodotMouseButton,
     MouseButtonInput as GodotMouseButtonInput, MouseMotion as GodotMouseMotion,
 };
 
 /// Plugin that bridges godot-bevy's input events to Bevy's standard input resources.
+/// This plugin automatically includes GodotInputEventPlugin as a dependency.
+#[derive(Default)]
 pub struct BevyInputBridgePlugin;
 
 impl Plugin for BevyInputBridgePlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(InputPlugin)
+        // Add the dependency - we need Godot input events to bridge them
+        app.add_plugins(super::events::GodotInputEventPlugin)
+            .add_plugins(InputPlugin)
             .add_plugins(GilrsPlugin)
             .add_systems(
                 PreUpdate,
@@ -80,7 +84,7 @@ fn bridge_mouse_button_input(
         };
 
         // Send MouseButtonInput event that Bevy's mouse_button_input_system will process
-        bevy_mouse_button_events.send(BevyMouseButtonInput {
+        bevy_mouse_button_events.write(BevyMouseButtonInput {
             button: bevy_button,
             state,
             window: Entity::PLACEHOLDER,
@@ -99,7 +103,7 @@ fn bridge_mouse_motion(
     // Send individual Bevy MouseMotion events AND accumulate for the frame
     for event in mouse_motion_events.read() {
         // Send individual MouseMotion event (for libraries that prefer events)
-        bevy_mouse_motion_events.send(BevyMouseMotion { delta: event.delta });
+        bevy_mouse_motion_events.write(BevyMouseMotion { delta: event.delta });
 
         // Accumulate delta for the AccumulatedMouseMotion resource
         accumulated_motion.delta += event.delta;
@@ -211,6 +215,50 @@ fn godot_key_to_bevy_keycode(godot_key: godot::global::Key) -> Option<KeyCode> {
         GK::F10 => Some(BK::F10),
         GK::F11 => Some(BK::F11),
         GK::F12 => Some(BK::F12),
+
+        // Numpad keys
+        GK::KP_0 => Some(BK::Numpad0),
+        GK::KP_1 => Some(BK::Numpad1),
+        GK::KP_2 => Some(BK::Numpad2),
+        GK::KP_3 => Some(BK::Numpad3),
+        GK::KP_4 => Some(BK::Numpad4),
+        GK::KP_5 => Some(BK::Numpad5),
+        GK::KP_6 => Some(BK::Numpad6),
+        GK::KP_7 => Some(BK::Numpad7),
+        GK::KP_8 => Some(BK::Numpad8),
+        GK::KP_9 => Some(BK::Numpad9),
+        GK::KP_ADD => Some(BK::NumpadAdd),
+        GK::KP_SUBTRACT => Some(BK::NumpadSubtract),
+        GK::KP_MULTIPLY => Some(BK::NumpadMultiply),
+        GK::KP_DIVIDE => Some(BK::NumpadDivide),
+        GK::KP_PERIOD => Some(BK::NumpadDecimal),
+        GK::KP_ENTER => Some(BK::NumpadEnter),
+
+        // Additional common keys
+        GK::DELETE => Some(BK::Delete),
+        GK::INSERT => Some(BK::Insert),
+        GK::HOME => Some(BK::Home),
+        GK::END => Some(BK::End),
+        GK::PAGEUP => Some(BK::PageUp),
+        GK::PAGEDOWN => Some(BK::PageDown),
+        GK::CAPSLOCK => Some(BK::CapsLock),
+        GK::NUMLOCK => Some(BK::NumLock),
+        GK::SCROLLLOCK => Some(BK::ScrollLock),
+        GK::PAUSE => Some(BK::Pause),
+        GK::PRINT => Some(BK::PrintScreen),
+
+        // Punctuation and symbols
+        GK::COMMA => Some(BK::Comma),
+        GK::PERIOD => Some(BK::Period),
+        GK::SLASH => Some(BK::Slash),
+        GK::SEMICOLON => Some(BK::Semicolon),
+        GK::APOSTROPHE => Some(BK::Quote),
+        GK::BRACKETLEFT => Some(BK::BracketLeft),
+        GK::BRACKETRIGHT => Some(BK::BracketRight),
+        GK::BACKSLASH => Some(BK::Backslash),
+        GK::QUOTELEFT => Some(BK::Backquote),
+        GK::MINUS => Some(BK::Minus),
+        GK::EQUAL => Some(BK::Equal),
 
         _ => None, // Many keys don't have direct equivalents
     }

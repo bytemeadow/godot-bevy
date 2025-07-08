@@ -15,7 +15,7 @@ use godot::{
 };
 use godot_bevy::{
     plugins::core::PhysicsDelta,
-    prelude::{godot_main_thread, *},
+    prelude::{main_thread_system, *},
 };
 
 #[derive(AssetCollection, Resource, Debug)]
@@ -61,7 +61,7 @@ fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
         .insert(Player { speed: 0.0 });
 }
 
-#[godot_main_thread]
+#[main_thread_system]
 fn player_on_ready(
     mut commands: Commands,
     mut player: Query<
@@ -89,7 +89,7 @@ fn player_on_ready(
     Ok(())
 }
 
-#[godot_main_thread]
+#[main_thread_system]
 fn setup_player(
     mut player: Query<(Entity, &mut VisibilityState, &mut Transform), With<Player>>,
     mut entities: Query<(&Name, &mut GodotNodeHandle), Without<Player>>,
@@ -112,7 +112,7 @@ fn setup_player(
     Ok(())
 }
 
-#[godot_main_thread]
+#[main_thread_system]
 fn move_player(
     mut player: Query<(
         &Player,
@@ -169,7 +169,7 @@ fn move_player(
     Ok(())
 }
 
-#[godot_main_thread]
+#[main_thread_system]
 fn check_player_death(
     mut player: Query<(&mut VisibilityState, &Collisions), With<Player>>,
     mut next_state: ResMut<NextState<GameState>>,

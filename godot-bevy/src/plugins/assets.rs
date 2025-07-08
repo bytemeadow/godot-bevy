@@ -14,7 +14,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
-use crate::bridge::GodotResourceHandle;
+use crate::interop::GodotResourceHandle;
 
 /// Plugin that provides Bevy AssetLoader implementations for Godot resources.
 /// This enables loading Godot resources through standard Bevy APIs while maintaining
@@ -64,6 +64,7 @@ use crate::bridge::GodotResourceHandle;
 /// - Unified system for all Godot resource types
 ///
 /// This works identically in development and exported builds, including with .pck files.
+#[derive(Default)]
 pub struct GodotAssetsPlugin;
 
 impl Plugin for GodotAssetsPlugin {

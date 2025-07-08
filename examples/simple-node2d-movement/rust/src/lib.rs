@@ -2,13 +2,14 @@ use bevy::ecs::system::Query;
 use bevy::prelude::{
     App, Commands, Component, Entity, IntoScheduleConfigs, Res, Time, Update, Without,
 };
-use bevy::transform::components::Transform;
 use godot::builtin::Vector2;
 use godot::classes::Sprite2D;
 use godot::global::godot_print;
 use godot_bevy::prelude::godot_prelude::gdextension;
 use godot_bevy::prelude::godot_prelude::ExtensionLibrary;
-use godot_bevy::prelude::{bevy_app, GodotNodeHandle, Sprite2DMarker};
+use godot_bevy::prelude::{
+    bevy_app, main_thread_system, GodotNodeHandle, GodotTransformSyncPlugin, Sprite2DMarker,
+};
 use std::f32::consts::PI;
 
 // The build_app function runs at your game's startup.
@@ -26,6 +27,9 @@ fn build_app(app: &mut App) {
     // Print to the Godot console:
     // (https://docs.rs/godot-core/0.3.1/godot_core/macro.godot_print.html)
     godot_print!("Hello from Godot-Bevy!");
+
+    // Add the transforms plugin since we're using Transform2D
+    app.add_plugins(GodotTransformSyncPlugin::default());
 
     // A system is a normal Rust function.
     //
@@ -62,6 +66,7 @@ struct Orbiter {
 struct NodeInitialized;
 
 // This system initializes Sprite2Ds with the required components to allow the orbit_system to manipulate them.
+#[main_thread_system]
 fn orbit_setup(
     // Bevy Commands allow us to modify the state of the world, such as adding components to entities.
     mut commands: Commands,
@@ -87,16 +92,16 @@ fn orbit_setup(
                 pos: sprite_node.get_transform().origin,
             })
             .insert(Orbiter { angle: 0.0 })
-            .insert(Transform::default())
             .insert(NodeInitialized);
     }
 }
 
-// This system orbits all Node2Ds, such as Sprite2Ds.
+// This system moves all Node2Ds to the right, such as Sprite2Ds.
 fn orbit_system(
-    // This query searches for all entities containing a Bevy `Transform` component.
-    // (https://docs.rs/bevy/latest/bevy/transform/components/struct.Transform.html)
-    mut transform: Query<(&mut Transform, &InitialPosition, &mut Orbiter)>,
+    // The `transform` parameter is a Bevy `Query` that matches all `Transform2D` components.
+    // `Transform2D` is a Godot-Bevy-provided component that matches all Node2Ds in the scene.
+    // (https://docs.rs/godot-bevy/latest/godot_bevy/plugins/core/transforms/struct.Transform2D.html)
+    mut transform: Query<(&mut Transform2D, &InitialPosition, &mut Orbiter)>,
 
     // This is equivalent to Godot's `_process` `delta: float` parameter.
     process_delta: Res<Time>,
@@ -104,9 +109,8 @@ fn orbit_system(
     // For single matches, you can use `single_mut()` instead:
     // `if let Ok(mut transform) = transform.single_mut() {`
     for (mut transform, initial_position, mut orbiter) in transform.iter_mut() {
-        let position2d = initial_position.pos + Vector2::from_angle(orbiter.angle) * 100.0;
-        transform.translation.x = position2d.x;
-        transform.translation.y = position2d.y;
+        transform.as_godot_mut().origin =
+            initial_position.pos + Vector2::from_angle(orbiter.angle) * 100.0;
         orbiter.angle += process_delta.as_ref().delta_secs();
         orbiter.angle %= 2.0 * PI;
     }

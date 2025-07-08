@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use godot::global::Key;
 use godot_bevy::prelude::godot_prelude::godot_print;
 
-use godot_bevy::plugins::core::input_event::{
+use godot_bevy::plugins::input::{
     ActionInput, GamepadAxisInput, GamepadButtonInput, KeyboardInput, MouseButton,
     MouseButtonInput, MouseMotion, TouchInput,
 };

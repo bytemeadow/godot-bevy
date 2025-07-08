@@ -166,7 +166,7 @@ impl Plugin for CommandSystemPlugin {
 }
 
 /// Main thread system that processes UI commands
-#[godot_main_thread]
+#[main_thread_system]
 fn process_ui_commands(mut ui_commands: EventReader<UICommand>, ui_handles: Res<UIHandles>) {
     use godot::classes::{Button, Label};
 
@@ -198,7 +198,7 @@ fn process_ui_commands(mut ui_commands: EventReader<UICommand>, ui_handles: Res<
 }
 
 /// Main thread system that processes node commands
-#[godot_main_thread]
+#[main_thread_system]
 fn process_node_commands(
     mut node_commands: EventReader<NodeCommand>,
     mut nodes: Query<&mut GodotNodeHandle>,
@@ -235,7 +235,7 @@ fn process_node_commands(
 }
 
 /// Main thread system that processes animation commands
-#[godot_main_thread]
+#[main_thread_system]
 fn process_animation_commands(
     mut animation_commands: EventReader<AnimationCommand>,
     mut nodes: Query<&mut GodotNodeHandle>,
@@ -266,7 +266,7 @@ fn process_animation_commands(
 }
 
 /// Main thread system that syncs visibility state to Godot nodes
-#[godot_main_thread]
+#[main_thread_system]
 fn sync_visibility_state(
     mut nodes: Query<(&mut GodotNodeHandle, &mut VisibilityState), Changed<VisibilityState>>,
 ) {
@@ -283,7 +283,7 @@ fn sync_visibility_state(
 }
 
 /// Main thread system that syncs animation state to Godot sprites
-#[godot_main_thread]
+#[main_thread_system]
 fn sync_animation_state(
     mut nodes: Query<(&mut GodotNodeHandle, &mut AnimationState), Changed<AnimationState>>,
 ) {

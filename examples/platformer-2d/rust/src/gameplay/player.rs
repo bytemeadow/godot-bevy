@@ -92,7 +92,7 @@ impl Plugin for PlayerPlugin {
 ///
 /// Runs in InputDetection set and can execute in parallel with other input systems.
 /// Only reads input and writes events, enabling better parallelization.
-#[godot_main_thread]
+#[main_thread_system]
 fn detect_player_input(
     mut player: Query<&mut GodotNodeHandle, With<Player>>,
     mut input_events: EventWriter<PlayerInputEvent>,
@@ -122,7 +122,7 @@ fn detect_player_input(
 ///
 /// Runs in Movement set after input detection. Handles all physics calculations
 /// and movement execution separately from input detection.
-#[godot_main_thread]
+#[main_thread_system]
 fn apply_player_movement(
     mut input_events: EventReader<PlayerInputEvent>,
     mut player: Query<(&mut GodotNodeHandle, &Speed, &JumpVelocity, &Gravity), With<Player>>,
@@ -188,7 +188,7 @@ fn apply_player_movement(
 ///
 /// Runs in Animation set after movement. Handles all animation state
 /// separately from physics and input.
-#[godot_main_thread]
+#[main_thread_system]
 fn update_player_animation(
     mut movement_events: EventReader<PlayerMovementEvent>,
     mut player: Query<&mut GodotNodeHandle, With<Player>>,

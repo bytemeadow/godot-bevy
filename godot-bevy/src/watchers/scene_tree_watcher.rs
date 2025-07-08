@@ -4,8 +4,8 @@ use godot::prelude::*;
 use std::sync::mpsc::Sender;
 
 use crate::{
-    bridge::GodotNodeHandle,
-    plugins::core::{SceneTreeEvent, SceneTreeEventType},
+    interop::GodotNodeHandle,
+    plugins::scene_tree::{SceneTreeEvent, SceneTreeEventType},
 };
 
 #[derive(GodotClass)]

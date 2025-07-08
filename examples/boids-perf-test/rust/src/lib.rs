@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 use godot_bevy::prelude::{
     godot_prelude::{gdextension, ExtensionLibrary},
-    *,
+    GodotTransformSyncPlugin, *,
 };
 
 use crate::bevy_boids::BoidsPlugin;
@@ -18,5 +18,9 @@ mod container;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins((BoidsPlugin,));
+    app.add_plugins(GodotPackedScenePlugin)
+        .add_plugins(GodotTransformSyncPlugin {
+            sync_mode: TransformSyncMode::OneWay,
+        })
+        .add_plugins(BoidsPlugin);
 }

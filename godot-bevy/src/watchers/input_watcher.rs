@@ -3,7 +3,7 @@ use godot::obj::Gd;
 use godot::prelude::*;
 use std::sync::mpsc::Sender;
 
-use crate::plugins::core::input_event::InputEventType;
+use crate::plugins::input::InputEventType;
 
 #[derive(GodotClass)]
 #[class(base=Node)]

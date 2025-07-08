@@ -6,6 +6,7 @@
 
 - [Installation](./getting-started/installation.md)
 - [Basic Concepts](./getting-started/basic-concepts.md)
+- [Plugin System](./getting-started/plugins.md)
 - [Examples](./getting-started/examples.md)
 
 # Scene Tree
@@ -35,3 +36,4 @@
 # Migration Guides
 
 - [v0.6 to v0.7](./migration/v0.6-to-v0.7.md)
+- [v0.7 to v0.8](./migration/v0.7-to-v0.8.md)

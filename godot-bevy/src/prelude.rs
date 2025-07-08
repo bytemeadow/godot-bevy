@@ -1,86 +1,40 @@
 pub use crate::GodotPlugin;
-pub use crate::autosync::AutoSyncBundleRegistry;
-pub use crate::bridge::*;
+pub use crate::interop::*;
 pub use crate::node_tree_view::NodeTreeView;
-#[allow(deprecated)]
 pub use crate::plugins::{
+    GodotCorePlugins,
+    GodotDefaultPlugins,
     assets::{GodotAssetsPlugin, GodotResource},
     audio::{
         Audio, AudioApp, AudioChannel, AudioChannelMarker, AudioEasing, AudioError, AudioOutput,
         AudioPlayerType, AudioSettings, AudioTween, GodotAudioChannels, GodotAudioPlugin,
         MainAudioTrack, PlayAudioCommand, SoundId,
     },
-    core::{
-        ActionInput,
-        // Node type marker components for type-safe ECS queries
-        AnimatedSprite2DMarker,
-        AnimatedSprite3DMarker,
-        AnimationPlayerMarker,
-        AnimationTreeMarker,
-        Area2DMarker,
-        Area3DMarker,
-        AudioStreamPlayer2DMarker,
-        AudioStreamPlayer3DMarker,
-        AudioStreamPlayerMarker,
-        BevyInputBridgePlugin,
-        ButtonMarker,
-        Camera2DMarker,
-        Camera3DMarker,
-        CanvasItemMarker,
-        CharacterBody2DMarker,
-        CharacterBody3DMarker,
-        CollisionPolygon2DMarker,
-        CollisionPolygon3DMarker,
-        CollisionShape2DMarker,
-        CollisionShape3DMarker,
-        Collisions,
-        ControlMarker,
-        DirectionalLight3DMarker,
-        FindEntityByNameExt,
-        GodotCorePlugin,
-        GodotSignal,
-        GodotSignalArgument,
-        GodotSignals,
-        GodotTransformConfig,
-        Groups,
-        KeyboardInput,
-        LabelMarker,
-        LineEditMarker,
-        MainThreadMarker,
-        MeshInstance2DMarker,
-        MeshInstance3DMarker,
-        MouseButtonInput,
-        MouseMotion,
-        Node2DMarker,
-        Node3DMarker,
-        NodeMarker,
-        PanelMarker,
-        Path2DMarker,
-        Path3DMarker,
-        PathFollow2DMarker,
-        PathFollow3DMarker,
-        PhysicsDelta,
-        PhysicsUpdate,
-        RigidBody2DMarker,
-        RigidBody3DMarker,
-        SceneTreeEventReader,
-        SceneTreeRef,
-        SpotLight3DMarker,
-        Sprite2DMarker,
-        Sprite3DMarker,
-        StaticBody2DMarker,
-        StaticBody3DMarker,
-        SystemDeltaTimer,
-        TextEditMarker,
-        TimerMarker,
-        TransformSyncMode,
-        collisions::{
-            ALL_COLLISION_SIGNALS, AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED,
-            COLLISION_END_SIGNALS, COLLISION_START_SIGNALS,
-        },
-        connect_godot_signal,
+    // Collisions
+    collisions::{
+        AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED, COLLISION_START_SIGNALS,
+        CollisionEvent, CollisionEventType, Collisions, GodotCollisionsPlugin,
     },
-    packed_scene::{GodotScene, PackedScenePlugin},
+    // Core functionality
+    core::{
+        FindEntityByNameExt, GodotTransformConfig, MainThreadMarker, PhysicsDelta, PhysicsUpdate,
+        TransformSyncMode,
+    },
+    // Input
+    input::{
+        ActionInput, BevyInputBridgePlugin, GodotInputEventPlugin, KeyboardInput, MouseButtonInput,
+        MouseMotion,
+    },
+    packed_scene::{GodotPackedScenePlugin, GodotScene},
+    // Scene tree
+    scene_tree::{AutoSyncBundleRegistry, GodotSceneTreePlugin, Groups, SceneTreeRef},
+    // Signals
+    signals::{
+        GodotSignal, GodotSignalArgument, GodotSignals, GodotSignalsPlugin, connect_godot_signal,
+    },
+    // Transforms
+    transforms::{GodotTransformSyncPlugin, Transform2D, Transform3D},
 };
+pub use bevy::prelude as bevy_prelude;
 pub use godot::prelude as godot_prelude;
 pub use godot_bevy_macros::*;
