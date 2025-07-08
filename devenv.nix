@@ -1,8 +1,4 @@
-{ pkgs, lib, config, inputs, ... }:
-let
-  pkgs-unstable = import inputs.nixpkgs-unstable { system = pkgs.stdenv.system; };
-in
-  {
+{ pkgs, lib, config, inputs, ... }: {
   # https://devenv.sh/basics/
 
   # may be useful - wrt bevy/devenv - https://github.com/cachix/devenv/issues/1681
@@ -22,9 +18,6 @@ in
       #
       # Packages supporting all platforms, typically cross-platform developer tools
       #
-
-      # example pulling a newer package than in the default (cachix rolling release)
-      # pkgs-unstable.elmPackages.elm-test-rs
 
       # dev tools
       samply # profiler, ref https://github.com/mstange/samply
