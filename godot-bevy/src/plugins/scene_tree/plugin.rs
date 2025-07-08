@@ -1,5 +1,5 @@
 use crate::interop::node_markers::*;
-use crate::plugins::transforms::{Transform2D, Transform3D};
+use crate::plugins::transforms::IntoBevyTransform;
 use crate::prelude::main_thread_system;
 use crate::{
     interop::GodotNodeHandle,
@@ -47,22 +47,37 @@ use std::marker::PhantomData;
 /// This plugin is always included in the core plugins and provides
 /// complete scene tree integration out of the box.
 pub struct GodotSceneTreePlugin {
-    /// Whether to automatically add Transform components to entities
+    /// When true, add a Transform component to the scene's entity.
+    /// NOTE: this will not override a Transform if you've already attached one
     pub add_transforms: bool,
+    /// When true, adds a parent child entity relationship in ECS
+    /// that mimics Godot's parent child node relationship.
+    /// NOTE: You should disable this if you want to use Avian Physics,
+    /// as it is incompatible, i.e., Avian Physics has its own notions
+    /// for what parent/child entity relatonships mean
+    pub add_child_relationship: bool,
 }
 
 impl Default for GodotSceneTreePlugin {
     fn default() -> Self {
         Self {
             add_transforms: true,
+            add_child_relationship: true,
         }
     }
 }
 
 /// Configuration resource for scene tree behavior
 #[derive(Resource)]
-pub(crate) struct SceneTreeConfig {
-    add_transforms: bool,
+pub struct SceneTreeConfig {
+    /// Add a Transform component
+    pub add_transforms: bool,
+    /// When true, adds a parent child entity relationship in ECS
+    /// that mimics Godot's parent child node relationship.
+    /// NOTE: You should disable this if you want to use Avian Physics,
+    /// as it is incompatible, i.e., Avian Physics has its own notions
+    /// for what parent/child entity relatonships mean
+    pub add_child_relationship: bool,
 }
 
 impl Plugin for GodotSceneTreePlugin {
@@ -73,6 +88,7 @@ impl Plugin for GodotSceneTreePlugin {
         app.init_non_send_resource::<SceneTreeRefImpl>()
             .insert_resource(SceneTreeConfig {
                 add_transforms: self.add_transforms,
+                add_child_relationship: self.add_child_relationship,
             })
             .add_event::<SceneTreeEvent>()
             .add_systems(
@@ -436,12 +452,9 @@ fn create_scene_tree_entity(
                 // Add transform components if configured to do so
                 if config.add_transforms {
                     if let Some(node3d) = node.try_get::<Node3D>() {
-                        ent.insert(Transform3D::from(node3d.get_transform()));
-                    }
-
-                    if let Some(node2d) = node.try_get::<Node2D>() {
-                        let transform = node2d.get_transform();
-                        ent.insert(Transform2D::from(transform));
+                        ent.insert_if_new(node3d.get_transform().to_bevy_transform());
+                    } else if let Some(node2d) = node.try_get::<Node2D>() {
+                        ent.insert_if_new(node2d.get_transform().to_bevy_transform());
                     }
                 }
 
@@ -512,15 +525,15 @@ fn create_scene_tree_entity(
                 // Try to add any registered bundles for this node type
                 super::autosync::try_add_bundles_for_node(commands, ent, &event.node);
 
-                if node.instance_id() != scene_root.instance_id() {
+                if config.add_child_relationship && node.instance_id() != scene_root.instance_id() {
                     if let Some(parent) = node.get_parent() {
                         let parent_id = parent.instance_id();
                         if let Some(&parent_entity) = ent_mapping.get(&parent_id) {
                             commands.entity(parent_entity).add_children(&[ent]);
                         } else {
                             bevy::log::warn!(target: "godot_scene_tree_events",
-                                "Parent entity with ID {} not found in ent_mapping. This might indicate a missing or incorrect mapping.",
-                                parent_id);
+                            "Parent entity with ID {} not found in ent_mapping. This might indicate a missing or incorrect mapping.",
+                            parent_id);
                         }
                     }
                 }

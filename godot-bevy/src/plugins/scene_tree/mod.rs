@@ -7,6 +7,6 @@ pub use autosync::{
     try_add_bundles_for_node,
 };
 pub use plugin::{
-    GodotSceneTreePlugin, Groups, SceneTreeEvent, SceneTreeEventReader, SceneTreeEventType,
-    SceneTreeRef,
+    GodotSceneTreePlugin, Groups, SceneTreeConfig, SceneTreeEvent, SceneTreeEventReader,
+    SceneTreeEventType, SceneTreeRef,
 };

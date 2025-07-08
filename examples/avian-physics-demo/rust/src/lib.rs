@@ -1,6 +1,10 @@
 use avian3d::{collision::CollisionDiagnostics, dynamics::solver::SolverDiagnostics, prelude::*};
+use bevy::app::Startup;
+use bevy::ecs::schedule::common_conditions::run_once;
+use bevy::ecs::schedule::IntoScheduleConfigs;
+use bevy::ecs::system::ResMut;
 use bevy::prelude::{
-    info, Added, App, AppExtStates, Assets, Commands, Component, Entity, Event, EventReader,
+    debug, Added, App, AppExtStates, Assets, Commands, Component, Entity, Event, EventReader,
     EventWriter, Handle, Mesh, OnExit, Plugin, Query, Res, Resource, Result, States, Transform,
     Vec3,
 };
@@ -10,11 +14,15 @@ use bevy_asset_loader::{
     loading_state::{config::ConfigureLoadingState, LoadingState, LoadingStateAppExt},
 };
 use godot::classes::{BoxMesh, MeshInstance3D};
-use godot_bevy::prelude::PhysicsUpdate;
+use godot_bevy::plugins::scene_tree::SceneTreeConfig;
 use godot_bevy::prelude::{
     bevy_app,
     godot_prelude::{gdextension, ExtensionLibrary},
     GodotNodeHandle, GodotResource, GodotScene,
+};
+use godot_bevy::prelude::{
+    main_thread_system, GodotPackedScenePlugin, GodotTransformSyncPlugin,
+    PhysicsUpdate,
 };
 use std::fmt::Debug;
 
@@ -35,6 +43,8 @@ enum GameState {
 impl Plugin for AvianPhysicsDemo {
     fn build(&self, app: &mut App) {
         app.add_plugins(StatesPlugin)
+            .add_plugins(GodotPackedScenePlugin)
+            .add_plugins(GodotTransformSyncPlugin::default())
             .add_plugins((
                 // Plugins required by Avian
                 ScenePlugin,
@@ -52,6 +62,7 @@ impl Plugin for AvianPhysicsDemo {
                     .load_collection::<GameAssets>()
                     .continue_to_state(GameState::InGame),
             )
+            .add_systems(Startup, update_scene_tree_config.run_if(run_once))
             .add_systems(OnExit(GameState::LoadAssets), spawn_entities)
             .add_systems(PhysicsUpdate, add_avian_collider)
             .add_event::<ColliderRequired>();
@@ -72,6 +83,22 @@ pub struct GameAssets {
 
 #[derive(Event)]
 struct ColliderRequired(Entity);
+
+// NOTE: Would really prefer initialize these values by adding the GodotSceneTreePlugin plugin
+// ourselves, but that's somewhat hardcoded at the moment, so this is a workaround until we
+// fix that
+#[main_thread_system]
+fn update_scene_tree_config(mut config: ResMut<SceneTreeConfig>) {
+    // When true, adds a parent child entity relationship in ECS
+    // that mimics Godot's parent child node relationship.
+    // NOTE: You should **disable** this if you want to use Avian Physics,
+    // as it is incompatible, i.e., Avian Physics has its own notions
+    // for what parent/child entity relatonships mean
+    config.add_child_relationship = false;
+
+    // We add our own transforms, no need to do it in the plugin
+    config.add_transforms = false
+}
 
 fn spawn_entities(
     mut commands: Commands,
@@ -130,7 +157,7 @@ fn add_avian_collider(
                     box_mesh_size.z,
                 ));
 
-                info!(
+                debug!(
                     "Added collider matching Godot's BoxMesh size of {:?}",
                     box_mesh_size
                 );

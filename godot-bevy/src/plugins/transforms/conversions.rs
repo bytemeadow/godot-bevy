@@ -1,12 +1,14 @@
 use bevy::math::{Quat, Vec3};
-use godot::builtin::{Basis, Quaternion, Vector3};
+use bevy::prelude::Transform as BevyTransform;
+use godot::builtin::Transform3D as GodotTransform3D;
+use godot::builtin::{Basis, Quaternion, Transform2D as GodotTransform2D, Vector3};
 
 pub trait IntoBevyTransform {
-    fn to_bevy_transform(self) -> bevy::prelude::Transform;
+    fn to_bevy_transform(self) -> BevyTransform;
 }
 
-impl IntoBevyTransform for godot::prelude::Transform3D {
-    fn to_bevy_transform(self) -> bevy::prelude::Transform {
+impl IntoBevyTransform for GodotTransform3D {
+    fn to_bevy_transform(self) -> BevyTransform {
         let quat = self.basis.get_quaternion();
         let quat = Quat::from_xyzw(quat.x, quat.y, quat.z, quat.w);
 
@@ -15,7 +17,7 @@ impl IntoBevyTransform for godot::prelude::Transform3D {
 
         let origin = Vec3::new(self.origin.x, self.origin.y, self.origin.z);
 
-        bevy::prelude::Transform {
+        BevyTransform {
             rotation: quat,
             translation: origin,
             scale,
@@ -23,8 +25,8 @@ impl IntoBevyTransform for godot::prelude::Transform3D {
     }
 }
 
-impl IntoBevyTransform for godot::prelude::Transform2D {
-    fn to_bevy_transform(self) -> bevy::prelude::Transform {
+impl IntoBevyTransform for GodotTransform2D {
+    fn to_bevy_transform(self) -> BevyTransform {
         // Extract 2D position
         let translation = Vec3::new(self.origin.x, self.origin.y, 0.0);
 
@@ -37,7 +39,7 @@ impl IntoBevyTransform for godot::prelude::Transform2D {
         let scale_y = self.b.length();
         let scale = Vec3::new(scale_x, scale_y, 1.0);
 
-        bevy::prelude::Transform {
+        BevyTransform {
             translation,
             rotation,
             scale,
@@ -46,15 +48,15 @@ impl IntoBevyTransform for godot::prelude::Transform2D {
 }
 
 pub trait IntoGodotTransform {
-    fn to_godot_transform(self) -> godot::prelude::Transform3D;
+    fn to_godot_transform(self) -> GodotTransform3D;
 }
 
 pub trait IntoGodotTransform2D {
-    fn to_godot_transform_2d(self) -> godot::prelude::Transform2D;
+    fn to_godot_transform_2d(self) -> GodotTransform2D;
 }
 
-impl IntoGodotTransform for bevy::prelude::Transform {
-    fn to_godot_transform(self) -> godot::prelude::Transform3D {
+impl IntoGodotTransform for BevyTransform {
+    fn to_godot_transform(self) -> GodotTransform3D {
         let [x, y, z, w] = self.rotation.to_array();
         let quat = Quaternion::new(x, y, z, w);
 
@@ -66,12 +68,12 @@ impl IntoGodotTransform for bevy::prelude::Transform {
         let [tx, ty, tz] = self.translation.to_array();
         let origin = Vector3::new(tx, ty, tz);
 
-        godot::prelude::Transform3D { basis, origin }
+        GodotTransform3D { basis, origin }
     }
 }
 
-impl IntoGodotTransform2D for bevy::prelude::Transform {
-    fn to_godot_transform_2d(self) -> godot::prelude::Transform2D {
+impl IntoGodotTransform2D for BevyTransform {
+    fn to_godot_transform_2d(self) -> GodotTransform2D {
         // Extract the Z rotation component from the quaternion
         let (_, _, rotation_z) = self.rotation.to_euler(bevy::math::EulerRot::XYZ);
 
@@ -84,6 +86,6 @@ impl IntoGodotTransform2D for bevy::prelude::Transform {
         let b = godot::builtin::Vector2::new(-sin_rot * self.scale.y, cos_rot * self.scale.y);
         let origin = godot::builtin::Vector2::new(self.translation.x, self.translation.y);
 
-        godot::prelude::Transform2D { a, b, origin }
+        GodotTransform2D { a, b, origin }
     }
 }

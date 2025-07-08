@@ -13,12 +13,11 @@ use bevy::{
 use bevy_spatial::{
     kdtree::KDTree2, AutomaticUpdate, SpatialAccess, SpatialSet, SpatialStructure, TransformMode,
 };
-    classes::Node as GodotNode,
-    prelude::{Node2D, Vector2},
+use godot::{
+    builtin::{Color, Vector2},
+    classes::{Node as GodotNode, Node2D},
 };
-use godot_bevy::prelude::{godot_main_thread, GodotNodeHandle, GodotResource, GodotScene};
-// Explicitly use godot-bevy's Transform2D to disambiguate
-use godot_bevy::prelude::Transform2D;
+use godot_bevy::prelude::{main_thread_system, GodotNodeHandle, GodotResource, GodotScene};
 
 // Type alias for our spatial tree
 type BoidTree = KDTree2<Boid>;
@@ -122,10 +121,6 @@ impl Plugin for BoidsPlugin {
             )
                 .chain(),
         )
-        // Our KDTree is getting updated every frame (from the automatic update specified above),
-        // so we must ensure it has valid data to work on - namely, the native Bevy Transforms
-        // are updated
-        .add_systems(PreUpdate, sync_transforms.in_set(SpatialSet))
         // Movement systems
         .add_systems(
             Update,
@@ -289,8 +284,7 @@ fn colorize_new_boids(
         let mut handle_clone = handle.clone();
 
         // Generate random color (matching GDScript)
-        let random_color =
-            GodotColor::from_rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.9);
+        let random_color = Color::from_rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.9);
 
         // Try different node structures (matching GDScript logic)
         if let Some(mut node) = handle_clone.try_get::<Node2D>() {

@@ -2,6 +2,7 @@ use bevy::ecs::system::Query;
 use bevy::prelude::{
     App, Commands, Component, Entity, IntoScheduleConfigs, Res, Time, Update, Without,
 };
+use bevy::transform::components::Transform;
 use godot::builtin::Vector2;
 use godot::classes::Sprite2D;
 use godot::global::godot_print;
@@ -96,12 +97,12 @@ fn orbit_setup(
     }
 }
 
-// This system moves all Node2Ds to the right, such as Sprite2Ds.
+// This system orbits entities created above
 fn orbit_system(
-    // The `transform` parameter is a Bevy `Query` that matches all `Transform2D` components.
-    // `Transform2D` is a Godot-Bevy-provided component that matches all Node2Ds in the scene.
-    // (https://docs.rs/godot-bevy/latest/godot_bevy/plugins/core/transforms/struct.Transform2D.html)
-    mut transform: Query<(&mut Transform2D, &InitialPosition, &mut Orbiter)>,
+    // The `transform` parameter is a Bevy `Query` that matches all `Transform` components.
+    // `Transform` is a Godot-Bevy-provided component that matches all Node2Ds in the scene.
+    // (https://docs.rs/godot-bevy/latest/godot_bevy/plugins/core/transforms/struct.Transform.html)
+    mut transform: Query<(&mut Transform, &InitialPosition, &mut Orbiter)>,
 
     // This is equivalent to Godot's `_process` `delta: float` parameter.
     process_delta: Res<Time>,
@@ -109,8 +110,9 @@ fn orbit_system(
     // For single matches, you can use `single_mut()` instead:
     // `if let Ok(mut transform) = transform.single_mut() {`
     for (mut transform, initial_position, mut orbiter) in transform.iter_mut() {
-        transform.as_godot_mut().origin =
-            initial_position.pos + Vector2::from_angle(orbiter.angle) * 100.0;
+        let position2d = initial_position.pos + Vector2::from_angle(orbiter.angle) * 100.0;
+        transform.translation.x = position2d.x;
+        transform.translation.y = position2d.y;
         orbiter.angle += process_delta.as_ref().delta_secs();
         orbiter.angle %= 2.0 * PI;
     }

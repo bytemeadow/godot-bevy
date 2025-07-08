@@ -160,10 +160,8 @@ fn move_player(
         // Transform update using cached screen size
         transform.translation.x += velocity.x * physics_delta.delta_seconds;
         transform.translation.y += velocity.y * physics_delta.delta_seconds;
-        transform.translation.x =
-            f32::min(f32::max(0.0, transform.translation.x), screen_cache.size.x);
-        transform.translation.y =
-            f32::min(f32::max(0.0, transform.translation.y), screen_cache.size.y);
+        transform.translation.x = transform.translation.x.clamp(0., screen_cache.size.x);
+        transform.translation.y = transform.translation.y.clamp(0., screen_cache.size.y);
     }
 
     Ok(())

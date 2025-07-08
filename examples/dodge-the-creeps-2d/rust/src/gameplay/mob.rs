@@ -1,3 +1,10 @@
+use crate::gameplay::audio::GameSfxChannel;
+use crate::{
+    commands::{AnimationState, NodeCommand},
+    GameState,
+};
+use bevy::math::{vec3, Vec3Swizzles};
+use bevy::transform::components::Transform;
 use bevy::{
     app::{App, Plugin, Update},
     asset::Handle,
@@ -11,29 +18,22 @@ use bevy::{
         system::{Commands, Query, Res, ResMut},
     },
     log::info,
-    math::Vec2,
     state::condition::in_state,
     time::{Time, Timer, TimerMode},
 };
 use bevy_asset_loader::asset_collection::AssetCollection;
 use godot::{
-    builtin::{Transform2D as GodotTransform2D, Vector2},
+    builtin::Vector2,
     classes::{AnimatedSprite2D, Node, PathFollow2D, RigidBody2D},
 };
 use godot_bevy::{
     interop::GodotNodeHandle,
     prelude::{
         main_thread_system, AudioChannel, FindEntityByNameExt, GodotResource, GodotScene,
-        GodotSignal, GodotSignals, NodeTreeView, Transform2D,
+        GodotSignal, GodotSignals, NodeTreeView,
     },
 };
 use std::f32::consts::PI;
-
-use crate::gameplay::audio::GameSfxChannel;
-use crate::{
-    commands::{AnimationState, NodeCommand},
-    GameState,
-};
 
 #[derive(AssetCollection, Resource, Debug)]
 pub struct MobAssets {
@@ -96,13 +96,13 @@ fn spawn_mob(
     direction += fastrand::f32() * PI / 2.0 - PI / 4.0;
 
     let position = mob_spawn_location.get_position();
-    let transform = GodotTransform2D::IDENTITY.translated(position);
-    let transform = transform.rotated_local(direction);
+    let mut transform = Transform::default().with_translation(vec3(position.x, position.y, 0.));
+    transform.rotate_z(direction);
 
     commands
         .spawn_empty()
         .insert(Mob { direction })
-        .insert(Transform2D::from(transform))
+        .insert(transform)
         .insert(GodotScene::from_handle(assets.mob_scn.clone()))
         .insert(AnimationState::default());
 }
@@ -118,15 +118,7 @@ pub struct MobNodes {
 
 #[main_thread_system]
 fn new_mob(
-    mut entities: Query<
-        (
-            &Mob,
-            &Transform2D,
-            &mut GodotNodeHandle,
-            &mut AnimationState,
-        ),
-        Added<Mob>,
-    >,
+    mut entities: Query<(&Mob, &Transform, &mut GodotNodeHandle, &mut AnimationState), Added<Mob>>,
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
     assets: Res<MobAssets>,
     signals: GodotSignals,
@@ -155,10 +147,7 @@ fn new_mob(
         signals.connect(&mut mob_nodes.visibility_notifier, "screen_exited");
 
         // Play 2D positional spawn sound at mob's position with fade-in
-        let position = Vec2::new(
-            transform.as_bevy().translation.x,
-            transform.as_bevy().translation.y,
-        );
+        let position = transform.translation.xy();
 
         sfx_channel
             .play_2d(assets.mob_pop.clone(), position)

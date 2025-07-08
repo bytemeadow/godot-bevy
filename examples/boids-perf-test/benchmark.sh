@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Boids Performance Benchmark Runner
 # This script runs automated benchmarks comparing Godot and Bevy implementations
