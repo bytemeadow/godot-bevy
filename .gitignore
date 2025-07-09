@@ -5,6 +5,8 @@ target/
 # Jetbrains IDEs
 .idea
 
+profile.json.gz
+
 # Book
 book/book
 benchmark_results/
