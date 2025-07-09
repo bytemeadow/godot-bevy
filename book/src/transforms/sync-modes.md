@@ -10,13 +10,13 @@ No transform syncing occurs and no transform components are created.
 
 **Characteristics:**
 - ✅ Zero performance overhead
-- ✅ No memory usage for transform components  
-- ✅ Best for physics-heavy games
-- ❌ Cannot use Transform2D/Transform3D components
+- ✅ Best for when your ECS systems rarely read/write Godot Node transforms, or you wish to explicitly control when
+synchronization occurs
+- ❌ Godot Transform changes aren't automatically reflected in ECS
+- ❌ ECS Transform changes aren't automatically reflected in Godot
 
 **Use when:**
 - Building platformers with CharacterBody2D
-- Using RigidBody physics exclusively
 - You need maximum performance
 
 ### `TransformSyncMode::OneWay` (Default)
@@ -33,6 +33,7 @@ Synchronizes transforms from ECS to Godot only.
 - Building pure ECS games
 - All movement logic is in Bevy systems
 - You don't need to read Godot transforms
+- Physics is controlled in ECS, i.e., you've disabled all Godot Physics engines and use something like Avian physics
 
 ### `TransformSyncMode::TwoWay`
 
@@ -42,7 +43,7 @@ Full bidirectional synchronization between ECS and Godot.
 - ✅ Changes in either system are reflected
 - ✅ Works with Godot animations
 - ✅ Supports hybrid architectures
-- ❌ Higher performance overhead
+- ❌ Highest performance cost
 
 **Use when:**
 - Migrating from GDScript to ECS
@@ -138,8 +139,8 @@ The system uses Bevy's change detection to optimize writes:
 ```rust
 fn post_update_transforms(
     mut query: Query<
-        (&Transform2D, &mut GodotNodeHandle),
-        Or<(Added<Transform2D>, Changed<Transform2D>)>
+        (&Transform, &mut GodotNodeHandle),
+        Or<(Added<Transform>, Changed<Transform>)>
     >
 ) {
     // Only processes entities with new or changed transforms

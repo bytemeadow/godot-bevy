@@ -29,7 +29,7 @@ fn build_app(app: &mut App) {
     // (https://docs.rs/godot-core/0.3.1/godot_core/macro.godot_print.html)
     godot_print!("Hello from Godot-Bevy!");
 
-    // Add the transforms plugin since we're using Transform2D
+    // Add the transform syncing plugin since we're using Transform components
     app.add_plugins(GodotTransformSyncPlugin::default());
 
     // A system is a normal Rust function.

@@ -70,18 +70,18 @@ fn build_app(app: &mut App) {
 
 // A system is a normal Rust function. This system moves all Node2Ds to the right, such as Sprite2Ds.
 //
-// The `transform` parameter is a Bevy `Query` that matches all `Transform2D` components.
-// `Transform2D` is a Godot-Bevy-provided component that matches all Node2Ds in the scene.
-// (https://docs.rs/godot-bevy/latest/godot_bevy/plugins/core/transforms/struct.Transform2D.html)
+// The `transform` parameter is a Bevy `Query` that matches all `Transform` components.
+// `Transform` is a Godot-Bevy-provided component that matches all Node2Ds in the scene.
+// (https://docs.rs/godot-bevy/latest/godot_bevy/plugins/core/transforms/struct.Transform.html)
 //
 // For more information on Bevy Components, Systems, and Queries, see:
 // (https://bevy.org/learn/quick-start/getting-started/ecs/).
-fn position_system(mut transform: Query<&mut Transform2D>) {
+fn position_system(mut transform: Query<&mut Transform>) {
     // For single matches, you can use `single_mut()` instead:
     // `if let Ok(mut transform) = transform.single_mut() {`
     for mut transform in transform.iter_mut() {
         // Move the node to the right.
-        transform.as_godot_mut().origin.x += 1.0;
+        transform.translation.x += 1.0;
     }
 }
 

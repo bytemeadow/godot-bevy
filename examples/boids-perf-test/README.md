@@ -17,7 +17,7 @@ This example demonstrates the performance benefits of using **godot-bevy** (Rust
 - **Language**: Rust (compiled, zero-cost abstractions)
 - **Architecture**: Entity Component System with Bevy
 - **Neighbor Finding**: **bevy_spatial KDTree2** with k_nearest_neighbour optimization
-- **Transform Sync**: **Hybrid batching** for efficient Transform2D synchronization
+- **Transform Sync**: **Hybrid batching** for efficient Transform synchronization
 - **Behaviors**: Separation, alignment, cohesion, boundary avoidance
 - **Visual Effects**: **Random color generation** matching GDScript variety
 - **Advantages**: Compiled performance, memory efficiency, CPU cache-friendly data layout
@@ -107,7 +107,7 @@ The benchmark tracks:
 - Optimized with pre-allocated PackedVector2Array data structures
 
 ### godot-bevy Implementation (`rust/src/bevy_boids.rs`)
-- ECS entities with `Boid`, `Velocity`, and `Transform2D` components  
+- ECS entities with `Boid`, `Velocity`, and `Transform` components  
 - **bevy_spatial AutomaticUpdate** plugin with KDTree2 for spatial queries
 - **k_nearest_neighbour** with 50-entity cap for optimized neighbor finding
 - **Hybrid transform batching** for efficient Godot scene synchronization

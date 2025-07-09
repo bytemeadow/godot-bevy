@@ -8,14 +8,14 @@ godot-bevy supports three distinct approaches for handling transforms and moveme
 
 ### 1. ECS Transform Components
 
-Use `Transform2D`/`Transform3D` components with automatic syncing between ECS and Godot. This is the default approach. You update transforms in ECS, and we take care of syncing the transforms to the Godot side at the end of each frame.
+Use standard bevy `Transform` components with automatic syncing from ECS to Godot. This is the default approach. You update transforms in ECS, and we take care of syncing the transforms to the Godot side at the end of each frame. You can also configure bi-directional synchronization, or disable all synchronization.
 
 ```rust
 use godot_bevy::prelude::*;
 
-fn move_entity(mut query: Query<&mut Transform2D>) {
+fn move_entity(mut query: Query<&mut Transform>) {
     for mut transform in query.iter_mut() {
-        transform.as_bevy_mut().translation.x += 1.0;
+        transform.translation.x += 1.0;
     }
 }
 ```
@@ -70,12 +70,7 @@ This is optimal for pure ECS applications where all movement logic lives in Bevy
 
 ### Transform Components
 
-godot-bevy provides two transform components that maintain both Bevy and Godot representations:
-
-- **`Transform2D`** - For 2D games
-- **`Transform3D`** - For 3D games
-
-These components automatically keep Bevy and Godot transforms in sync based on your configuration.
+Use standard bevy `Transform` components. This is the default approach. You update transforms in ECS, and we take care of syncing the transforms to the Godot side at the end of each frame. You can also configure bi-directional synchronization, or disable all synchronization.
 
 ### Sync Modes
 

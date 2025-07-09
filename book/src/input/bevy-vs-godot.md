@@ -11,14 +11,14 @@ Use Bevy's standard input resources for simple, direct input handling:
 ```rust
 fn movement_system(
     keys: Res<ButtonInput<KeyCode>>,
-    mut query: Query<&mut Transform2D, With<Player>>,
+    mut query: Query<&mut Transform, With<Player>>,
 ) {
     for mut transform in query.iter_mut() {
         if keys.pressed(KeyCode::ArrowLeft) {
-            transform.as_bevy_mut().translation.x -= 200.0;
+            transform.translation.x -= 200.0;
         }
         if keys.pressed(KeyCode::ArrowRight) {
-            transform.as_bevy_mut().translation.x += 200.0;
+            transform.translation.x += 200.0;
         }
     }
 }
@@ -31,7 +31,7 @@ Use godot-bevy's event-based system for more advanced input handling:
 ```rust
 fn movement_system(
     mut events: EventReader<ActionInput>,
-    mut query: Query<&mut Transform2D, With<Player>>,
+    mut query: Query<&mut Transform, With<Player>>,
 ) {
     for event in events.read() {
         if event.pressed {

@@ -50,7 +50,6 @@ fn find_player(
 Components store data on entities. godot-bevy provides several built-in components:
 
 - `GodotNodeHandle` - Reference to the Godot node
-- `Transform2D/3D` - Position, rotation, scale
 - `Name` - Node name
 - `Collisions` - Collision events
 - `Groups` - Godot node groups
@@ -61,10 +60,10 @@ Systems contain your game logic and run on a schedule:
 ```rust
 fn movement_system(
     time: Res<Time>,
-    mut query: Query<&mut Transform2D, With<Player>>,
+    mut query: Query<&mut Transform, With<Player>>,
 ) {
     for mut transform in query.iter_mut() {
-        transform.as_bevy_mut().translation.x += 
+        transform.translation.x += 
             100.0 * time.delta_seconds();
     }
 }
@@ -157,9 +156,9 @@ fn handle_button_press(
 ```rust
 # use bevy::app::{App, Plugin, Startup, Update};
 # use bevy::asset::{AssetServer, Handle};
-# use bevy::prelude::{Commands, Component, Res, Resource, Single, With};
+# use bevy::prelude::{Commands, Component, Res, Resource, Single, Transform, With};
 # use godot_bevy::bridge::GodotNodeHandle;
-# use godot_bevy::prelude::{GodotResource, GodotScene, Transform2D};
+# use godot_bevy::prelude::{GodotResource, GodotScene};
 # 
 # struct EnemyPlugin;
 # 
@@ -195,7 +194,7 @@ fn spawn_enemy(
         GodotScene::from_handle(enemy_scene.0.clone())
             .with_parent(enemy_spawner.into_inner().clone()),
         Enemy { health: 100 },
-        Transform2D::default(),
+        Transform::default(),
     ));
 }
 ```

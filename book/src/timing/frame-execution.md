@@ -114,7 +114,7 @@ Different schedules require different delta time sources:
 ```rust
 fn movement_system(
     time: Res<Time>,
-    mut query: Query<&mut Transform2D>,
+    mut query: Query<&mut Transform>,
 ) {
     let delta = time.delta_seconds();
     // Use Bevy's time for visual frame systems
@@ -126,7 +126,7 @@ fn movement_system(
 ```rust
 fn physics_movement(
     physics_delta: Res<PhysicsDelta>,
-    mut query: Query<&mut Transform2D>,
+    mut query: Query<&mut Transform>,
 ) {
     let delta = physics_delta.delta_seconds;
     // Use Godot's physics delta for physics systems

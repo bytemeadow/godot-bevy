@@ -40,7 +40,6 @@ When the scene tree is parsed, each Godot node becomes a Bevy entity with these 
 
 - **`GodotNodeHandle`** - Reference to the Godot node
 - **`Name`** - The node's name from Godot
-- **`Transform2D`** or **`Transform3D`** - For Node2D and Node3D types respectively
 - **`Groups`** - The node's group memberships
 - **`Collisions`** - If the node has collision signals
 - **Node type markers** - Components like `ButtonMarker`, `Sprite2DMarker`, etc.

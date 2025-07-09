@@ -119,7 +119,7 @@ Examples are structured as workspace members with separate Rust crates. Each exa
 
 ## Key Integration Points
 
-**Transform Synchronization**: Automatic bidirectional sync between Bevy `Transform2D`/`Transform3D` components and Godot node transforms.
+**Transform Synchronization**: Automatic synchronization between Bevy `Transform` components and Godot node transforms. You can select for this synchronization to be disabled, just sync Bevy Transforms to Godot Transforms, or sync bi-directionally.
 
 **Signal Integration**: Godot signals become Bevy events via `EventReader<GodotSignal>`, enabling ECS systems to respond to UI interactions and game events.
 
