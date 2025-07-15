@@ -52,6 +52,29 @@ fn build_app(app: &mut App) {
 
 ## Advanced Usage
 
+### Directional Sync Control
+
+You can specify which direction of synchronization you need for optimal performance:
+
+```rust
+add_transform_sync_systems! {
+    app,
+    // Only ECS → Godot (one-way sync)
+    UIElements = 2d: bevy_to_godot: With<UIElement>,
+    
+    // Only Godot → ECS (useful for reading physics results)
+    PhysicsResults = 3d: godot_to_bevy: With<PhysicsActor>,
+    
+    // Full bidirectional sync
+    Player = 2d: bevy_to_godot: With<Player>, godot_to_bevy: With<Player>,
+}
+```
+
+This provides significant performance benefits:
+- **`bevy_to_godot` only**: Skips reading Godot transforms, ideal for UI elements
+- **`godot_to_bevy` only**: Skips writing to Godot, useful for reading physics results  
+- **Both directions**: Full synchronization when needed
+
 ### Multiple Sync Systems
 
 You can define multiple sync systems for different entity types:
@@ -60,21 +83,21 @@ You can define multiple sync systems for different entity types:
 add_transform_sync_systems! {
     app,
     // 3D physics bodies
-    PhysicsBody3D: 3d = Or<(
+    PhysicsBody3D = 3d: Or<(
         With<RigidBody3DMarker>,
         With<CharacterBody3DMarker>,
         With<StaticBody3DMarker>,
     )>,
     
     // 2D physics bodies
-    PhysicsBody2D: 2d = Or<(
+    PhysicsBody2D = 2d: Or<(
         With<RigidBody2DMarker>,
         With<CharacterBody2DMarker>,
         With<StaticBody2DMarker>,
     )>,
     
-    // Visual elements
-    VisualOnly: 3d = Or<(
+    // Visual elements (ECS-driven only)
+    VisualOnly = 3d: bevy_to_godot: Or<(
         With<Sprite3DMarker>,
         With<MeshInstance3DMarker>,
     )>
@@ -115,9 +138,27 @@ fn spawn_entity(mut commands: Commands) {
 
 ## Performance Optimization
 
-### One-Way Sync Only
+### Directional Optimization
 
-If you don't need bidirectional sync, you can optimize further by manually adding only the systems you need:
+The most efficient approach is to specify exactly which direction of sync you need:
+
+```rust
+add_transform_sync_systems! {
+    app,
+    // UI elements only need ECS → Godot
+    UIElements = 2d: bevy_to_godot: With<UIElement>,
+    
+    // Physics bodies only need Godot → ECS for reading results
+    PhysicsResults = 3d: godot_to_bevy: With<PhysicsActor>,
+    
+    // Player needs both directions
+    Player = 2d: bevy_to_godot: With<Player>, godot_to_bevy: With<Player>,
+}
+```
+
+### Manual System Control
+
+For maximum control, you can generate systems manually and add only what you need:
 
 ```rust
 use godot_bevy::plugins::transforms::transform_sync_systems;
@@ -210,6 +251,49 @@ app.add_systems(
         post_update_godot_transforms_3d_physicsbody3d,
     ).chain()
 );
+```
+
+## Common Use Cases
+
+### UI Elements (ECS → Godot only)
+
+UI elements are typically driven by ECS systems and don't need to be read back:
+
+```rust
+add_transform_sync_systems! {
+    app,
+    UIElements = 2d: bevy_to_godot: Or<(
+        With<HealthBar>,
+        With<MenuItem>,
+        With<DialogBox>,
+    )>
+}
+```
+
+### Physics Results (Godot → ECS only)
+
+When using Godot physics, you often only need to read the results:
+
+```rust
+add_transform_sync_systems! {
+    app,
+    PhysicsActors = 3d: godot_to_bevy: Or<(
+        With<RigidBody3DMarker>,
+        With<CharacterBody3DMarker>,
+    )>
+}
+```
+
+### Interactive Elements (Bidirectional)
+
+Player characters and interactive objects often need both directions:
+
+```rust
+add_transform_sync_systems! {
+    app,
+    Interactive = 2d: bevy_to_godot: With<Player>, godot_to_bevy: With<Player>,
+    NPCs = 2d: bevy_to_godot: With<NPC>, godot_to_bevy: With<NPC>,
+}
 ```
 
 ## Best Practices
@@ -330,12 +414,14 @@ fn build_app(app: &mut App) {
 1. Check that you're using `GodotCustomTransformSyncPlugin`, not `GodotDefaultTransformSyncPlugin`
 2. Verify your query matches the entities you expect
 3. Ensure the entities have the required components AND the transform components
+4. Check that you've specified the correct direction (`bevy_to_godot` or `godot_to_bevy`)
 
 ### "Performance is worse than default"
 
 1. You might have too many sync systems - consolidate them
 2. Check that your queries are specific enough
-3. Consider using one-way sync instead of bidirectional
+3. Consider using directional sync instead of bidirectional
+4. Use `bevy_to_godot` only for UI elements and `godot_to_bevy` only for physics results
 
 ### "Systems not found"
 
@@ -346,12 +432,25 @@ The macro generates systems with lowercase names. `PhysicsBody3D` becomes `physi
 app.add_systems(Last, post_update_godot_transforms_3d_physicsbody3d);
 ```
 
+### "Directional sync not working"
+
+1. Verify you're using the correct syntax: `2d: bevy_to_godot: With<Component>`
+2. Check that the generated systems are being added to the correct schedules
+3. Ensure you're not overriding the sync direction in your config
+
 ## Performance Comparison
 
-| Approach | Entities Synced | Query Overhead | Memory Usage |
-|----------|----------------|----------------|--------------|
-| Default Plugin | ALL Node2D/Node3D | Minimal | High |
-| Custom: All Physics | Only physics bodies | Minimal | Medium |
-| Custom: Opt-in Marker | Only marked entities | Minimal | Low |
+| Approach | Entities Synced | Direction | Query Overhead | Memory Usage |
+|----------|----------------|-----------|----------------|--------------|
+| Default Plugin | ALL Node2D/Node3D | Bidirectional | Minimal | High |
+| Custom: All Physics | Only physics bodies | Bidirectional | Minimal | Medium |
+| Custom: Opt-in Marker | Only marked entities | Bidirectional | Minimal | Low |
+| Custom: ECS → Godot only | Only marked entities | One-way | Minimal | Very Low |
+| Custom: Godot → ECS only | Only marked entities | One-way | Minimal | Very Low |
+
+**Directional Performance Benefits:**
+- **`bevy_to_godot` only**: ~50% fewer systems, no PreUpdate overhead
+- **`godot_to_bevy` only**: ~50% fewer systems, no Last schedule overhead  
+- **Both directions**: Full functionality with targeted entities
 
 Choose the approach that best fits your performance requirements and entity distribution.
