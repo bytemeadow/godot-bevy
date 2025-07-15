@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 use godot_bevy::prelude::{
     godot_prelude::{gdextension, ExtensionLibrary},
-    GodotCustomTransformSyncPlugin, *,
+    *,
 };
 
 use crate::bevy_boids::BoidsPlugin;

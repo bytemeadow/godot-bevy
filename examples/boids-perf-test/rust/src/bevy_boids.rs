@@ -136,10 +136,10 @@ impl Plugin for BoidsPlugin {
                 .after(sync_container_params),
         );
 
-        // Add custom transform sync systems for Boid entities only
+        // Add custom transform sync systems for Boid entities only (2D only since boids are 2D)
         add_transform_sync_systems! {
             app,
-            Boid: 2d = With<Boid>
+            Boid = 2d: With<Boid>
         }
     }
 }
