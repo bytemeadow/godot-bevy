@@ -19,9 +19,7 @@ pub use input::{BevyInputBridgePlugin, GodotInputEventPlugin};
 pub use packed_scene::GodotPackedScenePlugin;
 pub use scene_tree::GodotSceneTreePlugin;
 pub use signals::GodotSignalsPlugin;
-pub use transforms::{
-    GodotCustomTransformSyncPlugin, GodotDefaultTransformSyncPlugin, GodotTransformSyncPlugin,
-};
+pub use transforms::{GodotCustomTransformSyncPlugin, GodotDefaultTransformSyncPlugin};
 
 // Re-export for backwards compatibility
 #[deprecated(note = "Use GodotInputEventPlugin instead")]

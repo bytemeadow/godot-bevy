@@ -1,6 +1,7 @@
 pub use crate::GodotPlugin;
 pub use crate::interop::*;
 pub use crate::node_tree_view::NodeTreeView;
+#[allow(deprecated)]
 pub use crate::plugins::{
     GodotCorePlugins,
     GodotDefaultPlugins,

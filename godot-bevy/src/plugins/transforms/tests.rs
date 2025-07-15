@@ -1,5 +1,6 @@
 #[cfg(test)]
-mod tests {
+#[allow(dead_code)]
+mod test_transforms {
     use crate::interop::node_markers::*;
     use crate::{add_transform_sync_systems, transform_sync_systems};
     use bevy::ecs::query::{Or, With};
@@ -7,10 +8,10 @@ mod tests {
 
     // Test components
     #[derive(Component)]
-    struct Player;
+    pub struct Player;
 
     #[derive(Component)]
-    struct PlayerInput;
+    pub struct PlayerInput;
 
     // Test the macro generates systems correctly
     transform_sync_systems! {

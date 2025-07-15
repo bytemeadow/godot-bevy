@@ -10,6 +10,19 @@
 /// use godot_bevy::plugins::transforms::transform_sync_systems;
 /// use godot_bevy::interop::node_markers::*;
 /// use bevy::ecs::query::{Or, With};
+/// use bevy::ecs::component::Component;
+///
+/// // Test components for examples
+/// #[derive(Component)]
+/// struct Boid;
+/// #[derive(Component)]
+/// struct Player;
+/// #[derive(Component)]
+/// struct PlayerInput;
+/// #[derive(Component)]
+/// struct UIElement;
+/// #[derive(Component)]
+/// struct InputHandler;
 ///
 /// // Generate systems for physics bodies only (both 2D and 3D)
 /// transform_sync_systems! {
@@ -35,9 +48,9 @@
 ///     Player = bevy_to_godot: With<Player>, godot_to_bevy: With<PlayerInput>
 /// }
 ///
-/// // Generate systems with different queries for each direction, 2D only
+/// // Generate systems with different queries for each direction, both 2D and 3D
 /// transform_sync_systems! {
-///     Player2D = 2d: bevy_to_godot: With<Player>, godot_to_bevy: With<PlayerInput>, 3d: none
+///     Player2D = 2d: bevy_to_godot: With<Player>, godot_to_bevy: With<PlayerInput>, 3d: bevy_to_godot: With<Player>, godot_to_bevy: With<PlayerInput>
 /// }
 ///
 /// // Generate systems with directional omission (only specific synchronization)
@@ -59,8 +72,24 @@
 /// You can then add these systems to your Bevy App:
 ///
 /// ```rust
-/// app.add_systems(PreUpdate, (pre_update_godot_transforms_2d_physics_body, pre_update_godot_transforms_3d_physics_body))
-///    .add_systems(Last, (post_update_godot_transforms_2d_physics_body, post_update_godot_transforms_3d_physics_body));
+/// use bevy::prelude::*;
+/// use godot_bevy::plugins::transforms::transform_sync_systems;
+/// use godot_bevy::interop::node_markers::*;
+/// use bevy::ecs::query::{Or, With};
+///
+/// // First generate the systems
+/// transform_sync_systems! {
+///     PhysicsBody = Or<(
+///         With<CharacterBody3DMarker>,
+///         With<RigidBody3DMarker>,
+///         With<StaticBody3DMarker>,
+///     )>
+/// }
+///
+/// // Then add them to the app
+/// let mut app = App::new();
+/// app.add_systems(PreUpdate, (pre_update_godot_transforms_2d_physicsbody, pre_update_godot_transforms_3d_physicsbody))
+///    .add_systems(Last, (post_update_godot_transforms_2d_physicsbody, post_update_godot_transforms_3d_physicsbody));
 /// ```
 #[macro_export]
 macro_rules! transform_sync_systems {
@@ -199,7 +228,7 @@ macro_rules! transform_sync_systems {
 
                 use godot::builtin::Transform2D as GodotTransform2D;
                 use godot::classes::Node2D;
-                use $crate::plugins::transforms::conversions::IntoGodotTransform2D;
+
 
                 for (transform, mut reference) in entities.iter_mut() {
                     if let Some(mut obj) = reference.try_get::<Node2D>() {
@@ -235,7 +264,7 @@ macro_rules! transform_sync_systems {
                 use bevy::ecs::change_detection::DetectChanges;
                 use godot::builtin::Transform2D as GodotTransform2D;
                 use godot::classes::Node2D;
-                use $crate::plugins::transforms::conversions::IntoGodotTransform2D;
+
 
                 for (mut transform, mut reference) in entities.iter_mut() {
                     // Skip entities that were changed recently (e.g., by PhysicsUpdate systems)
@@ -359,6 +388,22 @@ macro_rules! transform_sync_systems {
 ///
 /// ```rust
 /// use godot_bevy::plugins::transforms::add_transform_sync_systems;
+/// use godot_bevy::interop::node_markers::*;
+/// use bevy::ecs::query::{Or, With};
+/// use bevy::ecs::component::Component;
+/// use bevy::prelude::*;
+///
+/// // Test components for examples
+/// #[derive(Component)]
+/// struct Boid;
+/// #[derive(Component)]
+/// struct Player;
+/// #[derive(Component)]
+/// struct PlayerInput;
+/// #[derive(Component)]
+/// struct UIElement;
+/// #[derive(Component)]
+/// struct InputHandler;
 ///
 /// let mut app = App::new();
 /// add_transform_sync_systems! {
