@@ -139,7 +139,7 @@ impl Plugin for GodotCustomTransformSyncPlugin {
 
 /// Plugin that provides default transform synchronization for all Node2D and Node3D entities.
 /// This is equivalent to the old GodotTransformSyncPlugin behavior.
-/// 
+///
 /// For custom transform sync queries, use `GodotCustomTransformSyncPlugin` instead and
 /// define your own systems with the `transform_sync_systems!` macro.
 pub struct GodotDefaultTransformSyncPlugin {
@@ -162,19 +162,25 @@ impl Plugin for GodotDefaultTransformSyncPlugin {
         });
 
         // Add the default systems (sync all Node2D and Node3D entities)
-        app.add_systems(Last, (
+        app.add_systems(
+            Last,
+            (
                 default_post_update_godot_transforms_2d,
                 default_post_update_godot_transforms_3d,
-            ))
-            .add_systems(PreUpdate, (
+            ),
+        )
+        .add_systems(
+            PreUpdate,
+            (
                 default_pre_update_godot_transforms_2d,
                 default_pre_update_godot_transforms_3d,
-            ));
+            ),
+        );
     }
 }
 
 /// Legacy alias for backward compatibility.
-/// 
+///
 /// **Deprecated**: Use `GodotDefaultTransformSyncPlugin` for default behavior,
 /// or `GodotCustomTransformSyncPlugin` + custom systems for advanced use cases.
 #[deprecated(

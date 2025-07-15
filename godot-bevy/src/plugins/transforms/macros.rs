@@ -154,7 +154,7 @@ macro_rules! transform_sync_systems {
                 }
 
                 use godot::classes::Node3D;
-                use $crate::plugins::transforms::conversions::IntoGodotTransform;
+                
 
                 for (transform, mut reference) in entities.iter_mut() {
                     if let Some(mut obj) = reference.try_get::<Node3D>() {
@@ -180,7 +180,7 @@ macro_rules! transform_sync_systems {
 
                 use bevy::ecs::change_detection::DetectChanges;
                 use godot::classes::Node3D;
-                use $crate::plugins::transforms::conversions::IntoGodotTransform;
+                
 
                 for (mut transform, mut reference) in entities.iter_mut() {
                     // Skip entities that were changed recently (e.g., by PhysicsUpdate systems)

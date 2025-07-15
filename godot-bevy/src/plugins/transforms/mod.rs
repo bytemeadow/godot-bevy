@@ -10,7 +10,7 @@ pub use components::{Transform2D, Transform2DMutGuard, Transform3D, TransformMut
 pub use conversions::{IntoBevyTransform, IntoGodotTransform, IntoGodotTransform2D};
 pub use macros::{add_transform_sync_systems, transform_sync_systems};
 pub use plugin::{
-    GodotDefaultTransformSyncPlugin, GodotCustomTransformSyncPlugin, GodotTransformSyncPlugin,
+    GodotCustomTransformSyncPlugin, GodotDefaultTransformSyncPlugin, GodotTransformSyncPlugin,
 };
 
 // Re-export math utilities for advanced users
