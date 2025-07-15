@@ -2053,6 +2053,7 @@ dependencies = [
  "lazy_static",
  "once_cell",
  "parking_lot",
+ "paste",
  "thiserror 2.0.12",
 ]
 
