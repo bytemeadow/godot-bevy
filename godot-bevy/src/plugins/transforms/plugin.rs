@@ -12,7 +12,7 @@ use crate::plugins::core::GodotDefaultTransformSyncConfig;
 use crate::plugins::transforms::components::{Transform2D, Transform3D};
 use crate::prelude::main_thread_system;
 
-// Default systems that use GodotDefaultTransformSyncConfig
+#[main_thread_system]
 pub fn default_post_update_godot_transforms_3d(
     config: Res<GodotDefaultTransformSyncConfig>,
     mut entities: Query<
@@ -86,7 +86,6 @@ pub fn default_post_update_godot_transforms_2d(
     }
 }
 
-#[main_thread_system]
 pub fn default_pre_update_godot_transforms_2d(
     config: Res<GodotDefaultTransformSyncConfig>,
     mut entities: Query<(&mut Transform2D, &mut GodotNodeHandle), With<Node2DMarker>>,
