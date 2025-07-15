@@ -60,7 +60,7 @@ macro_rules! transform_sync_systems {
         paste::paste! {
             #[$crate::prelude::main_thread_system]
             pub fn [<post_update_godot_transforms_2d_ $name:lower>](
-                config: bevy::prelude::Res<$crate::plugins::core::GodotTransformConfig>,
+                config: bevy::prelude::Res<$crate::plugins::core::GodotCustomTransformSyncConfig>,
                 mut entities: bevy::prelude::Query<
                     (&$crate::plugins::transforms::Transform2D, &mut $crate::interop::GodotNodeHandle),
                     (
@@ -96,7 +96,7 @@ macro_rules! transform_sync_systems {
 
             #[$crate::prelude::main_thread_system]
             pub fn [<pre_update_godot_transforms_2d_ $name:lower>](
-                config: bevy::prelude::Res<$crate::plugins::core::GodotTransformConfig>,
+                config: bevy::prelude::Res<$crate::plugins::core::GodotCustomTransformSyncConfig>,
                 mut entities: bevy::prelude::Query<
                     (&mut $crate::plugins::transforms::Transform2D, &mut $crate::interop::GodotNodeHandle),
                     $query
@@ -136,7 +136,7 @@ macro_rules! transform_sync_systems {
         paste::paste! {
             #[$crate::prelude::main_thread_system]
             pub fn [<post_update_godot_transforms_3d_ $name:lower>](
-                config: bevy::prelude::Res<$crate::plugins::core::GodotTransformConfig>,
+                config: bevy::prelude::Res<$crate::plugins::core::GodotCustomTransformSyncConfig>,
                 mut entities: bevy::prelude::Query<
                     (&$crate::plugins::transforms::Transform3D, &mut $crate::interop::GodotNodeHandle),
                     (
@@ -167,7 +167,7 @@ macro_rules! transform_sync_systems {
 
             #[$crate::prelude::main_thread_system]
             pub fn [<pre_update_godot_transforms_3d_ $name:lower>](
-                config: bevy::prelude::Res<$crate::plugins::core::GodotTransformConfig>,
+                config: bevy::prelude::Res<$crate::plugins::core::GodotCustomTransformSyncConfig>,
                 mut entities: bevy::prelude::Query<
                     (&mut $crate::plugins::transforms::Transform3D, &mut $crate::interop::GodotNodeHandle),
                     $query

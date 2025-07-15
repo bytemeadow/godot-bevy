@@ -17,7 +17,7 @@ pub use crate::plugins::{
     },
     // Core functionality
     core::{
-        FindEntityByNameExt, GodotTransformConfig, MainThreadMarker, PhysicsDelta, PhysicsUpdate,
+        FindEntityByNameExt, GodotCustomTransformSyncConfig, GodotDefaultTransformSyncConfig, MainThreadMarker, PhysicsDelta, PhysicsUpdate,
         TransformSyncMode,
     },
     // Input
@@ -33,7 +33,7 @@ pub use crate::plugins::{
         GodotSignal, GodotSignalArgument, GodotSignals, GodotSignalsPlugin, connect_godot_signal,
     },
     // Transforms
-    transforms::{GodotTransformSyncPlugin, Transform2D, Transform3D},
+    transforms::{GodotDefaultTransformSyncPlugin, GodotCustomTransformSyncPlugin, GodotTransformSyncPlugin, Transform2D, Transform3D},
 };
 pub use bevy::prelude as bevy_prelude;
 pub use godot::prelude as godot_prelude;

@@ -51,42 +51,68 @@ Full bidirectional synchronization between ECS and Godot.
 
 ## Configuration
 
-Configure the sync mode in your `#[bevy_app]` function:
+Configure the sync mode based on which approach you're using:
 
-### Disabled Mode
+### Default Transform Sync Plugin
+
+Configure the plugin directly:
 
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.insert_resource(GodotTransformConfig::disabled());
+    // Disabled mode - no transform syncing
+    app.add_plugins(GodotDefaultTransformSyncPlugin {
+        sync_mode: TransformSyncMode::Disabled,
+    });
     
-    // Use direct physics instead
-    app.add_systems(Update, physics_movement);
+    // One-way mode (default)
+    app.add_plugins(GodotDefaultTransformSyncPlugin::default());
+    
+    // Two-way mode
+    app.add_plugins(GodotDefaultTransformSyncPlugin {
+        sync_mode: TransformSyncMode::TwoWay,
+    });
 }
 ```
 
-### One-Way Mode (Default)
+### Custom Transform Sync Systems
+
+Configure via the config plugin:
 
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    // One-way is the default, no configuration needed
-    // Or explicitly:
-    app.insert_resource(GodotTransformConfig::one_way());
+    // Disabled mode
+    app.add_plugins(GodotCustomTransformSyncPlugin {
+        sync_mode: TransformSyncMode::Disabled,
+    });
     
-    app.add_systems(Update, ecs_movement);
+    // One-way mode (default)
+    app.add_plugins(GodotCustomTransformSyncPlugin::default());
+    
+    // Two-way mode
+    app.add_plugins(GodotCustomTransformSyncPlugin {
+        sync_mode: TransformSyncMode::TwoWay,
+    });
+    
+    // Add your custom systems
+    add_transform_sync_systems! {
+        app,
+        PhysicsOnly = Or<(With<RigidBody3DMarker>, With<CharacterBody3DMarker>)>
+    }
 }
 ```
 
-### Two-Way Mode
+### Runtime Configuration
+
+You can also modify configuration at runtime:
 
 ```rust
-#[bevy_app]
-fn build_app(app: &mut App) {
-    app.insert_resource(GodotTransformConfig::two_way());
-    
-    app.add_systems(Update, hybrid_movement);
-}
+// For default systems
+app.insert_resource(GodotDefaultTransformSyncConfig::two_way());
+
+// For custom systems
+app.insert_resource(GodotCustomTransformSyncConfig::two_way());
 ```
 
 ## Performance Impact
@@ -153,10 +179,18 @@ fn post_update_transforms(
 While not common, you can change modes during runtime:
 
 ```rust
-fn switch_to_physics_mode(
+// For default systems
+fn switch_default_to_physics_mode(
     mut commands: Commands,
 ) {
-    commands.insert_resource(GodotTransformConfig::disabled());
+    commands.insert_resource(GodotDefaultTransformSyncConfig::disabled());
+}
+
+// For custom systems  
+fn switch_custom_to_physics_mode(
+    mut commands: Commands,
+) {
+    commands.insert_resource(GodotCustomTransformSyncConfig::disabled());
 }
 ```
 
@@ -165,18 +199,36 @@ Note: Existing transform components remain but stop syncing.
 ### Checking Current Mode
 
 ```rust
-fn check_sync_mode(
-    config: Res<GodotTransformConfig>,
+// For default systems
+fn check_default_sync_mode(
+    config: Res<GodotDefaultTransformSyncConfig>,
 ) {
     match config.sync_mode {
         TransformSyncMode::Disabled => {
-            println!("Using direct physics");
+            println!("Default sync: Using direct physics");
         }
         TransformSyncMode::OneWay => {
-            println!("ECS drives transforms");
+            println!("Default sync: ECS drives transforms");
         }
         TransformSyncMode::TwoWay => {
-            println!("Bidirectional sync active");
+            println!("Default sync: Bidirectional sync active");
+        }
+    }
+}
+
+// For custom systems
+fn check_custom_sync_mode(
+    config: Res<GodotCustomTransformSyncConfig>,
+) {
+    match config.sync_mode {
+        TransformSyncMode::Disabled => {
+            println!("Custom sync: Using direct physics");
+        }
+        TransformSyncMode::OneWay => {
+            println!("Custom sync: ECS drives transforms");
+        }
+        TransformSyncMode::TwoWay => {
+            println!("Custom sync: Bidirectional sync active");
         }
     }
 }
