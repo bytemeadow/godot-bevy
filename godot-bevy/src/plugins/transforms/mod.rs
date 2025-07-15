@@ -3,7 +3,6 @@ pub mod conversions;
 pub mod macros;
 pub mod math;
 pub mod plugin;
-pub mod sync_systems;
 pub mod tests;
 
 // Re-export main components and types
