@@ -57,7 +57,7 @@ macro_rules! transform_sync_systems {
 
     // Internal macro for generating the actual systems
     (@generate_systems $name:ident, 2d, $query:ty) => {
-        paste::paste! {
+        $crate::paste::paste! {
             #[$crate::prelude::main_thread_system]
             pub fn [<post_update_godot_transforms_2d_ $name:lower>](
                 config: bevy::prelude::Res<$crate::plugins::core::GodotCustomTransformSyncConfig>,
@@ -133,7 +133,7 @@ macro_rules! transform_sync_systems {
     };
 
     (@generate_systems $name:ident, 3d, $query:ty) => {
-        paste::paste! {
+        $crate::paste::paste! {
             #[$crate::prelude::main_thread_system]
             pub fn [<post_update_godot_transforms_3d_ $name:lower>](
                 config: bevy::prelude::Res<$crate::plugins::core::GodotCustomTransformSyncConfig>,
@@ -239,14 +239,14 @@ macro_rules! add_transform_sync_systems {
     };
 
     (@add_to_app $app:expr, $name:ident, 2d) => {
-        paste::paste! {
+        $crate::paste::paste! {
             $app.add_systems(bevy::app::Last, [<post_update_godot_transforms_2d_ $name:lower>])
                 .add_systems(bevy::app::PreUpdate, [<pre_update_godot_transforms_2d_ $name:lower>]);
         }
     };
 
     (@add_to_app $app:expr, $name:ident, 3d) => {
-        paste::paste! {
+        $crate::paste::paste! {
             $app.add_systems(bevy::app::Last, [<post_update_godot_transforms_3d_ $name:lower>])
                 .add_systems(bevy::app::PreUpdate, [<pre_update_godot_transforms_3d_ $name:lower>]);
         }
