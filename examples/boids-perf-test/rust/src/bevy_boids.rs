@@ -139,7 +139,7 @@ impl Plugin for BoidsPlugin {
         // Add custom transform sync systems for Boid entities only (2D only since boids are 2D)
         add_transform_sync_systems! {
             app,
-            Boid = 2d: With<Boid>
+            Boid = 2d: bevy_to_godot: With<Boid>
         }
     }
 }
