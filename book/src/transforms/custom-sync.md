@@ -8,40 +8,51 @@ Use custom transform sync when:
 - You have many entities but only some need synchronization
 - Performance is critical and you want to minimize overhead
 - You need fine-grained control over which entities sync
-- You're building a game with physics bodies mixed with UI elements
 
 ## Basic Usage
 
-### 1. Add the Config Plugin
+### 1. Disable Default Plugin (if using GodotDefaultPlugins)
 
-First, add the config-only plugin instead of the default transform sync plugin:
+If you're using `GodotDefaultPlugins`, you'll want to disable the default transform sync plugin:
 
 ```rust
-use godot_bevy::plugins::transforms::GodotCustomTransformSyncPlugin;
+use godot_bevy::plugins::{GodotDefaultPlugins, transforms::GodotTransformSyncPlugin};
 
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotCustomTransformSyncPlugin::default());
+    app.add_plugins(GodotDefaultPlugins.build().disable::<GodotTransformSyncPlugin>());
 }
 ```
 
 ### 2. Define Custom Systems
 
-Use the `add_transform_sync_systems!` macro to define which entities should sync:
+Use the `add_transform_sync_systems_2d!` or `add_transform_sync_systems_3d!` macros to define which entities should sync:
 
 ```rust
-use godot_bevy::plugins::transforms::add_transform_sync_systems;
+use godot_bevy::plugins::transforms::{add_transform_sync_systems_2d, add_transform_sync_systems_3d};
+use godot_bevy::plugins::{GodotDefaultPlugins, transforms::GodotTransformSyncPlugin};
 use godot_bevy::interop::node_markers::*;
 use bevy::ecs::query::{Or, With};
 
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotCustomTransformSyncPlugin::default());
-    
-    // Only sync physics bodies
-    add_transform_sync_systems! {
+    // Disable default transform sync plugin
+    app.add_plugins(GodotDefaultPlugins.build().disable::<GodotTransformSyncPlugin>());
+
+    // Only sync 2D physics bodies
+    add_transform_sync_systems_2d! {
         app,
-        PhysicsOnly = Or<(
+        PhysicsOnly2D = Or<(
+            With<RigidBody2DMarker>,
+            With<CharacterBody2DMarker>,
+            With<StaticBody2DMarker>,
+        )>
+    }
+
+    // Only sync 3D physics bodies
+    add_transform_sync_systems_3d! {
+        app,
+        PhysicsOnly3D = Or<(
             With<RigidBody3DMarker>,
             With<CharacterBody3DMarker>,
             With<StaticBody3DMarker>,
@@ -57,47 +68,72 @@ fn build_app(app: &mut App) {
 You can specify which direction of synchronization you need for optimal performance:
 
 ```rust
-add_transform_sync_systems! {
+// 2D systems
+add_transform_sync_systems_2d! {
     app,
     // Only ECS → Godot (one-way sync)
-    UIElements = 2d: bevy_to_godot: With<UIElement>,
-    
+    UIElements = bevy_to_godot: With<UIElement>,
+
     // Only Godot → ECS (useful for reading physics results)
-    PhysicsResults = 3d: godot_to_bevy: With<PhysicsActor>,
-    
+    PhysicsResults = godot_to_bevy: With<PhysicsActor>,
+
     // Full bidirectional sync
-    Player = 2d: bevy_to_godot: With<Player>, godot_to_bevy: With<Player>,
+    Player = With<Player>,
+}
+
+// 3D systems
+add_transform_sync_systems_3d! {
+    app,
+    // Only ECS → Godot (one-way sync)
+    VisualEffects = bevy_to_godot: With<VisualEffect>,
+
+    // Only Godot → ECS (useful for reading physics results)
+    PhysicsResults3D = godot_to_bevy: With<PhysicsActor3D>,
+
+    // Full bidirectional sync
+    Player3D = With<Player3D>,
 }
 ```
 
 This provides significant performance benefits:
 - **`bevy_to_godot` only**: Skips reading Godot transforms, ideal for UI elements
-- **`godot_to_bevy` only**: Skips writing to Godot, useful for reading physics results  
-- **Both directions**: Full synchronization when needed
+- **`godot_to_bevy` only**: Skips writing to Godot, useful for reading physics results
+- **Both directions** (no prefix): Full synchronization when needed
 
 ### Multiple Sync Systems
 
 You can define multiple sync systems for different entity types:
 
 ```rust
-add_transform_sync_systems! {
+// 2D systems
+add_transform_sync_systems_2d! {
     app,
-    // 3D physics bodies
-    PhysicsBody3D = 3d: Or<(
-        With<RigidBody3DMarker>,
-        With<CharacterBody3DMarker>,
-        With<StaticBody3DMarker>,
-    )>,
-    
     // 2D physics bodies
-    PhysicsBody2D = 2d: Or<(
+    PhysicsBody2D = Or<(
         With<RigidBody2DMarker>,
         With<CharacterBody2DMarker>,
         With<StaticBody2DMarker>,
     )>,
-    
+
+    // 2D UI elements (ECS-driven only)
+    UIElements = bevy_to_godot: Or<(
+        With<Button>,
+        With<Label>,
+    )>,
+}
+
+// 3D systems
+add_transform_sync_systems_3d! {
+    app,
+    // 3D physics bodies
+    PhysicsBody3D = Or<(
+        With<RigidBody3DMarker>,
+        With<CharacterBody3DMarker>,
+        With<StaticBody3DMarker>,
+    )>,
+
     // Visual elements (ECS-driven only)
-    VisualOnly = 3d: bevy_to_godot: Or<(
+    VisualOnly = bevy_to_godot: Or<(
         With<Sprite3DMarker>,
         With<MeshInstance3DMarker>,
     )>
@@ -117,13 +153,24 @@ struct NeedsTransformSync;
 #[derive(Component)]
 struct HighPrioritySync;
 
-add_transform_sync_systems! {
+// 2D opt-in sync
+add_transform_sync_systems_2d! {
     app,
     // Only entities explicitly marked for sync
-    OptIn = With<NeedsTransformSync>,
-    
+    OptIn2D = With<NeedsTransformSync>,
+
     // High priority entities
-    HighPriority = With<HighPrioritySync>,
+    HighPriority2D = With<HighPrioritySync>,
+}
+
+// 3D opt-in sync
+add_transform_sync_systems_3d! {
+    app,
+    // Only entities explicitly marked for sync
+    OptIn3D = With<NeedsTransformSync>,
+
+    // High priority entities
+    HighPriority3D = With<HighPrioritySync>,
 }
 
 // In your spawning systems
@@ -136,122 +183,14 @@ fn spawn_entity(mut commands: Commands) {
 }
 ```
 
-## Performance Optimization
+### Selective System Registration
 
-### Directional Optimization
+The macros automatically register systems in the appropriate schedules:
+- `bevy_to_godot` systems run in the `Last` schedule
+- `godot_to_bevy` systems run in the `PreUpdate` schedule
+- Bidirectional sync (no prefix) runs in both schedules
 
-The most efficient approach is to specify exactly which direction of sync you need:
-
-```rust
-add_transform_sync_systems! {
-    app,
-    // UI elements only need ECS → Godot
-    UIElements = 2d: bevy_to_godot: With<UIElement>,
-    
-    // Physics bodies only need Godot → ECS for reading results
-    PhysicsResults = 3d: godot_to_bevy: With<PhysicsActor>,
-    
-    // Player needs both directions
-    Player = 2d: bevy_to_godot: With<Player>, godot_to_bevy: With<Player>,
-}
-```
-
-### Manual System Control
-
-For maximum control, you can generate systems manually and add only what you need:
-
-```rust
-use godot_bevy::plugins::transforms::transform_sync_systems;
-
-// Generate systems but don't add them automatically
-transform_sync_systems! {
-    PhysicsOnly = Or<(
-        With<RigidBody3DMarker>,
-        With<CharacterBody3DMarker>,
-    )>
-}
-
-#[bevy_app]
-fn build_app(app: &mut App) {
-    app.add_plugins(GodotCustomTransformSyncPlugin::default());
-    
-    // Only add the ECS → Godot system
-    app.add_systems(Last, post_update_godot_transforms_3d_physicsonly);
-    // Skip the Godot → ECS system for one-way sync
-}
-```
-
-### Conditional Sync
-
-You can add conditions to your sync systems:
-
-```rust
-#[bevy_app]
-fn build_app(app: &mut App) {
-    app.add_plugins(GodotCustomTransformSyncPlugin::default());
-    
-    add_transform_sync_systems! {
-        app,
-        PhysicsOnly = Or<(With<RigidBody3DMarker>, With<CharacterBody3DMarker>)>
-    }
-    
-    // Add conditions
-    app.add_systems(
-        Last,
-        post_update_godot_transforms_3d_physicsonly.run_if(in_state(GameState::Playing))
-    );
-}
-```
-
-## Configuration
-
-Custom sync systems use `GodotCustomTransformSyncConfig` for configuration:
-
-```rust
-#[bevy_app]
-fn build_app(app: &mut App) {
-    // Configure the custom sync behavior
-    app.add_plugins(GodotCustomTransformSyncPlugin {
-        sync_mode: TransformSyncMode::TwoWay,
-    });
-    
-    add_transform_sync_systems! {
-        app,
-        PhysicsOnly = Or<(With<RigidBody3DMarker>, With<CharacterBody3DMarker>)>
-    }
-}
-
-// Runtime configuration
-fn enable_two_way_sync(mut commands: Commands) {
-    commands.insert_resource(GodotCustomTransformSyncConfig::two_way());
-}
-```
-
-## Generated System Names
-
-The macro generates predictable system names based on your identifiers:
-
-```rust
-transform_sync_systems! {
-    PhysicsBody3D = Or<(With<RigidBody3DMarker>, With<CharacterBody3DMarker>)>
-}
-```
-
-Generates:
-- `pre_update_godot_transforms_3d_physicsbody3d`
-- `post_update_godot_transforms_3d_physicsbody3d`
-
-You can reference these systems for ordering or conditions:
-
-```rust
-app.add_systems(
-    Last,
-    (
-        my_physics_system,
-        post_update_godot_transforms_3d_physicsbody3d,
-    ).chain()
-);
-```
+This happens automatically when you use the macros, providing optimal performance without manual system management.
 
 ## Common Use Cases
 
@@ -260,9 +199,9 @@ app.add_systems(
 UI elements are typically driven by ECS systems and don't need to be read back:
 
 ```rust
-add_transform_sync_systems! {
+add_transform_sync_systems_2d! {
     app,
-    UIElements = 2d: bevy_to_godot: Or<(
+    UIElements = bevy_to_godot: Or<(
         With<HealthBar>,
         With<MenuItem>,
         With<DialogBox>,
@@ -275,9 +214,17 @@ add_transform_sync_systems! {
 When using Godot physics, you often only need to read the results:
 
 ```rust
-add_transform_sync_systems! {
+add_transform_sync_systems_2d! {
     app,
-    PhysicsActors = 3d: godot_to_bevy: Or<(
+    PhysicsActors2D = godot_to_bevy: Or<(
+        With<RigidBody2DMarker>,
+        With<CharacterBody2DMarker>,
+    )>
+}
+
+add_transform_sync_systems_3d! {
+    app,
+    PhysicsActors3D = godot_to_bevy: Or<(
         With<RigidBody3DMarker>,
         With<CharacterBody3DMarker>,
     )>
@@ -289,10 +236,16 @@ add_transform_sync_systems! {
 Player characters and interactive objects often need both directions:
 
 ```rust
-add_transform_sync_systems! {
+add_transform_sync_systems_2d! {
     app,
-    Interactive = 2d: bevy_to_godot: With<Player>, godot_to_bevy: With<Player>,
-    NPCs = 2d: bevy_to_godot: With<NPC>, godot_to_bevy: With<NPC>,
+    Interactive2D = With<Player>,
+    NPCs2D = With<NPC>,
+}
+
+add_transform_sync_systems_3d! {
+    app,
+    Interactive3D = With<Player3D>,
+    NPCs3D = With<NPC3D>,
 }
 ```
 
@@ -303,9 +256,14 @@ add_transform_sync_systems! {
 Begin with a single, broad filter and optimize as needed:
 
 ```rust
-add_transform_sync_systems! {
+add_transform_sync_systems_2d! {
     app,
-    GameEntities = Or<(With<Player>, With<Enemy>, With<Pickup>)>
+    GameEntities2D = Or<(With<Player>, With<Enemy>, With<Pickup>)>
+}
+
+add_transform_sync_systems_3d! {
+    app,
+    GameEntities3D = Or<(With<Player3D>, With<Enemy3D>, With<Pickup3D>)>
 }
 ```
 
@@ -314,143 +272,39 @@ add_transform_sync_systems! {
 Choose clear names for your sync systems:
 
 ```rust
-add_transform_sync_systems! {
+add_transform_sync_systems_2d! {
     app,
-    MovingEntities = Or<(With<Player>, With<Enemy>)>,
-    StaticProps = With<StaticProp>,
+    MovingEntities2D = Or<(With<Player>, With<Enemy>)>,
+    StaticProps2D = With<StaticProp>,
+}
+
+add_transform_sync_systems_3d! {
+    app,
+    MovingEntities3D = Or<(With<Player3D>, With<Enemy3D>)>,
+    StaticProps3D = With<StaticProp3D>,
 }
 ```
 
-### 3. Document Your Filters
-
-Add comments explaining your sync strategy:
-
-```rust
-add_transform_sync_systems! {
-    app,
-    // Entities that move and need frequent sync
-    DynamicEntities = Or<(With<Player>, With<Enemy>)>,
-    
-    // UI elements that occasionally change
-    UiElements = Or<(With<HealthBar>, With<MenuButton>)>,
-}
-```
-
-### 4. Avoid Over-Optimization
+### 3. Avoid Over-Optimization
 
 Don't create too many specialized systems unless profiling shows it's necessary:
 
 ```rust
 // Good: Two logical groups
-add_transform_sync_systems! {
+add_transform_sync_systems_2d! {
     app,
     GameEntities = Or<(With<Player>, With<Enemy>, With<Pickup>)>,
-    UiElements = Or<(With<Button>, With<Label>)>,
+    UiElements = bevy_to_godot: Or<(With<Button>, With<Label>)>,
 }
 
 // Avoid: Too many micro-optimizations
-add_transform_sync_systems! {
+add_transform_sync_systems_2d! {
     app,
     Players = With<Player>,
     Enemies = With<Enemy>,
     Pickups = With<Pickup>,
-    Buttons = With<Button>,
-    Labels = With<Label>,
+    Buttons = bevy_to_godot: With<Button>,
+    Labels = bevy_to_godot: With<Label>,
     // ... too granular
 }
 ```
-
-## Migration from Default Sync
-
-If you're migrating from the default sync plugin:
-
-### Before
-
-```rust
-#[bevy_app]
-fn build_app(app: &mut App) {
-    app.add_plugins(GodotDefaultTransformSyncPlugin::default());
-}
-```
-
-### After
-
-```rust
-#[bevy_app]
-fn build_app(app: &mut App) {
-    app.add_plugins(GodotCustomTransformSyncPlugin::default());
-    
-    // Equivalent to default behavior
-    add_transform_sync_systems! {
-        app,
-        AllNodes: 2d = With<Node2DMarker>,
-        AllNodes: 3d = With<Node3DMarker>,
-    }
-}
-```
-
-### Performance-Focused Migration
-
-```rust
-#[bevy_app]
-fn build_app(app: &mut App) {
-    app.add_plugins(GodotCustomTransformSyncPlugin::default());
-    
-    // Only sync what you actually need
-    add_transform_sync_systems! {
-        app,
-        PhysicsOnly = Or<(
-            With<RigidBody3DMarker>,
-            With<CharacterBody3DMarker>,
-        )>
-    }
-}
-```
-
-## Troubleshooting
-
-### "My entities aren't syncing"
-
-1. Check that you're using `GodotCustomTransformSyncPlugin`, not `GodotDefaultTransformSyncPlugin`
-2. Verify your query matches the entities you expect
-3. Ensure the entities have the required components AND the transform components
-4. Check that you've specified the correct direction (`bevy_to_godot` or `godot_to_bevy`)
-
-### "Performance is worse than default"
-
-1. You might have too many sync systems - consolidate them
-2. Check that your queries are specific enough
-3. Consider using directional sync instead of bidirectional
-4. Use `bevy_to_godot` only for UI elements and `godot_to_bevy` only for physics results
-
-### "Systems not found"
-
-The macro generates systems with lowercase names. `PhysicsBody3D` becomes `physicsbody3d`:
-
-```rust
-// Generated name
-app.add_systems(Last, post_update_godot_transforms_3d_physicsbody3d);
-```
-
-### "Directional sync not working"
-
-1. Verify you're using the correct syntax: `2d: bevy_to_godot: With<Component>`
-2. Check that the generated systems are being added to the correct schedules
-3. Ensure you're not overriding the sync direction in your config
-
-## Performance Comparison
-
-| Approach | Entities Synced | Direction | Query Overhead | Memory Usage |
-|----------|----------------|-----------|----------------|--------------|
-| Default Plugin | ALL Node2D/Node3D | Bidirectional | Minimal | High |
-| Custom: All Physics | Only physics bodies | Bidirectional | Minimal | Medium |
-| Custom: Opt-in Marker | Only marked entities | Bidirectional | Minimal | Low |
-| Custom: ECS → Godot only | Only marked entities | One-way | Minimal | Very Low |
-| Custom: Godot → ECS only | Only marked entities | One-way | Minimal | Very Low |
-
-**Directional Performance Benefits:**
-- **`bevy_to_godot` only**: ~50% fewer systems, no PreUpdate overhead
-- **`godot_to_bevy` only**: ~50% fewer systems, no Last schedule overhead  
-- **Both directions**: Full functionality with targeted entities
-
-Choose the approach that best fits your performance requirements and entity distribution.
