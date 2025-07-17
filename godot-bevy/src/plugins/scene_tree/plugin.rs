@@ -528,6 +528,7 @@ fn create_scene_tree_entity(
             SceneTreeEventType::NodeRemoved => {
                 if let Some(ent) = ent {
                     commands.entity(ent).despawn();
+                    ent_mapping.remove(&node.instance_id());
                 } else {
                     // Entity was already despawned (common when using queue_free)
                     trace!(target: "godot_scene_tree_events", "Entity for removed node was already despawned");
