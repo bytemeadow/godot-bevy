@@ -17,7 +17,7 @@ use godot_bevy::prelude::*;
 // Explicitly use godot-bevy's Transform2D to disambiguate
 use godot_bevy::prelude::Transform2D;
 // Import the custom transform sync macro
-use godot_bevy::add_transform_sync_systems;
+use godot_bevy::add_transform_sync_systems_2d;
 
 use crate::container::{BevyBoids, BoidsContainer};
 
@@ -137,9 +137,9 @@ impl Plugin for BoidsPlugin {
         );
 
         // Add custom transform sync systems for Boid entities only (2D only since boids are 2D)
-        add_transform_sync_systems! {
+        add_transform_sync_systems_2d! {
             app,
-            Boid = 2d: bevy_to_godot: With<Boid>
+            Boid = bevy_to_godot: With<Boid>
         }
     }
 }

@@ -1,211 +1,57 @@
-/// Macro for generating custom transform synchronization systems with compile-time queries.
+/// Macro for generating 2D transform synchronization systems with compile-time queries.
 ///
-/// This macro generates systems that sync transforms between Bevy and Godot for entities
-/// matching specific component queries. The queries are compiled at compile-time for
-/// maximum performance.
+/// This macro generates systems that sync transforms between Bevy and Godot for 2D entities
+/// matching specific component queries. Much simpler than the combined 2D/3D macro.
 ///
 /// # Usage
 ///
 /// ```rust
-/// use godot_bevy::plugins::transforms::transform_sync_systems;
-/// use godot_bevy::interop::node_markers::*;
-/// use bevy::ecs::query::{Or, With};
+/// use godot_bevy::plugins::transforms::add_transform_sync_systems_2d;
+/// use bevy::ecs::query::With;
 /// use bevy::ecs::component::Component;
+/// use bevy::prelude::*;
 ///
-/// // Test components for examples
 /// #[derive(Component)]
 /// struct Boid;
-/// #[derive(Component)]
-/// struct Player;
-/// #[derive(Component)]
-/// struct PlayerInput;
-/// #[derive(Component)]
-/// struct UIElement;
-/// #[derive(Component)]
-/// struct InputHandler;
 ///
-/// // Generate systems for physics bodies only (both 2D and 3D)
-/// transform_sync_systems! {
-///     PhysicsBody = Or<(
-///         With<CharacterBody3DMarker>,
-///         With<RigidBody3DMarker>,
-///         With<StaticBody3DMarker>,
-///     )>
-/// }
-///
-/// // Generate systems for 2D only
-/// transform_sync_systems! {
-///     Boid2D = 2d: With<Boid>
-/// }
-///
-/// // Generate systems for 3D only
-/// transform_sync_systems! {
-///     Boid3D = 3d: With<Boid>
-/// }
-///
-/// // Generate systems with different queries for each direction
-/// transform_sync_systems! {
-///     Player = bevy_to_godot: With<Player>, godot_to_bevy: With<PlayerInput>
-/// }
-///
-/// // Generate systems with different queries for each direction, both 2D and 3D
-/// transform_sync_systems! {
-///     Player2D = 2d: bevy_to_godot: With<Player>, godot_to_bevy: With<PlayerInput>, 3d: bevy_to_godot: With<Player>, godot_to_bevy: With<PlayerInput>
-/// }
-///
-/// // Generate systems with directional omission (only specific synchronization)
-/// transform_sync_systems! {
-///     UIElement = 2d: bevy_to_godot: With<UIElement>  // Only Bevy→Godot sync
-/// }
-///
-/// transform_sync_systems! {
-///     InputHandler = 3d: godot_to_bevy: With<InputHandler>  // Only Godot→Bevy sync
-/// }
-/// ```
-///
-/// The macro generates up to four systems:
-/// - `pre_update_godot_transforms_2d_{name}` - Reads 2D transforms from Godot to Bevy
-/// - `pre_update_godot_transforms_3d_{name}` - Reads 3D transforms from Godot to Bevy
-/// - `post_update_godot_transforms_2d_{name}` - Writes 2D transforms from Bevy to Godot
-/// - `post_update_godot_transforms_3d_{name}` - Writes 3D transforms from Bevy to Godot
-///
-/// You can then add these systems to your Bevy App:
-///
-/// ```rust
-/// use bevy::prelude::*;
-/// use godot_bevy::plugins::transforms::transform_sync_systems;
-/// use godot_bevy::interop::node_markers::*;
-/// use bevy::ecs::query::{Or, With};
-///
-/// // First generate the systems
-/// transform_sync_systems! {
-///     PhysicsBody = Or<(
-///         With<CharacterBody3DMarker>,
-///         With<RigidBody3DMarker>,
-///         With<StaticBody3DMarker>,
-///     )>
-/// }
-///
-/// // Then add them to the app
 /// let mut app = App::new();
-/// app.add_systems(PreUpdate, (pre_update_godot_transforms_2d_physicsbody, pre_update_godot_transforms_3d_physicsbody))
-///    .add_systems(Last, (post_update_godot_transforms_2d_physicsbody, post_update_godot_transforms_3d_physicsbody));
+/// add_transform_sync_systems_2d! {
+///     app,
+///     Boid = With<Boid>
+/// }
 /// ```
 #[macro_export]
-macro_rules! transform_sync_systems {
-    // Handle same query for both directions (both 2D and 3D)
-    ($($name:ident = $query:ty),+ $(,)?) => {
+macro_rules! add_transform_sync_systems_2d {
+    ($app:expr, $($name:ident = $query:ty),+ $(,)?) => {
         $(
-            $crate::transform_sync_systems!(@generate_systems $name, $query, $query, $query, $query);
+            $crate::add_transform_sync_systems_2d!(@generate_systems $app, $name, $query, $query);
         )+
     };
 
-    // Handle different queries for each direction (both 2D and 3D)
-    ($($name:ident = bevy_to_godot: $bevy_to_godot_query:ty, godot_to_bevy: $godot_to_bevy_query:ty),+ $(,)?) => {
+    ($app:expr, $($name:ident = bevy_to_godot: $bevy_to_godot_query:ty, godot_to_bevy: $godot_to_bevy_query:ty),+ $(,)?) => {
         $(
-            $crate::transform_sync_systems!(@generate_systems $name, $bevy_to_godot_query, $godot_to_bevy_query, $bevy_to_godot_query, $godot_to_bevy_query);
+            $crate::add_transform_sync_systems_2d!(@generate_systems $app, $name, $bevy_to_godot_query, $godot_to_bevy_query);
         )+
     };
 
-    // Handle 2D and 3D specific queries with same query for both directions
-    ($($name:ident = 2d: $query_2d:ty, 3d: $query_3d:ty),+ $(,)?) => {
+    ($app:expr, $($name:ident = bevy_to_godot: $bevy_to_godot_query:ty),+ $(,)?) => {
         $(
-            $crate::transform_sync_systems!(@generate_systems $name, $query_2d, $query_2d, $query_3d, $query_3d);
+            $crate::add_transform_sync_systems_2d!(@generate_post_system $app, $name, $bevy_to_godot_query);
         )+
     };
 
-    // Handle 2D only
-    ($($name:ident = 2d: $query_2d:ty),+ $(,)?) => {
+    ($app:expr, $($name:ident = godot_to_bevy: $godot_to_bevy_query:ty),+ $(,)?) => {
         $(
-            $crate::transform_sync_systems!(@generate_systems $name, $query_2d, $query_2d, none, none);
+            $crate::add_transform_sync_systems_2d!(@generate_pre_system $app, $name, $godot_to_bevy_query);
         )+
     };
 
-    // Handle 3D only
-    ($($name:ident = 3d: $query_3d:ty),+ $(,)?) => {
-        $(
-            $crate::transform_sync_systems!(@generate_systems $name, none, none, $query_3d, $query_3d);
-        )+
+    (@generate_systems $app:expr, $name:ident, $bevy_to_godot_query:ty, $godot_to_bevy_query:ty) => {
+        $crate::add_transform_sync_systems_2d!(@generate_post_system $app, $name, $bevy_to_godot_query);
+        $crate::add_transform_sync_systems_2d!(@generate_pre_system $app, $name, $godot_to_bevy_query);
     };
 
-    // Handle 2D and 3D specific queries with different queries for each direction
-    ($($name:ident = 2d: bevy_to_godot: $bevy_to_godot_2d:ty, godot_to_bevy: $godot_to_bevy_2d:ty, 3d: bevy_to_godot: $bevy_to_godot_3d:ty, godot_to_bevy: $godot_to_bevy_3d:ty),+ $(,)?) => {
-        $(
-            $crate::transform_sync_systems!(@generate_systems $name, $bevy_to_godot_2d, $godot_to_bevy_2d, $bevy_to_godot_3d, $godot_to_bevy_3d);
-        )+
-    };
-
-    // Handle 2D specific with different queries, 3D None
-    ($($name:ident = 2d: bevy_to_godot: $bevy_to_godot_2d:ty, godot_to_bevy: $godot_to_bevy_2d:ty, 3d: None),+ $(,)?) => {
-        $(
-            $crate::transform_sync_systems!(@generate_systems $name, $bevy_to_godot_2d, $godot_to_bevy_2d, None, None);
-        )+
-    };
-
-    // Handle 3D specific with different queries, 2D None
-    ($($name:ident = 2d: None, 3d: bevy_to_godot: $bevy_to_godot_3d:ty, godot_to_bevy: $godot_to_bevy_3d:ty),+ $(,)?) => {
-        $(
-            $crate::transform_sync_systems!(@generate_systems $name, None, None, $bevy_to_godot_3d, $godot_to_bevy_3d);
-        )+
-    };
-
-    // Handle 2D with only bevy_to_godot (post-update only)
-    ($($name:ident = 2d: bevy_to_godot: $bevy_to_godot_2d:ty),+ $(,)?) => {
-        $(
-            $crate::transform_sync_systems!(@generate_systems $name, $bevy_to_godot_2d, none, none, none);
-        )+
-    };
-
-    // Handle 2D with only godot_to_bevy (pre-update only)
-    ($($name:ident = 2d: godot_to_bevy: $godot_to_bevy_2d:ty),+ $(,)?) => {
-        $(
-            $crate::transform_sync_systems!(@generate_systems $name, none, $godot_to_bevy_2d, none, none);
-        )+
-    };
-
-    // Handle 3D with only bevy_to_godot (post-update only)
-    ($($name:ident = 3d: bevy_to_godot: $bevy_to_godot_3d:ty),+ $(,)?) => {
-        $(
-            $crate::transform_sync_systems!(@generate_systems $name, none, none, $bevy_to_godot_3d, none);
-        )+
-    };
-
-    // Handle 3D with only godot_to_bevy (pre-update only)
-    ($($name:ident = 3d: godot_to_bevy: $godot_to_bevy_3d:ty),+ $(,)?) => {
-        $(
-            $crate::transform_sync_systems!(@generate_systems $name, none, none, none, $godot_to_bevy_3d);
-        )+
-    };
-
-    // Internal macro for generating the actual systems
-    (@generate_systems $name:ident, $bevy_to_godot_2d:tt, $godot_to_bevy_2d:tt, $bevy_to_godot_3d:tt, $godot_to_bevy_3d:tt) => {
-        $crate::transform_sync_systems!(@generate_2d_systems $name, $bevy_to_godot_2d, $godot_to_bevy_2d);
-        $crate::transform_sync_systems!(@generate_3d_systems $name, $bevy_to_godot_3d, $godot_to_bevy_3d);
-    };
-
-    // Generate 2D systems if query is not None
-    (@generate_2d_systems $name:ident, none, none) => {
-        // Skip generation for None queries
-    };
-
-    // Generate only 2D post-update system (bevy_to_godot only)
-    (@generate_2d_systems $name:ident, $bevy_to_godot_2d:ty, none) => {
-        $crate::transform_sync_systems!(@generate_2d_post_system $name, $bevy_to_godot_2d);
-    };
-
-    // Generate only 2D pre-update system (godot_to_bevy only)
-    (@generate_2d_systems $name:ident, none, $godot_to_bevy_2d:ty) => {
-        $crate::transform_sync_systems!(@generate_2d_pre_system $name, $godot_to_bevy_2d);
-    };
-
-    // Generate both 2D systems
-    (@generate_2d_systems $name:ident, $bevy_to_godot_2d:ty, $godot_to_bevy_2d:ty) => {
-        $crate::transform_sync_systems!(@generate_2d_post_system $name, $bevy_to_godot_2d);
-        $crate::transform_sync_systems!(@generate_2d_pre_system $name, $godot_to_bevy_2d);
-    };
-
-    // Generate 2D post-update system (Bevy→Godot)
-    (@generate_2d_post_system $name:ident, $bevy_to_godot_2d:ty) => {
+    (@generate_post_system $app:expr, $name:ident, $bevy_to_godot_query:ty) => {
         $crate::paste::paste! {
             #[$crate::prelude::main_thread_system]
             pub fn [<post_update_godot_transforms_2d_ $name:lower>](
@@ -217,7 +63,7 @@ macro_rules! transform_sync_systems {
                             bevy::ecs::query::Added<$crate::plugins::transforms::Transform2D>,
                             bevy::ecs::query::Changed<$crate::plugins::transforms::Transform2D>
                         )>,
-                        $bevy_to_godot_2d,
+                        $bevy_to_godot_query,
                     ),
                 >,
             ) {
@@ -228,7 +74,6 @@ macro_rules! transform_sync_systems {
 
                 use godot::builtin::Transform2D as GodotTransform2D;
                 use godot::classes::Node2D;
-
 
                 for (transform, mut reference) in entities.iter_mut() {
                     if let Some(mut obj) = reference.try_get::<Node2D>() {
@@ -242,18 +87,19 @@ macro_rules! transform_sync_systems {
                     }
                 }
             }
+
+            $app.add_systems(bevy::app::Last, [<post_update_godot_transforms_2d_ $name:lower>]);
         }
     };
 
-    // Generate 2D pre-update system (Godot→Bevy)
-    (@generate_2d_pre_system $name:ident, $godot_to_bevy_2d:ty) => {
+    (@generate_pre_system $app:expr, $name:ident, $godot_to_bevy_query:ty) => {
         $crate::paste::paste! {
             #[$crate::prelude::main_thread_system]
             pub fn [<pre_update_godot_transforms_2d_ $name:lower>](
                 config: bevy::prelude::Res<$crate::plugins::core::GodotCustomTransformSyncConfig>,
                 mut entities: bevy::prelude::Query<
                     (&mut $crate::plugins::transforms::Transform2D, &mut $crate::interop::GodotNodeHandle),
-                    $godot_to_bevy_2d
+                    $godot_to_bevy_query
                 >,
             ) {
                 // Early return if not using two-way sync
@@ -264,7 +110,6 @@ macro_rules! transform_sync_systems {
                 use bevy::ecs::change_detection::DetectChanges;
                 use godot::builtin::Transform2D as GodotTransform2D;
                 use godot::classes::Node2D;
-
 
                 for (mut transform, mut reference) in entities.iter_mut() {
                     // Skip entities that were changed recently (e.g., by PhysicsUpdate systems)
@@ -283,32 +128,66 @@ macro_rules! transform_sync_systems {
                     }
                 }
             }
+
+            $app.add_systems(bevy::app::PreUpdate, [<pre_update_godot_transforms_2d_ $name:lower>]);
         }
     };
+}
 
-    // Generate 3D systems if query is not None
-    (@generate_3d_systems $name:ident, none, none) => {
-        // Skip generation for None queries
+/// Macro for generating 3D transform synchronization systems with compile-time queries.
+///
+/// This macro generates systems that sync transforms between Bevy and Godot for 3D entities
+/// matching specific component queries. Much simpler than the combined 2D/3D macro.
+///
+/// # Usage
+///
+/// ```rust
+/// use godot_bevy::plugins::transforms::add_transform_sync_systems_3d;
+/// use bevy::ecs::query::With;
+/// use bevy::ecs::component::Component;
+/// use bevy::prelude::*;
+///
+/// #[derive(Component)]
+/// struct Player;
+///
+/// let mut app = App::new();
+/// add_transform_sync_systems_3d! {
+///     app,
+///     Player = With<Player>
+/// }
+/// ```
+#[macro_export]
+macro_rules! add_transform_sync_systems_3d {
+    ($app:expr, $($name:ident = $query:ty),+ $(,)?) => {
+        $(
+            $crate::add_transform_sync_systems_3d!(@generate_systems $app, $name, $query, $query);
+        )+
     };
 
-    // Generate only 3D post-update system (bevy_to_godot only)
-    (@generate_3d_systems $name:ident, $bevy_to_godot_3d:ty, none) => {
-        $crate::transform_sync_systems!(@generate_3d_post_system $name, $bevy_to_godot_3d);
+    ($app:expr, $($name:ident = bevy_to_godot: $bevy_to_godot_query:ty, godot_to_bevy: $godot_to_bevy_query:ty),+ $(,)?) => {
+        $(
+            $crate::add_transform_sync_systems_3d!(@generate_systems $app, $name, $bevy_to_godot_query, $godot_to_bevy_query);
+        )+
     };
 
-    // Generate only 3D pre-update system (godot_to_bevy only)
-    (@generate_3d_systems $name:ident, none, $godot_to_bevy_3d:ty) => {
-        $crate::transform_sync_systems!(@generate_3d_pre_system $name, $godot_to_bevy_3d);
+    ($app:expr, $($name:ident = bevy_to_godot: $bevy_to_godot_query:ty),+ $(,)?) => {
+        $(
+            $crate::add_transform_sync_systems_3d!(@generate_post_system $app, $name, $bevy_to_godot_query);
+        )+
     };
 
-    // Generate both 3D systems
-    (@generate_3d_systems $name:ident, $bevy_to_godot_3d:ty, $godot_to_bevy_3d:ty) => {
-        $crate::transform_sync_systems!(@generate_3d_post_system $name, $bevy_to_godot_3d);
-        $crate::transform_sync_systems!(@generate_3d_pre_system $name, $godot_to_bevy_3d);
+    ($app:expr, $($name:ident = godot_to_bevy: $godot_to_bevy_query:ty),+ $(,)?) => {
+        $(
+            $crate::add_transform_sync_systems_3d!(@generate_pre_system $app, $name, $godot_to_bevy_query);
+        )+
     };
 
-    // Generate 3D post-update system (Bevy→Godot)
-    (@generate_3d_post_system $name:ident, $bevy_to_godot_3d:ty) => {
+    (@generate_systems $app:expr, $name:ident, $bevy_to_godot_query:ty, $godot_to_bevy_query:ty) => {
+        $crate::add_transform_sync_systems_3d!(@generate_post_system $app, $name, $bevy_to_godot_query);
+        $crate::add_transform_sync_systems_3d!(@generate_pre_system $app, $name, $godot_to_bevy_query);
+    };
+
+    (@generate_post_system $app:expr, $name:ident, $bevy_to_godot_query:ty) => {
         $crate::paste::paste! {
             #[$crate::prelude::main_thread_system]
             pub fn [<post_update_godot_transforms_3d_ $name:lower>](
@@ -320,7 +199,7 @@ macro_rules! transform_sync_systems {
                             bevy::ecs::query::Added<$crate::plugins::transforms::Transform3D>,
                             bevy::ecs::query::Changed<$crate::plugins::transforms::Transform3D>
                         )>,
-                        $bevy_to_godot_3d,
+                        $bevy_to_godot_query,
                     ),
                 >,
             ) {
@@ -339,18 +218,19 @@ macro_rules! transform_sync_systems {
                     }
                 }
             }
+
+            $app.add_systems(bevy::app::Last, [<post_update_godot_transforms_3d_ $name:lower>]);
         }
     };
 
-    // Generate 3D pre-update system (Godot→Bevy)
-    (@generate_3d_pre_system $name:ident, $godot_to_bevy_3d:ty) => {
+    (@generate_pre_system $app:expr, $name:ident, $godot_to_bevy_query:ty) => {
         $crate::paste::paste! {
             #[$crate::prelude::main_thread_system]
             pub fn [<pre_update_godot_transforms_3d_ $name:lower>](
                 config: bevy::prelude::Res<$crate::plugins::core::GodotCustomTransformSyncConfig>,
                 mut entities: bevy::prelude::Query<
                     (&mut $crate::plugins::transforms::Transform3D, &mut $crate::interop::GodotNodeHandle),
-                    $godot_to_bevy_3d
+                    $godot_to_bevy_query
                 >,
             ) {
                 // Early return if not using two-way sync
@@ -375,330 +255,12 @@ macro_rules! transform_sync_systems {
                     }
                 }
             }
-        }
-    };
-}
 
-/// Helper macro to generate transform sync systems and add them to an App
-///
-/// This macro both generates the systems and adds them to the provided App
-/// with the correct scheduling.
-///
-/// # Usage
-///
-/// ```rust
-/// use godot_bevy::plugins::transforms::add_transform_sync_systems;
-/// use godot_bevy::interop::node_markers::*;
-/// use bevy::ecs::query::{Or, With};
-/// use bevy::ecs::component::Component;
-/// use bevy::prelude::*;
-///
-/// // Test components for examples
-/// #[derive(Component)]
-/// struct Boid;
-/// #[derive(Component)]
-/// struct Player;
-/// #[derive(Component)]
-/// struct PlayerInput;
-/// #[derive(Component)]
-/// struct UIElement;
-/// #[derive(Component)]
-/// struct InputHandler;
-///
-/// let mut app = App::new();
-/// add_transform_sync_systems! {
-///     app,
-///     PhysicsBody = Or<(
-///         With<CharacterBody3DMarker>,
-///         With<RigidBody3DMarker>,
-///         With<StaticBody3DMarker>,
-///     )>
-/// }
-///
-/// // Or with separate queries for each direction
-/// add_transform_sync_systems! {
-///     app,
-///     Player = bevy_to_godot: With<Player>, godot_to_bevy: With<PlayerInput>
-/// }
-///
-/// // Or with specific dimensions
-/// add_transform_sync_systems! {
-///     app,
-///     Boid2D = 2d: With<Boid>
-/// }
-///
-/// // Or with directional omission for specific synchronization needs
-/// add_transform_sync_systems! {
-///     app,
-///     UIElement = 2d: bevy_to_godot: With<UIElement>  // Only Bevy→Godot sync
-/// }
-///
-/// add_transform_sync_systems! {
-///     app,  
-///     InputHandler = 3d: godot_to_bevy: With<InputHandler>  // Only Godot→Bevy sync
-/// }
-/// ```
-#[macro_export]
-macro_rules! add_transform_sync_systems {
-    // Handle same query for both directions (both 2D and 3D)
-    ($app:expr, $($name:ident = $query:ty),+ $(,)?) => {
-        // Generate the systems
-        $crate::transform_sync_systems! {
-            $($name = $query),+
-        }
-
-        // Add them to the app
-        $(
-            $crate::add_transform_sync_systems!(@add_to_app $app, $name, both, both);
-        )+
-    };
-
-    // Handle separate query syntax (both 2D and 3D)
-    ($app:expr, $($name:ident = bevy_to_godot: $bevy_to_godot_query:ty, godot_to_bevy: $godot_to_bevy_query:ty),+ $(,)?) => {
-        // Generate the systems with separate queries
-        $crate::transform_sync_systems! {
-            $($name = bevy_to_godot: $bevy_to_godot_query, godot_to_bevy: $godot_to_bevy_query),+
-        }
-
-        // Add them to the app
-        $(
-            $crate::add_transform_sync_systems!(@add_to_app $app, $name, both, both);
-        )+
-    };
-
-    // Handle 2D and 3D specific queries with same query for both directions
-    ($app:expr, $($name:ident = 2d: $query_2d:ty, 3d: $query_3d:ty),+ $(,)?) => {
-        // Generate the systems
-        $crate::transform_sync_systems! {
-            $($name = 2d: $query_2d, 3d: $query_3d),+
-        }
-
-        // Add them to the app
-        $(
-            $crate::add_transform_sync_systems!(@add_to_app $app, $name, $query_2d, $query_3d);
-        )+
-    };
-
-    // Handle 2D only
-    ($app:expr, $($name:ident = 2d: $query_2d:ty),+ $(,)?) => {
-        // Generate the systems
-        $crate::transform_sync_systems! {
-            $($name = 2d: $query_2d),+
-        }
-
-        // Add them to the app
-        $(
-            $crate::add_transform_sync_systems!(@add_to_app $app, $name, $query_2d, none);
-        )+
-    };
-
-    // Handle 3D only
-    ($app:expr, $($name:ident = 3d: $query_3d:ty),+ $(,)?) => {
-        // Generate the systems
-        $crate::transform_sync_systems! {
-            $($name = 3d: $query_3d),+
-        }
-
-        // Add them to the app
-        $(
-            $crate::add_transform_sync_systems!(@add_to_app $app, $name, none, $query_3d);
-        )+
-    };
-
-    // Handle 2D with only bevy_to_godot (post-update only)
-    ($app:expr, $($name:ident = 2d: bevy_to_godot: $bevy_to_godot_2d:ty),+ $(,)?) => {
-        // Generate the systems
-        $crate::transform_sync_systems! {
-            $($name = 2d: bevy_to_godot: $bevy_to_godot_2d),+
-        }
-
-        // Add them to the app
-        $(
-            $crate::add_transform_sync_systems!(@add_to_app $app, $name, post_only, none);
-        )+
-    };
-
-    // Handle 2D with only godot_to_bevy (pre-update only)
-    ($app:expr, $($name:ident = 2d: godot_to_bevy: $godot_to_bevy_2d:ty),+ $(,)?) => {
-        // Generate the systems
-        $crate::transform_sync_systems! {
-            $($name = 2d: godot_to_bevy: $godot_to_bevy_2d),+
-        }
-
-        // Add them to the app
-        $(
-            $crate::add_transform_sync_systems!(@add_to_app $app, $name, pre_only, none);
-        )+
-    };
-
-    // Handle 3D with only bevy_to_godot (post-update only)
-    ($app:expr, $($name:ident = 3d: bevy_to_godot: $bevy_to_godot_3d:ty),+ $(,)?) => {
-        // Generate the systems
-        $crate::transform_sync_systems! {
-            $($name = 3d: bevy_to_godot: $bevy_to_godot_3d),+
-        }
-
-        // Add them to the app
-        $(
-            $crate::add_transform_sync_systems!(@add_to_app $app, $name, none, post_only);
-        )+
-    };
-
-    // Handle 3D with only godot_to_bevy (pre-update only)
-    ($app:expr, $($name:ident = 3d: godot_to_bevy: $godot_to_bevy_3d:ty),+ $(,)?) => {
-        // Generate the systems
-        $crate::transform_sync_systems! {
-            $($name = 3d: godot_to_bevy: $godot_to_bevy_3d),+
-        }
-
-        // Add them to the app
-        $(
-            $crate::add_transform_sync_systems!(@add_to_app $app, $name, none, pre_only);
-        )+
-    };
-
-    // Handle 2D and 3D specific queries with different queries for each direction
-    ($app:expr, $($name:ident = 2d: bevy_to_godot: $bevy_to_godot_2d:ty, godot_to_bevy: $godot_to_bevy_2d:ty, 3d: bevy_to_godot: $bevy_to_godot_3d:ty, godot_to_bevy: $godot_to_bevy_3d:ty),+ $(,)?) => {
-        // Generate the systems with separate queries
-        $crate::transform_sync_systems! {
-            $($name = 2d: bevy_to_godot: $bevy_to_godot_2d, godot_to_bevy: $godot_to_bevy_2d, 3d: bevy_to_godot: $bevy_to_godot_3d, godot_to_bevy: $godot_to_bevy_3d),+
-        }
-
-        // Add them to the app
-        $(
-            $crate::add_transform_sync_systems!(@add_to_app $app, $name, enabled, enabled);
-        )+
-    };
-
-    // Handle 2D specific with different queries, 3D None
-    ($app:expr, $($name:ident = 2d: bevy_to_godot: $bevy_to_godot_2d:ty, godot_to_bevy: $godot_to_bevy_2d:ty, 3d: none),+ $(,)?) => {
-        // Generate the systems
-        $crate::transform_sync_systems! {
-            $($name = 2d: bevy_to_godot: $bevy_to_godot_2d, godot_to_bevy: $godot_to_bevy_2d, 3d: none),+
-        }
-
-        // Add them to the app
-        $(
-            $crate::add_transform_sync_systems!(@add_to_app $app, $name, enabled, none);
-        )+
-    };
-
-    // Handle 3D specific with different queries, 2D None
-    ($app:expr, $($name:ident = 2d: none, 3d: bevy_to_godot: $bevy_to_godot_3d:ty, godot_to_bevy: $godot_to_bevy_3d:ty),+ $(,)?) => {
-        // Generate the systems
-        $crate::transform_sync_systems! {
-            $($name = 2d: none, 3d: bevy_to_godot: $bevy_to_godot_3d, godot_to_bevy: $godot_to_bevy_3d),+
-        }
-
-        // Add them to the app
-        $(
-            $crate::add_transform_sync_systems!(@add_to_app $app, $name, none, enabled);
-        )+
-    };
-
-    // Internal helper to add systems to app, conditionally based on enabled dimensions
-
-    // Handle specific directional patterns first (for higher priority matching)
-
-    // Handle 2D post-update only
-    (@add_to_app $app:expr, $name:ident, post_only, none) => {
-        $crate::paste::paste! {
-            $app.add_systems(bevy::app::Last, [<post_update_godot_transforms_2d_ $name:lower>]);
-        }
-    };
-
-    // Handle 2D pre-update only
-    (@add_to_app $app:expr, $name:ident, pre_only, none) => {
-        $crate::paste::paste! {
-            $app.add_systems(bevy::app::PreUpdate, [<pre_update_godot_transforms_2d_ $name:lower>]);
-        }
-    };
-
-    // Handle 3D post-update only
-    (@add_to_app $app:expr, $name:ident, none, post_only) => {
-        $crate::paste::paste! {
-            $app.add_systems(bevy::app::Last, [<post_update_godot_transforms_3d_ $name:lower>]);
-        }
-    };
-
-    // Handle 3D pre-update only
-    (@add_to_app $app:expr, $name:ident, none, pre_only) => {
-        $crate::paste::paste! {
             $app.add_systems(bevy::app::PreUpdate, [<pre_update_godot_transforms_3d_ $name:lower>]);
         }
     };
-
-    // Handle general dimension patterns
-
-    (@add_to_app $app:expr, $name:ident, both, both) => {
-        $crate::paste::paste! {
-            $app.add_systems(bevy::app::Last, (
-                    [<post_update_godot_transforms_2d_ $name:lower>],
-                    [<post_update_godot_transforms_3d_ $name:lower>],
-                ))
-                .add_systems(bevy::app::PreUpdate, (
-                    [<pre_update_godot_transforms_2d_ $name:lower>],
-                    [<pre_update_godot_transforms_3d_ $name:lower>],
-                ));
-        }
-    };
-
-    (@add_to_app $app:expr, $name:ident, enabled, enabled) => {
-        $crate::paste::paste! {
-            $app.add_systems(bevy::app::Last, (
-                    [<post_update_godot_transforms_2d_ $name:lower>],
-                    [<post_update_godot_transforms_3d_ $name:lower>],
-                ))
-                .add_systems(bevy::app::PreUpdate, (
-                    [<pre_update_godot_transforms_2d_ $name:lower>],
-                    [<pre_update_godot_transforms_3d_ $name:lower>],
-                ));
-        }
-    };
-
-    (@add_to_app $app:expr, $name:ident, enabled, none) => {
-        $crate::paste::paste! {
-            $app.add_systems(bevy::app::Last, [<post_update_godot_transforms_2d_ $name:lower>])
-                .add_systems(bevy::app::PreUpdate, [<pre_update_godot_transforms_2d_ $name:lower>]);
-        }
-    };
-
-    (@add_to_app $app:expr, $name:ident, none, enabled) => {
-        $crate::paste::paste! {
-            $app.add_systems(bevy::app::Last, [<post_update_godot_transforms_3d_ $name:lower>])
-                .add_systems(bevy::app::PreUpdate, [<pre_update_godot_transforms_3d_ $name:lower>]);
-        }
-    };
-
-    // These patterns are for dimension-only (2d: With<T> or 3d: With<T>)
-    (@add_to_app $app:expr, $name:ident, $query_2d:ty, none) => {
-        $crate::paste::paste! {
-            $app.add_systems(bevy::app::Last, [<post_update_godot_transforms_2d_ $name:lower>])
-                .add_systems(bevy::app::PreUpdate, [<pre_update_godot_transforms_2d_ $name:lower>]);
-        }
-    };
-
-    (@add_to_app $app:expr, $name:ident, none, $query_3d:ty) => {
-        $crate::paste::paste! {
-            $app.add_systems(bevy::app::Last, [<post_update_godot_transforms_3d_ $name:lower>])
-                .add_systems(bevy::app::PreUpdate, [<pre_update_godot_transforms_3d_ $name:lower>]);
-        }
-    };
-
-    (@add_to_app $app:expr, $name:ident, $query_2d:ty, $query_3d:ty) => {
-        $crate::paste::paste! {
-            $app.add_systems(bevy::app::Last, (
-                    [<post_update_godot_transforms_2d_ $name:lower>],
-                    [<post_update_godot_transforms_3d_ $name:lower>],
-                ))
-                .add_systems(bevy::app::PreUpdate, (
-                    [<pre_update_godot_transforms_2d_ $name:lower>],
-                    [<pre_update_godot_transforms_3d_ $name:lower>],
-                ));
-        }
-    };
 }
 
-// Re-export the macros at the crate level
-pub use add_transform_sync_systems;
-pub use transform_sync_systems;
+// Re-export the new macros at the crate level
+pub use add_transform_sync_systems_2d;
+pub use add_transform_sync_systems_3d;

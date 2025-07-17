@@ -2,7 +2,7 @@
 #[allow(dead_code)]
 mod test_transforms {
     use crate::interop::node_markers::*;
-    use crate::{add_transform_sync_systems, transform_sync_systems};
+    use crate::{add_transform_sync_systems_2d, add_transform_sync_systems_3d};
     use bevy::ecs::query::{Or, With};
     use bevy::prelude::*;
 
@@ -13,112 +13,14 @@ mod test_transforms {
     #[derive(Component)]
     pub struct PlayerInput;
 
-    // Test the macro generates systems correctly
-    transform_sync_systems! {
-        TestPhysicsBody = Or<(
-            With<CharacterBody3DMarker>,
-            With<RigidBody3DMarker>,
-            With<StaticBody3DMarker>,
-        )>
-    }
-
-    // Test separate queries syntax
-    transform_sync_systems! {
-        TestPlayer = bevy_to_godot: With<Player>, godot_to_bevy: With<PlayerInput>
-    }
-
-    // Test 2D only syntax
-    transform_sync_systems! {
-        Test2DOnly = 2d: With<Player>
-    }
-
-    // Test 3D only syntax
-    transform_sync_systems! {
-        Test3DOnly = 3d: With<Player>
-    }
-
-    // Test 2D post-update only
-    transform_sync_systems! {
-        Test2DPostOnly = 2d: bevy_to_godot: With<Player>
-    }
-
-    // Test 2D pre-update only
-    transform_sync_systems! {
-        Test2DPreOnly = 2d: godot_to_bevy: With<Player>
-    }
-
-    // Test 3D post-update only
-    transform_sync_systems! {
-        Test3DPostOnly = 3d: bevy_to_godot: With<Player>
-    }
-
-    // Test 3D pre-update only
-    transform_sync_systems! {
-        Test3DPreOnly = 3d: godot_to_bevy: With<Player>
-    }
-
     #[test]
-    fn test_macro_generates_systems() {
+    fn test_2d_macro_same_query() {
         let mut app = App::new();
 
-        // Test that we can add the generated systems without errors
-        app.add_systems(
-            bevy::app::Last,
-            (
-                post_update_godot_transforms_2d_testphysicsbody,
-                post_update_godot_transforms_3d_testphysicsbody,
-            ),
-        )
-        .add_systems(
-            bevy::app::PreUpdate,
-            (
-                pre_update_godot_transforms_2d_testphysicsbody,
-                pre_update_godot_transforms_3d_testphysicsbody,
-            ),
-        );
-
-        // Test that the systems exist in the schedule
-        assert!(
-            app.world()
-                .contains_resource::<bevy::ecs::schedule::Schedules>()
-        );
-    }
-
-    #[test]
-    fn test_separate_queries_macro() {
-        let mut app = App::new();
-
-        // Test that we can add the generated systems with separate queries
-        app.add_systems(
-            bevy::app::Last,
-            (
-                post_update_godot_transforms_2d_testplayer,
-                post_update_godot_transforms_3d_testplayer,
-            ),
-        )
-        .add_systems(
-            bevy::app::PreUpdate,
-            (
-                pre_update_godot_transforms_2d_testplayer,
-                pre_update_godot_transforms_3d_testplayer,
-            ),
-        );
-
-        // Test that the systems exist in the schedule
-        assert!(
-            app.world()
-                .contains_resource::<bevy::ecs::schedule::Schedules>()
-        );
-    }
-
-    #[test]
-    fn test_convenience_macro() {
-        let mut app = App::new();
-
-        // Test the convenience macro
-        add_transform_sync_systems! {
+        // Test the 2D macro with same query for both directions
+        add_transform_sync_systems_2d! {
             app,
-            ConvenienceTest = With<Node3DMarker>
+            Test2D = With<Player>
         }
 
         assert!(
@@ -128,13 +30,13 @@ mod test_transforms {
     }
 
     #[test]
-    fn test_convenience_macro_with_separate_queries() {
+    fn test_3d_macro_same_query() {
         let mut app = App::new();
 
-        // Test the convenience macro with separate queries
-        add_transform_sync_systems! {
+        // Test the 3D macro with same query for both directions
+        add_transform_sync_systems_3d! {
             app,
-            ConveniencePlayer = bevy_to_godot: With<Player>, godot_to_bevy: With<PlayerInput>
+            Test3D = With<Player>
         }
 
         assert!(
@@ -144,13 +46,13 @@ mod test_transforms {
     }
 
     #[test]
-    fn test_2d_only_macro() {
+    fn test_2d_macro_separate_queries() {
         let mut app = App::new();
 
-        // Test the 2D only macro
-        add_transform_sync_systems! {
+        // Test the 2D macro with separate queries for each direction
+        add_transform_sync_systems_2d! {
             app,
-            Test2DOnly = 2d: With<Player>
+            Test2DPlayer = bevy_to_godot: With<Player>, godot_to_bevy: With<PlayerInput>
         }
 
         assert!(
@@ -160,13 +62,13 @@ mod test_transforms {
     }
 
     #[test]
-    fn test_3d_only_macro() {
+    fn test_3d_macro_separate_queries() {
         let mut app = App::new();
 
-        // Test the 3D only macro
-        add_transform_sync_systems! {
+        // Test the 3D macro with separate queries for each direction
+        add_transform_sync_systems_3d! {
             app,
-            Test3DOnly = 3d: With<Player>
+            Test3DPlayer = bevy_to_godot: With<Player>, godot_to_bevy: With<PlayerInput>
         }
 
         assert!(
@@ -176,54 +78,30 @@ mod test_transforms {
     }
 
     #[test]
-    fn test_manual_2d_only_systems() {
+    fn test_2d_bevy_to_godot_only() {
         let mut app = App::new();
 
-        // Test that we can manually add 2D only systems
-        app.add_systems(bevy::app::Last, post_update_godot_transforms_2d_test2donly)
-            .add_systems(
-                bevy::app::PreUpdate,
-                pre_update_godot_transforms_2d_test2donly,
-            );
-
-        assert!(
-            app.world()
-                .contains_resource::<bevy::ecs::schedule::Schedules>()
-        );
-    }
-
-    #[test]
-    fn test_manual_3d_only_systems() {
-        let mut app = App::new();
-
-        // Test that we can manually add 3D only systems
-        app.add_systems(bevy::app::Last, post_update_godot_transforms_3d_test3donly)
-            .add_systems(
-                bevy::app::PreUpdate,
-                pre_update_godot_transforms_3d_test3donly,
-            );
-
-        assert!(
-            app.world()
-                .contains_resource::<bevy::ecs::schedule::Schedules>()
-        );
-    }
-
-    #[test]
-    fn test_2d_post_update_only() {
-        let mut app = App::new();
-
-        // Test the 2D post-update only macro
-        add_transform_sync_systems! {
+        // Test 2D bevy_to_godot only
+        add_transform_sync_systems_2d! {
             app,
-            Test2DPostOnly = 2d: bevy_to_godot: With<Player>
+            Test2DPostOnly = bevy_to_godot: With<Player>
         }
 
-        // Should only have the post-update system
-        app.add_systems(
-            bevy::app::Last,
-            post_update_godot_transforms_2d_test2dpostonly,
+        assert!(
+            app.world()
+                .contains_resource::<bevy::ecs::schedule::Schedules>()
         );
+    }
+
+    #[test]
+    fn test_2d_godot_to_bevy_only() {
+        let mut app = App::new();
+
+        // Test 2D godot_to_bevy only
+        add_transform_sync_systems_2d! {
+            app,
+            Test2DPreOnly = godot_to_bevy: With<Player>
+        }
 
         assert!(
             app.world()
@@ -232,20 +110,14 @@ mod test_transforms {
     }
 
     #[test]
-    fn test_2d_pre_update_only() {
+    fn test_3d_bevy_to_godot_only() {
         let mut app = App::new();
 
-        // Test the 2D pre-update only macro
-        add_transform_sync_systems! {
+        // Test 3D bevy_to_godot only
+        add_transform_sync_systems_3d! {
             app,
-            Test2DPreOnly = 2d: godot_to_bevy: With<Player>
+            Test3DPostOnly = bevy_to_godot: With<Player>
         }
-
-        // Should only have the pre-update system
-        app.add_systems(
-            bevy::app::PreUpdate,
-            pre_update_godot_transforms_2d_test2dpreonly,
-        );
 
         assert!(
             app.world()
@@ -254,20 +126,14 @@ mod test_transforms {
     }
 
     #[test]
-    fn test_3d_post_update_only() {
+    fn test_3d_godot_to_bevy_only() {
         let mut app = App::new();
 
-        // Test the 3D post-update only macro
-        add_transform_sync_systems! {
+        // Test 3D godot_to_bevy only
+        add_transform_sync_systems_3d! {
             app,
-            Test3DPostOnly = 3d: bevy_to_godot: With<Player>
+            Test3DPreOnly = godot_to_bevy: With<Player>
         }
-
-        // Should only have the post-update system
-        app.add_systems(
-            bevy::app::Last,
-            post_update_godot_transforms_3d_test3dpostonly,
-        );
 
         assert!(
             app.world()
@@ -276,20 +142,72 @@ mod test_transforms {
     }
 
     #[test]
-    fn test_3d_pre_update_only() {
+    fn test_complex_query_2d() {
         let mut app = App::new();
 
-        // Test the 3D pre-update only macro
-        add_transform_sync_systems! {
+        // Test complex query with 2D
+        add_transform_sync_systems_2d! {
             app,
-            Test3DPreOnly = 3d: godot_to_bevy: With<Player>
+            TestPhysicsBody2D = Or<(
+                With<CharacterBody2DMarker>,
+                With<RigidBody2DMarker>,
+                With<StaticBody2DMarker>,
+            )>
         }
 
-        // Should only have the pre-update system
-        app.add_systems(
-            bevy::app::PreUpdate,
-            pre_update_godot_transforms_3d_test3dpreonly,
+        assert!(
+            app.world()
+                .contains_resource::<bevy::ecs::schedule::Schedules>()
         );
+    }
+
+    #[test]
+    fn test_complex_query_3d() {
+        let mut app = App::new();
+
+        // Test complex query with 3D
+        add_transform_sync_systems_3d! {
+            app,
+            TestPhysicsBody3D = Or<(
+                With<CharacterBody3DMarker>,
+                With<RigidBody3DMarker>,
+                With<StaticBody3DMarker>,
+            )>
+        }
+
+        assert!(
+            app.world()
+                .contains_resource::<bevy::ecs::schedule::Schedules>()
+        );
+    }
+
+    #[test]
+    fn test_multiple_systems_2d() {
+        let mut app = App::new();
+
+        // Test multiple systems in one macro call
+        add_transform_sync_systems_2d! {
+            app,
+            TestPlayer2D = With<Player>,
+            TestInput2D = With<PlayerInput>
+        }
+
+        assert!(
+            app.world()
+                .contains_resource::<bevy::ecs::schedule::Schedules>()
+        );
+    }
+
+    #[test]
+    fn test_multiple_systems_3d() {
+        let mut app = App::new();
+
+        // Test multiple systems in one macro call
+        add_transform_sync_systems_3d! {
+            app,
+            TestPlayer3D = With<Player>,
+            TestInput3D = With<PlayerInput>
+        }
 
         assert!(
             app.world()
