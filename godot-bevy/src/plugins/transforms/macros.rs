@@ -13,52 +13,60 @@
 /// use bevy::prelude::*;
 ///
 /// #[derive(Component)]
-/// struct Boid;
+/// struct Player;
+/// #[derive(Component)]
+/// struct UIElement;
+/// #[derive(Component)]
+/// struct PhysicsActor;
 ///
 /// let mut app = App::new();
-/// // Automatically configures TwoWay sync
+/// // Mixed directional sync in a single call
 /// add_transform_sync_systems_2d! {
 ///     app,
-///     Boid = With<Boid>
-/// }
-///
-/// // Automatically configures OneWay sync (Bevy → Godot)
-/// add_transform_sync_systems_2d! {
-///     app,
-///     BoidPost = bevy_to_godot: With<Boid>
-/// }
-///
-/// // Automatically configures TwoWay sync (Godot → Bevy)
-/// add_transform_sync_systems_2d! {
-///     app,
-///     BoidPre = godot_to_bevy: With<Boid>
+///     UIElements = bevy_to_godot: With<UIElement>,    // ECS → Godot only
+///     PhysicsResults = godot_to_bevy: With<PhysicsActor>, // Godot → ECS only
+///     Player = With<Player>,                          // Bidirectional
 /// }
 /// ```
 #[macro_export]
 macro_rules! add_transform_sync_systems_2d {
-    ($app:expr, $($name:ident = $query:ty),+ $(,)?) => {
-        $(
-            $crate::add_transform_sync_systems_2d!(@generate_systems $app, $name, $query, $query);
-        )+
+    // Main entry point - handles mixed directional sync
+    ($app:expr, $($tokens:tt)*) => {
+        $crate::add_transform_sync_systems_2d!(@parse_all $app, $($tokens)*);
     };
 
-    ($app:expr, $($name:ident = bevy_to_godot: $bevy_to_godot_query:ty, godot_to_bevy: $godot_to_bevy_query:ty),+ $(,)?) => {
-        $(
-            $crate::add_transform_sync_systems_2d!(@generate_systems $app, $name, $bevy_to_godot_query, $godot_to_bevy_query);
-        )+
+    // Parse all items recursively
+    (@parse_all $app:expr, $name:ident = bevy_to_godot: $query:ty, $($rest:tt)*) => {
+        $crate::add_transform_sync_systems_2d!(@generate_post_system $app, $name, $query);
+        $crate::add_transform_sync_systems_2d!(@parse_all $app, $($rest)*);
     };
 
-    ($app:expr, $($name:ident = bevy_to_godot: $bevy_to_godot_query:ty),+ $(,)?) => {
-        $(
-            $crate::add_transform_sync_systems_2d!(@generate_post_system $app, $name, $bevy_to_godot_query);
-        )+
+    (@parse_all $app:expr, $name:ident = godot_to_bevy: $query:ty, $($rest:tt)*) => {
+        $crate::add_transform_sync_systems_2d!(@generate_pre_system $app, $name, $query);
+        $crate::add_transform_sync_systems_2d!(@parse_all $app, $($rest)*);
     };
 
-    ($app:expr, $($name:ident = godot_to_bevy: $godot_to_bevy_query:ty),+ $(,)?) => {
-        $(
-            $crate::add_transform_sync_systems_2d!(@generate_pre_system $app, $name, $godot_to_bevy_query);
-        )+
+    (@parse_all $app:expr, $name:ident = $query:ty, $($rest:tt)*) => {
+        $crate::add_transform_sync_systems_2d!(@generate_systems $app, $name, $query, $query);
+        $crate::add_transform_sync_systems_2d!(@parse_all $app, $($rest)*);
     };
+
+    // Handle last item (without trailing comma)
+    (@parse_all $app:expr, $name:ident = bevy_to_godot: $query:ty) => {
+        $crate::add_transform_sync_systems_2d!(@generate_post_system $app, $name, $query);
+    };
+
+    (@parse_all $app:expr, $name:ident = godot_to_bevy: $query:ty) => {
+        $crate::add_transform_sync_systems_2d!(@generate_pre_system $app, $name, $query);
+    };
+
+    (@parse_all $app:expr, $name:ident = $query:ty) => {
+        $crate::add_transform_sync_systems_2d!(@generate_systems $app, $name, $query, $query);
+    };
+
+    // Handle empty case
+    (@parse_all $app:expr,) => {};
+    (@parse_all $app:expr) => {};
 
     (@generate_systems $app:expr, $name:ident, $bevy_to_godot_query:ty, $godot_to_bevy_query:ty) => {
         $crate::add_transform_sync_systems_2d!(@generate_post_system $app, $name, $bevy_to_godot_query);
@@ -153,51 +161,59 @@ macro_rules! add_transform_sync_systems_2d {
 ///
 /// #[derive(Component)]
 /// struct Player;
+/// #[derive(Component)]
+/// struct VisualEffect;
+/// #[derive(Component)]
+/// struct PhysicsActor;
 ///
 /// let mut app = App::new();
-/// // Automatically configures TwoWay sync
+/// // Mixed directional sync in a single call
 /// add_transform_sync_systems_3d! {
 ///     app,
-///     Player = With<Player>
-/// }
-///
-/// // Automatically configures OneWay sync (Bevy → Godot)
-/// add_transform_sync_systems_3d! {
-///     app,
-///     PlayerPost = bevy_to_godot: With<Player>
-/// }
-///
-/// // Automatically configures TwoWay sync (Godot → Bevy)
-/// add_transform_sync_systems_3d! {
-///     app,
-///     PlayerPre = godot_to_bevy: With<Player>
+///     VisualEffects = bevy_to_godot: With<VisualEffect>,  // ECS → Godot only
+///     PhysicsResults = godot_to_bevy: With<PhysicsActor>, // Godot → ECS only
+///     Player = With<Player>,                              // Bidirectional
 /// }
 /// ```
 #[macro_export]
 macro_rules! add_transform_sync_systems_3d {
-    ($app:expr, $($name:ident = $query:ty),+ $(,)?) => {
-        $(
-            $crate::add_transform_sync_systems_3d!(@generate_systems $app, $name, $query, $query);
-        )+
+    // Main entry point - handles mixed directional sync
+    ($app:expr, $($tokens:tt)*) => {
+        $crate::add_transform_sync_systems_3d!(@parse_all $app, $($tokens)*);
     };
 
-    ($app:expr, $($name:ident = bevy_to_godot: $bevy_to_godot_query:ty, godot_to_bevy: $godot_to_bevy_query:ty),+ $(,)?) => {
-        $(
-            $crate::add_transform_sync_systems_3d!(@generate_systems $app, $name, $bevy_to_godot_query, $godot_to_bevy_query);
-        )+
+    // Parse all items recursively
+    (@parse_all $app:expr, $name:ident = bevy_to_godot: $query:ty, $($rest:tt)*) => {
+        $crate::add_transform_sync_systems_3d!(@generate_post_system $app, $name, $query);
+        $crate::add_transform_sync_systems_3d!(@parse_all $app, $($rest)*);
     };
 
-    ($app:expr, $($name:ident = bevy_to_godot: $bevy_to_godot_query:ty),+ $(,)?) => {
-        $(
-            $crate::add_transform_sync_systems_3d!(@generate_post_system $app, $name, $bevy_to_godot_query);
-        )+
+    (@parse_all $app:expr, $name:ident = godot_to_bevy: $query:ty, $($rest:tt)*) => {
+        $crate::add_transform_sync_systems_3d!(@generate_pre_system $app, $name, $query);
+        $crate::add_transform_sync_systems_3d!(@parse_all $app, $($rest)*);
     };
 
-    ($app:expr, $($name:ident = godot_to_bevy: $godot_to_bevy_query:ty),+ $(,)?) => {
-        $(
-            $crate::add_transform_sync_systems_3d!(@generate_pre_system $app, $name, $godot_to_bevy_query);
-        )+
+    (@parse_all $app:expr, $name:ident = $query:ty, $($rest:tt)*) => {
+        $crate::add_transform_sync_systems_3d!(@generate_systems $app, $name, $query, $query);
+        $crate::add_transform_sync_systems_3d!(@parse_all $app, $($rest)*);
     };
+
+    // Handle last item (without trailing comma)
+    (@parse_all $app:expr, $name:ident = bevy_to_godot: $query:ty) => {
+        $crate::add_transform_sync_systems_3d!(@generate_post_system $app, $name, $query);
+    };
+
+    (@parse_all $app:expr, $name:ident = godot_to_bevy: $query:ty) => {
+        $crate::add_transform_sync_systems_3d!(@generate_pre_system $app, $name, $query);
+    };
+
+    (@parse_all $app:expr, $name:ident = $query:ty) => {
+        $crate::add_transform_sync_systems_3d!(@generate_systems $app, $name, $query, $query);
+    };
+
+    // Handle empty case
+    (@parse_all $app:expr,) => {};
+    (@parse_all $app:expr) => {};
 
     (@generate_systems $app:expr, $name:ident, $bevy_to_godot_query:ty, $godot_to_bevy_query:ty) => {
         $crate::add_transform_sync_systems_3d!(@generate_post_system $app, $name, $bevy_to_godot_query);

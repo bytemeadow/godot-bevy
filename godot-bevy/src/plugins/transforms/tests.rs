@@ -52,7 +52,12 @@ mod test_transforms {
         // Test the 2D macro with separate queries for each direction
         add_transform_sync_systems_2d! {
             app,
-            Test2DPlayer = bevy_to_godot: With<Player>, godot_to_bevy: With<PlayerInput>
+            Test2DPlayerPost = bevy_to_godot: With<Player>
+        }
+
+        add_transform_sync_systems_2d! {
+            app,
+            Test2DPlayerPre = godot_to_bevy: With<PlayerInput>
         }
 
         assert!(
@@ -68,7 +73,12 @@ mod test_transforms {
         // Test the 3D macro with separate queries for each direction
         add_transform_sync_systems_3d! {
             app,
-            Test3DPlayer = bevy_to_godot: With<Player>, godot_to_bevy: With<PlayerInput>
+            Test3DPlayerPost = bevy_to_godot: With<Player>
+        }
+
+        add_transform_sync_systems_3d! {
+            app,
+            Test3DPlayerPre = godot_to_bevy: With<PlayerInput>
         }
 
         assert!(
@@ -207,6 +217,42 @@ mod test_transforms {
             app,
             TestPlayer3D = With<Player>,
             TestInput3D = With<PlayerInput>
+        }
+
+        assert!(
+            app.world()
+                .contains_resource::<bevy::ecs::schedule::Schedules>()
+        );
+    }
+
+    #[test]
+    fn test_mixed_directional_sync_2d() {
+        let mut app = App::new();
+
+        // Test mixed directional sync syntax - all directions in one call!
+        add_transform_sync_systems_2d! {
+            app,
+            UIElements = bevy_to_godot: With<Player>,
+            PhysicsResults = godot_to_bevy: With<PlayerInput>,
+            Interactive = With<Player>,
+        }
+
+        assert!(
+            app.world()
+                .contains_resource::<bevy::ecs::schedule::Schedules>()
+        );
+    }
+
+    #[test]
+    fn test_mixed_directional_sync_3d() {
+        let mut app = App::new();
+
+        // Test mixed directional sync syntax - all directions in one call!
+        add_transform_sync_systems_3d! {
+            app,
+            VisualEffects = bevy_to_godot: With<Player>,
+            PhysicsResults = godot_to_bevy: With<PlayerInput>,
+            Interactive = With<Player>,
         }
 
         assert!(
