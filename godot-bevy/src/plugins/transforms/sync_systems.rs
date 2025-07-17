@@ -23,7 +23,6 @@ pub fn post_update_godot_transforms_3d(
     }
 }
 
-#[main_thread_system]
 pub fn pre_update_godot_transforms_3d(
     mut entities: Query<(&mut BevyTransform, &mut GodotNodeHandle), With<Node3DMarker>>,
 ) {
@@ -49,7 +48,6 @@ pub fn post_update_godot_transforms_2d(
     }
 }
 
-#[main_thread_system]
 pub fn pre_update_godot_transforms_2d(
     mut entities: Query<(&mut BevyTransform, &mut GodotNodeHandle), With<Node2DMarker>>,
 ) {
