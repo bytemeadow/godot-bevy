@@ -111,39 +111,15 @@ pub fn default_pre_update_godot_transforms_2d(
     }
 }
 
-/// Base plugin that only sets up transform sync configuration for custom systems.
-/// Use this when you want to provide your own custom transform sync systems.
-pub struct GodotCustomTransformSyncPlugin {
-    pub sync_mode: crate::plugins::core::TransformSyncMode,
-}
-
-impl Default for GodotCustomTransformSyncPlugin {
-    fn default() -> Self {
-        Self {
-            sync_mode: crate::plugins::core::TransformSyncMode::OneWay,
-        }
-    }
-}
-
-impl Plugin for GodotCustomTransformSyncPlugin {
-    fn build(&self, app: &mut App) {
-        // Only register the transform configuration resource for custom systems
-        app.insert_resource(crate::plugins::core::GodotCustomTransformSyncConfig {
-            sync_mode: self.sync_mode,
-        });
-    }
-}
-
-/// Plugin that provides default transform synchronization for all Node2D and Node3D entities.
-/// This is equivalent to the old GodotTransformSyncPlugin behavior.
+/// Plugin that provides transform synchronization for all Node2D and Node3D entities.
 ///
-/// For custom transform sync queries, use `GodotCustomTransformSyncPlugin` instead and
-/// define your own systems with the `transform_sync_systems!` macro.
-pub struct GodotDefaultTransformSyncPlugin {
+/// For custom transform sync queries, use `add_transform_sync_systems_2d!` or
+/// `add_transform_sync_systems_3d!` macros instead, which provide a much cleaner API.
+pub struct GodotTransformSyncPlugin {
     pub sync_mode: crate::plugins::core::TransformSyncMode,
 }
 
-impl Default for GodotDefaultTransformSyncPlugin {
+impl Default for GodotTransformSyncPlugin {
     fn default() -> Self {
         Self {
             sync_mode: crate::plugins::core::TransformSyncMode::OneWay,
@@ -151,7 +127,7 @@ impl Default for GodotDefaultTransformSyncPlugin {
     }
 }
 
-impl Plugin for GodotDefaultTransformSyncPlugin {
+impl Plugin for GodotTransformSyncPlugin {
     fn build(&self, app: &mut App) {
         // Register the default transform sync configuration resource
         app.insert_resource(GodotDefaultTransformSyncConfig {
@@ -175,13 +151,3 @@ impl Plugin for GodotDefaultTransformSyncPlugin {
         );
     }
 }
-
-/// Legacy alias for backward compatibility.
-///
-/// **Deprecated**: Use `GodotDefaultTransformSyncPlugin` for default behavior,
-/// or `GodotCustomTransformSyncPlugin` + custom systems for advanced use cases.
-#[deprecated(
-    since = "0.7.0",
-    note = "Use `GodotDefaultTransformSyncPlugin` for default behavior, or `GodotCustomTransformSyncPlugin` + custom systems for advanced use cases"
-)]
-pub type GodotTransformSyncPlugin = GodotDefaultTransformSyncPlugin;

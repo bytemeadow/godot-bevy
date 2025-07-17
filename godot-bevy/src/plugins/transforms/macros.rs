@@ -1,7 +1,8 @@
 /// Macro for generating 2D transform synchronization systems with compile-time queries.
 ///
 /// This macro generates systems that sync transforms between Bevy and Godot for 2D entities
-/// matching specific component queries. Much simpler than the combined 2D/3D macro.
+/// matching specific component queries. It also automatically configures the transform sync
+/// mode based on the sync direction specified.
 ///
 /// # Usage
 ///
@@ -15,9 +16,22 @@
 /// struct Boid;
 ///
 /// let mut app = App::new();
+/// // Automatically configures TwoWay sync
 /// add_transform_sync_systems_2d! {
 ///     app,
 ///     Boid = With<Boid>
+/// }
+///
+/// // Automatically configures OneWay sync (Bevy → Godot)
+/// add_transform_sync_systems_2d! {
+///     app,
+///     BoidPost = bevy_to_godot: With<Boid>
+/// }
+///
+/// // Automatically configures TwoWay sync (Godot → Bevy)
+/// add_transform_sync_systems_2d! {
+///     app,
+///     BoidPre = godot_to_bevy: With<Boid>
 /// }
 /// ```
 #[macro_export]
@@ -55,7 +69,6 @@ macro_rules! add_transform_sync_systems_2d {
         $crate::paste::paste! {
             #[$crate::prelude::main_thread_system]
             pub fn [<post_update_godot_transforms_2d_ $name:lower>](
-                config: bevy::prelude::Res<$crate::plugins::core::GodotCustomTransformSyncConfig>,
                 mut entities: bevy::prelude::Query<
                     (&$crate::plugins::transforms::Transform2D, &mut $crate::interop::GodotNodeHandle),
                     (
@@ -67,11 +80,6 @@ macro_rules! add_transform_sync_systems_2d {
                     ),
                 >,
             ) {
-                // Early return if transform syncing is disabled
-                if config.sync_mode == $crate::plugins::core::TransformSyncMode::Disabled {
-                    return;
-                }
-
                 use godot::builtin::Transform2D as GodotTransform2D;
                 use godot::classes::Node2D;
 
@@ -96,17 +104,11 @@ macro_rules! add_transform_sync_systems_2d {
         $crate::paste::paste! {
             #[$crate::prelude::main_thread_system]
             pub fn [<pre_update_godot_transforms_2d_ $name:lower>](
-                config: bevy::prelude::Res<$crate::plugins::core::GodotCustomTransformSyncConfig>,
                 mut entities: bevy::prelude::Query<
                     (&mut $crate::plugins::transforms::Transform2D, &mut $crate::interop::GodotNodeHandle),
                     $godot_to_bevy_query
                 >,
             ) {
-                // Early return if not using two-way sync
-                if config.sync_mode != $crate::plugins::core::TransformSyncMode::TwoWay {
-                    return;
-                }
-
                 use bevy::ecs::change_detection::DetectChanges;
                 use godot::builtin::Transform2D as GodotTransform2D;
                 use godot::classes::Node2D;
@@ -132,12 +134,14 @@ macro_rules! add_transform_sync_systems_2d {
             $app.add_systems(bevy::app::PreUpdate, [<pre_update_godot_transforms_2d_ $name:lower>]);
         }
     };
+
 }
 
 /// Macro for generating 3D transform synchronization systems with compile-time queries.
 ///
 /// This macro generates systems that sync transforms between Bevy and Godot for 3D entities
-/// matching specific component queries. Much simpler than the combined 2D/3D macro.
+/// matching specific component queries. It also automatically configures the transform sync
+/// mode based on the sync direction specified.
 ///
 /// # Usage
 ///
@@ -151,9 +155,22 @@ macro_rules! add_transform_sync_systems_2d {
 /// struct Player;
 ///
 /// let mut app = App::new();
+/// // Automatically configures TwoWay sync
 /// add_transform_sync_systems_3d! {
 ///     app,
 ///     Player = With<Player>
+/// }
+///
+/// // Automatically configures OneWay sync (Bevy → Godot)
+/// add_transform_sync_systems_3d! {
+///     app,
+///     PlayerPost = bevy_to_godot: With<Player>
+/// }
+///
+/// // Automatically configures TwoWay sync (Godot → Bevy)
+/// add_transform_sync_systems_3d! {
+///     app,
+///     PlayerPre = godot_to_bevy: With<Player>
 /// }
 /// ```
 #[macro_export]
@@ -191,7 +208,6 @@ macro_rules! add_transform_sync_systems_3d {
         $crate::paste::paste! {
             #[$crate::prelude::main_thread_system]
             pub fn [<post_update_godot_transforms_3d_ $name:lower>](
-                config: bevy::prelude::Res<$crate::plugins::core::GodotCustomTransformSyncConfig>,
                 mut entities: bevy::prelude::Query<
                     (&$crate::plugins::transforms::Transform3D, &mut $crate::interop::GodotNodeHandle),
                     (
@@ -203,11 +219,6 @@ macro_rules! add_transform_sync_systems_3d {
                     ),
                 >,
             ) {
-                // Early return if transform syncing is disabled
-                if config.sync_mode == $crate::plugins::core::TransformSyncMode::Disabled {
-                    return;
-                }
-
                 use godot::classes::Node3D;
 
                 for (transform, mut reference) in entities.iter_mut() {
@@ -227,17 +238,11 @@ macro_rules! add_transform_sync_systems_3d {
         $crate::paste::paste! {
             #[$crate::prelude::main_thread_system]
             pub fn [<pre_update_godot_transforms_3d_ $name:lower>](
-                config: bevy::prelude::Res<$crate::plugins::core::GodotCustomTransformSyncConfig>,
                 mut entities: bevy::prelude::Query<
                     (&mut $crate::plugins::transforms::Transform3D, &mut $crate::interop::GodotNodeHandle),
                     $godot_to_bevy_query
                 >,
             ) {
-                // Early return if not using two-way sync
-                if config.sync_mode != $crate::plugins::core::TransformSyncMode::TwoWay {
-                    return;
-                }
-
                 use bevy::ecs::change_detection::DetectChanges;
                 use godot::classes::Node3D;
 
@@ -259,6 +264,7 @@ macro_rules! add_transform_sync_systems_3d {
             $app.add_systems(bevy::app::PreUpdate, [<pre_update_godot_transforms_3d_ $name:lower>]);
         }
     };
+
 }
 
 // Re-export the new macros at the crate level
