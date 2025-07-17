@@ -1,6 +1,7 @@
 pub use crate::GodotPlugin;
 pub use crate::interop::*;
 pub use crate::node_tree_view::NodeTreeView;
+#[allow(deprecated)]
 pub use crate::plugins::{
     GodotCorePlugins,
     GodotDefaultPlugins,
@@ -17,8 +18,8 @@ pub use crate::plugins::{
     },
     // Core functionality
     core::{
-        FindEntityByNameExt, GodotTransformConfig, MainThreadMarker, PhysicsDelta, PhysicsUpdate,
-        TransformSyncMode,
+        FindEntityByNameExt, GodotCustomTransformSyncConfig, GodotDefaultTransformSyncConfig,
+        MainThreadMarker, PhysicsDelta, PhysicsUpdate, TransformSyncMode,
     },
     // Input
     input::{

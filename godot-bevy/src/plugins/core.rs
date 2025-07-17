@@ -58,13 +58,19 @@ impl Default for TransformSyncMode {
     }
 }
 
-/// Configuration resource for transform syncing behavior
+/// Configuration resource for custom transform syncing behavior (macro-generated systems)
 #[derive(Resource, Debug, Clone)]
-pub struct GodotTransformConfig {
+pub struct GodotCustomTransformSyncConfig {
     pub sync_mode: TransformSyncMode,
 }
 
-impl Default for GodotTransformConfig {
+/// Configuration resource for default transform syncing behavior (plugin systems)
+#[derive(Resource, Debug, Clone)]
+pub struct GodotDefaultTransformSyncConfig {
+    pub sync_mode: TransformSyncMode,
+}
+
+impl Default for GodotCustomTransformSyncConfig {
     fn default() -> Self {
         Self {
             sync_mode: TransformSyncMode::OneWay,
@@ -72,7 +78,38 @@ impl Default for GodotTransformConfig {
     }
 }
 
-impl GodotTransformConfig {
+impl Default for GodotDefaultTransformSyncConfig {
+    fn default() -> Self {
+        Self {
+            sync_mode: TransformSyncMode::OneWay,
+        }
+    }
+}
+
+impl GodotCustomTransformSyncConfig {
+    /// Disable all transform syncing - use direct Godot physics instead
+    pub fn disabled() -> Self {
+        Self {
+            sync_mode: TransformSyncMode::Disabled,
+        }
+    }
+
+    /// Enable one-way sync (ECS → Godot) - default behavior
+    pub fn one_way() -> Self {
+        Self {
+            sync_mode: TransformSyncMode::OneWay,
+        }
+    }
+
+    /// Enable two-way sync (ECS ↔ Godot) for hybrid apps
+    pub fn two_way() -> Self {
+        Self {
+            sync_mode: TransformSyncMode::TwoWay,
+        }
+    }
+}
+
+impl GodotDefaultTransformSyncConfig {
     /// Disable all transform syncing - use direct Godot physics instead
     pub fn disabled() -> Self {
         Self {

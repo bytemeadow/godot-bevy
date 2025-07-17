@@ -47,6 +47,41 @@ By default, godot-bevy operates in **one-way sync mode**:
 
 This is optimal for pure ECS applications where all movement logic lives in Bevy systems.
 
+## Plugin Architecture
+
+godot-bevy provides two approaches for transform synchronization:
+
+### 1. Default Transform Sync Plugin
+
+The simplest approach that synchronizes ALL Node2D and Node3D entities:
+
+```rust
+app.add_plugins(GodotDefaultTransformSyncPlugin::default());
+```
+
+### 2. Custom Transform Sync Systems
+
+For performance-critical applications, you can specify exactly which entities should be synchronized:
+
+```rust
+use godot_bevy::plugins::transforms::{add_transform_sync_systems, GodotCustomTransformSyncPlugin};
+
+// Step 1: Add config-only plugin
+app.add_plugins(GodotCustomTransformSyncPlugin::default());
+
+// Step 2: Define custom sync systems
+add_transform_sync_systems! {
+    app,
+    PhysicsOnly = Or<(
+        With<RigidBody3DMarker>,
+        With<CharacterBody3DMarker>,
+        With<StaticBody3DMarker>,
+    )>
+}
+```
+
+This approach uses compile-time queries for maximum performance - only entities matching your criteria will be synchronized.
+
 ## When to Use Each Approach
 
 ### Use ECS Transforms When:
