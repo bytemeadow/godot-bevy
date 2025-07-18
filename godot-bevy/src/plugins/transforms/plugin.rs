@@ -6,7 +6,7 @@ use bevy::{
 use crate::prelude::{GodotTransformConfig, TransformSyncMode};
 
 use super::sync_systems::{
-    post_update_godot_transforms_2d, post_update_godot_transforms_3d,
+    add_update_marker, post_update_godot_transforms_2d, post_update_godot_transforms_3d,
     pre_update_godot_transforms_2d, pre_update_godot_transforms_3d,
 };
 
@@ -36,9 +36,11 @@ impl Plugin for GodotTransformSyncPlugin {
         app.add_systems(
             PreUpdate,
             (
+                add_update_marker,
                 pre_update_godot_transforms_3d,
                 pre_update_godot_transforms_2d,
             )
+                .chain()
                 .run_if(transform_sync_twoway_enabled),
         );
     }

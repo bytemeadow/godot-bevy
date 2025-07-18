@@ -2216,6 +2216,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "godot-physics-demo"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "godot",
+ "godot-bevy",
+ "which 8.0.0",
+]
+
+[[package]]
 name = "gpu-alloc"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
