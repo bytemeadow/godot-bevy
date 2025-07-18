@@ -34,13 +34,16 @@ pub fn add_update_marker(
 pub fn post_update_godot_transforms_3d(
     mut entities: Query<
         (Ref<BevyTransform>, &PreUpdateMarker, &mut GodotNodeHandle),
-        (Added<BevyTransform>, With<Node3DMarker>),
+        (
+            Or<(Added<BevyTransform>, Changed<BevyTransform>)>,
+            With<Node3DMarker>,
+        ),
     >,
 ) {
     let mut count = 0;
     for (bevy_transform, change_marker, mut godot_node_handle) in entities.iter_mut() {
         if change_marker.0 == bevy_transform.last_changed() {
-            info!("skipped updating");
+            info!("post skipped updating, nothing changed between pre and post");
             continue;
         }
 

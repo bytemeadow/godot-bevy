@@ -19,9 +19,9 @@ fn build_app(app: &mut App) {
     app.add_systems(Update, print_positions);
 }
 
-fn print_positions(transform: Query<&mut Transform, Changed<Transform>>) {
+fn print_positions(mut query: Query<&mut Transform, Changed<Transform>>) {
     // TODO print once per second or something so we're not spamming, or perhaps only on change?
-    for transform in transform.iter() {
-        // info!("position: {:?}", transform.translation);
-    }
+    // for mut transform in query.iter_mut() {
+    //     transform.translation.x += 1.;
+    // }
 }
