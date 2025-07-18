@@ -29,7 +29,12 @@ pub fn pre_update_godot_transforms_3d(
 ) {
     for (mut bevy_transform, mut reference) in entities.iter_mut() {
         let godot_transform = reference.get::<Node3D>().get_transform();
-        *bevy_transform = godot_transform.to_bevy_transform();
+        let new_bevy_transform = godot_transform.to_bevy_transform();
+        
+        // Only write if actually different - avoids triggering change detection
+        if *bevy_transform != new_bevy_transform {
+            *bevy_transform = new_bevy_transform;
+        }
     }
 }
 
@@ -54,7 +59,12 @@ pub fn pre_update_godot_transforms_2d(
     mut entities: Query<(&mut BevyTransform, &mut GodotNodeHandle), With<Node2DMarker>>,
 ) {
     for (mut bevy_transform, mut reference) in entities.iter_mut() {
-        let obj = reference.get::<Node2D>();
-        *bevy_transform = obj.get_transform().to_bevy_transform();
+        let godot_transform = reference.get::<Node2D>().get_transform();
+        let new_bevy_transform = godot_transform.to_bevy_transform();
+        
+        // Only write if actually different - avoids triggering change detection
+        if *bevy_transform != new_bevy_transform {
+            *bevy_transform = new_bevy_transform;
+        }
     }
 }
