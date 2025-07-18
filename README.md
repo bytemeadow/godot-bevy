@@ -151,3 +151,15 @@ request is assumed to signal agreement with these licensing terms.
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Developing environment
+
+If you're on MacOS or Linux, you can quickly get started developing against this
+package using https://devenv.sh/, and (optionally) https://direnv.net/. Once
+they are setup/installed, you can leverage `devenv shell` in the root of this
+package to setup a development environment that includes all system
+dependencies, rust, godot, and other developer tools used in this package. Check
+out [devenv.nix](./devenv.nix) for details. You can, of course, skip this and
+use system-installed tooling of your own; but keep in mind that your system
+dependency versions (like Godot) may drift from what other contributors or our
+CI tooling use.

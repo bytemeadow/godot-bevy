@@ -111,9 +111,12 @@ fi
 godot --headless --export-release "$PLATFORM" "$BENCHMARK_BINARY" project.godot
 cd ..
 
+# If we're using a nix development environment, wrap executable in a file hierarchy standard (FHS) env
+[[ $(type -P "steam-run") ]] && FHS_BINARY="steam-run" || FHS_BINARY=""
+
 # Run the benchmark
 echo "🚀 Starting benchmark..."
-"$BENCHMARK_BINARY" --headless \
+$FHS_BINARY "$BENCHMARK_BINARY" --headless \
     --implementation="$IMPLEMENTATION" \
     --boid-count="$BOID_COUNT" \
     --duration="$DURATION" \

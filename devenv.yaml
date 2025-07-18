@@ -1,0 +1,23 @@
+# https://devenv.sh/reference/yaml-options/
+inputs:
+  # By default, devenv uses a fork of nixpkgs with additional fixes. This fork can
+  # be several months behind nixpkgs-unstable. You can still get a more recently
+  # updated package from nixpkgs-unstable into your devenv.
+  # https://devenv.sh/common-patterns/
+  nixpkgs:
+    url: github:nixos/nixpkgs/nixpkgs-unstable
+  rust-overlay:
+    url: github:oxalica/rust-overlay
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
+# If you're using non-OSS software, you can set allowUnfree to true.
+# in our case, `steam-run`
+allowUnfree: true
+# If you're willing to use a package that's vulnerable
+# permittedInsecurePackages:
+#  - "openssl-1.1.1w"
+
+# If you have more than one devenv you can merge them
+#imports:
+# - ./backend
