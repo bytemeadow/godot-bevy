@@ -1,7 +1,7 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::{exit, Command, Stdio},
+    process::{Command, Stdio, exit},
 };
 
 use which::{which, which_in_global};
@@ -28,6 +28,8 @@ fn main() -> Result<(), std::io::Error> {
     };
 
     let mut child = Command::new(godot_binary_path())
+        .arg("--max-fps")
+        .arg("1")
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
