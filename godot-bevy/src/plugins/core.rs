@@ -109,17 +109,17 @@ impl Plugin for GodotBaseCorePlugin {
                 .with_reader(|| Box::new(crate::plugins::assets::GodotAssetReader::new())),
         );
         app.register_asset_source(
-            AssetSourceId::new(Some("res")),
+            AssetSourceId::from("res"),
             AssetSource::build()
                 .with_reader(|| Box::new(crate::plugins::assets::GodotAssetReader::new())),
         );
         app.register_asset_source(
-            AssetSourceId::new(Some("user")),
+            AssetSourceId::from("user"),
             AssetSource::build()
                 .with_reader(|| Box::new(crate::plugins::assets::GodotAssetReader::new())),
         );
         app.register_asset_source(
-            AssetSourceId::new(Some("uid")),
+            AssetSourceId::from("uid"),
             AssetSource::build()
                 .with_reader(|| Box::new(crate::plugins::assets::GodotAssetReader::new())),
         );
