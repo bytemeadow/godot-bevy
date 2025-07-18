@@ -42,9 +42,17 @@ pub fn post_update_godot_transforms_3d(
 pub fn pre_update_godot_transforms_3d(
     mut commands: Commands,
     change_tick: SystemChangeTick,
-    mut entities: Query<(Entity, &mut BevyTransform, &mut GodotNodeHandle), With<Node3DMarker>>,
+    mut entities: Query<
+        (
+            Entity,
+            &mut BevyTransform,
+            &mut GodotNodeHandle,
+            Option<&mut LastGodotSyncTick>,
+        ),
+        With<Node3DMarker>,
+    >,
 ) {
-    for (entity, mut bevy_transform, mut reference) in entities.iter_mut() {
+    for (entity, mut bevy_transform, mut reference, sync_tick) in entities.iter_mut() {
         let godot_transform = reference.get::<Node3D>().get_transform();
         let new_bevy_transform = godot_transform.to_bevy_transform();
 
@@ -52,10 +60,14 @@ pub fn pre_update_godot_transforms_3d(
         if *bevy_transform != new_bevy_transform {
             *bevy_transform = new_bevy_transform;
 
-            // Store the current tick - any changes after this tick are from Bevy systems
-            commands.entity(entity).insert(LastGodotSyncTick {
-                tick: change_tick.this_run().get(),
-            });
+            // Update existing tick component or insert new one
+            if let Some(mut existing_tick) = sync_tick {
+                existing_tick.tick = change_tick.this_run().get();
+            } else {
+                commands.entity(entity).insert(LastGodotSyncTick {
+                    tick: change_tick.this_run().get(),
+                });
+            }
         }
     }
 }
@@ -93,9 +105,17 @@ pub fn post_update_godot_transforms_2d(
 pub fn pre_update_godot_transforms_2d(
     mut commands: Commands,
     change_tick: SystemChangeTick,
-    mut entities: Query<(Entity, &mut BevyTransform, &mut GodotNodeHandle), With<Node2DMarker>>,
+    mut entities: Query<
+        (
+            Entity,
+            &mut BevyTransform,
+            &mut GodotNodeHandle,
+            Option<&mut LastGodotSyncTick>,
+        ),
+        With<Node2DMarker>,
+    >,
 ) {
-    for (entity, mut bevy_transform, mut reference) in entities.iter_mut() {
+    for (entity, mut bevy_transform, mut reference, sync_tick) in entities.iter_mut() {
         let godot_transform = reference.get::<Node2D>().get_transform();
         let new_bevy_transform = godot_transform.to_bevy_transform();
 
@@ -103,10 +123,14 @@ pub fn pre_update_godot_transforms_2d(
         if *bevy_transform != new_bevy_transform {
             *bevy_transform = new_bevy_transform;
 
-            // Store the current tick - any changes after this tick are from Bevy systems
-            commands.entity(entity).insert(LastGodotSyncTick {
-                tick: change_tick.this_run().get(),
-            });
+            // Update existing tick component or insert new one
+            if let Some(mut existing_tick) = sync_tick {
+                existing_tick.tick = change_tick.this_run().get();
+            } else {
+                commands.entity(entity).insert(LastGodotSyncTick {
+                    tick: change_tick.this_run().get(),
+                });
+            }
         }
     }
 }
