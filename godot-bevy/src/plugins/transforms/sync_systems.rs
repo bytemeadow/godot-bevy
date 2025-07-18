@@ -36,6 +36,7 @@ pub fn post_update_godot_transforms_3d(
     }
 }
 
+#[main_thread_system]
 pub fn pre_update_godot_transforms_3d(
     config: Res<crate::plugins::core::GodotTransformConfig>,
     mut entities: Query<(&mut Transform3D, &mut GodotNodeHandle), With<Node3DMarker>>,
@@ -89,6 +90,7 @@ pub fn post_update_godot_transforms_2d(
     }
 }
 
+#[main_thread_system]
 pub fn pre_update_godot_transforms_2d(
     config: Res<crate::plugins::core::GodotTransformConfig>,
     mut entities: Query<(&mut Transform2D, &mut GodotNodeHandle), With<Node2DMarker>>,
