@@ -249,22 +249,22 @@ fn add_node_type_markers(
     // Check base types first to determine the hierarchy branch
     // This reduces FFI calls by only checking relevant subtypes
 
-    if let Some(_) = node.try_get::<Node3D>() {
+    if node.try_get::<Node3D>().is_some() {
         entity_commands.insert(Node3DMarker);
 
         // Only check 3D-specific nodes if we're in the Node3D hierarchy
         check_3d_node_types(entity_commands, node);
-    } else if let Some(_) = node.try_get::<Node2D>() {
+    } else if node.try_get::<Node2D>().is_some() {
         entity_commands.insert(Node2DMarker);
 
         // Only check 2D-specific nodes if we're in the Node2D hierarchy
         check_2d_node_types(entity_commands, node);
-    } else if let Some(_) = node.try_get::<Control>() {
+    } else if node.try_get::<Control>().is_some() {
         entity_commands.insert(ControlMarker);
 
         // Only check UI nodes if we're in the Control hierarchy
         check_control_node_types(entity_commands, node);
-    } else if let Some(_) = node.try_get::<CanvasItem>() {
+    } else if node.try_get::<CanvasItem>().is_some() {
         entity_commands.insert(CanvasItemMarker);
 
         // CanvasItem has some 2D nodes that aren't Node2D
