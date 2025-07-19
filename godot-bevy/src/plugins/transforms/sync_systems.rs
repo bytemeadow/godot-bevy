@@ -11,6 +11,7 @@ use godot::classes::{Node2D, Node3D};
 
 #[main_thread_system]
 pub fn post_update_godot_transforms_3d(
+    change_tick: SystemChangeTick,
     mut entities: Query<
         (
             &BevyTransform,
@@ -27,7 +28,10 @@ pub fn post_update_godot_transforms_3d(
     for (bevy_transform, mut reference, sync_tick, transform_ref) in entities.iter_mut() {
         // Check if this change happened after our last Godot sync
         if let Some(sync_tick) = sync_tick {
-            if transform_ref.last_changed().get() <= sync_tick.tick {
+            if !transform_ref
+                .last_changed()
+                .is_newer_than(sync_tick.tick, change_tick.this_run())
+            {
                 // This change was from our Godot sync, skip it
                 continue;
             }
@@ -62,10 +66,10 @@ pub fn pre_update_godot_transforms_3d(
 
             // Update existing tick component or insert new one
             if let Some(mut existing_tick) = sync_tick {
-                existing_tick.tick = change_tick.this_run().get();
+                existing_tick.tick = change_tick.this_run();
             } else {
                 commands.entity(entity).insert(LastGodotSyncTick {
-                    tick: change_tick.this_run().get(),
+                    tick: change_tick.this_run(),
                 });
             }
         }
@@ -74,6 +78,7 @@ pub fn pre_update_godot_transforms_3d(
 
 #[main_thread_system]
 pub fn post_update_godot_transforms_2d(
+    change_tick: SystemChangeTick,
     mut entities: Query<
         (
             &BevyTransform,
@@ -90,7 +95,10 @@ pub fn post_update_godot_transforms_2d(
     for (bevy_transform, mut reference, sync_tick, transform_ref) in entities.iter_mut() {
         // Check if this change happened after our last Godot sync
         if let Some(sync_tick) = sync_tick {
-            if transform_ref.last_changed().get() <= sync_tick.tick {
+            if !transform_ref
+                .last_changed()
+                .is_newer_than(sync_tick.tick, change_tick.this_run())
+            {
                 // This change was from our Godot sync, skip it
                 continue;
             }
@@ -125,10 +133,10 @@ pub fn pre_update_godot_transforms_2d(
 
             // Update existing tick component or insert new one
             if let Some(mut existing_tick) = sync_tick {
-                existing_tick.tick = change_tick.this_run().get();
+                existing_tick.tick = change_tick.this_run();
             } else {
                 commands.entity(entity).insert(LastGodotSyncTick {
-                    tick: change_tick.this_run().get(),
+                    tick: change_tick.this_run(),
                 });
             }
         }
