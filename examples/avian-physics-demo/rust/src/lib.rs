@@ -94,9 +94,6 @@ fn update_scene_tree_config(mut config: ResMut<SceneTreeConfig>) {
     // as it is incompatible, i.e., Avian Physics has its own notions
     // for what parent/child entity relatonships mean
     config.add_child_relationship = false;
-
-    // We add our own transforms, no need to do it in the plugin
-    config.add_transforms = false
 }
 
 fn spawn_entities(

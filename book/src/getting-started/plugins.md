@@ -121,7 +121,7 @@ fn build_app(app: &mut App) {
     app.add_plugins(GodotTransformSyncPlugin::default())  // Move nodes
         .add_plugins(GodotAudioPlugin)                    // Play sounds
         .add_plugins(BevyInputBridgePlugin);              // Handle input
-    
+
     app.add_systems(Update, my_game_systems);
 }
 ```
@@ -198,9 +198,7 @@ app.add_plugins(GodotTransformSyncPlugin {
 
 ```rust
 // Configure transform component creation
-app.add_plugins(GodotSceneTreePlugin {
-    add_transforms: false,  // Don't add Transform components
-});
+app.add_plugins(GodotSceneTreePlugin::default());
 ```
 
 Note: This is already included in `GodotCorePlugins`, so you'd need to disable the default `GodotPlugin` and build your own plugin setup to customize this.
@@ -217,7 +215,7 @@ Some plugins automatically include their dependencies:
 ### Ask Yourself:
 
 1. **Do I want to move/position nodes from Bevy?** → Add `GodotTransformSyncPlugin`
-2. **Do I want to play sounds and music?** → Add `GodotAudioPlugin`  
+2. **Do I want to play sounds and music?** → Add `GodotAudioPlugin`
 3. **Do I want to respond to UI signals?** → Add `GodotSignalsPlugin`
 4. **Do I want to detect collisions?** → Add `GodotCollisionsPlugin`
 5. **Do I want to handle input?** → Add `BevyInputBridgePlugin` or `GodotInputEventPlugin`
@@ -231,7 +229,7 @@ Start with `GodotDefaultPlugins` and optimize later by removing unused plugins.
 ### Smaller Binaries
 Only compile the features you actually use.
 
-### Better Performance  
+### Better Performance
 Skip unused systems and resources.
 
 ### Clear Dependencies
