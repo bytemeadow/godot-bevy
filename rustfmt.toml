@@ -1,0 +1,6 @@
+# https://github.com/rust-lang/rustfmt/blob/master/Configurations.md
+# When running cargo fmt, the edition is automatically read from the Cargo.toml
+# file. However, when running rustfmt directly the edition defaults to 2015 if
+# not explicitly configured. For consistent parsing between rustfmt and cargo
+# fmt you should configure the edition. For example in your rustfmt.toml file:
+edition = "2024"
