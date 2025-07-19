@@ -17,6 +17,9 @@ pub mod watchers;
 // Re-export inventory to avoid requiring users to add it as a dependency
 pub use inventory;
 
+// Re-export paste to avoid requiring users to add it as a dependency for transform sync macros
+pub use paste;
+
 pub struct GodotPlugin;
 
 impl Plugin for GodotPlugin {

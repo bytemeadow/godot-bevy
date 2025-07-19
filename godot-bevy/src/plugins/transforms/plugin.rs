@@ -12,9 +12,22 @@ use crate::prelude::{GodotTransformConfig, TransformSyncMode};
 use super::change_filter::TransformSyncMetadata;
 use super::sync_systems::{post_update_godot_transforms, pre_update_godot_transforms};
 
-#[derive(Default)]
 pub struct GodotTransformSyncPlugin {
+    /// The mode for syncing transforms between Godot and Bevy.
     pub sync_mode: crate::plugins::core::TransformSyncMode,
+    /// When true (default), enables automatic transform syncing systems.
+    /// When false, still registers Transform and TransformSyncMetadata components
+    /// but allows defining custom sync systems using the transform_sync_systems! macro.
+    pub auto_sync: bool,
+}
+
+impl Default for GodotTransformSyncPlugin {
+    fn default() -> Self {
+        Self {
+            sync_mode: crate::plugins::core::TransformSyncMode::default(),
+            auto_sync: true,
+        }
+    }
 }
 
 impl Plugin for GodotTransformSyncPlugin {
@@ -39,17 +52,20 @@ impl Plugin for GodotTransformSyncPlugin {
             sync_mode: self.sync_mode,
         });
 
-        // Add systems that sync godot -> bevy transforms when two-way syncing enabled
-        app.add_systems(
-            PreUpdate,
-            pre_update_godot_transforms.run_if(transform_sync_twoway_enabled),
-        );
+        // Only add automatic sync systems if auto_sync is enabled
+        if self.auto_sync {
+            // Add systems that sync godot -> bevy transforms when two-way syncing enabled
+            app.add_systems(
+                PreUpdate,
+                pre_update_godot_transforms.run_if(transform_sync_twoway_enabled),
+            );
 
-        // Add systems that sync bevy -> godot transforms when one or two-way syncing enabled
-        app.add_systems(
-            Last,
-            post_update_godot_transforms.run_if(transform_sync_enabled),
-        );
+            // Add systems that sync bevy -> godot transforms when one or two-way syncing enabled
+            app.add_systems(
+                Last,
+                post_update_godot_transforms.run_if(transform_sync_enabled),
+            );
+        }
     }
 }
 

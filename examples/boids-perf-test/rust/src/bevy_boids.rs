@@ -17,7 +17,10 @@ use godot::{
     builtin::{Color, Vector2},
     classes::{Node as GodotNode, Node2D},
 };
-use godot_bevy::prelude::{main_thread_system, GodotNodeHandle, GodotResource, GodotScene};
+use godot_bevy::{
+    add_transform_sync_systems_2d,
+    prelude::{main_thread_system, GodotNodeHandle, GodotResource, GodotScene},
+};
 
 // Type alias for our spatial tree
 type BoidTree = KDTree2<Boid>;
@@ -129,6 +132,12 @@ impl Plugin for BoidsPlugin {
                 .run_if(|state: Res<SimulationState>| state.is_running)
                 .after(sync_container_params),
         );
+
+        // Add custom transform sync systems for Boid entities only (2D only since boids are 2D)
+        add_transform_sync_systems_2d! {
+            app,
+            Boid = bevy_to_godot: With<Boid>
+        }
     }
 }
 

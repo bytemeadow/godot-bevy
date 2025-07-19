@@ -19,6 +19,7 @@
 
 - [Overview](./transforms/overview.md)
 - [Sync Modes](./transforms/sync-modes.md)
+- [Custom Transform Sync](./transforms/custom-sync.md)
 
 # Input Handling
 
