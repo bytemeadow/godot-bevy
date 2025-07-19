@@ -6,11 +6,14 @@ inputs:
   # https://devenv.sh/common-patterns/
   nixpkgs:
     url: github:nixos/nixpkgs/nixpkgs-unstable
-
+  rust-overlay:
+    url: github:oxalica/rust-overlay
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
 # If you're using non-OSS software, you can set allowUnfree to true.
 # in our case, `steam-run`
 allowUnfree: true
-
 # If you're willing to use a package that's vulnerable
 # permittedInsecurePackages:
 #  - "openssl-1.1.1w"

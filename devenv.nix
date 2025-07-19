@@ -1,4 +1,20 @@
-{ pkgs, lib, config, inputs, ... }: {
+{
+  pkgs,
+  nixpkgs,
+  rust-overlay,
+  lib,
+  # config,
+  # inputs,
+  ...
+}:
+let
+  overlays = [ (import rust-overlay) ];
+  system = pkgs.stdenv.system;
+  rustPkgs = import nixpkgs { inherit system overlays; };
+  # visit rust-toolchain.toml to specify rust toolchain version and associated tools (clippy, etc)
+  rust-toolchain = rustPkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+in
+{
   # https://devenv.sh/basics/
 
   # may be useful - wrt bevy/devenv - https://github.com/cachix/devenv/issues/1681
@@ -13,7 +29,8 @@
   ];
 
   # https://devenv.sh/packages/
-  packages = with pkgs;
+  packages =
+    with pkgs;
     [
       #
       # Packages supporting all platforms, typically cross-platform developer tools
@@ -23,7 +40,9 @@
       samply # profiler, ref https://github.com/mstange/samply
       sccache # cache rust build artifacts, ref https://github.com/mozilla/sccache
       just # simple command runner via justfile, ref https://github.com/casey/just
-    ] ++ lib.optionals pkgs.stdenv.isLinux [
+      rust-toolchain
+    ]
+    ++ lib.optionals pkgs.stdenv.isLinux [
       #
       # Linux specific packages
       #
@@ -44,11 +63,13 @@
       # execution of godot-exported binaries in a FHS-like environment
       # https://nix.dev/permalink/stub-ld
       steam-run
-    ] ++ lib.optionals pkgs.stdenv.isDarwin
-    (with pkgs.darwin.apple_sdk; [ frameworks.Security ]);
-
-  # https://devenv.sh/languages/
-  languages.rust.enable = true;
+    ]
+    ++ lib.optionals pkgs.stdenv.isDarwin (
+      with pkgs.darwin.apple_sdk;
+      [
+        # apple stuff
+      ]
+    );
 
   # speed up rust builds through caching
   env.RUSTC_WRAPPER = "${pkgs.sccache}/bin/sccache";
