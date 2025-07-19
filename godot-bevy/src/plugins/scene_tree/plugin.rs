@@ -1,5 +1,5 @@
 use crate::interop::node_markers::*;
-use crate::plugins::transforms::IntoBevyTransform;
+use crate::plugins::core::SceneTreeComponentRegistry;
 use crate::prelude::main_thread_system;
 use crate::{
     interop::GodotNodeHandle,
@@ -47,9 +47,6 @@ use std::marker::PhantomData;
 /// This plugin is always included in the core plugins and provides
 /// complete scene tree integration out of the box.
 pub struct GodotSceneTreePlugin {
-    /// When true, add a Transform component to the scene's entity.
-    /// NOTE: this will not override a Transform if you've already attached one
-    pub add_transforms: bool,
     /// When true, adds a parent child entity relationship in ECS
     /// that mimics Godot's parent child node relationship.
     /// NOTE: You should disable this if you want to use Avian Physics,
@@ -61,7 +58,6 @@ pub struct GodotSceneTreePlugin {
 impl Default for GodotSceneTreePlugin {
     fn default() -> Self {
         Self {
-            add_transforms: true,
             add_child_relationship: true,
         }
     }
@@ -70,8 +66,6 @@ impl Default for GodotSceneTreePlugin {
 /// Configuration resource for scene tree behavior
 #[derive(Resource)]
 pub struct SceneTreeConfig {
-    /// Add a Transform component
-    pub add_transforms: bool,
     /// When true, adds a parent child entity relationship in ECS
     /// that mimics Godot's parent child node relationship.
     /// NOTE: You should disable this if you want to use Avian Physics,
@@ -87,7 +81,6 @@ impl Plugin for GodotSceneTreePlugin {
 
         app.init_non_send_resource::<SceneTreeRefImpl>()
             .insert_resource(SceneTreeConfig {
-                add_transforms: self.add_transforms,
                 add_child_relationship: self.add_child_relationship,
             })
             .add_event::<SceneTreeEvent>()
@@ -142,6 +135,7 @@ fn initialize_scene_tree(
     mut scene_tree: SceneTreeRef,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
     config: Res<SceneTreeConfig>,
+    component_registry: Res<SceneTreeComponentRegistry>,
 ) {
     fn traverse(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
         events.push(SceneTreeEvent {
@@ -164,6 +158,7 @@ fn initialize_scene_tree(
         &mut scene_tree,
         &mut entities,
         &config,
+        &component_registry,
     );
 }
 
@@ -412,6 +407,7 @@ fn create_scene_tree_entity(
     scene_tree: &mut SceneTreeRef,
     entities: &mut Query<(&mut GodotNodeHandle, Entity)>,
     config: &SceneTreeConfig,
+    component_registry: &SceneTreeComponentRegistry,
 ) {
     let mut ent_mapping = entities
         .iter()
@@ -448,15 +444,6 @@ fn create_scene_tree_entity(
 
                 // Add node type marker components
                 add_node_type_markers(&mut ent, &mut node);
-
-                // Add transform components if configured to do so
-                if config.add_transforms {
-                    if let Some(node3d) = node.try_get::<Node3D>() {
-                        ent.insert_if_new(node3d.get_transform().to_bevy_transform());
-                    } else if let Some(node2d) = node.try_get::<Node2D>() {
-                        ent.insert_if_new(node2d.get_transform().to_bevy_transform());
-                    }
-                }
 
                 let mut node = node.get::<Node>();
 
@@ -519,6 +506,9 @@ fn create_scene_tree_entity(
 
                 ent.insert(Groups::from(&node));
 
+                // Add all components registered by plugins
+                component_registry.add_to_entity(&mut ent, &event.node);
+
                 let ent = ent.id();
                 ent_mapping.insert(node.instance_id(), ent);
 
@@ -567,6 +557,7 @@ fn read_scene_tree_events(
     mut event_reader: EventReader<SceneTreeEvent>,
     mut entities: Query<(&mut GodotNodeHandle, Entity)>,
     config: Res<SceneTreeConfig>,
+    component_registry: Res<SceneTreeComponentRegistry>,
 ) {
     create_scene_tree_entity(
         &mut commands,
@@ -574,5 +565,6 @@ fn read_scene_tree_events(
         &mut scene_tree,
         &mut entities,
         &config,
+        &component_registry,
     );
 }

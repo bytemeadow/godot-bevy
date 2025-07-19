@@ -8,6 +8,7 @@ use bevy::asset::{
 use bevy::ecs::schedule::{Schedule, ScheduleLabel};
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
+use std::any::TypeId;
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
@@ -95,6 +96,121 @@ impl GodotTransformConfig {
     }
 }
 
+use crate::interop::GodotNodeHandle;
+use bevy::ecs::system::EntityCommands;
+
+/// Function that adds a component to an entity with access to the Godot node
+type ComponentInserter = Box<dyn Fn(&mut EntityCommands, &GodotNodeHandle) + Send + Sync>;
+
+/// Registry for components that should be added to entities spawned from the scene tree
+#[derive(Resource, Default)]
+pub struct SceneTreeComponentRegistry {
+    /// Components to add to every entity spawned from scene tree
+    /// Stored as (TypeId, inserter) to avoid duplicates
+    components: Vec<(TypeId, ComponentInserter)>,
+}
+
+impl SceneTreeComponentRegistry {
+    /// Register a component type to be added to all scene tree entities
+    pub fn register<C>(&mut self)
+    where
+        C: Component + Default,
+    {
+        let type_id = TypeId::of::<C>();
+
+        // Check if already registered
+        if self.components.iter().any(|(id, _)| *id == type_id) {
+            return;
+        }
+
+        let inserter = Box::new(|entity: &mut EntityCommands, _node: &GodotNodeHandle| {
+            entity.insert(C::default());
+        });
+        self.components.push((type_id, inserter));
+    }
+
+    /// Register a component type with custom initialization logic
+    pub fn register_with_init<C, F>(&mut self, init_fn: F)
+    where
+        C: Component,
+        F: Fn(&mut EntityCommands, &GodotNodeHandle) + Send + Sync + 'static,
+    {
+        let type_id = TypeId::of::<C>();
+
+        // Check if already registered
+        if self.components.iter().any(|(id, _)| *id == type_id) {
+            return;
+        }
+
+        let inserter = Box::new(init_fn);
+        self.components.push((type_id, inserter));
+    }
+
+    /// Add all registered components to an entity
+    pub fn add_to_entity(&self, entity: &mut EntityCommands, node: &GodotNodeHandle) {
+        for (_, inserter) in &self.components {
+            inserter(entity, node);
+        }
+    }
+}
+
+/// Extension trait for App to register scene tree components
+pub trait AppSceneTreeExt {
+    /// Register a component to be added to all scene tree entities with default value
+    fn register_scene_tree_component<C>(&mut self) -> &mut Self
+    where
+        C: Component + Default;
+
+    /// Register a component with custom initialization logic that has access to the Godot node
+    fn register_scene_tree_component_with_init<C, F>(&mut self, init_fn: F) -> &mut Self
+    where
+        C: Component,
+        F: Fn(&mut EntityCommands, &GodotNodeHandle) + Send + Sync + 'static;
+}
+
+impl AppSceneTreeExt for App {
+    fn register_scene_tree_component<C>(&mut self) -> &mut Self
+    where
+        C: Component + Default,
+    {
+        // Get or create the registry
+        if !self
+            .world()
+            .contains_resource::<SceneTreeComponentRegistry>()
+        {
+            self.world_mut()
+                .init_resource::<SceneTreeComponentRegistry>();
+        }
+
+        self.world_mut()
+            .resource_mut::<SceneTreeComponentRegistry>()
+            .register::<C>();
+
+        self
+    }
+
+    fn register_scene_tree_component_with_init<C, F>(&mut self, init_fn: F) -> &mut Self
+    where
+        C: Component,
+        F: Fn(&mut EntityCommands, &GodotNodeHandle) + Send + Sync + 'static,
+    {
+        // Get or create the registry
+        if !self
+            .world()
+            .contains_resource::<SceneTreeComponentRegistry>()
+        {
+            self.world_mut()
+                .init_resource::<SceneTreeComponentRegistry>();
+        }
+
+        self.world_mut()
+            .resource_mut::<SceneTreeComponentRegistry>()
+            .register_with_init::<C, F>(init_fn);
+
+        self
+    }
+}
+
 /// Minimal core plugin with only essential Godot-Bevy integration.
 /// This includes scene tree management, basic Bevy setup, and core resources.
 #[derive(Default)]
@@ -118,7 +234,8 @@ impl Plugin for GodotBaseCorePlugin {
             .add_plugins(bevy::log::LogPlugin::default())
             .add_plugins(bevy::diagnostic::DiagnosticsPlugin)
             .init_resource::<PhysicsDelta>()
-            .init_non_send_resource::<MainThreadMarker>();
+            .init_non_send_resource::<MainThreadMarker>()
+            .init_resource::<SceneTreeComponentRegistry>();
 
         // Add the PhysicsUpdate schedule
         app.add_schedule(Schedule::new(PhysicsUpdate));
