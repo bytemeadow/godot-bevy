@@ -14,10 +14,9 @@ pub fn post_update_godot_transforms_3d(
     change_tick: SystemChangeTick,
     mut entities: Query<
         (
-            &BevyTransform,
+            Ref<BevyTransform>,
             &mut GodotNodeHandle,
             Option<&LastGodotSyncTick>,
-            Ref<BevyTransform>,
         ),
         (
             Or<(Added<BevyTransform>, Changed<BevyTransform>)>,
@@ -25,7 +24,7 @@ pub fn post_update_godot_transforms_3d(
         ),
     >,
 ) {
-    for (bevy_transform, mut reference, sync_tick, transform_ref) in entities.iter_mut() {
+    for (transform_ref, mut reference, sync_tick) in entities.iter_mut() {
         // Check if this change happened after our last Godot sync
         if let Some(sync_tick) = sync_tick {
             if !transform_ref
@@ -38,7 +37,7 @@ pub fn post_update_godot_transforms_3d(
         }
 
         let mut obj = reference.get::<Node3D>();
-        obj.set_transform(bevy_transform.to_godot_transform());
+        obj.set_transform(transform_ref.to_godot_transform());
     }
 }
 
@@ -81,10 +80,9 @@ pub fn post_update_godot_transforms_2d(
     change_tick: SystemChangeTick,
     mut entities: Query<
         (
-            &BevyTransform,
+            Ref<BevyTransform>,
             &mut GodotNodeHandle,
             Option<&LastGodotSyncTick>,
-            Ref<BevyTransform>,
         ),
         (
             Or<(Added<BevyTransform>, Changed<BevyTransform>)>,
@@ -92,7 +90,7 @@ pub fn post_update_godot_transforms_2d(
         ),
     >,
 ) {
-    for (bevy_transform, mut reference, sync_tick, transform_ref) in entities.iter_mut() {
+    for (transform_ref, mut reference, sync_tick) in entities.iter_mut() {
         // Check if this change happened after our last Godot sync
         if let Some(sync_tick) = sync_tick {
             if !transform_ref
@@ -105,7 +103,7 @@ pub fn post_update_godot_transforms_2d(
         }
 
         let mut obj = reference.get::<Node2D>();
-        obj.set_transform(bevy_transform.to_godot_transform_2d());
+        obj.set_transform(transform_ref.to_godot_transform_2d());
     }
 }
 
