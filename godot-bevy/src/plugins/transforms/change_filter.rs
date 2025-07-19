@@ -1,9 +1,11 @@
 use bevy::ecs::component::Tick;
-use bevy::prelude::Component;
+use bevy::prelude::{Entity, Resource};
+use std::collections::HashMap;
 
-/// Component that stores the tick when we last synced from Godot
-/// This allows us to detect changes that happened AFTER our sync
-#[derive(Component)]
-pub struct LastGodotSyncTick {
-    pub tick: Tick,
+/// Resource that tracks entities synced from Godot and their sync ticks
+/// This prevents post_update systems from writing back transforms that
+/// we just synced from Godot, and enables tick-based change detection
+#[derive(Resource, Default)]
+pub struct GodotSyncedEntities {
+    pub synced_entities: HashMap<Entity, Tick>,
 }

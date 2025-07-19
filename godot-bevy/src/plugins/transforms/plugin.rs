@@ -1,12 +1,13 @@
 use bevy::{
-    app::{App, Last, Plugin, PreUpdate},
+    app::{App, First, Last, Plugin, PreUpdate},
     ecs::{schedule::IntoScheduleConfigs, system::Res},
 };
 
 use crate::prelude::{GodotTransformConfig, TransformSyncMode};
 
+use super::change_filter::GodotSyncedEntities;
 use super::sync_systems::{
-    post_update_godot_transforms_2d, post_update_godot_transforms_3d,
+    clear_godot_synced_entities, post_update_godot_transforms_2d, post_update_godot_transforms_3d,
     pre_update_godot_transforms_2d, pre_update_godot_transforms_3d,
 };
 
@@ -22,15 +23,11 @@ impl Plugin for GodotTransformSyncPlugin {
             sync_mode: self.sync_mode,
         });
 
-        // Add systems that sync bevy -> godot transforms when one or two-way syncing enabled
-        app.add_systems(
-            Last,
-            (
-                post_update_godot_transforms_3d,
-                post_update_godot_transforms_2d,
-            )
-                .run_if(transform_sync_enabled),
-        );
+        // Register the synced entities tracking resource
+        app.insert_resource(GodotSyncedEntities::default());
+
+        // Clear synced entities at the start of each frame
+        app.add_systems(First, clear_godot_synced_entities);
 
         // Add systems that sync godot -> bevy transforms when two-way syncing enabled
         app.add_systems(
@@ -40,6 +37,16 @@ impl Plugin for GodotTransformSyncPlugin {
                 pre_update_godot_transforms_2d,
             )
                 .run_if(transform_sync_twoway_enabled),
+        );
+
+        // Add systems that sync bevy -> godot transforms when one or two-way syncing enabled
+        app.add_systems(
+            Last,
+            (
+                post_update_godot_transforms_3d,
+                post_update_godot_transforms_2d,
+            )
+                .run_if(transform_sync_enabled),
         );
     }
 }
