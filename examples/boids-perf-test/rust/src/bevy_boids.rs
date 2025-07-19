@@ -18,7 +18,7 @@ use godot::{
     classes::{Node as GodotNode, Node2D},
 };
 use godot_bevy::{
-    add_transform_sync_systems_2d,
+    add_transform_sync_systems,
     prelude::{main_thread_system, GodotNodeHandle, GodotResource, GodotScene},
 };
 
@@ -133,8 +133,8 @@ impl Plugin for BoidsPlugin {
                 .after(sync_container_params),
         );
 
-        // Add custom transform sync systems for Boid entities only (2D only since boids are 2D)
-        add_transform_sync_systems_2d! {
+        // Add custom transform sync systems for Boid entities only
+        add_transform_sync_systems! {
             app,
             Boid = bevy_to_godot: With<Boid>
         }
