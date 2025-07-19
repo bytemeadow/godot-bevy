@@ -44,7 +44,6 @@ pub fn post_update_godot_transforms_3d(
 #[main_thread_system]
 pub fn pre_update_godot_transforms_3d(
     mut commands: Commands,
-    change_tick: SystemChangeTick,
     mut entities: Query<
         (
             Entity,
@@ -63,13 +62,16 @@ pub fn pre_update_godot_transforms_3d(
         if *bevy_transform != new_bevy_transform {
             *bevy_transform = new_bevy_transform;
 
+            // Get the actual change tick from our mutation
+            let change_tick = bevy_transform.last_changed();
+
             // Update existing tick component or insert new one
             if let Some(mut existing_tick) = sync_tick {
-                existing_tick.tick = change_tick.this_run();
+                existing_tick.tick = change_tick;
             } else {
-                commands.entity(entity).insert(LastGodotSyncTick {
-                    tick: change_tick.this_run(),
-                });
+                commands
+                    .entity(entity)
+                    .insert(LastGodotSyncTick { tick: change_tick });
             }
         }
     }
@@ -110,7 +112,6 @@ pub fn post_update_godot_transforms_2d(
 #[main_thread_system]
 pub fn pre_update_godot_transforms_2d(
     mut commands: Commands,
-    change_tick: SystemChangeTick,
     mut entities: Query<
         (
             Entity,
@@ -129,13 +130,16 @@ pub fn pre_update_godot_transforms_2d(
         if *bevy_transform != new_bevy_transform {
             *bevy_transform = new_bevy_transform;
 
+            // Get the actual change tick from our mutation
+            let change_tick = bevy_transform.last_changed();
+
             // Update existing tick component or insert new one
             if let Some(mut existing_tick) = sync_tick {
-                existing_tick.tick = change_tick.this_run();
+                existing_tick.tick = change_tick;
             } else {
-                commands.entity(entity).insert(LastGodotSyncTick {
-                    tick: change_tick.this_run(),
-                });
+                commands
+                    .entity(entity)
+                    .insert(LastGodotSyncTick { tick: change_tick });
             }
         }
     }
