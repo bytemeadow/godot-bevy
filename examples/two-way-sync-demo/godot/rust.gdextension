@@ -1,0 +1,13 @@
+[configuration]
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = 4.1
+
+[libraries]
+linux.debug.x86_64 = "res://../../../target/debug/libtwo_way_sync_demo.so"
+linux.release.x86_64 = "res://../../../target/release/libtwo_way_sync_demo.so"
+macos.debug.x86_64 = "res://../../../target/debug/libtwo_way_sync_demo.dylib"
+macos.release.x86_64 = "res://../../../target/release/libtwo_way_sync_demo.dylib"
+macos.debug.arm64 = "res://../../../target/debug/libtwo_way_sync_demo.dylib"
+macos.release.arm64 = "res://../../../target/release/libtwo_way_sync_demo.dylib"
+windows.debug.x86_64 = "res://../../../target/debug/two_way_sync_demo.dll"
+windows.release.x86_64 = "res://../../../target/release/two_way_sync_demo.dll"

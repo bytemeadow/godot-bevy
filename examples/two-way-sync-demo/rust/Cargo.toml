@@ -1,0 +1,17 @@
+[package]
+name = "two-way-sync-demo"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[[bin]]
+path = "../../run_godot.rs"
+name = "two-way-sync-demo"
+
+[dependencies]
+godot-bevy = { path = "../../../godot-bevy" }
+bevy = { version = "0.16", default-features = false }
+godot = "0.3"
+which = "8"

@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3 uid="uid://by3mlw6lgl61y"]
+
+[ext_resource type="Script" uid="uid://dbrmkkj7y1fpl" path="res://quad.gd" id="1_ig7tw"]
+
+[sub_resource type="QuadMesh" id="QuadMesh_ig7tw"]
+
+[node name="Node" type="Node2D"]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+
+[node name="Quad" type="MeshInstance2D" parent="."]
+scale = Vector2(25, 25)
+mesh = SubResource("QuadMesh_ig7tw")
+script = ExtResource("1_ig7tw")
