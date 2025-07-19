@@ -14,10 +14,12 @@ use super::sync_systems::{post_update_godot_transforms, pre_update_godot_transfo
 
 pub struct GodotTransformSyncPlugin {
     /// The mode for syncing transforms between Godot and Bevy.
+    /// Note: This setting is only relevant when `auto_sync` is true.
+    /// When `auto_sync` is false, this value is ignored since no automatic sync systems run.
     pub sync_mode: crate::plugins::core::TransformSyncMode,
     /// When true (default), enables automatic transform syncing systems.
     /// When false, still registers Transform and TransformSyncMetadata components
-    /// but allows defining custom sync systems using the transform_sync_systems! macro.
+    /// but allows defining custom sync systems using the add_transform_sync_systems_*! macros.
     pub auto_sync: bool,
 }
 

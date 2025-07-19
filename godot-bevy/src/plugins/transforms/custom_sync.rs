@@ -320,6 +320,27 @@ macro_rules! add_transform_sync_systems_3d {
 
 }
 
+/// Helper trait to easily disable auto sync and configure custom systems
+pub trait GodotTransformSyncPluginExt {
+    /// Disable automatic transform syncing - you must provide your own sync systems
+    fn without_auto_sync(self) -> Self;
+
+    /// Configure the sync mode while keeping auto sync enabled
+    fn with_sync_mode(self, mode: crate::plugins::core::TransformSyncMode) -> Self;
+}
+
+impl GodotTransformSyncPluginExt for crate::plugins::transforms::GodotTransformSyncPlugin {
+    fn without_auto_sync(mut self) -> Self {
+        self.auto_sync = false;
+        self
+    }
+
+    fn with_sync_mode(mut self, mode: crate::plugins::core::TransformSyncMode) -> Self {
+        self.sync_mode = mode;
+        self
+    }
+}
+
 // Re-export the new macros at the crate level
 pub use add_transform_sync_systems_2d;
 pub use add_transform_sync_systems_3d;

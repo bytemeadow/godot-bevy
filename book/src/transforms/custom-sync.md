@@ -25,7 +25,6 @@ fn build_app(app: &mut App) {
     app.add_plugins(
         GodotTransformSyncPlugin::default()
             .without_auto_sync()
-            .with_sync_mode(TransformSyncMode::TwoWay)
     );
 }
 ```
@@ -436,11 +435,11 @@ add_transform_sync_systems_2d! {
     app,
     // Bidirectional sync (default)
     EntityName = With<Component>,
-    
+
     // One-way: ECS → Godot only
     EntityName = bevy_to_godot: With<Component>,
-    
-    // One-way: Godot → ECS only  
+
+    // One-way: Godot → ECS only
     EntityName = godot_to_bevy: With<Component>,
 }
 ```

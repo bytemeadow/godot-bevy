@@ -33,7 +33,7 @@ pub use crate::plugins::{
         GodotSignal, GodotSignalArgument, GodotSignals, GodotSignalsPlugin, connect_godot_signal,
     },
     // Transforms
-    transforms::GodotTransformSyncPlugin,
+    transforms::{GodotTransformSyncPlugin, GodotTransformSyncPluginExt, TransformSyncMetadata},
 };
 pub use bevy::prelude as bevy_prelude;
 pub use godot::prelude as godot_prelude;
