@@ -14,6 +14,8 @@ Use custom transform sync when:
 
 ### 1. Disable Auto Sync
 
+#### Option A: When Adding the Plugin Manually
+
 Use the `.without_auto_sync()` method to disable automatic transform syncing while keeping the Transform and TransformSyncMetadata components:
 
 ```rust
@@ -22,6 +24,30 @@ use godot_bevy::prelude::*;
 #[bevy_app]
 fn build_app(app: &mut App) {
     // Disable auto sync but keep transform components
+    app.add_plugins(
+        GodotTransformSyncPlugin::default()
+            .without_auto_sync()
+    );
+}
+```
+
+#### Option B: When Using GodotDefaultPlugins
+
+If you're using `GodotDefaultPlugins`, you need to disable the included `GodotTransformSyncPlugin` and add your own configured version:
+
+```rust
+use godot_bevy::prelude::*;
+
+#[bevy_app]
+fn build_app(app: &mut App) {
+    // Remove the default transform sync plugin and add a custom one
+    app.add_plugins(
+        GodotDefaultPlugins
+            .build()
+            .disable::<GodotTransformSyncPlugin>()
+    );
+
+    // Add your custom-configured transform sync plugin
     app.add_plugins(
         GodotTransformSyncPlugin::default()
             .without_auto_sync()
