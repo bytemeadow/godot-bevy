@@ -52,7 +52,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Install Nix
+        if: matrix.platform != 'windows'
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            extra-trusted-public-keys = devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw=
+            extra-substituters = https://devenv.cachix.org
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Setup devenv cache
+        if: matrix.platform != 'windows'
+        uses: cachix/cachix-action@v14
+        with:
+          name: devenv
+
+      - name: Install devenv
+        if: matrix.platform != 'windows'
+        run: nix profile install nixpkgs#devenv
+
+      - name: Install Rust toolchain (Windows only)
+        if: matrix.platform == 'windows'
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -65,24 +85,37 @@ jobs:
             . -> target
             examples/*/rust -> target
 
-      - name: Cache and install Linux dependencies
-        if: runner.os == 'linux'
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libasound2-dev libudev-dev pkg-config
-          version: 1.0
-
-      - name: Check formatting
+      - name: Check formatting (Windows)
+        if: matrix.platform == 'windows'
         run: cargo fmt --all -- --check
 
-      - name: Run clippy
+      - name: Check formatting (Linux/macOS)
+        if: matrix.platform != 'windows'
+        run: devenv shell -- cargo fmt --all -- --check
+
+      - name: Run clippy (Windows)
+        if: matrix.platform == 'windows'
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-      - name: Run tests
+      - name: Run clippy (Linux/macOS)
+        if: matrix.platform != 'windows'
+        run: devenv shell -- cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests (Windows)
+        if: matrix.platform == 'windows'
         run: cargo test
 
-      - name: Build release
+      - name: Run tests (Linux/macOS)
+        if: matrix.platform != 'windows'
+        run: devenv shell -- cargo test
+
+      - name: Build release (Windows)
+        if: matrix.platform == 'windows'
         run: cargo build --release
+
+      - name: Build release (Linux/macOS)
+        if: matrix.platform != 'windows'
+        run: devenv shell -- cargo build --release
 
       - name: Upload Rust libraries
         uses: actions/upload-artifact@v4
@@ -143,8 +176,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            extra-trusted-public-keys = devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw=
+            extra-substituters = https://devenv.cachix.org
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Setup devenv cache
+        uses: cachix/cachix-action@v14
+        with:
+          name: devenv
+
+      - name: Install devenv
+        run: nix profile install nixpkgs#devenv
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -187,7 +233,7 @@ jobs:
           ls -la target/release/ || echo "No release libraries found"
 
       - name: Build example Rust library
-        run: cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
+        run: devenv shell -- cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
 
       - name: Import Godot project
         working-directory: examples/${{ matrix.example }}/godot
@@ -223,8 +269,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            extra-trusted-public-keys = devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw=
+            extra-substituters = https://devenv.cachix.org
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Setup devenv cache
+        uses: cachix/cachix-action@v14
+        with:
+          name: devenv
+
+      - name: Install devenv
+        run: nix profile install nixpkgs#devenv
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -232,13 +291,6 @@ jobs:
           workspaces: |
             . -> target
             examples/*/rust -> target
-
-      - name: Cache and install Linux dependencies
-        if: runner.os == 'linux'
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libasound2-dev libudev-dev pkg-config
-          version: 1.0
 
       - name: Download Rust libraries
         uses: actions/download-artifact@v4
@@ -299,7 +351,7 @@ jobs:
             ${{ runner.os }}-godot-imports-boids-
 
       - name: Build boids benchmark
-        run: cargo build --release --manifest-path examples/boids-perf-test/rust/Cargo.toml
+        run: devenv shell -- cargo build --release --manifest-path examples/boids-perf-test/rust/Cargo.toml
 
       - name: Import Godot project
         working-directory: examples/boids-perf-test/godot
