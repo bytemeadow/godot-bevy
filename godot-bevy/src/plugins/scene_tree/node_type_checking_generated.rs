@@ -5,7 +5,7 @@ use crate::interop::{GodotNodeHandle, node_markers::*};
 use bevy::ecs::system::EntityCommands;
 
 /// Adds appropriate marker components to an entity based on the Godot node type.
-/// This function is automatically generated and handles all 186 Godot node types.
+/// This function is automatically generated and handles all 200 Godot node types.
 ///
 /// Godot's hierarchy: Node -> {Node3D, CanvasItem -> {Node2D, Control}, Others}
 /// We check the major branches: 3D, 2D, Control (UI), and Universal (direct Node children)
@@ -97,6 +97,60 @@ fn check_3d_node_types_comprehensive(
     }
     if node.try_get::<godot::classes::GpuParticles3D>().is_some() {
         entity_commands.insert(GPUParticles3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::GpuParticlesAttractor3D>()
+        .is_some()
+    {
+        entity_commands.insert(GPUParticlesAttractor3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::GpuParticlesAttractorBox3D>()
+        .is_some()
+    {
+        entity_commands.insert(GPUParticlesAttractorBox3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::GpuParticlesAttractorSphere3D>()
+        .is_some()
+    {
+        entity_commands.insert(GPUParticlesAttractorSphere3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::GpuParticlesAttractorVectorField3D>()
+        .is_some()
+    {
+        entity_commands.insert(GPUParticlesAttractorVectorField3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::GpuParticlesCollision3D>()
+        .is_some()
+    {
+        entity_commands.insert(GPUParticlesCollision3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::GpuParticlesCollisionBox3D>()
+        .is_some()
+    {
+        entity_commands.insert(GPUParticlesCollisionBox3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::GpuParticlesCollisionHeightField3D>()
+        .is_some()
+    {
+        entity_commands.insert(GPUParticlesCollisionHeightField3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::GpuParticlesCollisionSdf3d>()
+        .is_some()
+    {
+        entity_commands.insert(GPUParticlesCollisionSDF3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::GpuParticlesCollisionSphere3D>()
+        .is_some()
+    {
+        entity_commands.insert(GPUParticlesCollisionSphere3DMarker);
     }
     if node
         .try_get::<godot::classes::Generic6DofJoint3D>()
@@ -223,6 +277,36 @@ fn check_3d_node_types_comprehensive(
     }
     if node.try_get::<godot::classes::SpringArm3D>().is_some() {
         entity_commands.insert(SpringArm3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::SpringBoneCollision3D>()
+        .is_some()
+    {
+        entity_commands.insert(SpringBoneCollision3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::SpringBoneCollisionCapsule3D>()
+        .is_some()
+    {
+        entity_commands.insert(SpringBoneCollisionCapsule3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::SpringBoneCollisionPlane3D>()
+        .is_some()
+    {
+        entity_commands.insert(SpringBoneCollisionPlane3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::SpringBoneCollisionSphere3D>()
+        .is_some()
+    {
+        entity_commands.insert(SpringBoneCollisionSphere3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::SpringBoneSimulator3D>()
+        .is_some()
+    {
+        entity_commands.insert(SpringBoneSimulator3DMarker);
     }
     if node.try_get::<godot::classes::Sprite3D>().is_some() {
         entity_commands.insert(Sprite3DMarker);

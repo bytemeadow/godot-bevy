@@ -30,31 +30,31 @@ class GodotTypeGenerator:
     def run_godot_dump_api(self):
         """Run godot --dump-extension-api to generate extension_api.json"""
         print("🚀 Generating extension_api.json from Godot...")
-        
+
         try:
             # Try different common Godot executable names
             godot_commands = ["godot", "godot4", "/usr/local/bin/godot"]
-            
+
             for cmd in godot_commands:
                 try:
                     result = subprocess.run([
                         cmd, "--headless", "--dump-extension-api", str(self.api_file)
                     ], capture_output=True, text=True, timeout=30)
-                    
+
                     if result.returncode == 0 and self.api_file.exists():
                         print(f"✅ Successfully generated extension_api.json using '{cmd}'")
                         return
-                    
+
                 except (subprocess.TimeoutExpired, FileNotFoundError):
                     continue
-            
+
             # If all commands failed, give helpful error
             raise RuntimeError(
                 "Could not run Godot to generate extension_api.json.\n"
                 "Please ensure Godot 4 is installed and available in PATH.\n"
                 "You can also manually run: godot --dump-extension-api extension_api.json"
             )
-            
+
         except Exception as e:
             print(f"❌ Error generating extension_api.json: {e}")
             sys.exit(1)
@@ -62,51 +62,51 @@ class GodotTypeGenerator:
     def load_and_parse_extension_api(self):
         """Load and parse the extension API to extract node types"""
         print("📖 Parsing extension API...")
-        
+
         if not self.api_file.exists():
             raise FileNotFoundError(f"extension_api.json not found at {self.api_file}")
-        
+
         with open(self.api_file) as f:
             api = json.load(f)
-        
+
         # Build inheritance relationships
         inheritance_map = defaultdict(list)
         parent_map = {}
-        
+
         for class_info in api["classes"]:
             name = class_info["name"]
             if "inherits" in class_info:
                 parent = class_info["inherits"]
                 inheritance_map[parent].append(name)
                 parent_map[name] = parent
-        
+
         # Collect all Node-derived types
         node_types = set()
-        
+
         def collect_descendants(class_name):
             node_types.add(class_name)
             for child in inheritance_map.get(class_name, []):
                 collect_descendants(child)
-        
+
         collect_descendants("Node")
-        
+
         # Filter out base Node class and editor-only classes
         excluded_prefixes = ["Editor", "ScriptEditor", "VisualShader"]
         excluded_types = {"Node", "MissingNode", "ImporterMeshInstance3D"}
-        
+
         filtered_types = sorted([
-            t for t in node_types 
+            t for t in node_types
             if not any(t.startswith(prefix) for prefix in excluded_prefixes)
             and t not in excluded_types
         ])
-        
+
         print(f"✅ Found {len(filtered_types)} node types")
         return filtered_types, parent_map
 
     def generate_node_markers(self, node_types):
         """Generate the node_markers.rs file"""
         print("🏷️  Generating node markers...")
-        
+
         content = '''use bevy::ecs::component::Component;
 
 /// Marker components for Godot node types.
@@ -120,20 +120,20 @@ class GodotTypeGenerator:
 pub struct NodeMarker;
 
 '''
-        
+
         # Generate all markers
         for node_type in node_types:
             content += f"#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]\n"
             content += f"pub struct {node_type}Marker;\n\n"
-        
+
         with open(self.node_markers_file, "w") as f:
             f.write(content)
-        
+
         print(f"✅ Generated {len(node_types)} node markers")
 
     def categorize_types_by_hierarchy(self, node_types, parent_map):
         """Categorize node types by their inheritance hierarchy"""
-        
+
         def is_descendant_of(node_type, ancestor):
             current = node_type
             while current in parent_map:
@@ -141,14 +141,14 @@ pub struct NodeMarker;
                 if current == ancestor:
                     return True
             return False
-        
+
         categories = {
             "3d": [],
             "2d": [],
             "control": [],
             "universal": []
         }
-        
+
         for node_type in node_types:
             if is_descendant_of(node_type, "Node3D"):
                 categories["3d"].append(node_type)
@@ -158,19 +158,19 @@ pub struct NodeMarker;
                 categories["control"].append(node_type)
             elif parent_map.get(node_type) == "Node":
                 categories["universal"].append(node_type)
-        
+
         return categories
 
     def generate_type_checking_code(self, node_types, parent_map):
         """Generate the complete type checking implementation"""
         print("🔍 Generating type checking code...")
-        
+
         # Filter out invalid Godot classes first to avoid unnecessary work
         valid_types = self.filter_valid_godot_classes(node_types)
-        
+
         # Categorize only the valid types
         categories = self.categorize_types_by_hierarchy(valid_types, parent_map)
-        
+
         content = f'''// 🤖 This file is automatically generated by scripts/generate_godot_types.py
 // To regenerate: python scripts/generate_godot_types.py
 
@@ -179,7 +179,7 @@ use crate::interop::{{GodotNodeHandle, node_markers::*}};
 
 /// Adds appropriate marker components to an entity based on the Godot node type.
 /// This function is automatically generated and handles all {len(valid_types)} Godot node types.
-/// 
+///
 /// Godot's hierarchy: Node -> {{Node3D, CanvasItem -> {{Node2D, Control}}, Others}}
 /// We check the major branches: 3D, 2D, Control (UI), and Universal (direct Node children)
 pub fn add_comprehensive_node_type_markers(
@@ -208,16 +208,16 @@ pub fn add_comprehensive_node_type_markers(
 }}
 
 '''
-        
+
         # Generate specific checking functions
         content += self._generate_hierarchy_function_comprehensive("3d", categories["3d"])
         content += self._generate_hierarchy_function_comprehensive("2d", categories["2d"])
         content += self._generate_hierarchy_function_comprehensive("control", categories["control"])
         content += self._generate_universal_function_comprehensive(categories["universal"])
-        
+
         with open(self.type_checking_file, "w") as f:
             f.write(content)
-        
+
         print(f"✅ Generated type checking for {len(valid_types)} types")
 
     def filter_valid_godot_classes(self, node_types):
@@ -225,41 +225,33 @@ pub fn add_comprehensive_node_type_markers(
         # Known classes that don't exist in current Godot version or aren't available
         excluded_classes = {
             # CSG classes (require special module)
-            'CSGBox3D', 'CSGCombiner3D', 'CSGCylinder3D', 'CSGMesh3D', 'CSGPolygon3D', 
+            'CSGBox3D', 'CSGCombiner3D', 'CSGCylinder3D', 'CSGMesh3D', 'CSGPolygon3D',
             'CSGPrimitive3D', 'CSGShape3D', 'CSGSphere3D', 'CSGTorus3D',
             # Editor classes
             'GridMapEditorPlugin', 'ScriptCreateDialog', 'FileSystemDock',
-            'OpenXRBindingModifierEditor', 'OpenXRInteractionProfileEditor', 
+            'OpenXRBindingModifierEditor', 'OpenXRInteractionProfileEditor',
             'OpenXRInteractionProfileEditorBase',
             # XR classes that might not be available
-            'XRAnchor3D', 'XRBodyModifier3D', 'XRCamera3D', 'XRController3D', 
+            'XRAnchor3D', 'XRBodyModifier3D', 'XRCamera3D', 'XRController3D',
             'XRFaceModifier3D', 'XRHandModifier3D', 'XRNode3D', 'XROrigin3D',
             # OpenXR classes
-            'OpenXRCompositionLayer', 'OpenXRCompositionLayerCylinder', 
-            'OpenXRCompositionLayerEquirect', 'OpenXRCompositionLayerQuad', 
+            'OpenXRCompositionLayer', 'OpenXRCompositionLayerCylinder',
+            'OpenXRCompositionLayerEquirect', 'OpenXRCompositionLayerQuad',
             'OpenXRHand', 'OpenXRVisibilityMask',
             # Classes that might not be available in all builds
             'VoxelGI', 'LightmapGI', 'FogVolume', 'WorldEnvironment',
-            # GPU Particle classes (might be module-specific)
-            'GPUParticlesAttractor3D', 'GPUParticlesAttractorBox3D', 
-            'GPUParticlesAttractorSphere3D', 'GPUParticlesAttractorVectorField3D',
-            'GPUParticlesCollision3D', 'GPUParticlesCollisionBox3D', 
-            'GPUParticlesCollisionHeightField3D', 'GPUParticlesCollisionSDF3D',
-            'GPUParticlesCollisionSphere3D',
             # Navigation classes (might be module-specific)
-            'NavigationAgent2D', 'NavigationAgent3D', 'NavigationLink2D', 
-            'NavigationLink3D', 'NavigationObstacle2D', 'NavigationObstacle3D', 
+            'NavigationAgent2D', 'NavigationAgent3D', 'NavigationLink2D',
+            'NavigationLink3D', 'NavigationObstacle2D', 'NavigationObstacle3D',
             'NavigationRegion2D', 'NavigationRegion3D',
-            # Spring bone classes (addon-specific)
-            'SpringBoneCollision3D', 'SpringBoneCollisionCapsule3D', 
-            'SpringBoneCollisionPlane3D', 'SpringBoneCollisionSphere3D', 
-            'SpringBoneSimulator3D',
             # Other problematic classes
-            'Parallax2D', 'StatusIndicator',
+            'StatusIndicator',
             # Graph classes (not available in all Godot builds)
             'GraphEdit', 'GraphElement', 'GraphFrame', 'GraphNode',
+            # Parallax2D is in extension API but not in current Rust bindings
+            'Parallax2D',
         }
-        
+
         return [t for t in node_types if t not in excluded_classes]
 
     def fix_godot_class_name_for_rust(self, class_name):
@@ -270,11 +262,20 @@ pub fn add_comprehensive_node_type_markers(
             'CPUParticles3D': 'CpuParticles3D',
             'GPUParticles2D': 'GpuParticles2D',
             'GPUParticles3D': 'GpuParticles3D',
+            'GPUParticlesAttractor3D': 'GpuParticlesAttractor3D',
+            'GPUParticlesAttractorBox3D': 'GpuParticlesAttractorBox3D',
+            'GPUParticlesAttractorSphere3D': 'GpuParticlesAttractorSphere3D',
+            'GPUParticlesAttractorVectorField3D': 'GpuParticlesAttractorVectorField3D',
+            'GPUParticlesCollision3D': 'GpuParticlesCollision3D',
+            'GPUParticlesCollisionBox3D': 'GpuParticlesCollisionBox3D',
+            'GPUParticlesCollisionHeightField3D': 'GpuParticlesCollisionHeightField3D',
+            'GPUParticlesCollisionSDF3D': 'GpuParticlesCollisionSdf3d',
+            'GPUParticlesCollisionSphere3D': 'GpuParticlesCollisionSphere3D',
             'HTTPRequest': 'HttpRequest',
             'SkeletonIK3D': 'SkeletonIk3d',
             'Generic6DOFJoint3D': 'Generic6DofJoint3D',
         }
-        
+
         return name_fixes.get(class_name, class_name)
 
     def _generate_hierarchy_function_comprehensive(self, name, types):
@@ -284,14 +285,14 @@ pub fn add_comprehensive_node_type_markers(
     node: &mut GodotNodeHandle,
 ) {{
 '''
-        
+
         for node_type in sorted(types):
             rust_class_name = self.fix_godot_class_name_for_rust(node_type)
             content += f'''    if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
         entity_commands.insert({node_type}Marker);
     }}
 '''
-        
+
         content += "}\n\n"
         return content
 
@@ -302,24 +303,24 @@ pub fn add_comprehensive_node_type_markers(
     node: &mut GodotNodeHandle,
 ) {
 '''
-        
+
         for node_type in sorted(types):
             rust_class_name = self.fix_godot_class_name_for_rust(node_type)
             content += f'''    if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
         entity_commands.insert({node_type}Marker);
     }}
 '''
-        
+
         content += "}\n"
         return content
 
     def verify_plugin_integration(self):
         """Verify that the plugin is set up to use the generated code"""
         print("🔍 Verifying plugin integration...")
-        
+
         with open(self.plugin_file, "r") as f:
             content = f.read()
-        
+
         if "add_comprehensive_node_type_markers" in content:
             print("✅ Plugin is correctly integrated with generated code")
         else:
@@ -331,28 +332,28 @@ pub fn add_comprehensive_node_type_markers(
     def run(self):
         """Run the complete generation pipeline"""
         print("🎯 Starting Godot type generation pipeline...")
-        
+
         try:
             # Step 1: Generate extension API
             self.run_godot_dump_api()
-            
+
             # Step 2: Parse API and extract types
             node_types, parent_map = self.load_and_parse_extension_api()
-            
+
             # Step 3: Generate node markers
             self.generate_node_markers(node_types)
-            
+
             # Step 4: Generate type checking code
             self.generate_type_checking_code(node_types, parent_map)
-            
-            # Step 5: Verify plugin integration  
+
+            # Step 5: Verify plugin integration
             self.verify_plugin_integration()
-            
+
             print(f"""
 🎉 Generation complete!
 
 Generated:
-  • {len(node_types)} node marker components  
+  • {len(node_types)} node marker components
   • Complete type checking functions
 
 Files generated:
@@ -363,7 +364,7 @@ Next steps:
   • Run 'cargo check' to verify the build
   • Commit the generated files
 """)
-            
+
         except Exception as e:
             print(f"❌ Generation failed: {e}")
             sys.exit(1)
