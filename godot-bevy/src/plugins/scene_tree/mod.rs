@@ -1,4 +1,5 @@
 pub mod autosync;
+pub mod node_type_checking_generated;
 pub mod plugin;
 
 // Re-export main components

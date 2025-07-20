@@ -1,4 +1,4 @@
-use crate::interop::node_markers::*;
+use super::node_type_checking_generated::add_comprehensive_node_type_markers;
 use crate::plugins::core::SceneTreeComponentRegistry;
 use crate::prelude::main_thread_system;
 use crate::{
@@ -23,15 +23,7 @@ use bevy::{
 };
 use godot::{
     builtin::GString,
-    classes::{
-        AnimatedSprite2D, AnimatedSprite3D, AnimationPlayer, AnimationTree, Area2D, Area3D,
-        AudioStreamPlayer, AudioStreamPlayer2D, AudioStreamPlayer3D, Button, Camera2D, Camera3D,
-        CanvasItem, CharacterBody2D, CharacterBody3D, CollisionPolygon2D, CollisionPolygon3D,
-        CollisionShape2D, CollisionShape3D, Control, DirectionalLight3D, Engine, Label, LineEdit,
-        MeshInstance2D, MeshInstance3D, Node, Node2D, Node3D, Panel, Path2D, Path3D, PathFollow2D,
-        PathFollow3D, RigidBody2D, RigidBody3D, SceneTree, SpotLight3D, Sprite2D, Sprite3D,
-        StaticBody2D, StaticBody3D, TextEdit, Timer,
-    },
+    classes::{Engine, Node, SceneTree},
     meta::ToGodot,
     obj::{Gd, Inherits},
     prelude::GodotConvert,
@@ -232,226 +224,6 @@ impl<T: Inherits<Node>> From<&Gd<T>> for Groups {
     }
 }
 
-/// Adds appropriate marker components to an entity based on the Godot node type
-/// Optimized to reduce FFI calls by using hierarchical checking
-fn add_node_type_markers(
-    entity_commands: &mut bevy::ecs::system::EntityCommands,
-    node: &mut GodotNodeHandle,
-) {
-    // All nodes inherit from Node, so add this first
-    entity_commands.insert(NodeMarker);
-
-    // Check base types first to determine the hierarchy branch
-    // This reduces FFI calls by only checking relevant subtypes
-
-    if node.try_get::<Node3D>().is_some() {
-        entity_commands.insert(Node3DMarker);
-
-        // Only check 3D-specific nodes if we're in the Node3D hierarchy
-        check_3d_node_types(entity_commands, node);
-    } else if node.try_get::<Node2D>().is_some() {
-        entity_commands.insert(Node2DMarker);
-
-        // Only check 2D-specific nodes if we're in the Node2D hierarchy
-        check_2d_node_types(entity_commands, node);
-    } else if node.try_get::<Control>().is_some() {
-        entity_commands.insert(ControlMarker);
-
-        // Only check UI nodes if we're in the Control hierarchy
-        check_control_node_types(entity_commands, node);
-    } else if node.try_get::<CanvasItem>().is_some() {
-        entity_commands.insert(CanvasItemMarker);
-
-        // CanvasItem has some 2D nodes that aren't Node2D
-        check_canvas_item_node_types(entity_commands, node);
-    }
-
-    // Check node types that can exist in any hierarchy
-    check_universal_node_types(entity_commands, node);
-}
-
-/// Check 3D-specific node types (only called if node is Node3D)
-fn check_3d_node_types(
-    entity_commands: &mut bevy::ecs::system::EntityCommands,
-    node: &mut GodotNodeHandle,
-) {
-    // Visual 3D nodes
-    if node.try_get::<Sprite3D>().is_some() {
-        entity_commands.insert(Sprite3DMarker);
-    }
-    if node.try_get::<AnimatedSprite3D>().is_some() {
-        entity_commands.insert(AnimatedSprite3DMarker);
-    }
-    if node.try_get::<MeshInstance3D>().is_some() {
-        entity_commands.insert(MeshInstance3DMarker);
-    }
-
-    // Physics bodies 3D
-    if node.try_get::<CharacterBody3D>().is_some() {
-        entity_commands.insert(CharacterBody3DMarker);
-    }
-    if node.try_get::<RigidBody3D>().is_some() {
-        entity_commands.insert(RigidBody3DMarker);
-    }
-    if node.try_get::<StaticBody3D>().is_some() {
-        entity_commands.insert(StaticBody3DMarker);
-    }
-
-    // Areas 3D
-    if node.try_get::<Area3D>().is_some() {
-        entity_commands.insert(Area3DMarker);
-    }
-
-    // Collision shapes 3D
-    if node.try_get::<CollisionShape3D>().is_some() {
-        entity_commands.insert(CollisionShape3DMarker);
-    }
-    if node.try_get::<CollisionPolygon3D>().is_some() {
-        entity_commands.insert(CollisionPolygon3DMarker);
-    }
-
-    // Audio 3D
-    if node.try_get::<AudioStreamPlayer3D>().is_some() {
-        entity_commands.insert(AudioStreamPlayer3DMarker);
-    }
-
-    // Camera 3D
-    if node.try_get::<Camera3D>().is_some() {
-        entity_commands.insert(Camera3DMarker);
-    }
-
-    // Light nodes (only exist in 3D)
-    if node.try_get::<DirectionalLight3D>().is_some() {
-        entity_commands.insert(DirectionalLight3DMarker);
-    }
-    if node.try_get::<SpotLight3D>().is_some() {
-        entity_commands.insert(SpotLight3DMarker);
-    }
-
-    // Path nodes 3D
-    if node.try_get::<Path3D>().is_some() {
-        entity_commands.insert(Path3DMarker);
-    }
-    if node.try_get::<PathFollow3D>().is_some() {
-        entity_commands.insert(PathFollow3DMarker);
-    }
-}
-
-/// Check 2D-specific node types (only called if node is Node2D)
-fn check_2d_node_types(
-    entity_commands: &mut bevy::ecs::system::EntityCommands,
-    node: &mut GodotNodeHandle,
-) {
-    // Visual 2D nodes
-    if node.try_get::<Sprite2D>().is_some() {
-        entity_commands.insert(Sprite2DMarker);
-    }
-    if node.try_get::<AnimatedSprite2D>().is_some() {
-        entity_commands.insert(AnimatedSprite2DMarker);
-    }
-    if node.try_get::<MeshInstance2D>().is_some() {
-        entity_commands.insert(MeshInstance2DMarker);
-    }
-
-    // Physics bodies 2D
-    if node.try_get::<CharacterBody2D>().is_some() {
-        entity_commands.insert(CharacterBody2DMarker);
-    }
-    if node.try_get::<RigidBody2D>().is_some() {
-        entity_commands.insert(RigidBody2DMarker);
-    }
-    if node.try_get::<StaticBody2D>().is_some() {
-        entity_commands.insert(StaticBody2DMarker);
-    }
-
-    // Areas 2D
-    if node.try_get::<Area2D>().is_some() {
-        entity_commands.insert(Area2DMarker);
-    }
-
-    // Collision shapes 2D
-    if node.try_get::<CollisionShape2D>().is_some() {
-        entity_commands.insert(CollisionShape2DMarker);
-    }
-    if node.try_get::<CollisionPolygon2D>().is_some() {
-        entity_commands.insert(CollisionPolygon2DMarker);
-    }
-
-    // Audio 2D
-    if node.try_get::<AudioStreamPlayer2D>().is_some() {
-        entity_commands.insert(AudioStreamPlayer2DMarker);
-    }
-
-    // Camera 2D
-    if node.try_get::<Camera2D>().is_some() {
-        entity_commands.insert(Camera2DMarker);
-    }
-
-    // Path nodes 2D
-    if node.try_get::<Path2D>().is_some() {
-        entity_commands.insert(Path2DMarker);
-    }
-    if node.try_get::<PathFollow2D>().is_some() {
-        entity_commands.insert(PathFollow2DMarker);
-    }
-}
-
-/// Check Control-specific node types (only called if node is Control)
-fn check_control_node_types(
-    entity_commands: &mut bevy::ecs::system::EntityCommands,
-    node: &mut GodotNodeHandle,
-) {
-    // UI nodes
-    if node.try_get::<Label>().is_some() {
-        entity_commands.insert(LabelMarker);
-    }
-    if node.try_get::<Button>().is_some() {
-        entity_commands.insert(ButtonMarker);
-    }
-    if node.try_get::<LineEdit>().is_some() {
-        entity_commands.insert(LineEditMarker);
-    }
-    if node.try_get::<TextEdit>().is_some() {
-        entity_commands.insert(TextEditMarker);
-    }
-    if node.try_get::<Panel>().is_some() {
-        entity_commands.insert(PanelMarker);
-    }
-}
-
-/// Check CanvasItem-specific node types (only called if node is CanvasItem but not Node2D/Control)
-fn check_canvas_item_node_types(
-    _entity_commands: &mut bevy::ecs::system::EntityCommands,
-    _node: &mut GodotNodeHandle,
-) {
-    // This covers CanvasItem nodes that aren't Node2D or Control
-    // Most CanvasItem functionality is covered by Node2D and Control checks
-}
-
-/// Check node types that can exist in any hierarchy
-fn check_universal_node_types(
-    entity_commands: &mut bevy::ecs::system::EntityCommands,
-    node: &mut GodotNodeHandle,
-) {
-    // Audio nodes
-    if node.try_get::<AudioStreamPlayer>().is_some() {
-        entity_commands.insert(AudioStreamPlayerMarker);
-    }
-
-    // Animation nodes
-    if node.try_get::<AnimationPlayer>().is_some() {
-        entity_commands.insert(AnimationPlayerMarker);
-    }
-    if node.try_get::<AnimationTree>().is_some() {
-        entity_commands.insert(AnimationTreeMarker);
-    }
-
-    // Timer
-    if node.try_get::<Timer>().is_some() {
-        entity_commands.insert(TimerMarker);
-    }
-}
-
 #[doc(hidden)]
 pub struct SceneTreeEventReader(pub std::sync::mpsc::Receiver<SceneTreeEvent>);
 
@@ -504,7 +276,7 @@ fn create_scene_tree_entity(
                     .insert(Name::from(node.get::<Node>().get_name().to_string()));
 
                 // Add node type marker components
-                add_node_type_markers(&mut ent, &mut node);
+                add_comprehensive_node_type_markers(&mut ent, &mut node);
 
                 let mut node = node.get::<Node>();
 
