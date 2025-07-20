@@ -23,6 +23,9 @@ jobs:
   rust:
     name: build / rust (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
+    env:
+      # Disable debug symbols in release builds to save disk space
+      CARGO_PROFILE_RELEASE_DEBUG: false
     strategy:
       matrix:
         os:
