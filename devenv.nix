@@ -40,6 +40,7 @@ in
       samply # profiler, ref https://github.com/mstange/samply
       sccache # cache rust build artifacts, ref https://github.com/mozilla/sccache
       just # simple command runner via justfile, ref https://github.com/casey/just
+      python3 # for godot type generation script
       rust-toolchain
     ]
     ++ lib.optionals pkgs.stdenv.isLinux [
