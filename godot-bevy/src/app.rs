@@ -2,6 +2,7 @@ use bevy::app::App;
 use godot::prelude::*;
 use std::sync::{Mutex, mpsc::channel};
 
+use crate::plugins::core::PrePhysicsUpdate;
 use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
 use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
@@ -134,6 +135,7 @@ impl INode for BevyApp {
                 app.world_mut().resource_mut::<PhysicsDelta>().delta_seconds = delta;
 
                 // Run only our physics-specific schedule
+                app.world_mut().run_schedule(PrePhysicsUpdate);
                 app.world_mut().run_schedule(PhysicsUpdate);
             })) {
                 self.app = None;

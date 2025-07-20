@@ -13,6 +13,11 @@ use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
 /// Schedule that runs during Godot's physics_process at physics frame rate.
+/// This schedule runs just before the PhysicsUpdate schedule.
+#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct PrePhysicsUpdate;
+
+/// Schedule that runs during Godot's physics_process at physics frame rate.
 /// Use this for movement, physics, and systems that need to sync with Godot's physics timing.
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PhysicsUpdate;
@@ -253,6 +258,7 @@ impl Plugin for GodotBaseCorePlugin {
             .init_resource::<SceneTreeComponentRegistry>();
 
         // Add the PhysicsUpdate schedule
+        app.add_schedule(Schedule::new(PrePhysicsUpdate));
         app.add_schedule(Schedule::new(PhysicsUpdate));
     }
 }

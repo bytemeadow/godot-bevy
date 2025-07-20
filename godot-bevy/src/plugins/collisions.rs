@@ -1,5 +1,7 @@
+use crate::interop::GodotNodeHandle;
+use crate::plugins::core::PrePhysicsUpdate;
 use bevy::{
-    app::{App, First, Plugin, PreUpdate},
+    app::{App, Plugin},
     ecs::{
         component::Component,
         entity::Entity,
@@ -11,8 +13,6 @@ use bevy::{
 };
 use godot::prelude::*;
 use std::sync::mpsc::Receiver;
-
-use crate::interop::GodotNodeHandle;
 
 #[derive(Default)]
 pub struct GodotCollisionsPlugin;
@@ -38,12 +38,14 @@ pub struct CollisionEvent {
 
 impl Plugin for GodotCollisionsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreUpdate, update_godot_collisions)
-            .add_systems(
-                First,
+        app.add_systems(
+            PrePhysicsUpdate,
+            (
                 write_godot_collision_events.before(event_update_system),
-            )
-            .add_event::<CollisionEvent>();
+                update_godot_collisions,
+            ),
+        )
+        .add_event::<CollisionEvent>();
     }
 }
 
