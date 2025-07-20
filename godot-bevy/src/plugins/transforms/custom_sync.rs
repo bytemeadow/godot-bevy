@@ -176,7 +176,7 @@ macro_rules! add_transform_sync_systems {
 
 /// Helper trait to easily disable auto sync and configure custom systems
 pub trait GodotTransformSyncPluginExt {
-    /// Disable automatic transform syncing - you must provide your own sync systems
+    /// Disable automatic transform syncing - you must provide your own sync systems via `add_transform_sync_systems` macro
     fn without_auto_sync(self) -> Self;
 
     /// Configure the sync mode while keeping auto sync enabled
