@@ -8,7 +8,7 @@ use syn::{
     parse_macro_input,
 };
 
-/// Attribute macro that ensures a system runs on the main thread by adding a NonSend<MainThreadMarker> parameter.
+/// Attribute macro that ensures a system runs on the main thread by adding a `NonSend<MainThreadMarker>` parameter.
 /// This is required for systems that need to access Godot APIs.
 #[proc_macro_attribute]
 pub fn main_thread_system(_attr: TokenStream, item: TokenStream) -> TokenStream {

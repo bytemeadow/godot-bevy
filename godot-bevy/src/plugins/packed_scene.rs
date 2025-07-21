@@ -29,6 +29,8 @@ impl Plugin for GodotPackedScenePlugin {
     }
 }
 
+// silence warning about the following docs referring to private `spawn_scene`
+#[allow(rustdoc::private_intra_doc_links)]
 /// A to-be-instanced-and-spawned Godot scene.
 ///
 /// [`GodotScene`]s that are spawned/inserted into the bevy world will be instanced from the provided
@@ -47,7 +49,7 @@ enum GodotSceneResource {
 }
 
 impl GodotScene {
-    /// Instantiate the godot scene from a Bevy Handle<GodotResource> and add it to the
+    /// Instantiate the godot scene from a Bevy `Handle<GodotResource>` and add it to the
     /// scene tree root. This is the preferred method when using Bevy's asset system.
     pub fn from_handle(handle: Handle<GodotResource>) -> Self {
         Self {
