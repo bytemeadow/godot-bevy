@@ -4,7 +4,7 @@ use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::{
-    Data, DeriveInput, Error, Field, Fields, Ident, LitStr, Result, Token, braced,
+    Data, DeriveInput, Error, Field, Fields, Ident, LitStr, Path, Result, Token, braced,
     parse_macro_input,
 };
 
@@ -264,7 +264,7 @@ struct BevyBundleAttr {
 }
 
 struct ComponentSpec {
-    component_name: Ident,
+    component_name: Path,
     mapping: ComponentMapping,
 }
 
@@ -284,7 +284,7 @@ impl Parse for BevyBundleAttr {
             let component_content;
             syn::parenthesized!(component_content in input);
 
-            let component_name: Ident = component_content.parse()?;
+            let component_name: Path = component_content.parse()?;
 
             // Determine the mapping type
             let mapping = if component_content.peek(Token![:]) {
@@ -397,7 +397,11 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
         .iter()
         .map(|spec| {
             let component_name = &spec.component_name;
-            let field_name = format!("{component_name}").to_lowercase();
+            let last_segment = component_name
+                .segments
+                .last()
+                .expect("component to have at least one path segment");
+            let field_name = last_segment.ident.to_string().to_lowercase();
             let field_ident = syn::Ident::new(&field_name, component_name.span());
             quote! {
                 pub #field_ident: #component_name
@@ -418,7 +422,9 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
         .iter()
         .map(|spec| {
             let component_name = &spec.component_name;
-            let field_name = format!("{component_name}").to_lowercase();
+            let last_segment = component_name.segments.last()
+                .expect("component to have at least one path segment");
+            let field_name = last_segment.ident.to_string().to_lowercase();
             let field_ident = syn::Ident::new(&field_name, component_name.span());
 
             match &spec.mapping {
@@ -570,7 +576,7 @@ mod tests {
     #[test]
     fn test_bevy_bundle_multiple_fields() {
         let input: DeriveInput = parse_quote! {
-            #[bevy_bundle((TestComponent { name: test_name, value: test_value }))]
+            #[bevy_bundle((fully::qualified::path::to::TestComponent { name: test_name, value: test_value }))]
             struct TestNode {
                 #[bundle(transform_with = "String::from")]
                 test_name: String,
