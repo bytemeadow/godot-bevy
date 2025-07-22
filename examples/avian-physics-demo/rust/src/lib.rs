@@ -21,7 +21,8 @@ use godot_bevy::prelude::{
     GodotNodeHandle, GodotResource, GodotScene,
 };
 use godot_bevy::prelude::{
-    main_thread_system, GodotPackedScenePlugin, GodotTransformSyncPlugin, PhysicsUpdate,
+    main_thread_system, GodotAssetsPlugin, GodotPackedScenePlugin, GodotTransformSyncPlugin,
+    PhysicsUpdate,
 };
 use std::fmt::Debug;
 
@@ -42,6 +43,7 @@ enum GameState {
 impl Plugin for AvianPhysicsDemo {
     fn build(&self, app: &mut App) {
         app.add_plugins(StatesPlugin)
+            .add_plugins(GodotAssetsPlugin)
             .add_plugins(GodotPackedScenePlugin)
             .add_plugins(GodotTransformSyncPlugin::default())
             .add_plugins((
