@@ -12,7 +12,7 @@ path = "../../run_godot.rs"
 name = "platformer_2d"
 
 [dependencies]
-bevy = { version = "0.16", default-features = false }
+bevy = { version = "0.16", default-features = false, features = ["bevy_state"] }
 bevy_asset_loader = "0.23.0"
 fastrand = { version = "2.3.0" }
 godot = "0.3"

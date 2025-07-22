@@ -1,4 +1,4 @@
-use bevy::app::plugin_group;
+use bevy::{app::plugin_group, gilrs::GilrsPlugin};
 
 pub mod assets;
 pub mod audio;
@@ -44,5 +44,6 @@ plugin_group! {
         :GodotAudioPlugin,
         :GodotPackedScenePlugin,
         :GodotTransformSyncPlugin,
+        :GilrsPlugin,
     }
 }

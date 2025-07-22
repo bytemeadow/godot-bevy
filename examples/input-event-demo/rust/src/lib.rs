@@ -35,6 +35,8 @@ fn build_app(app: &mut App) {
     // Add the input plugin this example needs
     // BevyInputBridgePlugin automatically includes GodotInputEventPlugin
     app.add_plugins(BevyInputBridgePlugin);
+    // Add gamepad input plugin as its used for testing
+    app.add_plugins(GilrsPlugin);
 
     // Plugin 1: Raw Godot Input Events - shows direct Godot input
     app.add_plugins(GodotInputPlugin);
