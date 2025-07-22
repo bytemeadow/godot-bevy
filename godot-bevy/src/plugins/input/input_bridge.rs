@@ -14,7 +14,6 @@ use bevy::{
         },
     },
     math::Vec2,
-    prelude::GilrsPlugin,
 };
 
 use crate::plugins::input::events::{

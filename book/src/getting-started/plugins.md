@@ -21,13 +21,13 @@ All other features must be explicitly added as plugins.
   - Includes:
     - `GodotBaseCorePlugin`: Bevy MinimalPlugins, logging, diagnostics, schedules
     - `GodotSceneTreePlugin`: Scene tree entity mirroring and management
-    - `GodotAssetsPlugin`: Godot resource loading through Bevy's asset system
 
 ### Default Plugins
 
 - **`GodotDefaultPlugins`**: All optional features enabled
   - Does NOT include core plugins - those are already in `GodotCorePlugins`
   - Includes:
+    - `GodotAssetsPlugin`: Godot resource loading through Bevy's asset system
     - `GodotTransformSyncPlugin`: Transform synchronization
     - `GodotCollisionsPlugin`: Collision detection
     - `GodotSignalsPlugin`: Signal to event bridge
@@ -53,12 +53,12 @@ All other features must be explicitly added as plugins.
   - AutoSync bundle registration
   - Groups component for Godot groups
 
+### Optional Feature Plugins
+
 - **`GodotAssetsPlugin`**: Asset loading
   - Load Godot resources through Bevy's AssetServer
   - Supports .tscn, .tres, textures, sounds, etc.
   - Development and export path handling
-
-### Optional Feature Plugins
 
 - **`GodotTransformSyncPlugin`**: Transform synchronization
   - Configure sync mode: `Disabled`, `OneWay` (default), or `TwoWay`
@@ -214,12 +214,13 @@ Some plugins automatically include their dependencies:
 
 ### Ask Yourself:
 
-1. **Do I want to move/position nodes from Bevy?** → Add `GodotTransformSyncPlugin`
-2. **Do I want to play sounds and music?** → Add `GodotAudioPlugin`
-3. **Do I want to respond to UI signals?** → Add `GodotSignalsPlugin`
-4. **Do I want to detect collisions?** → Add `GodotCollisionsPlugin`
-5. **Do I want to handle input?** → Add `BevyInputBridgePlugin` or `GodotInputEventPlugin`
-6. **Do I want to spawn scenes at runtime?** → Add `GodotPackedScenePlugin`
+1. **Do I want to load Godot resources through Bevy's asset system?** → Add `GodotAssetsPlugin`
+2. **Do I want to move/position nodes from Bevy?** → Add `GodotTransformSyncPlugin`
+3. **Do I want to play sounds and music?** → Add `GodotAudioPlugin`
+4. **Do I want to respond to UI signals?** → Add `GodotSignalsPlugin`
+5. **Do I want to detect collisions?** → Add `GodotCollisionsPlugin`
+6. **Do I want to handle input?** → Add `BevyInputBridgePlugin` or `GodotInputEventPlugin`
+7. **Do I want to spawn scenes at runtime?** → Add `GodotPackedScenePlugin`
 
 ### When in Doubt:
 Start with `GodotDefaultPlugins` and optimize later by removing unused plugins.
