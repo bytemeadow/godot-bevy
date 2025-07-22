@@ -7,7 +7,7 @@ use godot::classes::{Node2D, Node3D};
 
 use crate::plugins::core::AppSceneTreeExt;
 use crate::plugins::transforms::IntoBevyTransform;
-use crate::prelude::{GodotTransformConfig, TransformSyncMode};
+use crate::plugins::transforms::{GodotTransformConfig, TransformSyncMode};
 
 use super::change_filter::TransformSyncMetadata;
 use super::sync_systems::{post_update_godot_transforms, pre_update_godot_transforms};
@@ -16,7 +16,7 @@ pub struct GodotTransformSyncPlugin {
     /// The mode for syncing transforms between Godot and Bevy.
     /// Note: This setting is only relevant when `auto_sync` is true.
     /// When `auto_sync` is false, this value is ignored since no automatic sync systems run.
-    pub sync_mode: crate::plugins::core::TransformSyncMode,
+    pub sync_mode: TransformSyncMode,
     /// When true (default), enables automatic transform syncing systems.
     /// When false, still registers Transform and TransformSyncMetadata components
     /// but allows defining custom sync systems using the add_transform_sync_systems_*! macros.
@@ -26,7 +26,7 @@ pub struct GodotTransformSyncPlugin {
 impl Default for GodotTransformSyncPlugin {
     fn default() -> Self {
         Self {
-            sync_mode: crate::plugins::core::TransformSyncMode::default(),
+            sync_mode: TransformSyncMode::default(),
             auto_sync: true,
         }
     }

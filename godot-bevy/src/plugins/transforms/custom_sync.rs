@@ -180,7 +180,7 @@ pub trait GodotTransformSyncPluginExt {
     fn without_auto_sync(self) -> Self;
 
     /// Configure the sync mode while keeping auto sync enabled
-    fn with_sync_mode(self, mode: crate::plugins::core::TransformSyncMode) -> Self;
+    fn with_sync_mode(self, mode: crate::plugins::transforms::TransformSyncMode) -> Self;
 }
 
 impl GodotTransformSyncPluginExt for crate::plugins::transforms::GodotTransformSyncPlugin {
@@ -189,7 +189,7 @@ impl GodotTransformSyncPluginExt for crate::plugins::transforms::GodotTransformS
         self
     }
 
-    fn with_sync_mode(mut self, mode: crate::plugins::core::TransformSyncMode) -> Self {
+    fn with_sync_mode(mut self, mode: crate::plugins::transforms::TransformSyncMode) -> Self {
         self.sync_mode = mode;
         self
     }

@@ -16,10 +16,7 @@ pub use crate::plugins::{
         CollisionEvent, CollisionEventType, Collisions, GodotCollisionsPlugin,
     },
     // Core functionality
-    core::{
-        FindEntityByNameExt, GodotTransformConfig, MainThreadMarker, PhysicsDelta, PhysicsUpdate,
-        TransformSyncMode,
-    },
+    core::{FindEntityByNameExt, MainThreadMarker, PhysicsDelta, PhysicsUpdate},
     // Input
     input::{
         ActionInput, BevyInputBridgePlugin, GodotInputEventPlugin, KeyboardInput, MouseButtonInput,
@@ -34,8 +31,8 @@ pub use crate::plugins::{
     },
     // Transforms
     transforms::{
-        GodotTransformSyncPlugin, GodotTransformSyncPluginExt, TransformSyncMetadata,
-        add_transform_sync_systems,
+        GodotTransformConfig, GodotTransformSyncPlugin, GodotTransformSyncPluginExt,
+        TransformSyncMetadata, TransformSyncMode, add_transform_sync_systems,
     },
 };
 pub use bevy::prelude as bevy_prelude;
