@@ -1,4 +1,6 @@
-use bevy::{app::plugin_group, gilrs::GilrsPlugin};
+use bevy::app::plugin_group;
+#[cfg(feature = "bevy_gamepad")]
+use bevy::gilrs::GilrsPlugin;
 
 pub mod assets;
 pub mod audio;
@@ -44,6 +46,7 @@ plugin_group! {
         :GodotAudioPlugin,
         :GodotPackedScenePlugin,
         :GodotTransformSyncPlugin,
+        #[cfg(feature = "bevy_gamepad")]
         :GilrsPlugin,
     }
 }
