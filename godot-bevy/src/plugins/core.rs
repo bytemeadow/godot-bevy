@@ -163,7 +163,6 @@ pub struct GodotBaseCorePlugin;
 impl Plugin for GodotBaseCorePlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(MinimalPlugins.build().disable::<ScheduleRunnerPlugin>())
-            .add_plugins(bevy::log::LogPlugin::default())
             .add_plugins(bevy::diagnostic::DiagnosticsPlugin)
             .init_resource::<PhysicsDelta>()
             .init_non_send_resource::<MainThreadMarker>()

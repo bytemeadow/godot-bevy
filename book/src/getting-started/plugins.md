@@ -15,10 +15,12 @@ All other features must be explicitly added as plugins.
 ## Plugin Groups
 
 - **`GodotCorePlugins`**: Minimal required functionality
+
   - Automatically included by `#[bevy_app]` macro via `GodotPlugin`
   - Includes:
     - `GodotBaseCorePlugin`: Bevy MinimalPlugins, logging, diagnostics, schedules
     - `GodotSceneTreePlugin`: Scene tree entity mirroring and management
+    - `GodotBevyLogPlugin`: Unify/improve bevy and godot logging such that `info!`, `debug!`, etc log messages are visible in the Godot Editor
 
 - **`GodotDefaultPlugins`**: Contains all plugins typically necessary for building a game
   - Includes:
@@ -35,6 +37,7 @@ All other features must be explicitly added as plugins.
 ### Core Infrastructure (Included by Default)
 
 - **`GodotBaseCorePlugin`**: Foundation setup
+
   - Bevy MinimalPlugins (without ScheduleRunnerPlugin)
   - Asset system with Godot resource reader
   - Logging and diagnostics
@@ -42,45 +45,61 @@ All other features must be explicitly added as plugins.
   - Main thread marker resource
 
 - **`GodotSceneTreePlugin`**: Scene tree management
+
   - Automatic entity creation for scene nodes
   - Scene tree change monitoring
   - Transform component addition (configurable)
   - AutoSync bundle registration
   - Groups component for Godot groups
 
+- **`GodotBevyLogPlugin`**: Improved logging by default
+
+  - Log message components are color-coded for readability by default. Color coding can be disabled entirely. NOTE: There is a performance penality for color-coding, so if your application is very performance sensitive, consider disabling this feature
+  - Log messages are prefixed with a short timestamp, e.g., `12:00:36.196`. Timestamps can be customized or entirely disabled
+  - Log messages are prefixed with a short log level, e.g., `T` for `TRACE`, `D` for `DEBUG`, `I` for `INFO`, `W` for `WARN`, `E` for `ERROR`
+  - Log messages are suffixed with a shortened path and line number location, e.g., `@ loading_state/systems.rs:186`
+  - Log level filtering is `INFO` and higher severity by default, this can be customized directly in your code or set at runtime using `RUST_LOG`, e.g., `RUST_LOG=trace cargo run`
+
 ### Additional Plugins
 
 - **`GodotAssetsPlugin`**: Asset loading
+
   - Load Godot resources through Bevy's AssetServer
   - Supports .tscn, .tres, textures, sounds, etc.
   - Development and export path handling
 
 - **`GodotTransformSyncPlugin`**: Transform synchronization
+
   - Configure sync mode: `Disabled`, `OneWay` (default), or `TwoWay`
   - Synchronizes Bevy Transform components with Godot node transforms
   - Required for moving/positioning nodes from Bevy
 
 - **`GodotCollisionsPlugin`**: Collision detection
+
   - Monitors Area2D/3D and RigidBody2D/3D collision signals
   - Provides `Collisions` component with entered/exited tracking
   - Converts Godot collision signals to queryable data
 
 - **`GodotSignalsPlugin`**: Signal event bridge
+
   - Converts Godot signals to Bevy events
   - Use `EventReader<GodotSignal>` to handle signals
   - Essential for UI interactions (button clicks, etc.)
 
 - **`GodotInputEventPlugin`**: Raw input events
+
   - Provides Godot input as Bevy events
   - Keyboard, mouse, touch, gamepad, and action events
   - Lower-level alternative to `BevyInputBridgePlugin`
 
 - **`BevyInputBridgePlugin`**: Bevy input API
+
   - Use Bevy's standard `ButtonInput<KeyCode>`, mouse events, etc.
   - Automatically includes `GodotInputEventPlugin`
   - Higher-level, more ergonomic than raw events
 
 - **`GodotAudioPlugin`**: Audio system
+
   - Channel-based audio API
   - Spatial audio support
   - Audio tweening and easing
@@ -136,6 +155,7 @@ fn build_app(app: &mut App) {
 ### Game-Specific Configurations
 
 **Pure ECS Game**:
+
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
@@ -147,6 +167,7 @@ fn build_app(app: &mut App) {
 ```
 
 **Physics Platformer**:
+
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
@@ -160,6 +181,7 @@ fn build_app(app: &mut App) {
 ```
 
 **UI-Heavy Game**:
+
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
@@ -218,20 +240,25 @@ Some plugins automatically include their dependencies:
 7. **Do I want to spawn scenes at runtime?** → Add `GodotPackedScenePlugin`
 
 ### When in Doubt:
+
 Start with `GodotDefaultPlugins` and optimize later by removing unused plugins.
 
 ## Benefits
 
 ### Smaller Binaries
+
 Only compile the features you actually use.
 
 ### Better Performance
+
 Skip unused systems and resources.
 
 ### Clear Dependencies
+
 Your plugin list shows exactly what features you're using.
 
 ### Future-Proof
+
 New optional features can be added without breaking existing code.
 
 ## Migration Note

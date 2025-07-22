@@ -6,6 +6,7 @@ pub mod assets;
 pub mod audio;
 pub mod collisions;
 pub mod core;
+pub mod godot_bevy_logger;
 pub mod input;
 pub mod packed_scene;
 pub mod scene_tree;
@@ -17,6 +18,7 @@ pub use assets::GodotAssetsPlugin;
 pub use audio::GodotAudioPlugin;
 pub use collisions::GodotCollisionsPlugin;
 pub use core::GodotBaseCorePlugin;
+pub use godot_bevy_logger::GodotBevyLogPlugin;
 pub use input::{BevyInputBridgePlugin, GodotInputEventPlugin};
 pub use packed_scene::GodotPackedScenePlugin;
 pub use scene_tree::GodotSceneTreePlugin;
@@ -33,6 +35,7 @@ plugin_group! {
     pub struct GodotCorePlugins {
         :GodotBaseCorePlugin,
         :GodotSceneTreePlugin,
+        :GodotBevyLogPlugin,
     }
 }
 
