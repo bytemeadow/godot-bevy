@@ -14,18 +14,13 @@ All other features must be explicitly added as plugins.
 
 ## Plugin Groups
 
-### Core Plugins
-
 - **`GodotCorePlugins`**: Minimal required functionality
   - Automatically included by `#[bevy_app]` macro via `GodotPlugin`
   - Includes:
     - `GodotBaseCorePlugin`: Bevy MinimalPlugins, logging, diagnostics, schedules
     - `GodotSceneTreePlugin`: Scene tree entity mirroring and management
 
-### Default Plugins
-
-- **`GodotDefaultPlugins`**: All optional features enabled
-  - Does NOT include core plugins - those are already in `GodotCorePlugins`
+- **`GodotDefaultPlugins`**: Contains all plugins typically necessary for building a game
   - Includes:
     - `GodotAssetsPlugin`: Godot resource loading through Bevy's asset system
     - `GodotTransformSyncPlugin`: Transform synchronization
@@ -53,7 +48,7 @@ All other features must be explicitly added as plugins.
   - AutoSync bundle registration
   - Groups component for Godot groups
 
-### Optional Feature Plugins
+### Additional Plugins
 
 - **`GodotAssetsPlugin`**: Asset loading
   - Load Godot resources through Bevy's AssetServer
