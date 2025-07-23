@@ -54,7 +54,7 @@ All other features must be explicitly added as plugins.
 
 - **`GodotBevyLogPlugin`**: Improved logging by default
 
-  - Log message components are color-coded for readability by default. Color coding can be disabled entirely. NOTE: There is a performance penality for color-coding, so if your application is very performance sensitive, consider disabling this feature
+  - Log message components are color-coded for readability by default. Color coding can be disabled entirely. NOTE: There is a performance penalty for color-coding, so if your application is very performance sensitive, consider disabling this feature
   - Log messages are prefixed with a short timestamp, e.g., `12:00:36.196`. Timestamps can be customized or entirely disabled
   - Log messages are prefixed with a short log level, e.g., `T` for `TRACE`, `D` for `DEBUG`, `I` for `INFO`, `W` for `WARN`, `E` for `ERROR`
   - Log messages are suffixed with a shortened path and line number location, e.g., `@ loading_state/systems.rs:186`

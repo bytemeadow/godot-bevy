@@ -31,11 +31,10 @@ pub use input::GodotInputEventPlugin as GodotInputPlugin;
 
 plugin_group! {
     /// Minimal core functionality required for Godot-Bevy integration.
-    /// This includes scene tree management and basic bridge components.
+    /// This includes scene tree management, asset loading, logging, and basic bridge components.
     pub struct GodotCorePlugins {
         :GodotBaseCorePlugin,
         :GodotSceneTreePlugin,
-        :GodotBevyLogPlugin,
     }
 }
 
@@ -49,6 +48,7 @@ plugin_group! {
         :GodotAudioPlugin,
         :GodotPackedScenePlugin,
         :GodotTransformSyncPlugin,
+        :GodotBevyLogPlugin,
         #[cfg(feature = "bevy_gamepad")]
         :GilrsPlugin,
     }

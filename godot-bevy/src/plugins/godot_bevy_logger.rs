@@ -17,7 +17,7 @@ pub struct GodotBevyLogPlugin {
     level_filter: LevelFilter,
 
     /// Enable/disable color in output. NOTE: Enabling this incurs
-    /// a performance penality. Defaults to true.
+    /// a performance penalty. Defaults to true.
     color: bool,
 
     /// Accepts timestamp formatting, see <https://docs.rs/chrono/0.4.41/chrono/format/strftime/index.html>
@@ -56,9 +56,9 @@ impl Plugin for GodotBevyLogPlugin {
     }
 }
 
-struct GodotProxyLayerVistitor(Option<String>);
+struct GodotProxyLayerVisitor(Option<String>);
 
-impl Visit for GodotProxyLayerVistitor {
+impl Visit for GodotProxyLayerVisitor {
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
         if field.name() == "message" {
             self.0 = Some(format!("{value:?}"))
@@ -86,7 +86,7 @@ where
         _context: tracing_subscriber::layer::Context<'_, S>,
     ) {
         let metadata = event.metadata();
-        let mut msg_vistor = GodotProxyLayerVistitor(None);
+        let mut msg_vistor = GodotProxyLayerVisitor(None);
         event.record(&mut msg_vistor);
 
         // Timestamp formatting reference https://docs.rs/chrono/0.4.41/chrono/format/strftime/index.html
@@ -124,12 +124,12 @@ where
             let parent = if let Some(parent) = x.next() {
                 format!("{}{}", parent.to_string_lossy(), MAIN_SEPARATOR_STR)
             } else {
-                String::default()
+                String::new()
             };
 
             format!("{}{}:{}", parent, file, metadata.line().unwrap_or_default())
         } else {
-            String::default()
+            String::new()
         };
 
         match self.color {
