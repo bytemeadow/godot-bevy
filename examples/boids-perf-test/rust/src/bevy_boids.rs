@@ -6,12 +6,12 @@ use bevy::{
     },
     math::Vec2,
     prelude::{
-        info, vec3, warn, App, AssetServer, Entity, Handle, IntoScheduleConfigs, Plugin, Resource,
-        Startup, Time, Transform, Update, Vec, Vec3, Vec3Swizzles, With,
+        App, AssetServer, Entity, Handle, IntoScheduleConfigs, Plugin, Resource, Startup, Time,
+        Transform, Update, Vec, Vec3, Vec3Swizzles, With, info, vec3, warn,
     },
 };
 use bevy_spatial::{
-    kdtree::KDTree2, AutomaticUpdate, SpatialAccess, SpatialSet, SpatialStructure, TransformMode,
+    AutomaticUpdate, SpatialAccess, SpatialSet, SpatialStructure, TransformMode, kdtree::KDTree2,
 };
 use godot::{
     builtin::{Color, Vector2},
@@ -19,7 +19,7 @@ use godot::{
 };
 use godot_bevy::{
     add_transform_sync_systems,
-    prelude::{main_thread_system, GodotNodeHandle, GodotResource, GodotScene},
+    prelude::{GodotNodeHandle, GodotResource, GodotScene, main_thread_system},
 };
 
 // Type alias for our spatial tree

@@ -5,8 +5,8 @@ use bevy::prelude::App;
 use godot::prelude::gdextension;
 use godot_bevy::prelude::godot_prelude::ExtensionLibrary;
 use godot_bevy::prelude::{
-    bevy_app, GodotAssetsPlugin, GodotPackedScenePlugin, GodotTransformSyncPlugin,
-    GodotTransformSyncPluginExt,
+    GodotAssetsPlugin, GodotPackedScenePlugin, GodotTransformSyncPlugin,
+    GodotTransformSyncPluginExt, bevy_app,
 };
 
 mod bevy_boids;
