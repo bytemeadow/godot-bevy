@@ -4,6 +4,7 @@ extends EditorPlugin
 const WIZARD_SCENE_PATH = "res://addons/godot-bevy/wizard/project_wizard.tscn"
 
 var wizard_dialog: Window
+var _should_restart_after_build: bool = false
 
 func _enter_tree():
 	# Add menu items
@@ -50,10 +51,7 @@ func _on_add_singleton():
 	ProjectSettings.set_setting("autoload/BevyAppSingleton", singleton_path)
 	ProjectSettings.save()
 
-	push_warning("BevyAppSingleton added to project autoload settings!")
-
-	# Refresh the project to apply changes
-	EditorInterface.restart_editor()
+	push_warning("BevyAppSingleton added to project autoload settings! Restart editor to apply changes.")
 
 func _create_bevy_app_singleton(path: String):
 	# Create a new scene with BevyApp node
@@ -98,9 +96,11 @@ func _on_project_created(project_info: Dictionary):
 	_scaffold_rust_project(project_info)
 	_create_bevy_app_singleton("res://bevy_app_singleton.tscn")
 	_on_add_singleton()  # This will add it to autoload
-	
-	# Automatically build the Rust project
-	_build_rust_project(project_info.get("release_build", false))
+
+	# Automatically build the Rust project and restart after
+	var is_release = project_info.get("release_build", false)
+	_should_restart_after_build = true
+	_build_rust_project(is_release)
 
 func _scaffold_rust_project(info: Dictionary):
 	var base_path = ProjectSettings.globalize_path("res://")
@@ -109,7 +109,7 @@ func _scaffold_rust_project(info: Dictionary):
 	# Debug: Print the info dictionary
 	print("Project info received: ", info)
 	print("Project name value: '", info.get("project_name", "KEY_NOT_FOUND"), "'")
-	
+
 	# Validate project name
 	var project_name = info.project_name.strip_edges()
 	if project_name.is_empty():
@@ -135,11 +135,13 @@ godot-bevy = "%s"
 
 [features]
 default = []
+
+[workspace]
+# Empty workspace table to make this a standalone project
 """ % [_to_snake_case(project_name), info.godot_bevy_version]
 
-	if info.use_defaults:
-		cargo_content = cargo_content.replace('godot-bevy = "%s"' % info.godot_bevy_version,
-			'godot-bevy = { version = "%s", features = ["default"] }' % info.godot_bevy_version)
+	# Note: godot-bevy 0.8.4 doesn't have a "default" feature, so we just use the base dependency
+	# The plugin selection will be handled in the Rust code via GodotDefaultPlugins
 
 	_save_file(rust_path.path_join("Cargo.toml"), cargo_content)
 
@@ -176,22 +178,12 @@ default = []
 
 	# Create lib.rs
 	var lib_content = """use godot::prelude::*;
+use bevy::prelude::*;
 use godot_bevy::prelude::*;
-
-#[derive(GodotClass)]
-#[class(base=Node)]
-struct %s;
-
-#[godot_api]
-impl INode for %s {
-	fn init(base: Base<Node>) -> Self {
-		Self
-	}
-}
 
 #[bevy_app]
 fn build_app(app: &mut App) {
-%s
+    %s
 
 	// Add your systems here
 	app.add_systems(Update, hello_world_system);
@@ -208,19 +200,7 @@ fn hello_world_system() {
 		}
 	}
 }
-
-// Required for GDExtension
-struct %sExtension;
-
-#[gdextension]
-unsafe impl ExtensionLibrary for %sExtension {}
-""" % [
-		_to_pascal_case(project_name),
-		_to_pascal_case(project_name),
-		plugin_config,
-		_to_pascal_case(project_name),
-		_to_pascal_case(project_name)
-	]
+""" % [plugin_config]
 
 	_save_file(rust_path.path_join("src/lib.rs"), lib_content)
 
@@ -254,29 +234,30 @@ macos.release.arm64 = "res://rust/target/release/lib%s.dylib"
 
 func _on_build_rust():
 	# Build the Rust project (called from menu)
+	_should_restart_after_build = false  # Don't restart for manual builds
 	_build_rust_project(false)  # Default to debug build
 
 func _build_rust_project(release_build: bool):
 	var base_path = ProjectSettings.globalize_path("res://")
 	var rust_path = base_path.path_join("rust")
-	
+
 	# Check if rust directory exists
 	if not DirAccess.dir_exists_absolute(rust_path):
 		push_error("No Rust project found! Run 'Setup godot-bevy Project' first.")
 		return
-	
+
 	# Prepare cargo command with working directory
 	var args = ["build", "--manifest-path", rust_path.path_join("Cargo.toml")]
 	if release_build:
 		args.append("--release")
-	
+
 	print("Building Rust project...")
 	print("Running: cargo ", " ".join(args))
-	
+
 	# Execute cargo build
 	var output = []
 	var exit_code = OS.execute("cargo", args, output, true, true)
-	
+
 	# Process results
 	if exit_code == 0:
 		var build_type = "debug" if not release_build else "release"
@@ -284,6 +265,11 @@ func _build_rust_project(release_build: bool):
 		print("Build output:")
 		for line in output:
 			print("  ", line)
+
+		# Restart editor if this was called from project setup
+		if _should_restart_after_build:
+			push_warning("Restarting editor to apply autoload changes...")
+			EditorInterface.restart_editor()
 	else:
 		push_error("Rust build failed with exit code: %d" % exit_code)
 		print("Build errors:")

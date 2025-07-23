@@ -18,7 +18,7 @@ func _ready():
 	
 	# Set defaults
 	project_name_input.text = "my_game"
-	version_input.text = "0.9"
+	version_input.text = "0.8.4"
 	use_defaults_check.button_pressed = true
 	
 	# Connect signals
