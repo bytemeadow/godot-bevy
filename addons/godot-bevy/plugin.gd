@@ -54,40 +54,14 @@ func _on_add_singleton():
 	push_warning("BevyAppSingleton added to project autoload settings! Restart editor to apply changes.")
 
 func _create_bevy_app_singleton(path: String):
-	# Create a new scene with BevyApp node
-	var scene = PackedScene.new()
-	var root = Node.new()
-	root.name = "BevyAppSingleton"
+	# Create the scene file content directly
+	var scene_content = """[gd_scene format=3 uid="uid://bjsfwt816j4tp"]
 
-	# Add script to handle the BevyApp setup
-	var script_content = """
-extends Node
-
-# This singleton manages the BevyApp instance for your game.
-# It's automatically loaded when the game starts.
-
-var bevy_app: BevyApp
-
-func _ready():
-	# Create and configure the BevyApp
-	bevy_app = BevyApp.new()
-	bevy_app.name = "BevyApp"
-	add_child(bevy_app)
-
-	print("BevyApp singleton initialized!")
-
-func _exit_tree():
-	# Cleanup is handled automatically by BevyApp
-	pass
+[node name="BevyApp" type="BevyApp"]
 """
-
-	var script = GDScript.new()
-	script.source_code = script_content
-	root.set_script(script)
-
-	# Pack and save the scene
-	scene.pack(root)
-	ResourceSaver.save(scene, path)
+	
+	# Save the scene file directly
+	_save_file(path, scene_content)
 
 	print("Created BevyApp singleton scene at: ", path)
 
@@ -207,6 +181,7 @@ fn hello_world_system() {
 	# Create .gdextension file
 	var gdextension_content = """[configuration]
 entry_symbol = "gdext_rust_init"
+compatibility_minimum = 4.1
 
 [libraries]
 linux.debug.x86_64 = "res://rust/target/debug/lib%s.so"
