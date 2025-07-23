@@ -20,7 +20,6 @@ All other features must be explicitly added as plugins.
   - Includes:
     - `GodotBaseCorePlugin`: Bevy MinimalPlugins, logging, diagnostics, schedules
     - `GodotSceneTreePlugin`: Scene tree entity mirroring and management
-    - `GodotBevyLogPlugin`: Unify/improve bevy and godot logging such that `info!`, `debug!`, etc log messages are visible in the Godot Editor
 
 - **`GodotDefaultPlugins`**: Contains all plugins typically necessary for building a game
   - Includes:
@@ -31,6 +30,7 @@ All other features must be explicitly added as plugins.
     - `BevyInputBridgePlugin`: Bevy input API support
     - `GodotAudioPlugin`: Audio system
     - `GodotPackedScenePlugin`: Runtime scene spawning
+    - `GodotBevyLogPlugin`: Unify/improve bevy and godot logging such that `info!`, `debug!`, etc log messages are visible in the Godot Editor
 
 ## Available Plugins
 
@@ -51,14 +51,6 @@ All other features must be explicitly added as plugins.
   - Transform component addition (configurable)
   - AutoSync bundle registration
   - Groups component for Godot groups
-
-- **`GodotBevyLogPlugin`**: Improved logging by default
-
-  - Log message components are color-coded for readability by default. Color coding can be disabled entirely. NOTE: There is a performance penalty for color-coding, so if your application is very performance sensitive, consider disabling this feature
-  - Log messages are prefixed with a short timestamp, e.g., `12:00:36.196`. Timestamps can be customized or entirely disabled
-  - Log messages are prefixed with a short log level, e.g., `T` for `TRACE`, `D` for `DEBUG`, `I` for `INFO`, `W` for `WARN`, `E` for `ERROR`
-  - Log messages are suffixed with a shortened path and line number location, e.g., `@ loading_state/systems.rs:186`
-  - Log level filtering is `INFO` and higher severity by default, this can be customized directly in your code or set at runtime using `RUST_LOG`, e.g., `RUST_LOG=trace cargo run`
 
 ### Additional Plugins
 
@@ -106,9 +98,18 @@ All other features must be explicitly added as plugins.
   - Integrates with Godot's audio engine
 
 - **`GodotPackedScenePlugin`**: Scene spawning
+
   - Spawn/instantiate scenes at runtime
   - Support for both asset handles and paths
   - Automatic transform application
+
+- **`GodotBevyLogPlugin`**: Improved logging by default
+
+  - Log message components are color-coded for readability by default. Color coding can be disabled entirely. NOTE: There is a performance penalty for color-coding, so if your application is very performance sensitive, consider disabling this feature
+  - Log messages are prefixed with a short timestamp, e.g., `12:00:36.196`. Timestamps can be customized or entirely disabled
+  - Log messages are prefixed with a short log level, e.g., `T` for `TRACE`, `D` for `DEBUG`, `I` for `INFO`, `W` for `WARN`, `E` for `ERROR`
+  - Log messages are suffixed with a shortened path and line number location, e.g., `@ loading_state/systems.rs:186`
+  - Log level filtering is `INFO` and higher severity by default, this can be customized directly in your code or set at runtime using `RUST_LOG`, e.g., `RUST_LOG=trace cargo run`
 
 ## Usage Examples
 
