@@ -12,6 +12,7 @@ license.workspace = true
 [dependencies]
 bevy = { version = "0.16", default-features = false, features = [
   "bevy_asset",
+  "bevy_log",       # we use the debug!, trace!, etc APIs internally, but recommend godot_bevy_log and GodotBevyLogPlugin for actual log sinking
   "multi_threaded",
 ] }
 godot = { version = "0.3.0", features = ["experimental-threads"] }

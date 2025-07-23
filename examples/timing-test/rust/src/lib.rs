@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use godot_bevy::{
     plugins::core::PhysicsDelta,
     prelude::{
-        godot_prelude::{gdextension, godot_print, ExtensionLibrary},
+        godot_prelude::{ExtensionLibrary, gdextension, godot_print},
         *,
     },
 };
