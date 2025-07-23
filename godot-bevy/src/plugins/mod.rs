@@ -31,7 +31,7 @@ pub use input::GodotInputEventPlugin as GodotInputPlugin;
 
 plugin_group! {
     /// Minimal core functionality required for Godot-Bevy integration.
-    /// This includes scene tree management, asset loading, logging, and basic bridge components.
+    /// This includes scene tree management
     pub struct GodotCorePlugins {
         :GodotBaseCorePlugin,
         :GodotSceneTreePlugin,
