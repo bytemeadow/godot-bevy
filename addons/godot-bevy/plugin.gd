@@ -9,6 +9,7 @@ func _enter_tree():
 	# Add menu items
 	add_tool_menu_item("Setup godot-bevy Project", _on_setup_project)
 	add_tool_menu_item("Add BevyApp Singleton", _on_add_singleton)
+	add_tool_menu_item("Build Rust Project", _on_build_rust)
 
 	print("godot-bevy plugin activated!")
 
@@ -16,6 +17,7 @@ func _exit_tree():
 	# Remove menu items
 	remove_tool_menu_item("Setup godot-bevy Project")
 	remove_tool_menu_item("Add BevyApp Singleton")
+	remove_tool_menu_item("Build Rust Project")
 
 	if wizard_dialog:
 		wizard_dialog.queue_free()
@@ -96,6 +98,9 @@ func _on_project_created(project_info: Dictionary):
 	_scaffold_rust_project(project_info)
 	_create_bevy_app_singleton("res://bevy_app_singleton.tscn")
 	_on_add_singleton()  # This will add it to autoload
+	
+	# Automatically build the Rust project
+	_build_rust_project(project_info.get("release_build", false))
 
 func _scaffold_rust_project(info: Dictionary):
 	var base_path = ProjectSettings.globalize_path("res://")
@@ -245,23 +250,45 @@ macos.release.arm64 = "res://rust/target/release/lib%s.dylib"
 
 	_save_file(base_path.path_join("rust.gdextension"), gdextension_content)
 
-	# Create build scripts for different platforms
-	if OS.get_name() == "Windows":
-		var build_script = """@echo off
-cd rust
-cargo build %s
-""" % ["--release" if info.release_build else ""]
-		_save_file(base_path.path_join("build.bat"), build_script)
-	else:
-		var build_script = """#!/bin/bash
-cd rust
-cargo build %s
-""" % ["--release" if info.release_build else ""]
-		_save_file(base_path.path_join("build.sh"), build_script)
-		# Make build script executable on Unix
-		OS.execute("chmod", ["+x", base_path.path_join("build.sh")])
+	push_warning("Rust project scaffolded successfully! Building now...")
 
-	push_warning("Rust project scaffolded successfully! Run build.sh to compile.")
+func _on_build_rust():
+	# Build the Rust project (called from menu)
+	_build_rust_project(false)  # Default to debug build
+
+func _build_rust_project(release_build: bool):
+	var base_path = ProjectSettings.globalize_path("res://")
+	var rust_path = base_path.path_join("rust")
+	
+	# Check if rust directory exists
+	if not DirAccess.dir_exists_absolute(rust_path):
+		push_error("No Rust project found! Run 'Setup godot-bevy Project' first.")
+		return
+	
+	# Prepare cargo command with working directory
+	var args = ["build", "--manifest-path", rust_path.path_join("Cargo.toml")]
+	if release_build:
+		args.append("--release")
+	
+	print("Building Rust project...")
+	print("Running: cargo ", " ".join(args))
+	
+	# Execute cargo build
+	var output = []
+	var exit_code = OS.execute("cargo", args, output, true, true)
+	
+	# Process results
+	if exit_code == 0:
+		var build_type = "debug" if not release_build else "release"
+		push_warning("Rust build completed successfully! (%s)" % build_type)
+		print("Build output:")
+		for line in output:
+			print("  ", line)
+	else:
+		push_error("Rust build failed with exit code: %d" % exit_code)
+		print("Build errors:")
+		for line in output:
+			print("  ", line)
 
 func _save_file(path: String, content: String):
 	var file = FileAccess.open(path, FileAccess.WRITE)
