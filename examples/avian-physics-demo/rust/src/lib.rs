@@ -1,28 +1,33 @@
-use avian3d::{collision::CollisionDiagnostics, dynamics::solver::SolverDiagnostics, prelude::*};
+use avian3d::{
+    collision::CollisionDiagnostics,
+    dynamics::solver::SolverDiagnostics,
+    prelude::{
+        AngularVelocity, Collider, Gravity, PhysicsPlugins, RigidBody, SpatialQueryDiagnostics,
+    },
+};
 use bevy::app::Startup;
-use bevy::ecs::schedule::common_conditions::run_once;
 use bevy::ecs::schedule::IntoScheduleConfigs;
+use bevy::ecs::schedule::common_conditions::run_once;
 use bevy::ecs::system::ResMut;
 use bevy::prelude::{
-    debug, Added, App, AppExtStates, Assets, Commands, Component, Entity, Event, EventReader,
-    EventWriter, Handle, Mesh, OnExit, Plugin, Query, Res, Resource, Result, States, Transform,
-    Vec3,
+    Added, App, AppExtStates, Assets, Commands, Component, Entity, Event, EventReader, EventWriter,
+    Handle, Mesh, OnExit, Plugin, Query, Res, Resource, Result, States, Transform, Vec3, debug,
 };
 use bevy::{scene::ScenePlugin, state::app::StatesPlugin};
 use bevy_asset_loader::{
     asset_collection::AssetCollection,
-    loading_state::{config::ConfigureLoadingState, LoadingState, LoadingStateAppExt},
+    loading_state::{LoadingState, LoadingStateAppExt, config::ConfigureLoadingState},
 };
 use godot::classes::{BoxMesh, MeshInstance3D};
+use godot_bevy::plugins::GodotBevyLogPlugin;
 use godot_bevy::plugins::scene_tree::SceneTreeConfig;
 use godot_bevy::prelude::{
-    bevy_app,
-    godot_prelude::{gdextension, ExtensionLibrary},
-    GodotNodeHandle, GodotResource, GodotScene,
+    GodotAssetsPlugin, GodotPackedScenePlugin, GodotTransformSyncPlugin, PhysicsUpdate,
+    main_thread_system,
 };
 use godot_bevy::prelude::{
-    main_thread_system, GodotAssetsPlugin, GodotPackedScenePlugin, GodotTransformSyncPlugin,
-    PhysicsUpdate,
+    GodotNodeHandle, GodotResource, GodotScene, bevy_app,
+    godot_prelude::{ExtensionLibrary, gdextension},
 };
 use std::fmt::Debug;
 
@@ -45,6 +50,7 @@ impl Plugin for AvianPhysicsDemo {
         app.add_plugins(StatesPlugin)
             .add_plugins(GodotAssetsPlugin)
             .add_plugins(GodotPackedScenePlugin)
+            .add_plugins(GodotBevyLogPlugin::default())
             .add_plugins(GodotTransformSyncPlugin::default())
             .add_plugins((
                 // Plugins required by Avian

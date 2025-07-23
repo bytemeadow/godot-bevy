@@ -1,7 +1,7 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::{exit, Command, Stdio},
+    process::{Command, Stdio, exit},
 };
 
 use which::{which, which_in_global};

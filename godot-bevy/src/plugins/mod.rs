@@ -48,6 +48,7 @@ plugin_group! {
         :GodotAudioPlugin,
         :GodotPackedScenePlugin,
         :GodotTransformSyncPlugin,
+        #[cfg(feature = "godot_bevy_log")]
         :GodotBevyLogPlugin,
         #[cfg(feature = "bevy_gamepad")]
         :GilrsPlugin,

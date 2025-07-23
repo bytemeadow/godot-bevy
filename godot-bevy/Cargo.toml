@@ -12,7 +12,6 @@ license.workspace = true
 [dependencies]
 bevy = { version = "0.16", default-features = false, features = [
   "bevy_asset",
-  "bevy_log",
   "multi_threaded",
 ] }
 godot = { version = "0.3.0", features = ["experimental-threads"] }
@@ -24,9 +23,11 @@ once_cell = "1.21"
 parking_lot = "0.12.4"
 inventory = "0.3"
 paste = "1.0"
+#[cfg(feature = "godot_bevy_log")]
 chrono = "0.4"
 
 [features]
-default = ["bevy_gamepad"]
+default = ["bevy_gamepad", "godot_bevy_log"]
 # Enable Bevy's gamepad support via gilrs
 bevy_gamepad = ["bevy/bevy_gilrs"]
+godot_bevy_log = []
