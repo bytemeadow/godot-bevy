@@ -1,6 +1,8 @@
 pub use crate::GodotPlugin;
 pub use crate::interop::*;
 pub use crate::node_tree_view::NodeTreeView;
+#[cfg(feature = "godot_bevy_log")]
+pub use crate::plugins::godot_bevy_logger::GodotBevyLogPlugin;
 pub use crate::plugins::{
     GodotCorePlugins,
     GodotDefaultPlugins,
@@ -24,7 +26,9 @@ pub use crate::plugins::{
     },
     packed_scene::{GodotPackedScenePlugin, GodotScene},
     // Scene tree
-    scene_tree::{AutoSyncBundleRegistry, GodotSceneTreePlugin, Groups, SceneTreeRef},
+    scene_tree::{
+        AutoSyncBundleRegistry, GodotSceneTreePlugin, Groups, SceneTreeConfig, SceneTreeRef,
+    },
     // Signals
     signals::{
         GodotSignal, GodotSignalArgument, GodotSignals, GodotSignalsPlugin, connect_godot_signal,

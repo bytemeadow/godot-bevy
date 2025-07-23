@@ -19,15 +19,11 @@ use bevy_asset_loader::{
     loading_state::{LoadingState, LoadingStateAppExt, config::ConfigureLoadingState},
 };
 use godot::classes::{BoxMesh, MeshInstance3D};
-use godot_bevy::plugins::GodotBevyLogPlugin;
-use godot_bevy::plugins::scene_tree::SceneTreeConfig;
 use godot_bevy::prelude::{
-    GodotAssetsPlugin, GodotPackedScenePlugin, GodotTransformSyncPlugin, PhysicsUpdate,
-    main_thread_system,
-};
-use godot_bevy::prelude::{
-    GodotNodeHandle, GodotResource, GodotScene, bevy_app,
+    GodotAssetsPlugin, GodotBevyLogPlugin, GodotNodeHandle, GodotPackedScenePlugin, GodotResource,
+    GodotScene, GodotTransformSyncPlugin, PhysicsUpdate, SceneTreeConfig, bevy_app,
     godot_prelude::{ExtensionLibrary, gdextension},
+    main_thread_system,
 };
 use std::fmt::Debug;
 
