@@ -6,6 +6,7 @@ pub mod assets;
 pub mod audio;
 pub mod collisions;
 pub mod core;
+#[cfg(feature = "godot_bevy_log")]
 pub mod godot_bevy_logger;
 pub mod input;
 pub mod packed_scene;
@@ -18,6 +19,7 @@ pub use assets::GodotAssetsPlugin;
 pub use audio::GodotAudioPlugin;
 pub use collisions::GodotCollisionsPlugin;
 pub use core::GodotBaseCorePlugin;
+#[cfg(feature = "godot_bevy_log")]
 pub use godot_bevy_logger::GodotBevyLogPlugin;
 pub use input::{BevyInputBridgePlugin, GodotInputEventPlugin};
 pub use packed_scene::GodotPackedScenePlugin;

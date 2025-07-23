@@ -12,6 +12,7 @@ use tracing_subscriber::{
     Layer, field::Visit, filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt,
 };
 
+/// NOTE: This plugin is only available if the `godot_bevy_log` feature is enabled
 pub struct GodotBevyLogPlugin {
     /// Logs messages of this level or higher severity. Defaults to `LevelFilter::INFO`
     level_filter: LevelFilter,
