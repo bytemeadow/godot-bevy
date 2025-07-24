@@ -5,7 +5,6 @@ use bevy::{
         schedule::IntoScheduleConfigs,
         system::NonSendMut,
     },
-    log::trace,
     math::Vec2,
 };
 use godot::{
@@ -16,6 +15,7 @@ use godot::{
     global::Key,
     obj::{EngineEnum, Gd},
 };
+use tracing::trace;
 
 /// Plugin that handles Godot input events and converts them to Bevy events.
 /// This is the base input plugin that provides raw input event types.

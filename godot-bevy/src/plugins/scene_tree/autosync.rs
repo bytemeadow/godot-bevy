@@ -14,6 +14,7 @@ use bevy::{
     ecs::{entity::Entity, system::Commands},
 };
 use std::sync::RwLock;
+use tracing::trace;
 
 use crate::interop::GodotNodeHandle;
 
@@ -63,10 +64,9 @@ pub fn try_add_bundles_for_node(
             // Try to create and add the bundle
             // The function will check if the node is the right type and if the bundle is already added
             if (entry.create_bundle_fn)(commands, entity, node_handle) {
-                bevy::log::trace!(
+                trace!(
                     "Added bundle for {} to entity {:?}",
-                    entry.godot_class_name,
-                    entity
+                    entry.godot_class_name, entity
                 );
             }
         }

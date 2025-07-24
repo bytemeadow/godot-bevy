@@ -12,9 +12,9 @@ license.workspace = true
 [dependencies]
 bevy = { version = "0.16", default-features = false, features = [
   "bevy_asset",
-  "bevy_log",       # we use the debug!, trace!, etc APIs internally, but recommend godot_bevy_log and GodotBevyLogPlugin for actual log sinking
   "multi_threaded",
 ] }
+tracing = { version = "0.1", default-features = false, features = ["std"] }
 godot = { version = "0.3.0", features = ["experimental-threads"] }
 godot-bevy-macros.workspace = true
 lazy_static = "1.5.0"
@@ -27,7 +27,11 @@ paste = "1.0"
 chrono = { version = "0.4", optional = true }
 
 [features]
+# default = ["bevy_gamepad"]
 default = ["bevy_gamepad", "godot_bevy_log"]
 # Enable Bevy's gamepad support via gilrs
 bevy_gamepad = ["bevy/bevy_gilrs"]
-godot_bevy_log = ["dep:chrono"]
+godot_bevy_log = [
+  "dep:chrono",
+  "bevy/bevy_log", # NOTE: make it easy for clients to use bevy::log::trace!, etc
+]

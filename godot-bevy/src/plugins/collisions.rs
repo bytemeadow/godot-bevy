@@ -9,10 +9,10 @@ use bevy::{
         schedule::IntoScheduleConfigs,
         system::{NonSendMut, Query},
     },
-    log::trace,
 };
 use godot::prelude::*;
 use std::sync::mpsc::Receiver;
+use tracing::trace;
 
 #[derive(Default)]
 pub struct GodotCollisionsPlugin;

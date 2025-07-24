@@ -20,6 +20,7 @@ use godot::{
     classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader},
 };
 use std::str::FromStr;
+use tracing::error;
 
 #[derive(Default)]
 pub struct GodotPackedScenePlugin;
@@ -104,7 +105,7 @@ fn spawn_scene(
 
         let packed_scene_cast = packed_scene.clone().try_cast::<PackedScene>();
         if packed_scene_cast.is_err() {
-            tracing::error!("Resource is not a PackedScene: {:?}", packed_scene);
+            error!("Resource is not a PackedScene: {:?}", packed_scene);
             continue;
         }
 
@@ -113,7 +114,7 @@ fn spawn_scene(
         let instance = match packed_scene.instantiate() {
             Some(instance) => instance,
             None => {
-                tracing::error!("Failed to instantiate PackedScene");
+                error!("Failed to instantiate PackedScene");
                 continue;
             }
         };
@@ -124,7 +125,7 @@ fn spawn_scene(
             } else if let Ok(mut node) = instance.clone().try_cast::<Node2D>() {
                 node.set_global_transform(transform.to_godot_transform_2d());
             } else {
-                tracing::error!(
+                error!(
                     "attempted to spawn a scene with a transform on Node that did not inherit from Node, the transform was not set"
                 )
             }

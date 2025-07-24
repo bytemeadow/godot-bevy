@@ -18,7 +18,6 @@ use bevy::{
         schedule::IntoScheduleConfigs,
         system::{Commands, NonSendMut, Query, Res, SystemParam},
     },
-    log::{debug, trace},
     prelude::Resource,
 };
 use godot::{
@@ -30,6 +29,7 @@ use godot::{
 };
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use tracing::{debug, trace, warn};
 
 /// Unified scene tree plugin that provides:
 /// - SceneTreeRef for accessing the Godot scene tree
@@ -354,7 +354,7 @@ fn create_scene_tree_entity(
                         if let Some(&parent_entity) = ent_mapping.get(&parent_id) {
                             commands.entity(parent_entity).add_children(&[ent]);
                         } else {
-                            bevy::log::warn!(target: "godot_scene_tree_events",
+                            warn!(target: "godot_scene_tree_events",
                             "Parent entity with ID {} not found in ent_mapping. This might indicate a missing or incorrect mapping.",
                             parent_id);
                         }
