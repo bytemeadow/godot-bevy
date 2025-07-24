@@ -1,3 +1,6 @@
+mod component_as_godot_node;
+
+use crate::component_as_godot_node::component_as_godot_node_impl;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned};
@@ -79,6 +82,26 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
     let expanded = bevy_bundle(input).unwrap_or_else(Error::into_compile_error);
 
     TokenStream::from(expanded)
+}
+
+/// Automatically registers a Godot node with the name `<struct_name>BevyComponent` for Bevy Components
+/// that derive this macro.
+///
+/// Fields can be exposed to Godot as node properties using the `#[export]` attribute. The attribute
+/// syntax is:
+///
+/// ```ignore
+/// #[export(export_type = "<GodotType>", transform_with = "<conversion_function>")]
+/// ```
+///
+/// For fields with types incompatible with Godot-Rust's `#[export]` macro:
+/// - Use `export_type` to specify an alternate Godot-compatible type
+/// - Use `transform_with` to provide a conversion function from the Godot type to the field type
+///
+/// Uses the `inventory` crate
+#[proc_macro_derive(ComponentAsGodotNode, attributes(export))]
+pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
+    component_as_godot_node_impl(input)
 }
 
 fn node_tree_view(input: DeriveInput) -> Result<TokenStream2> {

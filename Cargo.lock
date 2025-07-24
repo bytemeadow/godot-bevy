@@ -3745,6 +3745,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rust-godot-node-children-as-bevy-components"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "godot",
+ "godot-bevy",
+ "which 7.0.3",
+]
+
+[[package]]
 name = "rust-platformer-2d"
 version = "0.1.0"
 dependencies = [

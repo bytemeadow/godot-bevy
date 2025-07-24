@@ -1,0 +1,20 @@
+[gd_scene load_steps=2 format=3 uid="uid://by3mlw6lgl61y"]
+
+[ext_resource type="Texture2D" uid="uid://dok2kwhwxfree" path="res://icon.svg" id="1_ig7tw"]
+
+[node name="Node" type="Node"]
+
+[node name="OrbitingIcon" type="Sprite2D" parent="."]
+texture = ExtResource("1_ig7tw")
+
+[node name="OrbiterBevyComponent" type="OrbiterBevyComponent" parent="OrbitingIcon"]
+amplitude_x = 5.0
+amplitude_y = 2.0
+
+[node name="InitialPositionBevyComponent" type="InitialPositionBevyComponent" parent="OrbitingIcon"]
+
+[node name="StationaryIcon" type="Sprite2D" parent="."]
+texture = ExtResource("1_ig7tw")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(0.5, 0.5)

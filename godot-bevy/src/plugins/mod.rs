@@ -5,6 +5,7 @@ use bevy::gilrs::GilrsPlugin;
 pub mod assets;
 pub mod audio;
 pub mod collisions;
+pub mod component_as_godot_node_child;
 pub mod core;
 #[cfg(feature = "godot_bevy_log")]
 pub mod godot_bevy_logger;
@@ -18,6 +19,7 @@ pub mod transforms;
 pub use assets::GodotAssetsPlugin;
 pub use audio::GodotAudioPlugin;
 pub use collisions::GodotCollisionsPlugin;
+pub use component_as_godot_node_child::ComponentAsGodotNodeChildPlugin;
 pub use core::GodotBaseCorePlugin;
 #[cfg(feature = "godot_bevy_log")]
 pub use godot_bevy_logger::GodotBevyLogPlugin;
@@ -54,5 +56,6 @@ plugin_group! {
         :GodotBevyLogPlugin,
         #[cfg(feature = "bevy_gamepad")]
         :GilrsPlugin,
+        :ComponentAsGodotNodeChildPlugin,
     }
 }

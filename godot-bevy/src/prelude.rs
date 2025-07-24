@@ -17,6 +17,8 @@ pub use crate::plugins::{
         AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED, COLLISION_START_SIGNALS,
         CollisionEvent, CollisionEventType, Collisions, GodotCollisionsPlugin,
     },
+    // Components as Godot node children
+    component_as_godot_node_child::ComponentAsGodotNodeChildPlugin,
     // Core functionality
     core::{FindEntityByNameExt, MainThreadMarker, PhysicsDelta, PhysicsUpdate},
     // Input
