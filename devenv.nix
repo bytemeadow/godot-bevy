@@ -74,18 +74,4 @@ in
 
   # speed up rust builds through caching
   env.RUSTC_WRAPPER = "${pkgs.sccache}/bin/sccache";
-
-  # https://devenv.sh/git-hooks/
-  git-hooks.hooks = {
-    # lint shell scripts
-    shellcheck.enable = true;
-
-    rustfmt.enable = true;
-
-    # some hooks have more than one package, like clippy:
-    clippy.enable = true;
-    clippy.packageOverrides.cargo = pkgs.cargo;
-    clippy.packageOverrides.clippy = pkgs.clippy;
-    clippy.settings.allFeatures = true;
-  };
 }
