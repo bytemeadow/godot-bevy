@@ -7,14 +7,13 @@
 //! These sets can run in parallel since they use separate audio channels
 //! and have no shared mutable state, improving audio responsiveness.
 
+use crate::GameState;
+use crate::level_manager::{LevelId, LevelLoadedEvent};
 use bevy::prelude::*;
 use bevy::state::condition::in_state;
 use bevy::state::state::OnExit;
 use bevy_asset_loader::asset_collection::AssetCollection;
 use godot_bevy::prelude::{AudioApp, AudioChannel, AudioChannelMarker, GodotResource};
-
-use crate::level_manager::{LevelId, LevelLoadedEvent};
-use crate::GameState;
 
 /// System sets for audio operations that can run in parallel
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]

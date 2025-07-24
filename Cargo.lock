@@ -3742,7 +3742,7 @@ dependencies = [
  "fastrand",
  "godot",
  "godot-bevy",
- "which 7.0.3",
+ "which 8.0.0",
 ]
 
 [[package]]
@@ -3754,7 +3754,7 @@ dependencies = [
  "fastrand",
  "godot",
  "godot-bevy",
- "which 7.0.3",
+ "which 8.0.0",
 ]
 
 [[package]]
@@ -3800,7 +3800,7 @@ dependencies = [
  "godot",
  "godot-bevy",
  "leafwing-input-manager",
- "which 7.0.3",
+ "which 8.0.0",
 ]
 
 [[package]]

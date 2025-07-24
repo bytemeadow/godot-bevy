@@ -1,8 +1,7 @@
 [package]
 name = "rustinput"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.82"
+edition = "2024"
 
 [lib]
 crate-type = ["cdylib"]
@@ -17,4 +16,4 @@ fastrand = { version = "2.3.0" }
 godot = "0.3"
 godot-bevy = { path = "../../../godot-bevy" }
 leafwing-input-manager = "0.17.0"
-which = "7.0.3"
+which = "8"

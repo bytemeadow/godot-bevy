@@ -102,7 +102,9 @@ fn update_player_input(query: Query<&ActionState<PlayerAction>, With<Player>>) {
         }
 
         // Test specific input types
-        godot_print!("  - Testing keyboard (WASD/arrows), mouse (left click + movement), gamepad (left stick + A button)");
+        godot_print!(
+            "  - Testing keyboard (WASD/arrows), mouse (left click + movement), gamepad (left stick + A button)"
+        );
 
         let mouse_axis = action_state.axis_pair(&PlayerAction::MouseLook);
         if mouse_axis.xy().length() > 0.1 {

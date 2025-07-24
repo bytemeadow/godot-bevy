@@ -133,8 +133,7 @@ fn handle_level_scene_change(
     mut scene_events: EventWriter<SceneOperationEvent>,
     mut assets: ResMut<Assets<GodotResource>>,
 ) {
-    if let (Some(level_id), Some(ref handle)) =
-        (current_level.level_id, &loading_state.loading_handle)
+    if let (Some(level_id), Some(handle)) = (current_level.level_id, &loading_state.loading_handle)
     {
         // Check if the asset is loaded
         if let Some(_godot_resource) = assets.get_mut(handle) {

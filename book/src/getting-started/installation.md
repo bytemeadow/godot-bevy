@@ -39,7 +39,7 @@ Edit `rust/Cargo.toml`:
 [package]
 name = "your_game_name"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [lib]
 crate-type = ["cdylib"]
@@ -126,16 +126,19 @@ cargo build
 ### Common Issues
 
 **"Can't open dynamic library"**
+
 - Ensure the paths in `rust.gdextension` match your library output
 - Check that you've built the Rust project
 - On macOS, you may need to allow the library in System Preferences
 
 **"BevyApp not found"**
+
 - Make sure godot-bevy is properly added to your dependencies
 - Rebuild the Rust project
 - Restart the Godot editor
 
 **Build errors**
+
 - Verify your Rust version: `rustc --version`
 - Ensure all dependencies are compatible
 - Check for typos in the crate name

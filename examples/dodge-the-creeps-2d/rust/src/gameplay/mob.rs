@@ -1,9 +1,9 @@
 use crate::gameplay::audio::GameSfxChannel;
 use crate::{
-    commands::{AnimationState, NodeCommand},
     GameState,
+    commands::{AnimationState, NodeCommand},
 };
-use bevy::math::{vec3, Vec3Swizzles};
+use bevy::math::{Vec3Swizzles, vec3};
 use bevy::transform::components::Transform;
 use bevy::{
     app::{App, Plugin, Update},
@@ -29,8 +29,8 @@ use godot::{
 use godot_bevy::{
     interop::GodotNodeHandle,
     prelude::{
-        main_thread_system, AudioChannel, FindEntityByNameExt, GodotResource, GodotScene,
-        GodotSignal, GodotSignals, NodeTreeView,
+        AudioChannel, FindEntityByNameExt, GodotResource, GodotScene, GodotSignal, GodotSignals,
+        NodeTreeView, main_thread_system,
     },
 };
 use std::f32::consts::PI;

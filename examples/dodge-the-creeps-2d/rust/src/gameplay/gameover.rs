@@ -13,7 +13,7 @@ use bevy::{
     time::{Time, Timer, TimerMode},
 };
 
-use crate::{commands::UICommand, GameState};
+use crate::{GameState, commands::UICommand};
 
 pub struct GameoverPlugin;
 impl Plugin for GameoverPlugin {

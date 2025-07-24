@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use bevy::state::state::{OnEnter, OnExit};
 use bevy_asset_loader::asset_collection::AssetCollection;
 use godot_bevy::prelude::{
-    main_thread_system, AudioApp, AudioChannel, AudioChannelMarker, GodotResource,
+    AudioApp, AudioChannel, AudioChannelMarker, GodotResource, main_thread_system,
 };
 
 use crate::GameState;

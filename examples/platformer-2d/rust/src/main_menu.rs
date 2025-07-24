@@ -1,3 +1,7 @@
+use crate::{
+    GameState,
+    level_manager::{LevelId, LoadLevelEvent},
+};
 use bevy::{
     app::prelude::*,
     ecs::{
@@ -12,13 +16,8 @@ use bevy::{
         state::{NextState, OnEnter},
     },
 };
-use godot::classes::{display_server::WindowMode, Button, DisplayServer, Node};
+use godot::classes::{Button, DisplayServer, Node, display_server::WindowMode};
 use godot_bevy::prelude::*;
-
-use crate::{
-    level_manager::{LevelId, LoadLevelEvent},
-    GameState,
-};
 
 #[derive(Resource, Default)]
 pub struct MenuAssets {

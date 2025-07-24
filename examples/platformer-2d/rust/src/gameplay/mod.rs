@@ -1,21 +1,19 @@
+use crate::GameState;
+use crate::level_manager::{CurrentLevel, LevelLoadedEvent};
+use crate::scene_management::SceneOperationEvent;
 use bevy::app::{App, Plugin};
 use bevy::prelude::*;
 use bevy::state::condition::in_state;
 use bevy::state::state::NextState;
+use gem::GemsCollected;
 use godot::classes::Input;
-
-use crate::level_manager::{CurrentLevel, LevelLoadedEvent};
-use crate::scene_management::SceneOperationEvent;
-use crate::GameState;
+use hud::{HudHandles, HudUpdateEvent};
 
 pub mod audio;
 pub mod door;
 pub mod gem;
 pub mod hud;
 pub mod player;
-
-use gem::GemsCollected;
-use hud::{HudHandles, HudUpdateEvent};
 
 /// System sets for gameplay operations with better parallelization
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]

@@ -1,12 +1,12 @@
 use crate::{
+    GameState,
     commands::{AnimationState, CachedScreenSize, VisibilityState},
     nodes::player::Player as GodotPlayerNode,
-    GameState,
 };
 use bevy::prelude::{
-    in_state, App, Commands, Component, Entity, Handle, IntoScheduleConfigs, Name, NextState,
-    OnEnter, OnExit, Plugin, Query, Res, ResMut, Resource, Result, Transform, Update, With,
-    Without,
+    App, Commands, Component, Entity, Handle, IntoScheduleConfigs, Name, NextState, OnEnter,
+    OnExit, Plugin, Query, Res, ResMut, Resource, Result, Transform, Update, With, Without,
+    in_state,
 };
 use bevy_asset_loader::asset_collection::AssetCollection;
 use godot::{

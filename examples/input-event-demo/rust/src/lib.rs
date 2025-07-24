@@ -2,8 +2,9 @@
 
 use bevy::prelude::*;
 use godot_bevy::prelude::{
-    godot_prelude::{gdextension, ExtensionLibrary},
-    BevyInputBridgePlugin, *,
+    BevyInputBridgePlugin,
+    godot_prelude::{ExtensionLibrary, gdextension},
+    *,
 };
 
 mod bevy_input;

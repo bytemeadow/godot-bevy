@@ -13,12 +13,12 @@ use bevy::{
 };
 use godot_bevy::{
     interop::GodotNodeHandle,
-    prelude::{main_thread_system, GodotSignal, GodotSignals, NodeTreeView, SceneTreeRef},
+    prelude::{GodotSignal, GodotSignals, NodeTreeView, SceneTreeRef, main_thread_system},
 };
 
 use crate::{
-    commands::{UICommand, UIElement, UIHandles},
     GameState,
+    commands::{UICommand, UIElement, UIHandles},
 };
 
 #[derive(Resource, Default)]

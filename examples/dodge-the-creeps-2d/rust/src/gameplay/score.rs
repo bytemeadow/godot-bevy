@@ -12,8 +12,8 @@ use bevy::{
 };
 
 use crate::{
-    commands::{UICommand, UIElement},
     GameState, Score,
+    commands::{UICommand, UIElement},
 };
 
 pub struct ScorePlugin;

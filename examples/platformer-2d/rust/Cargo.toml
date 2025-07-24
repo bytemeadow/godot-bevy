@@ -1,8 +1,7 @@
 [package]
 name = "rust-platformer-2d"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.82"
+edition = "2024"
 
 [lib]
 crate-type = ["cdylib"]
@@ -17,4 +16,4 @@ bevy_asset_loader = "0.23.0"
 fastrand = { version = "2.3.0" }
 godot = "0.3"
 godot-bevy = { path = "../../../godot-bevy" }
-which = "7.0.3"
+which = "8"

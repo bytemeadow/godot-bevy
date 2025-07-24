@@ -16,8 +16,8 @@ use bevy::{
 use godot_bevy::prelude::Groups;
 
 use crate::{
-    commands::{NodeCommand, UICommand},
     GameState,
+    commands::{NodeCommand, UICommand},
 };
 
 pub struct CountdownPlugin;
