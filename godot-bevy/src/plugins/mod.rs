@@ -3,6 +3,7 @@ use bevy::app::plugin_group;
 pub mod assets;
 pub mod audio;
 pub mod collisions;
+pub mod component_as_godot_node_child;
 pub mod core;
 pub mod input;
 pub mod packed_scene;
@@ -14,6 +15,7 @@ pub mod transforms;
 pub use assets::GodotAssetsPlugin;
 pub use audio::GodotAudioPlugin;
 pub use collisions::GodotCollisionsPlugin;
+pub use component_as_godot_node_child::ComponentAsGodotNodeChildPlugin;
 pub use core::GodotBaseCorePlugin;
 pub use input::{BevyInputBridgePlugin, GodotInputEventPlugin};
 pub use packed_scene::GodotPackedScenePlugin;
@@ -44,5 +46,6 @@ plugin_group! {
         :GodotAudioPlugin,
         :GodotPackedScenePlugin,
         :GodotTransformSyncPlugin,
+        :ComponentAsGodotNodeChildPlugin,
     }
 }

@@ -34,6 +34,10 @@
 
 - [Thread Safety and Godot APIs](./threading/main-thread-access.md)
 
+# Common Patterns
+
+- [Godot Node Children as Components](./common_patterns/godot-node-children-as-components.md)
+
 # Migration Guides
 
 - [v0.6 to v0.7](./migration/v0.6-to-v0.7.md)
