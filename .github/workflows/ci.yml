@@ -147,6 +147,7 @@ jobs:
           gdenv use 4.4.1
 
       - name: Setup Godot environment
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
         run: |
           # Add gdenv bin directory to PATH
           echo "$HOME/.local/share/gdenv/bin" >> $GITHUB_PATH
