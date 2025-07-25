@@ -153,19 +153,42 @@ jobs:
           echo "Building example: ${{ matrix.example }}"
           cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
 
-      - name: Upload Rust libraries
+      - name: Upload example library
         uses: actions/upload-artifact@v4
         with:
           name: rust-libs-${{ matrix.example }}-${{ runner.os }}
           path: |
-            target/release/*rust${{ matrix.extension }}
-            target/release/deps/*rust*${{ matrix.extension }}
+            target/release/librust${{ matrix.extension }}
+            target/release/rust${{ matrix.extension }}
+            target/release/deps/librust*${{ matrix.extension }}
+          if-no-files-found: error
+
+  collect-artifacts:
+    name: collect / cross-platform libraries
+    runs-on: ubuntu-latest
+    needs: [build-examples]
+    strategy:
+      matrix:
+        example: ["dodge-the-creeps-2d", "platformer-2d", "boids-perf-test"]
+    steps:
+      - name: Download all platform libraries for ${{ matrix.example }}
+        uses: actions/download-artifact@v4
+        with:
+          pattern: rust-libs-${{ matrix.example }}-*
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Upload unified cross-platform libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-libs-${{ matrix.example }}-all-platforms
+          path: artifacts/
           if-no-files-found: error
 
   export-examples:
     name: export / examples ${{ matrix.example }}
     runs-on: blaze/macos-latest
-    needs: [build-examples, changes]
+    needs: [collect-artifacts, changes]
     if: |
       needs.changes.outputs.dodge-the-creeps-2d == 'true' ||
       needs.changes.outputs.platformer-2d == 'true'
@@ -212,9 +235,8 @@ jobs:
       - name: Download Rust libraries
         uses: actions/download-artifact@v4
         with:
-          pattern: rust-libs-${{ matrix.example }}-*
+          name: rust-libs-${{ matrix.example }}-all-platforms
           path: artifacts/
-          merge-multiple: true
 
       - name: Setup cross-platform libraries
         run: |
@@ -251,7 +273,7 @@ jobs:
   benchmark:
     name: benchmark / boids
     runs-on: blaze/compute/ubuntu-latest-amd64
-    needs: [build-examples, changes]
+    needs: [collect-artifacts, changes]
     if: |
       (needs.changes.outputs.boids-perf-test == 'true' ||
        contains(github.event.pull_request.labels.*.name, 'benchmark')) && (
@@ -283,9 +305,8 @@ jobs:
       - name: Download Rust libraries
         uses: actions/download-artifact@v4
         with:
-          pattern: rust-libs-boids-perf-test-*
+          name: rust-libs-boids-perf-test-all-platforms
           path: artifacts/
-          merge-multiple: true
 
       - name: Setup cross-platform libraries
         run: |
