@@ -60,7 +60,7 @@ jobs:
 
   examples:
     name: test / ${{ matrix.example }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner || matrix.os }}
     needs: [check]
     env:
       # Disable debug symbols in release builds to save disk space
@@ -79,6 +79,15 @@ jobs:
             "two-way-sync-demo",
           ]
         os: [ubuntu-latest, macos-15, windows-latest]
+        include:
+          # Use high-performance runner for boids-perf-test benchmarking on Linux
+          - example: boids-perf-test
+            os: ubuntu-latest
+            runner: blaze/compute/ubuntu-latest-amd64
+        exclude:
+          # Remove default ubuntu-latest for boids-perf-test (replaced by high-perf runner)
+          - example: boids-perf-test
+            os: ubuntu-latest
 
     steps:
       - name: Checkout code
