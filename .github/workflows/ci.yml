@@ -9,6 +9,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   GODOT_VERSION: "4.4.1"
+  # Configured examples (boids-perf-test included for build but not export)
+  EXPORT_EXAMPLES: '["dodge-the-creeps-2d", "platformer-2d", "boids-perf-test"]'
 
 permissions:
   contents: read
@@ -21,11 +23,87 @@ concurrency:
 
 jobs:
   rust:
-    name: build / rust (${{ matrix.platform }})
+    name: check / rust
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cache and install Linux dependencies
+        if: runner.os == 'linux'
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libasound2-dev libudev-dev pkg-config
+          version: 1.0
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test --package godot-bevy --package godot-bevy-macros
+
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      boids-perf-test: ${{ steps.filter.outputs.boids-perf-test }}
+      dodge-the-creeps-2d: ${{ steps.filter.outputs.dodge-the-creeps-2d }}
+      platformer-2d: ${{ steps.filter.outputs.platformer-2d }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            boids-perf-test:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/boids-perf-test/**'
+              - '.github/workflows/ci.yml'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            dodge-the-creeps-2d:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/dodge-the-creeps-2d/**'
+              - '.github/workflows/ci.yml'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            platformer-2d:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/platformer-2d/**'
+              - '.github/workflows/ci.yml'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+
+  build-examples:
+    name: build / examples (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
+    needs: [rust, changes]
+    if: |
+      needs.changes.outputs.dodge-the-creeps-2d == 'true' ||
+      needs.changes.outputs.platformer-2d == 'true' ||
+      needs.changes.outputs.boids-perf-test == 'true'
     env:
       # Disable debug symbols in release builds to save disk space
       CARGO_PROFILE_RELEASE_DEBUG: false
+      # Map change outputs to environment variables for dynamic access
+      CHANGED_DODGE_THE_CREEPS_2D: ${{ needs.changes.outputs.dodge-the-creeps-2d }}
+      CHANGED_PLATFORMER_2D: ${{ needs.changes.outputs.platformer-2d }}
+      CHANGED_BOIDS_PERF_TEST: ${{ needs.changes.outputs.boids-perf-test }}
     strategy:
       matrix:
         os:
@@ -56,7 +134,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-          components: rustfmt, clippy
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -72,17 +149,25 @@ jobs:
           packages: libasound2-dev libudev-dev pkg-config
           version: 1.0
 
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Run tests
-        run: cargo test
-
-      - name: Build release
+      - name: Build main library
         run: cargo build --release --package godot-bevy
+
+      - name: Build changed examples
+        run: |
+          EXAMPLES='${{ env.EXPORT_EXAMPLES }}'
+          echo "$EXAMPLES" | jq -r '.[]' | while read example; do
+            # Convert example name to environment variable name
+            # dodge-the-creeps-2d → CHANGED_DODGE_THE_CREEPS_2D
+            change_var="CHANGED_$(echo "$example" | tr '-' '_' | tr '[:lower:]' '[:upper:]')"
+
+            # Use indirect variable access to check if this example has changes
+            if [[ "${!change_var}" == "true" ]]; then
+              echo "Building example: $example"
+              cargo build --release --manifest-path examples/$example/rust/Cargo.toml
+            else
+              echo "Skipping example: $example (no changes)"
+            fi
+          done
 
       - name: Upload Rust libraries
         uses: actions/upload-artifact@v4
@@ -93,51 +178,24 @@ jobs:
             target/release/deps/*rust*${{ matrix.extension }}
           if-no-files-found: error
 
-  changes:
-    name: detect changes
-    runs-on: ubuntu-latest
-    outputs:
-      benchmark: ${{ steps.filter.outputs.benchmark }}
-      dodge-the-creeps-2d: ${{ steps.filter.outputs.dodge-the-creeps-2d }}
-      platformer-2d: ${{ steps.filter.outputs.platformer-2d }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            benchmark:
-              - 'godot-bevy/**'
-              - 'godot-bevy-macros/**'
-              - 'examples/boids-perf-test/**'
-              - '.github/workflows/ci.yml'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-            dodge-the-creeps-2d:
-              - 'godot-bevy/**'
-              - 'godot-bevy-macros/**'
-              - 'examples/dodge-the-creeps-2d/**'
-              - '.github/workflows/ci.yml'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-            platformer-2d:
-              - 'godot-bevy/**'
-              - 'godot-bevy-macros/**'
-              - 'examples/platformer-2d/**'
-              - '.github/workflows/ci.yml'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-
-  examples:
-    name: build / ${{ matrix.example }}
+  export-examples:
+    name: export / examples ${{ matrix.example }}
     runs-on: blaze/macos-latest
-    needs: [rust, changes]
+    needs: [build-examples, changes]
     if: |
       needs.changes.outputs.dodge-the-creeps-2d == 'true' ||
       needs.changes.outputs.platformer-2d == 'true'
     strategy:
       matrix:
-        example: ${{ fromJson(needs.changes.outputs.dodge-the-creeps-2d == 'true' && needs.changes.outputs.platformer-2d == 'true' && '["dodge-the-creeps-2d", "platformer-2d"]' || needs.changes.outputs.dodge-the-creeps-2d == 'true' && '["dodge-the-creeps-2d"]' || '["platformer-2d"]') }}
+        example: ${{ fromJson(env.EXPORT_EXAMPLES) }}
+        include:
+          - example: dodge-the-creeps-2d
+            changed: ${{ needs.changes.outputs.dodge-the-creeps-2d }}
+          - example: platformer-2d
+            changed: ${{ needs.changes.outputs.platformer-2d }}
+        exclude:
+          - changed: "false"
+          - example: "boids-perf-test" # Built but not exported (used by benchmark job)
 
     steps:
       - name: Checkout code
@@ -186,9 +244,6 @@ jobs:
           echo "Available libraries:"
           ls -la target/release/ || echo "No release libraries found"
 
-      - name: Build example Rust library
-        run: cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
-
       - name: Import Godot project
         working-directory: examples/${{ matrix.example }}/godot
         run: ${{ steps.install-godot.outputs.godot-executable }} --editor --headless --quit || true
@@ -209,11 +264,11 @@ jobs:
           if-no-files-found: error
 
   benchmark:
-    name: performance / boids benchmark
+    name: benchmark / boids
     runs-on: blaze/compute/ubuntu-latest-amd64
-    needs: [rust, changes]
+    needs: [build-examples, changes]
     if: |
-      (needs.changes.outputs.benchmark == 'true' ||
+      (needs.changes.outputs.boids-perf-test == 'true' ||
        contains(github.event.pull_request.labels.*.name, 'benchmark')) && (
         github.ref == 'refs/heads/main' ||
         github.event_name == 'pull_request'
@@ -297,9 +352,6 @@ jobs:
           key: ${{ runner.os }}-godot-imports-boids-${{ hashFiles('examples/boids-perf-test/godot/**/*.import') }}
           restore-keys: |
             ${{ runner.os }}-godot-imports-boids-
-
-      - name: Build boids benchmark
-        run: cargo build --release --manifest-path examples/boids-perf-test/rust/Cargo.toml
 
       - name: Import Godot project
         working-directory: examples/boids-perf-test/godot
