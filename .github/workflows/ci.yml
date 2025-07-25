@@ -59,7 +59,7 @@ jobs:
         run: cargo test --package godot-bevy --package godot-bevy-macros
 
   examples:
-    name: test / ${{ matrix.example }}
+    name: test / ${{ matrix.example }} (${{ matrix.os }})
     runs-on: ${{ matrix.runner || matrix.os }}
     needs: [check]
     env:
@@ -124,6 +124,61 @@ jobs:
           install-templates: true
         id: install-godot
 
+      - name: Cache gdenv
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
+        uses: actions/cache@v4
+        id: cache-gdenv
+        with:
+          path: ~/.local/share/gdenv
+          key: ${{ runner.os }}-gdenv-4.4.1
+
+      - name: Install gdenv
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example) && steps.cache-gdenv.outputs.cache-hit != 'true'
+        run: |
+          # Install gdenv using official installer
+          curl -fsSL https://gdenv.bytemeadow.com | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install Godot via gdenv
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example) && steps.cache-gdenv.outputs.cache-hit != 'true'
+        run: |
+          # Install Godot 4.4.1 using gdenv
+          gdenv install 4.4.1
+          gdenv use 4.4.1
+
+      - name: Setup Godot environment
+        run: |
+          # Add gdenv bin directory to PATH
+          echo "$HOME/.local/share/gdenv/bin" >> $GITHUB_PATH
+
+          # Set the executable path
+          echo "GODOT_EXECUTABLE=$HOME/.local/share/gdenv/bin/godot" >> $GITHUB_ENV
+
+          # Verify installation
+          $HOME/.local/share/gdenv/bin/godot --version
+
+      - name: Install Godot templates
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
+        run: |
+          # Set platform-specific template directory
+          case "${{ runner.os }}" in
+            "Linux")
+              GODOT_TEMPLATES_DIR="$HOME/.local/share/godot/export_templates"
+              ;;
+            "macOS")
+              GODOT_TEMPLATES_DIR="$HOME/Library/Application Support/Godot/export_templates"
+              ;;
+            "Windows")
+              GODOT_TEMPLATES_DIR="$APPDATA/Godot/export_templates"
+              ;;
+          esac
+
+          # Download and install templates
+          curl -L -o ./godot-templates.zip "https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}-stable/Godot_v${{ env.GODOT_VERSION }}-stable_export_templates.tpz"
+          unzip ./godot-templates.zip
+          mkdir -p "$GODOT_TEMPLATES_DIR"
+          mv ./templates "$GODOT_TEMPLATES_DIR/${{ env.GODOT_VERSION }}.stable"
+
       - name: Cache Godot imports for export
         if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
         uses: actions/cache@v4
@@ -138,19 +193,19 @@ jobs:
         working-directory: examples/${{ matrix.example }}/godot
         run: |
           # Import project
-          ${{ steps.install-godot.outputs.godot-executable }} --editor --headless --quit || true
+          "$GODOT_EXECUTABLE" --editor --headless --quit || true
 
           # Export for current platform
           mkdir -p exports
           case "${{ runner.os }}" in
-            "Linux")
-              ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Linux/X11" exports/${{ matrix.example }}-linux
+            "linux")
+              "$GODOT_EXECUTABLE" --headless --export-release "Linux/X11" exports/${{ matrix.example }}-linux
               ;;
-            "macOS")
-              ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
+            "macos")
+              "$GODOT_EXECUTABLE" --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
               ;;
-            "Windows")
-              ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
+            "windows")
+              "$GODOT_EXECUTABLE" --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
               ;;
           esac
 
