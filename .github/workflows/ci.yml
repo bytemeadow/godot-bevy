@@ -82,7 +82,7 @@ jobs:
         run: cargo test
 
       - name: Build release
-        run: cargo build --release
+        run: cargo build --release --package godot-bevy
 
       - name: Upload Rust libraries
         uses: actions/upload-artifact@v4
