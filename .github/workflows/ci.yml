@@ -115,39 +115,52 @@ jobs:
           echo "Building example: ${{ matrix.example }}"
           cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
 
-      - name: Cache gdenv
-        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
-        uses: actions/cache@v4
-        id: cache-gdenv
-        with:
-          path: ~/.local/share/gdenv
-          key: ${{ runner.os }}-gdenv-4.4.1
-
-      - name: Install gdenv
-        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example) && steps.cache-gdenv.outputs.cache-hit != 'true'
+      - name: Install gdenv (Unix)
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example) && runner.os != 'Windows'
         run: |
           # Install gdenv using official installer
           curl -fsSL https://gdenv.bytemeadow.com | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+      - name: Install gdenv (Windows)
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example) && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Install gdenv for Windows
+          iwr -useb https://gdenv.bytemeadow.com/install.ps1 | iex
+          echo "$env:LOCALAPPDATA\Programs\gdenv" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Install Godot via gdenv
-        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example) && steps.cache-gdenv.outputs.cache-hit != 'true'
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
         run: |
           # Install Godot 4.4.1 using gdenv
           gdenv install 4.4.1
           gdenv use 4.4.1
 
-      - name: Setup Godot environment
-        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
+      - name: Setup Godot environment (Unix)
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example) && runner.os != 'Windows'
         run: |
-          # Add gdenv bin directory to PATH
-          echo "$HOME/.local/share/gdenv/bin" >> $GITHUB_PATH
+          # Set platform-specific gdenv bin path
+          case "${{ runner.os }}" in
+            "Linux")
+              GDENV_BIN_DIR="$HOME/.local/share/gdenv/bin"
+              ;;
+            "macOS")
+              GDENV_BIN_DIR="$HOME/Library/Application Support/gdenv/bin"
+              ;;
+          esac
+          
+          echo "$GDENV_BIN_DIR" >> $GITHUB_PATH
+          echo "GODOT_EXECUTABLE=$GDENV_BIN_DIR/godot" >> $GITHUB_ENV
+          "$GDENV_BIN_DIR/godot" --version
 
-          # Set the executable path
-          echo "GODOT_EXECUTABLE=$HOME/.local/share/gdenv/bin/godot" >> $GITHUB_ENV
-
-          # Verify installation
-          $HOME/.local/share/gdenv/bin/godot --version
+      - name: Setup Godot environment (Windows)
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example) && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          echo "$env:LOCALAPPDATA\gdenv\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "GODOT_EXECUTABLE=$env:LOCALAPPDATA\gdenv\bin\godot.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & "$env:LOCALAPPDATA\gdenv\bin\godot.exe" --version
 
       - name: Install Godot templates
         if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
