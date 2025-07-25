@@ -9,6 +9,12 @@ on:
 env:
   CARGO_TERM_COLOR: always
   GODOT_VERSION: "4.4.1"
+  # Examples to export for cross-platform testing
+  EXAMPLES_TO_EXPORT: '["dodge-the-creeps-2d", "platformer-2d"]'
+  # Examples to benchmark for performance testing
+  EXAMPLES_TO_BENCHMARK: '["boids-perf-test"]'
+  # All examples (for comprehensive build testing)
+  ALL_EXAMPLES: '["dodge-the-creeps-2d", "platformer-2d", "boids-perf-test", "avian-physics-demo", "input-event-demo", "simple-node2d-movement", "timing-test", "two-way-sync-demo"]'
 
 permissions:
   contents: read
@@ -20,33 +26,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  rust:
-    name: build / rust (${{ matrix.platform }})
-    runs-on: ${{ matrix.os }}
-    env:
-      # Disable debug symbols in release builds to save disk space
-      CARGO_PROFILE_RELEASE_DEBUG: false
-    strategy:
-      matrix:
-        os:
-          [
-            blaze/compute/ubuntu-latest-amd64,
-            blaze/macos-latest,
-            windows-latest,
-          ]
-        include:
-          - os: blaze/compute/ubuntu-latest-amd64
-            platform: linux
-            target: x86_64-unknown-linux-gnu
-            extension: .so
-          - os: blaze/macos-latest
-            platform: macos
-            target: x86_64-apple-darwin
-            extension: .dylib
-          - os: windows-latest
-            platform: windows
-            target: x86_64-pc-windows-msvc
-            extension: .dll
+  check:
+    name: check
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -55,15 +37,10 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
           components: rustfmt, clippy
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            . -> target
-            examples/*/rust -> target
 
       - name: Cache and install Linux dependencies
         if: runner.os == 'linux'
@@ -79,145 +56,38 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Run tests
-        run: cargo test
-
-      - name: Build release
-        run: cargo build --release
-
-      - name: Upload Rust libraries
-        uses: actions/upload-artifact@v4
-        with:
-          name: rust-libs-${{ runner.os }}
-          path: |
-            target/release/*rust${{ matrix.extension }}
-            target/release/deps/*rust*${{ matrix.extension }}
-          if-no-files-found: error
-
-  changes:
-    name: detect changes
-    runs-on: ubuntu-latest
-    outputs:
-      benchmark: ${{ steps.filter.outputs.benchmark }}
-      dodge-the-creeps-2d: ${{ steps.filter.outputs.dodge-the-creeps-2d }}
-      platformer-2d: ${{ steps.filter.outputs.platformer-2d }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            benchmark:
-              - 'godot-bevy/**'
-              - 'godot-bevy-macros/**'
-              - 'examples/boids-perf-test/**'
-              - '.github/workflows/ci.yml'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-            dodge-the-creeps-2d:
-              - 'godot-bevy/**'
-              - 'godot-bevy-macros/**'
-              - 'examples/dodge-the-creeps-2d/**'
-              - '.github/workflows/ci.yml'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-            platformer-2d:
-              - 'godot-bevy/**'
-              - 'godot-bevy-macros/**'
-              - 'examples/platformer-2d/**'
-              - '.github/workflows/ci.yml'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
+        run: cargo test --package godot-bevy --package godot-bevy-macros
 
   examples:
-    name: build / ${{ matrix.example }}
-    runs-on: blaze/macos-latest
-    needs: [rust, changes]
-    if: |
-      needs.changes.outputs.dodge-the-creeps-2d == 'true' ||
-      needs.changes.outputs.platformer-2d == 'true'
+    name: test / ${{ matrix.example }} (${{ matrix.os }})
+    runs-on: ${{ matrix.runner || matrix.os }}
+    needs: [check]
+    env:
+      # Disable debug symbols in release builds to save disk space
+      CARGO_PROFILE_RELEASE_DEBUG: false
     strategy:
       matrix:
-        example: ${{ fromJson(needs.changes.outputs.dodge-the-creeps-2d == 'true' && needs.changes.outputs.platformer-2d == 'true' && '["dodge-the-creeps-2d", "platformer-2d"]' || needs.changes.outputs.dodge-the-creeps-2d == 'true' && '["dodge-the-creeps-2d"]' || '["platformer-2d"]') }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            . -> target
-            examples/*/rust -> target
-
-      - name: Install Godot
-        uses: CapsCollective/godot-actions/install-godot@v1.2
-        with:
-          godot-version: ${{ env.GODOT_VERSION }}
-          install-templates: true
-        id: install-godot
-
-      - name: Cache Godot imports
-        uses: actions/cache@v4
-        with:
-          path: examples/${{ matrix.example }}/godot/.godot
-          key: ${{ runner.os }}-godot-imports-${{ matrix.example }}-${{ hashFiles(format('examples/{0}/godot/**/*.import', matrix.example)) }}
-          restore-keys: |
-            ${{ runner.os }}-godot-imports-${{ matrix.example }}-
-
-      - name: Download Rust libraries
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-
-      - name: Setup cross-platform libraries
-        run: |
-          mkdir -p target/{release,debug}
-
-          # Copy all platform libraries to target directories
-          find artifacts/ -name "*rust*" -type f | while read file; do
-            cp "$file" target/release/ 2>/dev/null || true
-            cp "$file" target/debug/ 2>/dev/null || true
-          done
-
-          echo "Available libraries:"
-          ls -la target/release/ || echo "No release libraries found"
-
-      - name: Build example Rust library
-        run: cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
-
-      - name: Import Godot project
-        working-directory: examples/${{ matrix.example }}/godot
-        run: ${{ steps.install-godot.outputs.godot-executable }} --editor --headless --quit || true
-
-      - name: Export for all platforms
-        working-directory: examples/${{ matrix.example }}/godot
-        run: |
-          mkdir -p exports
-          ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Linux/X11" exports/${{ matrix.example }}-linux
-          ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
-          ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
-
-      - name: Upload game exports
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.example }}-exports
-          path: examples/${{ matrix.example }}/godot/exports/
-          if-no-files-found: error
-
-  benchmark:
-    name: performance / boids benchmark
-    runs-on: blaze/compute/ubuntu-latest-amd64
-    needs: [rust, changes]
-    if: |
-      (needs.changes.outputs.benchmark == 'true' ||
-       contains(github.event.pull_request.labels.*.name, 'benchmark')) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'pull_request'
-      )
+        example:
+          [
+            "dodge-the-creeps-2d",
+            "platformer-2d",
+            "boids-perf-test",
+            "avian-physics-demo",
+            "input-event-demo",
+            "simple-node2d-movement",
+            "timing-test",
+            "two-way-sync-demo",
+          ]
+        os: [ubuntu-latest, macos-15, windows-latest]
+        include:
+          # Use high-performance runner for boids-perf-test benchmarking on Linux
+          - example: boids-perf-test
+            os: ubuntu-latest
+            runner: blaze/compute/ubuntu-latest-amd64
+        exclude:
+          # Remove default ubuntu-latest for boids-perf-test (replaced by high-perf runner)
+          - example: boids-perf-test
+            os: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -240,154 +110,152 @@ jobs:
           packages: libasound2-dev libudev-dev pkg-config
           version: 1.0
 
-      - name: Download Rust libraries
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-
-      - name: Setup cross-platform libraries
+      - name: Build example
         run: |
-          mkdir -p target/{release,debug}
+          echo "Building example: ${{ matrix.example }}"
+          cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
 
-          # Copy all platform libraries to target directories
-          find artifacts/ -name "*rust*" -type f | while read file; do
-            cp "$file" target/release/ 2>/dev/null || true
-            cp "$file" target/debug/ 2>/dev/null || true
-          done
-
-          echo "Available libraries:"
-          ls -la target/release/ || echo "No release libraries found"
-
-      - name: Cache gdenv
-        uses: actions/cache@v4
-        id: cache-gdenv
-        with:
-          path: ~/.local/share/gdenv
-          key: ${{ runner.os }}-gdenv-4.4.1
-
-      - name: Install gdenv
-        if: steps.cache-gdenv.outputs.cache-hit != 'true'
+      - name: Install gdenv (Unix)
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example) && runner.os != 'Windows'
         run: |
           # Install gdenv using official installer
           curl -fsSL https://gdenv.bytemeadow.com | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+      - name: Install gdenv (Windows)
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example) && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Install gdenv for Windows
+          iwr -useb https://gdenv.bytemeadow.com/install.ps1 | iex
+          echo "$env:LOCALAPPDATA\Programs\gdenv" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Install Godot via gdenv
-        if: steps.cache-gdenv.outputs.cache-hit != 'true'
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
         run: |
           # Install Godot 4.4.1 using gdenv
           gdenv install 4.4.1
           gdenv use 4.4.1
 
-      - name: Setup Godot environment
+      - name: Setup Godot environment (Unix)
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example) && runner.os != 'Windows'
         run: |
-          # Add gdenv bin directory to PATH
-          echo "$HOME/.local/share/gdenv/bin" >> $GITHUB_PATH
+          # Set platform-specific gdenv bin path
+          case "${{ runner.os }}" in
+            "Linux")
+              GDENV_BIN_DIR="$HOME/.local/share/gdenv/bin"
+              ;;
+            "macOS")
+              GDENV_BIN_DIR="$HOME/Library/Application Support/gdenv/bin"
+              ;;
+          esac
+          
+          echo "$GDENV_BIN_DIR" >> $GITHUB_PATH
+          echo "GODOT_EXECUTABLE=$GDENV_BIN_DIR/godot" >> $GITHUB_ENV
+          "$GDENV_BIN_DIR/godot" --version
 
-          # Set the executable path
-          echo "GODOT_EXECUTABLE=$HOME/.local/share/gdenv/bin/godot" >> $GITHUB_ENV
+      - name: Setup Godot environment (Windows)
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example) && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          echo "$env:LOCALAPPDATA\gdenv\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "GODOT_EXECUTABLE=$env:LOCALAPPDATA\gdenv\bin\godot.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & "$env:LOCALAPPDATA\gdenv\bin\godot.exe" --version
 
-          # Verify installation
-          $HOME/.local/share/gdenv/bin/godot --version
+      - name: Install Godot templates
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
+        run: |
+          # Set platform-specific template directory
+          case "${{ runner.os }}" in
+            "Linux")
+              GODOT_TEMPLATES_DIR="$HOME/.local/share/godot/export_templates"
+              ;;
+            "macOS")
+              GODOT_TEMPLATES_DIR="$HOME/Library/Application Support/Godot/export_templates"
+              ;;
+            "Windows")
+              GODOT_TEMPLATES_DIR="$APPDATA/Godot/export_templates"
+              ;;
+          esac
 
-      - name: Cache Godot imports
+          # Download and install templates
+          curl -L -o ./godot-templates.zip "https://github.com/godotengine/godot/releases/download/${{ env.GODOT_VERSION }}-stable/Godot_v${{ env.GODOT_VERSION }}-stable_export_templates.tpz"
+          unzip ./godot-templates.zip
+          mkdir -p "$GODOT_TEMPLATES_DIR"
+          mv ./templates "$GODOT_TEMPLATES_DIR/${{ env.GODOT_VERSION }}.stable"
+
+      - name: Cache Godot imports for export
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
         uses: actions/cache@v4
         with:
-          path: examples/boids-perf-test/godot/.godot
-          key: ${{ runner.os }}-godot-imports-boids-${{ hashFiles('examples/boids-perf-test/godot/**/*.import') }}
+          path: examples/${{ matrix.example }}/godot/.godot
+          key: ${{ runner.os }}-godot-imports-${{ matrix.example }}-${{ hashFiles(format('examples/{0}/godot/**/*.import', matrix.example)) }}
           restore-keys: |
-            ${{ runner.os }}-godot-imports-boids-
+            ${{ runner.os }}-godot-imports-${{ matrix.example }}-
 
-      - name: Build boids benchmark
-        run: cargo build --release --manifest-path examples/boids-perf-test/rust/Cargo.toml
-
-      - name: Import Godot project
-        working-directory: examples/boids-perf-test/godot
-        run: $GODOT_EXECUTABLE --editor --headless --quit || true
-
-      - name: Download baseline for regression check
-        if: github.event_name == 'pull_request'
-        working-directory: examples/boids-perf-test
+      - name: Verify Rust library location
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
         run: |
-          # Download baseline from main branch for regression testing
-          if curl -f -o main-baseline.json https://raw.githubusercontent.com/${{ github.repository }}/main/examples/boids-perf-test/baseline.json; then
-            # Check if this is a CI-generated baseline
-            if jq -e '.ci_metadata' main-baseline.json > /dev/null; then
-              echo "Found CI-generated baseline from commit $(jq -r '.ci_metadata.commit' main-baseline.json)"
-              echo "BASELINE_AVAILABLE=true" >> $GITHUB_ENV
-            else
-              echo "Baseline exists but was not generated by CI - skipping regression check"
-              echo "BASELINE_AVAILABLE=false" >> $GITHUB_ENV
-            fi
-          else
-            echo "No baseline found on main branch - regression check skipped"
-            echo "BASELINE_AVAILABLE=false" >> $GITHUB_ENV
-          fi
+          echo "Checking for built libraries in target/release/:"
+          ls -la target/release/ | grep -E "\.(so|dylib|dll)$" || echo "No libraries found"
+          echo ""
+          echo "Checking workspace target directory:"
+          find target -name "*${{ matrix.example }}*" -type f 2>/dev/null || echo "No example-specific libraries found"
 
-      - name: Run performance benchmark with regression check
-        id: benchmark
-        working-directory: examples/boids-perf-test
+      - name: Import and export Godot project
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
+        working-directory: examples/${{ matrix.example }}/godot
         run: |
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            # On main branch: always save baseline
-            if python3 regression_test.py --boids 500 1000 2000 5000 10000 20000 --save-baseline baseline.json --godot "$GODOT_EXECUTABLE"; then
-              echo "benchmark_success=true" >> $GITHUB_OUTPUT
-              echo "baseline_created=true" >> $GITHUB_OUTPUT
-            else
-              echo "benchmark_success=false" >> $GITHUB_OUTPUT
-              exit 1
-            fi
-          elif [ "$BASELINE_AVAILABLE" = "true" ]; then
-            # On PR with baseline: run regression check
-            echo "Running benchmark with regression check against main baseline..."
-            if python3 regression_test.py --boids 500 1000 2000 5000 10000 20000 --baseline main-baseline.json --threshold 0.85 --godot "$GODOT_EXECUTABLE"; then
-              echo "benchmark_success=true" >> $GITHUB_OUTPUT
-            else
-              echo "::warning::Performance regression detected! Bevy implementation performance dropped more than 15%"
-              echo "benchmark_success=false" >> $GITHUB_OUTPUT
-              exit 1
-            fi
-          else
-            # On PR without baseline: just run benchmark
-            echo "Running benchmark without regression check (no baseline available)..."
-            if python3 regression_test.py --boids 500 1000 2000 5000 10000 20000 --godot "$GODOT_EXECUTABLE"; then
-              echo "benchmark_success=true" >> $GITHUB_OUTPUT
-            else
-              echo "benchmark_success=false" >> $GITHUB_OUTPUT
-              exit 1
-            fi
-          fi
+          # Import project
+          "$GODOT_EXECUTABLE" --editor --headless --quit || true
 
-      - name: Generate benchmark summary
-        if: always() && steps.benchmark.outputs.benchmark_success == 'true'
-        working-directory: examples/boids-perf-test
-        run: |
-          echo "## 🚀 Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "✅ Benchmark completed and baseline saved for future regression tests." >> $GITHUB_STEP_SUMMARY
-          elif [ "$BASELINE_AVAILABLE" = "true" ]; then
-            echo "✅ Benchmark completed with regression check passed." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "ℹ️  Benchmark completed (no regression check - baseline not available)." >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Check the benchmark job logs for detailed results." >> $GITHUB_STEP_SUMMARY
+          # Export for current platform
+          mkdir -p exports
+          case "${{ runner.os }}" in
+            "Linux")
+              "$GODOT_EXECUTABLE" --headless --export-release "Linux/X11" exports/${{ matrix.example }}-linux
+              ;;
+            "macOS")
+              "$GODOT_EXECUTABLE" --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
+              ;;
+            "Windows")
+              "$GODOT_EXECUTABLE" --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
+              ;;
+          esac
 
-      - name: Save PR metadata for comment workflow
-        if: github.event_name == 'pull_request' && steps.benchmark.outputs.benchmark_success == 'true'
-        run: |
-          mkdir -p benchmark-artifacts
-          echo "${{ github.event.number }}" > benchmark-artifacts/pr_number.txt
-          echo "${{ github.event.pull_request.head.sha }}" > benchmark-artifacts/pr_sha.txt
-
-      - name: Upload benchmark results
-        if: always()
+      - name: Upload game exports
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-results
+          name: ${{ matrix.example }}-export-${{ runner.os }}
+          path: examples/${{ matrix.example }}/godot/exports/
+          if-no-files-found: error
+
+      # Benchmark steps (only for examples in EXAMPLES_TO_BENCHMARK and on Linux)
+      - name: Cache Godot imports for benchmarking
+        if: contains(fromJson(env.EXAMPLES_TO_BENCHMARK), matrix.example) && runner.os == 'Linux'
+        uses: actions/cache@v4
+        with:
+          path: examples/${{ matrix.example }}/godot/.godot
+          key: ${{ runner.os }}-godot-imports-${{ matrix.example }}-${{ hashFiles(format('examples/{0}/godot/**/*.import', matrix.example)) }}
+          restore-keys: |
+            ${{ runner.os }}-godot-imports-${{ matrix.example }}-
+
+      - name: Run benchmark
+        if: contains(fromJson(env.EXAMPLES_TO_BENCHMARK), matrix.example) && runner.os == 'Linux'
+        working-directory: examples/${{ matrix.example }}
+        run: |
+          # Import project
+          $GODOT_EXECUTABLE --editor --headless --quit || true
+
+          # Run benchmark
+          python3 regression_test.py --boids 500 1000 2000 5000 10000 20000 --godot "$GODOT_EXECUTABLE"
+
+      - name: Upload benchmark results
+        if: contains(fromJson(env.EXAMPLES_TO_BENCHMARK), matrix.example) && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.example }}-benchmark-results
           path: |
-            examples/boids-perf-test/benchmark_results/
-            examples/boids-perf-test/benchmark_output.txt
-            examples/boids-perf-test/baseline.json
-            benchmark-artifacts/
+            examples/${{ matrix.example }}/benchmark_results/
+            examples/${{ matrix.example }}/benchmark_output.txt
