@@ -115,15 +115,6 @@ jobs:
           echo "Building example: ${{ matrix.example }}"
           cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
 
-      # Export step (only for examples in EXAMPLES_TO_EXPORT)
-      - name: Setup Godot for export
-        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
-        uses: CapsCollective/godot-actions/install-godot@v1.2
-        with:
-          godot-version: ${{ env.GODOT_VERSION }}
-          install-templates: true
-        id: install-godot
-
       - name: Cache gdenv
         if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
         uses: actions/cache@v4
