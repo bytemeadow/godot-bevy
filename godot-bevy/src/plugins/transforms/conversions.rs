@@ -88,6 +88,7 @@ pub trait IntoVector3 {
 }
 
 impl IntoVector3 for Vec3 {
+    #[inline]
     fn to_vector3(self) -> Vector3 {
         Vector3::new(self.x, self.y, self.z)
     }
@@ -98,12 +99,14 @@ pub trait IntoVec3 {
 }
 
 impl IntoVec3 for Vector3 {
+    #[inline]
     fn to_vec3(self) -> Vec3 {
         vec3(self.x, self.y, self.z)
     }
 }
 
 impl IntoVec3 for Vector2 {
+    #[inline]
     fn to_vec3(self) -> Vec3 {
         vec3(self.x, self.y, 0.)
     }
@@ -114,6 +117,7 @@ pub trait IntoQuat {
 }
 
 impl IntoQuat for Quaternion {
+    #[inline]
     fn to_quat(self) -> Quat {
         Quat::from_xyzw(self.x, self.y, self.z, self.w)
     }
@@ -124,6 +128,7 @@ pub trait IntoQuaternion {
 }
 
 impl IntoQuaternion for Quat {
+    #[inline]
     fn to_quaternion(self) -> Quaternion {
         Quaternion::new(self.x, self.y, self.z, self.w)
     }
