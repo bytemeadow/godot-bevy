@@ -180,6 +180,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-godot-imports-${{ matrix.example }}-
 
+      - name: Verify Rust library location
+        if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
+        run: |
+          echo "Checking for built libraries in target/release/:"
+          ls -la target/release/ | grep -E "\.(so|dylib|dll)$" || echo "No libraries found"
+          echo ""
+          echo "Checking workspace target directory:"
+          find target -name "*${{ matrix.example }}*" -type f 2>/dev/null || echo "No example-specific libraries found"
+
       - name: Import and export Godot project
         if: contains(fromJson(env.EXAMPLES_TO_EXPORT), matrix.example)
         working-directory: examples/${{ matrix.example }}/godot
@@ -190,13 +199,13 @@ jobs:
           # Export for current platform
           mkdir -p exports
           case "${{ runner.os }}" in
-            "linux")
+            "Linux")
               "$GODOT_EXECUTABLE" --headless --export-release "Linux/X11" exports/${{ matrix.example }}-linux
               ;;
-            "macos")
+            "macOS")
               "$GODOT_EXECUTABLE" --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
               ;;
-            "windows")
+            "Windows")
               "$GODOT_EXECUTABLE" --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
               ;;
           esac
