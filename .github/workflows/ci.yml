@@ -13,6 +13,8 @@ env:
   EXAMPLES_TO_EXPORT: '["dodge-the-creeps-2d", "platformer-2d"]'
   # Examples to benchmark for performance testing
   EXAMPLES_TO_BENCHMARK: '["boids-perf-test"]'
+  # All examples (for comprehensive build testing)
+  ALL_EXAMPLES: '["dodge-the-creeps-2d", "platformer-2d", "boids-perf-test", "avian-physics-demo", "input-event-demo", "simple-node2d-movement", "timing-test", "two-way-sync-demo"]'
 
 permissions:
   contents: read
@@ -56,65 +58,27 @@ jobs:
       - name: Run tests
         run: cargo test --package godot-bevy --package godot-bevy-macros
 
-  changes:
-    name: detect changes
-    runs-on: ubuntu-latest
-    outputs:
-      boids-perf-test: ${{ steps.filter.outputs.boids-perf-test }}
-      dodge-the-creeps-2d: ${{ steps.filter.outputs.dodge-the-creeps-2d }}
-      platformer-2d: ${{ steps.filter.outputs.platformer-2d }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            boids-perf-test:
-              - 'godot-bevy/**'
-              - 'godot-bevy-macros/**'
-              - 'examples/boids-perf-test/**'
-              - '.github/workflows/ci.yml'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-            dodge-the-creeps-2d:
-              - 'godot-bevy/**'
-              - 'godot-bevy-macros/**'
-              - 'examples/dodge-the-creeps-2d/**'
-              - '.github/workflows/ci.yml'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-            platformer-2d:
-              - 'godot-bevy/**'
-              - 'godot-bevy-macros/**'
-              - 'examples/platformer-2d/**'
-              - '.github/workflows/ci.yml'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-
   examples:
     name: test / ${{ matrix.example }}
     runs-on: ${{ matrix.os }}
-    needs: [check, changes]
-    if: |
-      needs.changes.outputs.dodge-the-creeps-2d == 'true' ||
-      needs.changes.outputs.platformer-2d == 'true' ||
-      needs.changes.outputs.boids-perf-test == 'true'
+    needs: [check]
     env:
       # Disable debug symbols in release builds to save disk space
       CARGO_PROFILE_RELEASE_DEBUG: false
     strategy:
       matrix:
-        example: ["dodge-the-creeps-2d", "platformer-2d", "boids-perf-test"]
+        example:
+          [
+            "dodge-the-creeps-2d",
+            "platformer-2d",
+            "boids-perf-test",
+            "avian-physics-demo",
+            "input-event-demo",
+            "simple-node2d-movement",
+            "timing-test",
+            "two-way-sync-demo",
+          ]
         os: [ubuntu-latest, macos-15, windows-latest]
-        include:
-          - example: dodge-the-creeps-2d
-            changed: ${{ needs.changes.outputs.dodge-the-creeps-2d }}
-          - example: platformer-2d
-            changed: ${{ needs.changes.outputs.platformer-2d }}
-          - example: boids-perf-test
-            changed: ${{ needs.changes.outputs.boids-perf-test }}
-        exclude:
-          - changed: "false"
 
     steps:
       - name: Checkout code
