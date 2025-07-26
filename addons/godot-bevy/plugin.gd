@@ -37,21 +37,19 @@ func _on_setup_project():
 	wizard_dialog.popup_centered(Vector2(600, 400))
 
 func _on_add_singleton():
-	# Check if singleton already exists
-	if ProjectSettings.has_setting("autoload/BevyAppSingleton"):
-		push_warning("BevyAppSingleton already exists in project settings")
-		return
-
-	# Create the singleton scene if it doesn't exist
 	var singleton_path = "res://bevy_app_singleton.tscn"
-	if not FileAccess.file_exists(singleton_path):
-		_create_bevy_app_singleton(singleton_path)
+	
+	# Always create/update the singleton scene with latest template
+	_create_bevy_app_singleton(singleton_path)
 
-	# Add to autoload
-	ProjectSettings.set_setting("autoload/BevyAppSingleton", singleton_path)
+	# Add to autoload (this will update if already exists) and ensure it's enabled
+	ProjectSettings.set_setting("autoload/BevyAppSingleton", "*" + singleton_path)
 	ProjectSettings.save()
 
-	push_warning("BevyAppSingleton added to project autoload settings! Restart editor to apply changes.")
+	if ProjectSettings.has_setting("autoload/BevyAppSingleton"):
+		push_warning("BevyAppSingleton updated in project autoload settings! Restart editor to apply changes.")
+	else:
+		push_warning("BevyAppSingleton added to project autoload settings! Restart editor to apply changes.")
 
 func _create_bevy_app_singleton(path: String):
 	# Create the scene file content directly
