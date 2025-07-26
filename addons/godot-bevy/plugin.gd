@@ -128,7 +128,7 @@ default = []
 		if info.features.get("GodotAssetsPlugin", false):
 			plugins_to_add.append("app.add_plugins(GodotAssetsPlugin);")
 		if info.features.get("GodotTransformSyncPlugin", false):
-			plugins_to_add.append("app.add_plugins(GodotTransformSyncPlugin::default());")
+			plugins_to_add.append("app.add_plugins(GodotTransformSyncPlugin);")
 		if info.features.get("GodotCollisionsPlugin", false):
 			plugins_to_add.append("app.add_plugins(GodotCollisionsPlugin);")
 		if info.features.get("GodotSignalsPlugin", false):
@@ -163,15 +163,12 @@ fn build_app(app: &mut App) {
 	app.add_systems(Update, hello_world_system);
 }
 
-fn hello_world_system() {
+fn hello_world_system(mut timer: Local<f32>, time: Res<Time>) {
 	// This runs every frame in Bevy's Update schedule
-	static mut COUNTER: f32 = 0.0;
-	unsafe {
-		COUNTER += 0.016; // Approximate frame time
-		if COUNTER > 1.0 {
-			COUNTER = 0.0;
-			godot_print!("Hello from Bevy ECS!");
-		}
+	*timer += time.delta_secs();
+	if *timer > 1.0 {
+		*timer = 0.0;
+		godot_print!("Hello from Bevy ECS!");
 	}
 }
 """ % [plugin_config]

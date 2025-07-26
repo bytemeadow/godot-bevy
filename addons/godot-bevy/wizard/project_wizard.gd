@@ -11,23 +11,25 @@ signal project_created(project_info: Dictionary)
 
 var feature_checkboxes: Dictionary = {}
 
+const DEFAULT_VERSION = "0.8.4"
+
 func _ready():
 	title = "Setup godot-bevy Project"
 	get_ok_button().text = "Create Project"
 	get_cancel_button().text = "Cancel"
-	
+
 	# Set defaults
 	project_name_input.text = "my_game"
-	version_input.text = "0.8.4"
+	version_input.text = DEFAULT_VERSION
 	use_defaults_check.button_pressed = true
-	
+
 	# Connect signals
 	get_ok_button().pressed.connect(_on_create_pressed)
 	use_defaults_check.toggled.connect(_on_use_defaults_toggled)
-	
+
 	# Create feature checkboxes
 	_create_feature_checkboxes()
-	
+
 	# Initially hide custom features if using defaults
 	_on_use_defaults_toggled(true)
 
@@ -42,7 +44,7 @@ func _create_feature_checkboxes():
 		{"name": "GodotPackedScenePlugin", "description": "Scene spawning", "default": true},
 		{"name": "bevy_gamepad", "description": "Gamepad support (adds GilrsPlugin)", "default": true}
 	]
-	
+
 	for feature in features:
 		var checkbox = CheckBox.new()
 		checkbox.text = feature.name + " - " + feature.description
@@ -61,10 +63,10 @@ func _on_create_pressed():
 		"release_build": release_build_check.button_pressed,
 		"features": {}
 	}
-	
+
 	if not info.use_defaults:
 		for feature_name in feature_checkboxes:
 			info.features[feature_name] = feature_checkboxes[feature_name].button_pressed
-	
+
 	project_created.emit(info)
 	hide()
