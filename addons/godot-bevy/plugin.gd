@@ -117,36 +117,9 @@ godot-bevy = "%s"
 
 	_save_file(rust_path.path_join("Cargo.toml"), cargo_content)
 
-	# Build plugin configuration
-	var plugin_config = ""
-	if info.use_defaults:
-		plugin_config = "app.add_plugins(GodotDefaultPlugins);"
-	else:
-		var plugins_to_add = []
-		if info.features.get("GodotAssetsPlugin", false):
-			plugins_to_add.append("app.add_plugins(GodotAssetsPlugin);")
-		if info.features.get("GodotTransformSyncPlugin", false):
-			plugins_to_add.append("app.add_plugins(GodotTransformSyncPlugin);")
-		if info.features.get("GodotCollisionsPlugin", false):
-			plugins_to_add.append("app.add_plugins(GodotCollisionsPlugin);")
-		if info.features.get("GodotSignalsPlugin", false):
-			plugins_to_add.append("app.add_plugins(GodotSignalsPlugin);")
-		if info.features.get("BevyInputBridgePlugin", false):
-			plugins_to_add.append("app.add_plugins(BevyInputBridgePlugin);")
-		if info.features.get("GodotAudioPlugin", false):
-			plugins_to_add.append("app.add_plugins(GodotAudioPlugin);")
-		if info.features.get("GodotPackedScenePlugin", false):
-			plugins_to_add.append("app.add_plugins(GodotPackedScenePlugin);")
-
-		if plugins_to_add.size() > 0:
-			plugin_config = "    " + "\n    ".join(plugins_to_add)
-		else:
-			plugin_config = "    // Add plugins as needed"
-
-	# Update Cargo.toml for gamepad feature
-	if info.features.get("bevy_gamepad", false) and not info.use_defaults:
-		cargo_content = cargo_content.replace('godot-bevy = "%s"' % info.godot_bevy_version,
-			'godot-bevy = { version = "%s", features = ["bevy_gamepad"] }' % info.godot_bevy_version)
+	# Always use GodotDefaultPlugins for bootstrapping
+	# Users can customize plugin selection in their generated code
+	var plugin_config = "app.add_plugins(GodotDefaultPlugins);"
 
 	# Create lib.rs
 	var lib_content = """use godot::prelude::*;
@@ -155,6 +128,11 @@ use godot_bevy::prelude::*;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
+	// GodotDefaultPlugins provides all standard godot-bevy functionality
+	// For minimal setup, use individual plugins instead:
+	// app.add_plugins(GodotTransformSyncPlugin)
+	//     .add_plugins(GodotAudioPlugin)
+	//     .add_plugins(BevyInputBridgePlugin);
 	%s
 
 	// Add your systems here

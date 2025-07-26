@@ -55,11 +55,6 @@ placeholder_text = "e.g., 0.9"
 [node name="HSeparator2" type="HSeparator" parent="VBox"]
 layout_mode = 2
 
-[node name="UseDefaults" type="CheckBox" parent="VBox"]
-layout_mode = 2
-button_pressed = true
-text = "Use GodotDefaultPlugins (recommended for beginners)"
-
 [node name="ReleaseBuild" type="CheckBox" parent="VBox"]
 layout_mode = 2
 text = "Configure for release builds"
@@ -67,11 +62,8 @@ text = "Configure for release builds"
 [node name="HSeparator3" type="HSeparator" parent="VBox"]
 layout_mode = 2
 
-[node name="FeaturesLabel" type="Label" parent="VBox"]
+[node name="PluginNote" type="RichTextLabel" parent="VBox"]
 layout_mode = 2
-text = "Select features to include:"
-
-[node name="FeaturesContainer" type="VBoxContainer" parent="VBox"]
-visible = false
-layout_mode = 2
-size_flags_vertical = 3
+bbcode_enabled = true
+text = "[b]Note:[/b] This wizard creates a project with [i]GodotDefaultPlugins[/i] which includes all standard godot-bevy functionality.\n\nAfter generation, you can customize plugin selection in your [code]lib.rs[/code] file by replacing [code]GodotDefaultPlugins[/code] with individual plugins.\n\nSee the [url=https://docs.rs/godot-bevy]godot-bevy documentation[/url] for available plugins."
+fit_content = true
