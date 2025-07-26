@@ -77,6 +77,13 @@ func _on_project_created(project_info: Dictionary):
 func _scaffold_rust_project(info: Dictionary):
 	var base_path = ProjectSettings.globalize_path("res://")
 	var rust_path = base_path.path_join("rust")
+	var cargo_toml_path = rust_path.path_join("Cargo.toml")
+
+	# Check if Rust project already exists
+	if FileAccess.file_exists(cargo_toml_path):
+		push_warning("Rust project already exists at 'rust/' directory. Skipping Rust scaffolding.")
+		print("Found existing Cargo.toml at: ", cargo_toml_path)
+		return
 
 	# Debug: Print the info dictionary
 	print("Project info received: ", info)
