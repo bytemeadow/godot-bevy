@@ -59,7 +59,7 @@ func _create_bevy_app_singleton(path: String):
 
 [node name="BevyApp" type="BevyApp"]
 """
-	
+
 	# Save the scene file directly
 	_save_file(path, scene_content)
 
@@ -107,15 +107,13 @@ bevy = { version = "0.16", default-features = false, features = ["bevy_state"] }
 godot = "0.3"
 godot-bevy = "%s"
 
-[features]
-default = []
-
 [workspace]
 # Empty workspace table to make this a standalone project
 """ % [_to_snake_case(project_name), info.godot_bevy_version]
 
-	# Note: godot-bevy 0.8.4 doesn't have a "default" feature, so we just use the base dependency
-	# The plugin selection will be handled in the Rust code via GodotDefaultPlugins
+	if info.use_defaults:
+		cargo_content = cargo_content.replace('godot-bevy = "%s"' % info.godot_bevy_version,
+			'godot-bevy = { version = "%s", features = ["default"] }' % info.godot_bevy_version)
 
 	_save_file(rust_path.path_join("Cargo.toml"), cargo_content)
 
@@ -157,7 +155,7 @@ use godot_bevy::prelude::*;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
-    %s
+	%s
 
 	// Add your systems here
 	app.add_systems(Update, hello_world_system);

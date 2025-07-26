@@ -11,7 +11,7 @@ signal project_created(project_info: Dictionary)
 
 var feature_checkboxes: Dictionary = {}
 
-const DEFAULT_VERSION = "0.8.4"
+const DEFAULT_VERSION = "0.9.0"
 
 func _ready():
 	title = "Setup godot-bevy Project"
