@@ -24,6 +24,10 @@ window/size/viewport_width=600
 window/size/viewport_height=600
 window/stretch/mode="viewport"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/godot-bevy/plugin.cfg")
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
