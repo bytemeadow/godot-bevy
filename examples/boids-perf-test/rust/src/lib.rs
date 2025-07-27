@@ -12,6 +12,12 @@ use godot_bevy::prelude::{
 mod bevy_boids;
 mod container;
 
+// TODO move this, it should be visible from the bevy_app macro, without every client injecting it
+#[cfg(feature = "profiling")]
+// Single global handle; will be initialised exactly once.
+static TRACY_CLIENT: std::sync::OnceLock<tracing_tracy::client::Client> =
+    std::sync::OnceLock::new();
+
 /// Performance benchmark comparing pure Godot vs godot-bevy boids implementations
 ///
 /// This benchmark demonstrates the performance benefits of using Bevy's ECS

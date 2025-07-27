@@ -20,11 +20,15 @@ use std::sync::mpsc::channel;
 // Stores the client's entrypoint (the function they decorated with the `#[bevy_app]` macro) at runtime
 pub static BEVY_INIT_FUNC: OnceLock<Box<dyn Fn(&mut App) + Send + Sync>> = OnceLock::new();
 
-#[derive(GodotClass)]
+#[derive(GodotClass, Debug)]
 #[class(base=Node)]
 pub struct BevyApp {
     base: Base<Node>,
     app: Option<App>,
+    #[var]
+    process_tick: u32,
+    #[var]
+    physics_process_tick: u32,
 }
 
 impl BevyApp {
@@ -78,6 +82,8 @@ impl INode for BevyApp {
         Self {
             base,
             app: Default::default(),
+            process_tick: 0,
+            physics_process_tick: 0,
         }
     }
 
@@ -101,12 +107,15 @@ impl INode for BevyApp {
         self.app = Some(app);
     }
 
+    #[tracing::instrument]
     fn process(&mut self, _delta: f64) {
         use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 
         if godot::classes::Engine::singleton().is_editor_hint() {
             return;
         }
+
+        self.process_tick += 1;
 
         if let Some(app) = self.app.as_mut() {
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
@@ -121,12 +130,15 @@ impl INode for BevyApp {
         }
     }
 
+    #[tracing::instrument]
     fn physics_process(&mut self, delta: f32) {
         use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 
         if godot::classes::Engine::singleton().is_editor_hint() {
             return;
         }
+
+        self.physics_process_tick += 1;
 
         if let Some(app) = self.app.as_mut() {
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| {

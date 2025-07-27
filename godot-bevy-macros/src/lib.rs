@@ -4,9 +4,14 @@ use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::{
-    Data, DeriveInput, Error, Field, Fields, Ident, LitStr, Path, Result, Token, braced,
-    parse_macro_input,
+    braced, parse_macro_input, Data, DeriveInput, Error, Field, Fields, Ident, LitStr, Path,
+    Result, Token,
 };
+
+// #[cfg(feature = "profiling")]
+// // Single global handle; will be initialised exactly once.
+// static TRACY_CLIENT: std::sync::OnceLock<tracing_tracy::client::Client> =
+//     std::sync::OnceLock::new();
 
 /// Attribute macro that ensures a system runs on the main thread by adding a `NonSend<MainThreadMarker>` parameter.
 /// This is required for systems that need to access Godot APIs.
@@ -53,6 +58,45 @@ pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     // Stores the client's entrypoint, which we'll call shortly when our `BevyApp`
                     // Godot Node has its `ready()` invoked
                     let _ = godot_bevy::app::BEVY_INIT_FUNC.get_or_init(|| Box::new(#name));
+                }
+
+                #[cfg(feature = "profiling")]
+                {
+                    use std::sync::Once;
+                    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+                    use tracing_tracy::{TracyLayer, client::Client};
+
+                    if level == godot::prelude::InitLevel::Scene && !godot::classes::Engine::singleton().is_editor_hint() {
+                        tracing::info!("profiling enabled");
+
+                        // Make sure we only run the init block once per library load.
+                        static START: Once = Once::new();
+                        START.call_once(|| {
+                            // 1. Start Tracy manually (manual‑lifetime feature enabled).
+                            let client = Client::start();
+                            let _ = TRACY_CLIENT.set(client);
+
+                            // 2. Install the Tracy layer for all `tracing` spans.
+                            let _ = tracing_subscriber::registry()
+                                .with(TracyLayer::default())
+                                .try_init(); // avoids panics if already set
+                        });
+                    }
+                }
+            }
+
+
+            fn on_level_deinit(_level: godot::prelude::InitLevel) {
+                #[cfg(feature = "profiling")]
+                {
+                    if _level == godot::prelude::InitLevel::Scene && !godot::classes::Engine::singleton().is_editor_hint() {
+                        // Explicitly shut Tracy down; required with `manual-lifetime`.
+                        unsafe {
+                            tracing_tracy::client::sys::___tracy_shutdown_profiler();
+                        }
+                        // TRACY_CLIENT stays filled, but the library is about to be unloaded,
+                        // so its memory will disappear immediately afterwards.
+                    }
                 }
             }
         }
@@ -138,12 +182,12 @@ fn node_tree_view(input: DeriveInput) -> Result<TokenStream2> {
     let gd = quote! { godot::obj::Gd };
 
     let expanded = quote! {
-       impl #node_tree_view for #item {
-           fn from_node<T: #inherits<#node>>(node: #gd<T>) -> Self {
-               let node = node.upcast::<#node>();
-               #self_expr
-           }
-       }
+        impl #node_tree_view for #item {
+            fn from_node<T: #inherits<#node>>(node: #gd<T>) -> Self {
+                let node = node.upcast::<#node>();
+                #self_expr
+            }
+        }
     };
 
     Ok(expanded)
@@ -462,18 +506,18 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
                                 }
                             }
                         })
-                        .collect();
+                    .collect();
 
                     quote! {
                         #field_ident: #component_name {
                             #(#field_inits),*,
                             ..Default::default()
-                        }
+                            }
                     }
                 }
             }
         })
-        .collect();
+    .collect();
 
     let bundle_constructor = quote! {
         impl #bundle_name {

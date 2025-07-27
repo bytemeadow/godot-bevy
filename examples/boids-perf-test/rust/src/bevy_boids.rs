@@ -30,13 +30,13 @@ type BoidTree = KDTree2<Boid>;
 struct BoidScene(Handle<GodotResource>);
 
 /// Resource tracking simulation state
-#[derive(Resource, Default, PartialEq)]
+#[derive(Resource, Default, PartialEq, Debug)]
 pub struct SimulationState {
     pub is_running: bool,
 }
 
 /// Resource tracking boid count
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Debug)]
 pub struct BoidCount {
     pub target: i32,
     pub current: i32,
@@ -58,7 +58,7 @@ pub struct Velocity(pub Vector2);
 pub struct BoidForce(pub Vector2);
 
 /// Resource for boids simulation parameters
-#[derive(Resource)]
+#[derive(Resource, Debug)]
 pub struct BoidsConfig {
     pub world_bounds: Vec2,
     pub max_speed: f32,
@@ -148,6 +148,7 @@ fn load_assets(mut commands: Commands, server: Res<AssetServer>) {
 }
 
 /// Synchronize parameters from the container to Bevy resources
+#[tracing::instrument]
 #[main_thread_system]
 fn sync_container_params(
     mut boid_count: ResMut<BoidCount>,
@@ -182,6 +183,7 @@ fn sync_container_params(
 }
 
 /// System that handles spawning and despawning boids
+#[tracing::instrument(skip(commands))]
 fn handle_boid_count(
     mut commands: Commands,
     mut boid_count: ResMut<BoidCount>,
@@ -264,6 +266,7 @@ fn despawn_boids(
 }
 
 /// Update simulation state and manage cleanup on stop
+#[tracing::instrument(skip(commands))]
 #[main_thread_system]
 fn stop_simulation(
     simulation_state: Res<SimulationState>,
@@ -284,6 +287,7 @@ fn stop_simulation(
 }
 
 /// Colorize newly spawned boids (matches GDScript behavior)
+#[tracing::instrument(skip(commands))]
 #[main_thread_system]
 fn colorize_new_boids(
     mut commands: Commands,
@@ -325,6 +329,7 @@ fn colorize_new_boids(
 // system to calculate/store neighborhood forces
 // NOTE: While this doesn't _need_ to be on the main thread, we see a
 // significant performance impact (75 -> 53 fps drop) when not on main
+#[tracing::instrument(skip(spatial_tree))]
 #[main_thread_system]
 fn boids_calculate_neighborhood_forces(
     spatial_tree: Res<BoidTree>,
@@ -350,6 +355,7 @@ fn boids_calculate_neighborhood_forces(
 }
 
 // system to apply forces
+#[tracing::instrument]
 fn boids_apply_forces(
     mut boid_transform_query: Query<
         (Entity, &mut Transform, &mut Velocity, &BoidForce),

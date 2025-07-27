@@ -11,9 +11,30 @@ path = "../../run_godot.rs"
 name = "boids-benchmark"
 
 [dependencies]
-bevy = { version = "0.16", default-features = false, features = ["bevy_log"] }
+bevy = "0.16"
 bevy_spatial = "0.11.0"
 fastrand = "2.3.0"
 godot = "0.3"
-godot-bevy = { path = "../../../godot-bevy" }
+godot-bevy = { path = "../../../godot-bevy", default-features = false, features = [
+  "profiling",
+] }
 which = "8"
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+tracing-tracy = { version = "0.11.4", default-features = false, features = [
+  "enable",
+  "manual-lifetime",
+  "ondemand",
+  "broadcast",       # announce presence
+], optional = true }
+tracing-subscriber = { version = "0.3.19", optional = true }
+
+[features]
+profiling = [
+  # "dep:tracing",
+  "dep:tracing-tracy",
+  "dep:tracing-subscriber",
+  "bevy/trace_tracy",
+  "tracing-tracy/enable",          # actually emit data
+  "tracing-tracy/manual-lifetime", # disable the problematic static C‑tors
+  "tracing-tracy/ondemand",        # enable the on-demand feature
+]

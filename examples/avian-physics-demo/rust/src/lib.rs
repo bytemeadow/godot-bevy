@@ -20,12 +20,17 @@ use bevy_asset_loader::{
 };
 use godot::classes::{BoxMesh, MeshInstance3D};
 use godot_bevy::prelude::{
-    GodotAssetsPlugin, GodotBevyLogPlugin, GodotNodeHandle, GodotPackedScenePlugin, GodotResource,
-    GodotScene, GodotTransformSyncPlugin, PhysicsUpdate, SceneTreeConfig, bevy_app,
+    GodotAssetsPlugin, GodotNodeHandle, GodotPackedScenePlugin, GodotResource, GodotScene,
+    GodotTransformSyncPlugin, PhysicsUpdate, SceneTreeConfig, bevy_app,
     godot_prelude::{ExtensionLibrary, gdextension},
     main_thread_system,
 };
 use std::fmt::Debug;
+
+#[cfg(feature = "profiling")]
+// Single global handle; will be initialised exactly once.
+static TRACY_CLIENT: std::sync::OnceLock<tracing_tracy::client::Client> =
+    std::sync::OnceLock::new();
 
 #[bevy_app]
 fn build_app(app: &mut App) {
@@ -46,7 +51,7 @@ impl Plugin for AvianPhysicsDemo {
         app.add_plugins(StatesPlugin)
             .add_plugins(GodotAssetsPlugin)
             .add_plugins(GodotPackedScenePlugin)
-            .add_plugins(GodotBevyLogPlugin::default())
+            // .add_plugins(GodotBevyLogPlugin::default())
             .add_plugins(GodotTransformSyncPlugin::default())
             .add_plugins((
                 // Plugins required by Avian
