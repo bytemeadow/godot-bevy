@@ -6,9 +6,14 @@
 
 pub mod debug;
 pub mod math;
+pub mod profiling;
 
 // Re-export commonly used shared functions
 pub use math::{clamp_to_range, is_reasonable_float, lerp, move_toward, normalize_angle};
 
 // Re-export debug functions
 pub use debug::{print_scene_tree, print_tree_structure};
+
+// Re-export tracy client singleton
+#[cfg(feature = "profiling")]
+pub use profiling::TRACY_CLIENT;

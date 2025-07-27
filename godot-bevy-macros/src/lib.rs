@@ -8,11 +8,6 @@ use syn::{
     Result, Token,
 };
 
-// #[cfg(feature = "profiling")]
-// // Single global handle; will be initialised exactly once.
-// static TRACY_CLIENT: std::sync::OnceLock<tracing_tracy::client::Client> =
-//     std::sync::OnceLock::new();
-
 /// Attribute macro that ensures a system runs on the main thread by adding a `NonSend<MainThreadMarker>` parameter.
 /// This is required for systems that need to access Godot APIs.
 #[proc_macro_attribute]
@@ -67,15 +62,14 @@ pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     use tracing_tracy::{TracyLayer, client::Client};
 
                     if level == godot::prelude::InitLevel::Scene && !godot::classes::Engine::singleton().is_editor_hint() {
-                        tracing::info!("profiling enabled");
-
                         // Make sure we only run the init block once per library load.
                         static START: Once = Once::new();
                         START.call_once(|| {
                             // 1. Start Tracy manually (manual‑lifetime feature enabled).
                             let client = Client::start();
-                            let _ = TRACY_CLIENT.set(client);
+                            let _ = godot_bevy::utils::TRACY_CLIENT.set(client);
 
+                            // TODO make this work with GodotLogPlugin
                             // 2. Install the Tracy layer for all `tracing` spans.
                             let _ = tracing_subscriber::registry()
                                 .with(TracyLayer::default())

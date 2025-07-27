@@ -121,6 +121,14 @@ impl INode for BevyApp {
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
                 // Run the full Bevy update cycle - much simpler!
                 app.update();
+
+                #[cfg(feature = "profiling")]
+                {
+                    // Indicate that rendering of a continuous frame has ended.
+                    tracing_tracy::client::Client::running()
+                        .expect("client must be running")
+                        .frame_mark();
+                }
             })) {
                 self.app = None;
 

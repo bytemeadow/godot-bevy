@@ -27,11 +27,6 @@ use godot_bevy::prelude::{
 };
 use std::fmt::Debug;
 
-#[cfg(feature = "profiling")]
-// Single global handle; will be initialised exactly once.
-static TRACY_CLIENT: std::sync::OnceLock<tracing_tracy::client::Client> =
-    std::sync::OnceLock::new();
-
 #[bevy_app]
 fn build_app(app: &mut App) {
     app.add_plugins(AvianPhysicsDemo);
