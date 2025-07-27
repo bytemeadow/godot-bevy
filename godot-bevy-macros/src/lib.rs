@@ -68,12 +68,6 @@ pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
                             // 1. Start Tracy manually (manual‑lifetime feature enabled).
                             let client = Client::start();
                             let _ = godot_bevy::utils::TRACY_CLIENT.set(client);
-
-                            // TODO make this work with GodotLogPlugin
-                            // 2. Install the Tracy layer for all `tracing` spans.
-                            let _ = tracing_subscriber::registry()
-                                .with(TracyLayer::default())
-                                .try_init(); // avoids panics if already set
                         });
                     }
                 }

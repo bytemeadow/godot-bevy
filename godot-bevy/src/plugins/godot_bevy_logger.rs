@@ -47,11 +47,21 @@ impl Plugin for GodotBevyLogPlugin {
             // Add override support via RUST_LOG env variable, e.g., `RUST_LOG=WARN cargo run` will filter-in warning and higher messages only
             .from_env_lossy();
 
+        let godot_proxy_layer = GodotProxyLayer {
+            color: self.color,
+            timestamp_format: self.timestamp_format.clone(),
+        };
+
+        #[cfg(feature = "profiling")]
         tracing_subscriber::registry()
-            .with(GodotProxyLayer {
-                color: self.color,
-                timestamp_format: self.timestamp_format.clone(),
-            })
+            .with(godot_proxy_layer)
+            .with(env_filter)
+            .with(tracing_tracy::TracyLayer::default())
+            .init();
+
+        #[cfg(not(feature = "profiling"))]
+        tracing_subscriber::registry()
+            .with(godot_proxy_layer)
             .with(env_filter)
             .init();
     }
