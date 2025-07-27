@@ -25,10 +25,6 @@ pub static BEVY_INIT_FUNC: OnceLock<Box<dyn Fn(&mut App) + Send + Sync>> = OnceL
 pub struct BevyApp {
     base: Base<Node>,
     app: Option<App>,
-    #[var]
-    process_tick: u32,
-    #[var]
-    physics_process_tick: u32,
 }
 
 impl BevyApp {
@@ -82,8 +78,6 @@ impl INode for BevyApp {
         Self {
             base,
             app: Default::default(),
-            process_tick: 0,
-            physics_process_tick: 0,
         }
     }
 
@@ -107,7 +101,6 @@ impl INode for BevyApp {
         self.app = Some(app);
     }
 
-    #[tracing::instrument]
     fn process(&mut self, _delta: f64) {
         use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 
@@ -115,20 +108,16 @@ impl INode for BevyApp {
             return;
         }
 
-        self.process_tick += 1;
-
         if let Some(app) = self.app.as_mut() {
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
                 // Run the full Bevy update cycle - much simpler!
                 app.update();
 
                 #[cfg(feature = "profiling")]
-                {
-                    // Indicate that rendering of a continuous frame has ended.
-                    tracing_tracy::client::Client::running()
-                        .expect("client must be running")
-                        .frame_mark();
-                }
+                // Indicate that rendering of a continuous frame has ended.
+                tracing_tracy::client::Client::running()
+                    .expect("client must be running")
+                    .frame_mark();
             })) {
                 self.app = None;
 
@@ -138,15 +127,12 @@ impl INode for BevyApp {
         }
     }
 
-    #[tracing::instrument]
     fn physics_process(&mut self, delta: f32) {
         use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 
         if godot::classes::Engine::singleton().is_editor_hint() {
             return;
         }
-
-        self.physics_process_tick += 1;
 
         if let Some(app) = self.app.as_mut() {
             if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
@@ -156,6 +142,12 @@ impl INode for BevyApp {
                 // Run only our physics-specific schedule
                 app.world_mut().run_schedule(PrePhysicsUpdate);
                 app.world_mut().run_schedule(PhysicsUpdate);
+
+                #[cfg(feature = "profiling")]
+                // Indicate that a physics frame has ended.
+                tracing_tracy::client::Client::running()
+                    .expect("client must be running")
+                    .secondary_frame_mark(tracing_tracy::client::frame_name!("physics"));
             })) {
                 self.app = None;
 

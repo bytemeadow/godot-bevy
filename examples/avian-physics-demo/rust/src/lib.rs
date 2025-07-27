@@ -20,8 +20,8 @@ use bevy_asset_loader::{
 };
 use godot::classes::{BoxMesh, MeshInstance3D};
 use godot_bevy::prelude::{
-    GodotAssetsPlugin, GodotNodeHandle, GodotPackedScenePlugin, GodotResource, GodotScene,
-    GodotTransformSyncPlugin, PhysicsUpdate, SceneTreeConfig, bevy_app,
+    GodotAssetsPlugin, GodotBevyLogPlugin, GodotNodeHandle, GodotPackedScenePlugin, GodotResource,
+    GodotScene, GodotTransformSyncPlugin, PhysicsUpdate, SceneTreeConfig, bevy_app,
     godot_prelude::{ExtensionLibrary, gdextension},
     main_thread_system,
 };
@@ -46,7 +46,7 @@ impl Plugin for AvianPhysicsDemo {
         app.add_plugins(StatesPlugin)
             .add_plugins(GodotAssetsPlugin)
             .add_plugins(GodotPackedScenePlugin)
-            // .add_plugins(GodotBevyLogPlugin::default())
+            .add_plugins(GodotBevyLogPlugin::default())
             .add_plugins(GodotTransformSyncPlugin::default())
             .add_plugins((
                 // Plugins required by Avian

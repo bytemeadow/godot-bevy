@@ -40,11 +40,4 @@ godot_bevy_log = [
   "dep:chrono",
   "bevy/bevy_log", # NOTE: make it easy for clients to use bevy::log::trace!, etc
 ]
-profiling = [
-  # "dep:tracing",
-  "dep:tracing-tracy",
-  "dep:tracing-subscriber",
-  "tracing-tracy/enable",          # actually emit data
-  "tracing-tracy/manual-lifetime", # disable the problematic static C‑tors
-  "tracing-tracy/ondemand",        # enable the on-demand feature
-]
+profiling = ["dep:tracing-tracy", "dep:tracing-subscriber"]

@@ -21,3 +21,6 @@ devenv.local.nix
 
 # https://direnv.net/
 .direnv
+
+# tracy profiler captures
+*.tracy

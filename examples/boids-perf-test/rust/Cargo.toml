@@ -11,13 +11,13 @@ path = "../../run_godot.rs"
 name = "boids-benchmark"
 
 [dependencies]
-bevy = "0.16"
+bevy = { version = "0.16", default-features = false }
 bevy_spatial = "0.11.0"
 fastrand = "2.3.0"
 godot = "0.3"
 godot-bevy = { path = "../../../godot-bevy" }
 which = "8"
-tracing = { version = "0.1", default-features = false, features = ["std"] }
+tracing = "0.1"
 tracing-tracy = { version = "0.11.4", default-features = false, features = [
   "enable",
   "manual-lifetime",
@@ -28,9 +28,9 @@ tracing-subscriber = { version = "0.3.19", optional = true }
 
 [features]
 profiling = [
-  # "dep:tracing",
   "dep:tracing-tracy",
   "dep:tracing-subscriber",
   "godot-bevy/profiling",
+  "bevy/trace",
   "bevy/trace_tracy",
 ]

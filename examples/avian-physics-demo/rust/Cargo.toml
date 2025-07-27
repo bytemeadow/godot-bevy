@@ -20,11 +20,9 @@ bevy = { version = "0.16", default-features = false, features = [
 ] }
 bevy_asset_loader = "0.23.0"
 godot = "0.3"
-godot-bevy = { path = "../../../godot-bevy", default-features = false, features = [
-  "profiling",
-] }
+godot-bevy = { path = "../../../godot-bevy" }
 which = "8"
-tracing = { version = "0.1", default-features = false, features = ["std"] }
+tracing = "0.1"
 tracing-tracy = { version = "0.11.4", default-features = false, features = [
   "enable",
   "manual-lifetime",
@@ -35,10 +33,9 @@ tracing-subscriber = { version = "0.3.19", optional = true }
 
 [features]
 profiling = [
-  # "dep:tracing",
   "dep:tracing-tracy",
   "dep:tracing-subscriber",
-  "tracing-tracy/enable",          # actually emit data
-  "tracing-tracy/manual-lifetime", # disable the problematic static C‑tors
-  "tracing-tracy/ondemand",        # enable the on-demand feature
+  "godot-bevy/profiling",
+  "bevy/trace",
+  "bevy/trace_tracy",
 ]
