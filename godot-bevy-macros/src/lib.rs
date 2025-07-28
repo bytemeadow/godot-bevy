@@ -156,12 +156,12 @@ fn node_tree_view(input: DeriveInput) -> Result<TokenStream2> {
     let gd = quote! { godot::obj::Gd };
 
     let expanded = quote! {
-        impl #node_tree_view for #item {
-            fn from_node<T: #inherits<#node>>(node: #gd<T>) -> Self {
-                let node = node.upcast::<#node>();
-                #self_expr
-            }
-        }
+       impl #node_tree_view for #item {
+           fn from_node<T: #inherits<#node>>(node: #gd<T>) -> Self {
+               let node = node.upcast::<#node>();
+               #self_expr
+           }
+       }
     };
 
     Ok(expanded)
@@ -480,18 +480,18 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
                                 }
                             }
                         })
-                    .collect();
+                        .collect();
 
                     quote! {
                         #field_ident: #component_name {
                             #(#field_inits),*,
                             ..Default::default()
-                            }
+                        }
                     }
                 }
             }
         })
-    .collect();
+        .collect();
 
     let bundle_constructor = quote! {
         impl #bundle_name {
