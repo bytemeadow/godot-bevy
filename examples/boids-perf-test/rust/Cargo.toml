@@ -26,4 +26,11 @@ tracing-tracy = { version = "0.11.4", default-features = false, features = [
 ], optional = true }
 
 [features]
+# You can also profile this example!
+# 1. Install [Tracy](https://github.com/wolfpld/tracy), see https://github.com/bevyengine/bevy/blob/main/docs/profiling.md
+#    for details on picking the correct version to install.
+# 2. Run the Tracy Profiler (`tracy-profiler`), and hit the `Connect` button so it's
+#    listening/ready to receive real time data from the game
+# 3. Build the game with this feature enabled: `cargo build --features trace_tracy`
+# 4. Run the game, either via the Godot Editor or using `cargo run --features trace_tracy`
 trace_tracy = ["dep:tracing-tracy", "godot-bevy/trace_tracy"]
