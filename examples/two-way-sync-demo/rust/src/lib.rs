@@ -1,4 +1,5 @@
 #![allow(clippy::type_complexity)]
+#![allow(unexpected_cfgs)]
 
 use bevy::app::Update;
 use bevy::ecs::query::{Changed, With};

@@ -58,7 +58,7 @@ pub struct Velocity(pub Vector2);
 pub struct BoidForce(pub Vector2);
 
 /// Resource for boids simulation parameters
-#[derive(Resource)]
+#[derive(Resource, Debug)]
 pub struct BoidsConfig {
     pub world_bounds: Vec2,
     pub max_speed: f32,
@@ -325,6 +325,7 @@ fn colorize_new_boids(
 // system to calculate/store neighborhood forces
 // NOTE: While this doesn't _need_ to be on the main thread, we see a
 // significant performance impact (75 -> 53 fps drop) when not on main
+#[tracing::instrument(skip(spatial_tree))]
 #[main_thread_system]
 fn boids_calculate_neighborhood_forces(
     spatial_tree: Res<BoidTree>,

@@ -37,7 +37,7 @@ impl PhysicsDelta {
 }
 
 /// Resource marker to ensure systems accessing Godot APIs run on the main thread
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Debug)]
 pub struct MainThreadMarker;
 
 use crate::interop::GodotNodeHandle;

@@ -15,5 +15,5 @@ pub use math::{clamp_to_range, is_reasonable_float, lerp, move_toward, normalize
 pub use debug::{print_scene_tree, print_tree_structure};
 
 // Re-export tracy client singleton
-#[cfg(feature = "profiling")]
+#[cfg(feature = "trace_tracy")]
 pub use profiling::TRACY_CLIENT;

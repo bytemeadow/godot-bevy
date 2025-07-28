@@ -24,13 +24,6 @@ tracing-tracy = { version = "0.11.4", default-features = false, features = [
   "ondemand",
   "broadcast",       # announce presence
 ], optional = true }
-tracing-subscriber = { version = "0.3.19", optional = true }
 
 [features]
-profiling = [
-  "dep:tracing-tracy",
-  "dep:tracing-subscriber",
-  "godot-bevy/profiling",
-  "bevy/trace",
-  "bevy/trace_tracy",
-]
+trace_tracy = ["dep:tracing-tracy", "godot-bevy/trace_tracy"]

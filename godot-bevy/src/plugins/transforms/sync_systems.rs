@@ -11,6 +11,7 @@ use godot::classes::{Node2D, Node3D};
 use super::change_filter::TransformSyncMetadata;
 
 #[main_thread_system]
+#[tracing::instrument]
 pub fn pre_update_godot_transforms(
     mut entities: Query<(
         &mut BevyTransform,
@@ -48,6 +49,7 @@ pub fn pre_update_godot_transforms(
 }
 
 #[main_thread_system]
+#[tracing::instrument]
 pub fn post_update_godot_transforms(
     change_tick: SystemChangeTick,
     mut entities: Query<

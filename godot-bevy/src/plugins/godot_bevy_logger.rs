@@ -52,14 +52,14 @@ impl Plugin for GodotBevyLogPlugin {
             timestamp_format: self.timestamp_format.clone(),
         };
 
-        #[cfg(feature = "profiling")]
+        #[cfg(feature = "trace_tracy")]
         tracing_subscriber::registry()
             .with(godot_proxy_layer)
             .with(env_filter)
             .with(tracing_tracy::TracyLayer::default())
             .init();
 
-        #[cfg(not(feature = "profiling"))]
+        #[cfg(not(feature = "trace_tracy"))]
         tracing_subscriber::registry()
             .with(godot_proxy_layer)
             .with(env_filter)

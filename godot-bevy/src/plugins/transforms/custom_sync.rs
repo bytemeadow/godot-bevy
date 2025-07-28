@@ -75,6 +75,7 @@ macro_rules! add_transform_sync_systems {
 
     (@generate_post_system $app:expr, $name:ident, $bevy_to_godot_query:ty) => {
         $crate::paste::paste! {
+            #[tracing::instrument]
             #[$crate::prelude::main_thread_system]
             pub fn [<post_update_godot_transforms_ $name:lower>](
                 change_tick: bevy::ecs::system::SystemChangeTick,
@@ -124,6 +125,7 @@ macro_rules! add_transform_sync_systems {
 
     (@generate_pre_system $app:expr, $name:ident, $godot_to_bevy_query:ty) => {
         $crate::paste::paste! {
+            #[tracing::instrument]
             #[$crate::prelude::main_thread_system]
             pub fn [<pre_update_godot_transforms_ $name:lower>](
                 mut entities: bevy::prelude::Query<

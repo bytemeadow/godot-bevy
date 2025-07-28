@@ -4,8 +4,8 @@ use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::{
-    braced, parse_macro_input, Data, DeriveInput, Error, Field, Fields, Ident, LitStr, Path,
-    Result, Token,
+    Data, DeriveInput, Error, Field, Fields, Ident, LitStr, Path, Result, Token, braced,
+    parse_macro_input,
 };
 
 /// Attribute macro that ensures a system runs on the main thread by adding a `NonSend<MainThreadMarker>` parameter.
@@ -50,41 +50,27 @@ pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
             fn on_level_init(level: godot::prelude::InitLevel) {
                 if level == godot::prelude::InitLevel::Core {
                     godot::private::class_macros::registry::class::auto_register_classes(level);
+
                     // Stores the client's entrypoint, which we'll call shortly when our `BevyApp`
                     // Godot Node has its `ready()` invoked
                     let _ = godot_bevy::app::BEVY_INIT_FUNC.get_or_init(|| Box::new(#name));
-                }
 
-                #[cfg(feature = "profiling")]
-                {
-                    use std::sync::Once;
-                    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-                    use tracing_tracy::{TracyLayer, client::Client};
-
-                    if level == godot::prelude::InitLevel::Scene && !godot::classes::Engine::singleton().is_editor_hint() {
-                        // Make sure we only run the init block once per library load.
-                        static START: Once = Once::new();
-                        START.call_once(|| {
-                            // 1. Start Tracy manually (manual‑lifetime feature enabled).
-                            let client = Client::start();
-                            let _ = godot_bevy::utils::TRACY_CLIENT.set(client);
-                        });
-                    }
+                    #[cfg(feature = "trace_tracy")]
+                    // Start Tracy manually (manual‑lifetime feature enabled)
+                    let _ = &godot_bevy::utils::TRACY_CLIENT;
                 }
             }
 
 
             fn on_level_deinit(_level: godot::prelude::InitLevel) {
-                #[cfg(feature = "profiling")]
-                {
-                    if _level == godot::prelude::InitLevel::Scene && !godot::classes::Engine::singleton().is_editor_hint() {
-                        // Explicitly shut Tracy down; required with `manual-lifetime`.
-                        unsafe {
-                            tracing_tracy::client::sys::___tracy_shutdown_profiler();
-                        }
-                        // TRACY_CLIENT stays filled, but the library is about to be unloaded,
-                        // so its memory will disappear immediately afterwards.
+                #[cfg(feature = "trace_tracy")]
+                if _level == godot::prelude::InitLevel::Core {
+                    // Explicitly shut Tracy down; required with `manual-lifetime`.
+                    unsafe {
+                        tracing_tracy::client::sys::___tracy_shutdown_profiler();
                     }
+                    // TRACY_CLIENT stays filled, but the library is about to be unloaded,
+                    // so its memory will disappear immediately afterwards.
                 }
             }
         }

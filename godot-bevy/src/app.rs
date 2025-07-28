@@ -20,7 +20,7 @@ use std::sync::mpsc::channel;
 // Stores the client's entrypoint (the function they decorated with the `#[bevy_app]` macro) at runtime
 pub static BEVY_INIT_FUNC: OnceLock<Box<dyn Fn(&mut App) + Send + Sync>> = OnceLock::new();
 
-#[derive(GodotClass, Debug)]
+#[derive(GodotClass)]
 #[class(base=Node)]
 pub struct BevyApp {
     base: Base<Node>,
@@ -113,7 +113,7 @@ impl INode for BevyApp {
                 // Run the full Bevy update cycle - much simpler!
                 app.update();
 
-                #[cfg(feature = "profiling")]
+                #[cfg(feature = "trace_tracy")]
                 // Indicate that rendering of a continuous frame has ended.
                 tracing_tracy::client::Client::running()
                     .expect("client must be running")
@@ -143,7 +143,7 @@ impl INode for BevyApp {
                 app.world_mut().run_schedule(PrePhysicsUpdate);
                 app.world_mut().run_schedule(PhysicsUpdate);
 
-                #[cfg(feature = "profiling")]
+                #[cfg(feature = "trace_tracy")]
                 // Indicate that a physics frame has ended.
                 tracing_tracy::client::Client::running()
                     .expect("client must be running")

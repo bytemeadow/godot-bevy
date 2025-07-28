@@ -310,9 +310,6 @@ dependencies = [
  "bevy_asset_loader",
  "godot",
  "godot-bevy",
- "tracing",
- "tracing-subscriber",
- "tracing-tracy",
  "which 8.0.0",
 ]
 
@@ -2230,9 +2227,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
- "tracing",
- "tracing-subscriber",
- "tracing-tracy",
 ]
 
 [[package]]
@@ -3867,7 +3861,6 @@ dependencies = [
  "godot",
  "godot-bevy",
  "tracing",
- "tracing-subscriber",
  "tracing-tracy",
  "which 8.0.0",
 ]
