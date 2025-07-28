@@ -1,13 +1,52 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{format_ident, quote};
-use std::collections::HashMap;
-use syn::parse::ParseStream;
+use quote::{ToTokens, format_ident, quote};
+use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Token, parse_macro_input, parse_str};
+use syn::{Data, DeriveInput, Token, parse_macro_input, parse2};
 
-const EXPORT_TYPE_KEY: &str = "export_type";
-const TRANSFORM_WITH_KEY: &str = "transform_with";
+#[derive(Debug)]
+enum GodotExportParams {
+    ExportType,
+    TransformWith,
+}
+
+impl GodotExportParams {
+    fn as_str(&self) -> &str {
+        match self {
+            GodotExportParams::ExportType => "export_type",
+            GodotExportParams::TransformWith => "transform_with",
+        }
+    }
+
+    fn all_as_str() -> String {
+        [
+            GodotExportParams::ExportType.as_str(),
+            GodotExportParams::TransformWith.as_str(),
+        ]
+        .join(", ")
+    }
+}
+
+impl TryFrom<&syn::Ident> for GodotExportParams {
+    type Error = syn::Error;
+
+    fn try_from(ident: &syn::Ident) -> Result<Self, Self::Error> {
+        match ident.to_string().as_str() {
+            "export_type" => Ok(GodotExportParams::ExportType),
+            "transform_with" => Ok(GodotExportParams::TransformWith),
+            _ => Err(syn::Error::new(
+                ident.span(),
+                format!(
+                    "Unknown parameter: {}. Valid parameters are: {}",
+                    ident,
+                    GodotExportParams::all_as_str()
+                ),
+            )),
+        }
+    }
+}
 
 #[derive(Clone)]
 struct ComponentField {
@@ -24,7 +63,83 @@ struct ExportAttribute {
 #[derive(Clone)]
 struct ExportTypeTransform {
     export_type: syn::Type,
-    transform_with: syn::LitStr,
+    transform_with: syn::Type,
+}
+
+impl Parse for ExportTypeTransform {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut export_type = None;
+        let mut transform_with = None;
+
+        // Parse comma-separated name-value pairs
+        let arguments =
+            Punctuated::<KeyValue, Token![,]>::parse_terminated(input).map_err(|error| {
+                syn::Error::new(
+                    input.span(),
+                    format!(
+                        "Failed to parse comma separated list of arguments: {}",
+                        error
+                    ),
+                )
+            })?;
+
+        for argument in arguments {
+            match GodotExportParams::try_from(&argument.key) {
+                Ok(GodotExportParams::ExportType) => {
+                    let value = &argument.value;
+                    export_type = Some(parse2::<syn::Type>(quote!(#value)).map_err(|error| {
+                        syn::Error::new(
+                            error.span(),
+                            format!("Failed to parse export type: {}", error),
+                        )
+                    })?);
+                }
+                Ok(GodotExportParams::TransformWith) => {
+                    let value = &argument.value;
+                    transform_with =
+                        Some(parse2::<syn::Type>(quote!(#value)).map_err(|error| {
+                            syn::Error::new(
+                                error.span(),
+                                format!("Failed to parse transform_with type: {}", error),
+                            )
+                        })?);
+                }
+                Err(error) => {
+                    return Err(error);
+                }
+            }
+        }
+
+        if let (Some(export_type), Some(transform_with)) = (export_type, transform_with) {
+            Ok(ExportTypeTransform {
+                export_type,
+                transform_with,
+            })
+        } else {
+            Err(syn::Error::new(
+                input.span(),
+                format!(
+                    "Both {} and {} must be provided",
+                    GodotExportParams::ExportType.as_str(),
+                    GodotExportParams::TransformWith.as_str()
+                ),
+            ))
+        }
+    }
+}
+
+struct KeyValue {
+    key: syn::Ident,
+    value: syn::Expr,
+}
+
+impl Parse for KeyValue {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let name: syn::Ident = input.parse()?;
+        input.parse::<Token![=]>()?;
+        let value: syn::Expr = input.parse()?;
+        Ok(KeyValue { key: name, value })
+    }
 }
 
 pub fn component_as_godot_node_impl(input: TokenStream) -> TokenStream {
@@ -68,7 +183,14 @@ pub fn component_as_godot_node_impl(input: TokenStream) -> TokenStream {
                 .unwrap_or(&attr.field_type);
             if let Some(export_attribute) = attr.export.as_ref() {
                 if let Some(alternate_type) = &export_attribute.alternate_type {
-                    let transform_with = &alternate_type.transform_with;
+                    let transform_with = syn::LitStr::new(
+                        alternate_type
+                            .transform_with
+                            .to_token_stream()
+                            .to_string()
+                            .as_str(),
+                        alternate_type.transform_with.span(),
+                    );
                     // TODO: Default values don't show up in Godot editor
                     quote! {
                         #[export]
@@ -131,7 +253,7 @@ pub fn component_as_godot_node_impl(input: TokenStream) -> TokenStream {
 
 /// Parses the following format:
 /// ```ignore
-/// #[export(export_type = "<godot_type>", transform_with = "<conversion_function>")]
+/// #[godot_export(export_type = <godot_type>, transform_with = <conversion_function>)]
 /// <field_name>: <field_type>,
 /// ```
 fn parse_field(field: &syn::Field) -> syn::Result<ComponentField> {
@@ -143,7 +265,7 @@ fn parse_field(field: &syn::Field) -> syn::Result<ComponentField> {
     let export_attribute = field
         .attrs
         .iter()
-        .find(|attr| attr.path().is_ident("export"))
+        .find(|attr| attr.path().is_ident("godot_export"))
         .map(parse_export_parameters)
         .transpose()?
         .map(|params| ExportAttribute {
@@ -158,55 +280,16 @@ fn parse_field(field: &syn::Field) -> syn::Result<ComponentField> {
 
 /// Parses the following format:
 /// ```ignore
-/// export_type = "<godot_type>", transform_with = "<conversion_function>"
+/// export_type = <godot_type>, transform_with = <conversion_function>
 /// ```
 fn parse_export_parameters(attr: &syn::Attribute) -> syn::Result<Option<ExportTypeTransform>> {
     if let syn::Meta::List(meta_list) = &attr.meta {
-        let parameter_map = meta_list.parse_args_with(|input: ParseStream| {
-            let mut parameter_map: HashMap<String, syn::LitStr> = HashMap::new();
-            loop {
-                let key = input.parse::<syn::Ident>()?;
-                let key_str = key.to_string();
-                if key_str != EXPORT_TYPE_KEY && key_str != TRANSFORM_WITH_KEY {
-                    return Err(syn::Error::new(
-                        key.span(),
-                        format!("Invalid parameter: {}. Only '{EXPORT_TYPE_KEY}' and '{TRANSFORM_WITH_KEY}' are allowed", key_str),
-                    ));
-                }
-
-                let _eq = input.parse::<Token![=]>()?;
-                let parameter = input.parse::<syn::LitStr>()?;
-                parameter_map.insert(key_str, parameter);
-
-                if input.is_empty() {
-                    break;
-                }
-                let _comma = input.parse::<Token![,]>()?;
-                if input.is_empty() {
-                    break;
-                }
-            }
-
-            Ok(parameter_map)
-        })?;
-
-        if parameter_map.is_empty() {
-            Ok(None)
-        } else if parameter_map.contains_key(EXPORT_TYPE_KEY)
-            && parameter_map.contains_key(TRANSFORM_WITH_KEY)
-        {
-            let export_type = parameter_map.get(EXPORT_TYPE_KEY).unwrap();
-            let export_type = parse_str::<syn::Type>(export_type.value().as_str())?;
-            let transform_with = parameter_map.get(TRANSFORM_WITH_KEY).unwrap();
-            Ok(Some(ExportTypeTransform {
-                export_type,
-                transform_with: transform_with.clone(),
-            }))
-        } else {
-            Err(syn::Error::new(
-                meta_list.span(),
-                "Both export_type and transform_with must be provided",
-            ))
+        match parse2::<ExportTypeTransform>(meta_list.tokens.clone()) {
+            Ok(export_type_transform) => Ok(Some(export_type_transform)),
+            Err(error) => Err(syn::Error::new(
+                error.span(),
+                format!("Failed to parse export parameters: {}", error),
+            )),
         }
     } else {
         Ok(None)

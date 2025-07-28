@@ -91,7 +91,7 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
 /// syntax is:
 ///
 /// ```ignore
-/// #[export(export_type = "<GodotType>", transform_with = "<conversion_function>")]
+/// #[godot_export(export_type = <GodotType>, transform_with = <conversion_function>)]
 /// ```
 ///
 /// For fields with types incompatible with Godot-Rust's `#[export]` macro:
@@ -99,7 +99,7 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
 /// - Use `transform_with` to provide a conversion function from the Godot type to the field type
 ///
 /// Uses the `inventory` crate
-#[proc_macro_derive(ComponentAsGodotNode, attributes(export))]
+#[proc_macro_derive(ComponentAsGodotNode, attributes(godot_export, godot_node))]
 pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
     component_as_godot_node_impl(input)
 }

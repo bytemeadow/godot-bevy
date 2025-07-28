@@ -4,7 +4,6 @@ use crate::prelude::bevy_prelude::{
 };
 use bevy::app::Plugin;
 use godot::classes::Node;
-use godot::global::godot_print;
 use godot::obj::Gd;
 use std::collections::HashMap;
 

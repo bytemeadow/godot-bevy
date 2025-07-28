@@ -1,3 +1,4 @@
+use godot::builtin::Vector2;
 use bevy::ecs::system::Query;
 use bevy::math::Vec2;
 use bevy::prelude::{App, Component, Res, Time, Update};
@@ -55,19 +56,21 @@ struct InitialPosition {
 
 // This component tracks the angle at which the Node2D is orbiting its starting position.
 #[derive(Debug, Clone, Component, ComponentAsGodotNode)]
+#[godot_node(base = Node2D, class_name = Orbiter)]
 struct Orbiter {
-    #[export]
-    amplitude_x: f32,
-    #[export]
-    amplitude_y: f32,
+    #[godot_export(export_type = Vector2, transform_with = vector2_to_vec2)]
+    amplitude: Vec2,
     angle: f32,
+}
+
+fn vector2_to_vec2(v: Vector2) -> Vec2 {
+    Vec2::new(v.x, v.y)
 }
 
 impl Default for Orbiter {
     fn default() -> Self {
         Self {
-            amplitude_x: 1.0,
-            amplitude_y: 1.0,
+            amplitude: Vec2::new(1.0, 1.0),
             angle: 0.0,
         }
     }
@@ -91,8 +94,8 @@ fn orbit_system(
             initial_position.pos = Vec2::new(transform.translation.x, transform.translation.y);
         }
         let position2d = initial_position.pos + Vec2::from_angle(orbiter.angle) * 100.0;
-        transform.translation.x = position2d.x * orbiter.amplitude_x;
-        transform.translation.y = position2d.y * orbiter.amplitude_y;
+        transform.translation.x = position2d.x * orbiter.amplitude.x;
+        transform.translation.y = position2d.y * orbiter.amplitude.y;
         orbiter.angle += process_delta.as_ref().delta_secs();
         orbiter.angle %= 2.0 * PI;
     }

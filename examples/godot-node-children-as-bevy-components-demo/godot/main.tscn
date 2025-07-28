@@ -8,8 +8,7 @@
 texture = ExtResource("1_ig7tw")
 
 [node name="OrbiterBevyComponent" type="OrbiterBevyComponent" parent="OrbitingIcon"]
-amplitude_x = 5.0
-amplitude_y = 2.0
+amplitude = Vector2(5, 2)
 
 [node name="InitialPositionBevyComponent" type="InitialPositionBevyComponent" parent="OrbitingIcon"]
 

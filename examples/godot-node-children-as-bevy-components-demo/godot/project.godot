@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="Simple Node2D Movement"
+config/name="Component As Godot Node"
 run/main_scene="uid://by3mlw6lgl61y"
 config/features=PackedStringArray("4.4", "GL Compatibility")
 config/icon="res://icon.svg"
