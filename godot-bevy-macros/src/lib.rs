@@ -101,7 +101,7 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
 /// Uses the `inventory` crate
 #[proc_macro_derive(ComponentAsGodotNode, attributes(godot_export, godot_node))]
 pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
-    component_as_godot_node_impl(input)
+    component_as_godot_node_impl(input.into()).unwrap_or_else(Error::into_compile_error).into()
 }
 
 fn node_tree_view(input: DeriveInput) -> Result<TokenStream2> {

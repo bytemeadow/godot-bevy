@@ -54,9 +54,9 @@ struct InitialPosition {
     pos: Vec2,
 }
 
-// This component tracks the angle at which the Node2D is orbiting its starting position.
+/// This component tracks the angle at which the Node2D is orbiting its starting position.
 #[derive(Debug, Clone, Component, ComponentAsGodotNode)]
-#[godot_node(base = Node2D, class_name = Orbiter)]
+#[godot_node(base = Node2D, class_name = OrbiterCmp)]
 struct Orbiter {
     #[godot_export(export_type = Vector2, transform_with = vector2_to_vec2)]
     amplitude: Vec2,
