@@ -50,10 +50,9 @@ pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
             fn on_level_init(level: godot::prelude::InitLevel) {
                 if level == godot::prelude::InitLevel::Core {
                     godot::private::class_macros::registry::class::auto_register_classes(level);
-                    let mut app_builder_func = godot_bevy::app::BEVY_INIT_FUNC.lock().unwrap();
-                    if app_builder_func.is_none() {
-                        *app_builder_func = Some(Box::new(#name));
-                    }
+                    // Stores the client's entrypoint, which we'll call shortly when our `BevyApp`
+                    // Godot Node has its `ready()` invoked
+                    let _ = godot_bevy::app::BEVY_INIT_FUNC.get_or_init(|| Box::new(#name));
                 }
             }
         }

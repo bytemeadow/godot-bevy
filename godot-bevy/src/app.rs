@@ -1,7 +1,3 @@
-use bevy::app::App;
-use godot::prelude::*;
-use std::sync::{Mutex, mpsc::channel};
-
 use crate::plugins::core::PrePhysicsUpdate;
 use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
@@ -16,12 +12,13 @@ use crate::{
         signals::{GodotSignalReader, GodotSignalSender},
     },
 };
+use bevy::app::App;
+use godot::prelude::*;
+use std::sync::OnceLock;
+use std::sync::mpsc::channel;
 
-lazy_static::lazy_static! {
-    #[doc(hidden)]
-    pub static ref BEVY_INIT_FUNC: Mutex<Option<Box<dyn Fn(&mut App) + Send>>> =
-            Mutex::new(None);
-}
+// Stores the client's entrypoint (the function they decorated with the `#[bevy_app]` macro) at runtime
+pub static BEVY_INIT_FUNC: OnceLock<Box<dyn Fn(&mut App) + Send + Sync>> = OnceLock::new();
 
 #[derive(GodotClass)]
 #[class(base=Node)]
@@ -92,7 +89,9 @@ impl INode for BevyApp {
         let mut app = App::new();
         app.add_plugins(GodotPlugin);
 
-        (BEVY_INIT_FUNC.lock().unwrap().as_mut().unwrap())(&mut app);
+        // Call the client's entrypoint (the function they decorated with the `#[bevy_app]` macro)
+        let app_builder_func = BEVY_INIT_FUNC.get().unwrap();
+        app_builder_func(&mut app);
 
         self.register_scene_tree_watcher(&mut app);
         self.register_signal_system(&mut app);

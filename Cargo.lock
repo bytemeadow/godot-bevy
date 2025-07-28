@@ -2155,7 +2155,6 @@ dependencies = [
  "godot",
  "godot-bevy-macros",
  "inventory",
- "lazy_static",
  "once_cell",
  "parking_lot",
  "paste",
