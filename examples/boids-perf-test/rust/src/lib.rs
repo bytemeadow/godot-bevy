@@ -1,4 +1,5 @@
 #![allow(clippy::type_complexity)]
+#![allow(unexpected_cfgs)] // silence potential `tracy_trace` feature config warning brought in by `bevy_app` macro
 
 use crate::bevy_boids::BoidsPlugin;
 use bevy::prelude::App;

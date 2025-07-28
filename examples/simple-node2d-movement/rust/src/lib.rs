@@ -1,3 +1,4 @@
+#![allow(unexpected_cfgs)] // silence potential `tracy_trace` feature config warning brought in by `bevy_app` macro
 use bevy::ecs::system::Query;
 use bevy::prelude::{
     App, Commands, Component, Entity, IntoScheduleConfigs, Res, Time, Update, Without,
