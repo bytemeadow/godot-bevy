@@ -32,15 +32,16 @@ struct ComponentField {
 impl Parse for KeyValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let name: syn::Ident = input.parse()?;
-        input.parse::<Token![=]>()?;
-        let value: syn::Expr = input.parse()?;
+        let content;
+        syn::parenthesized!(content in input);
+        let value: syn::Expr = content.parse()?;
         Ok(KeyValue { key: name, value })
     }
 }
 
 /// Parses the following format:
 /// ```ignore
-/// base = <godot_type>, class_name = <identifier>
+/// base(<godot_type>), class_name(<identifier>)
 /// ```
 impl Parse for GodotNodeAttrArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
@@ -70,7 +71,7 @@ impl Parse for GodotNodeAttrArgs {
 
 /// Parses the following format:
 /// ```ignore
-/// export_type = <godot_type>, transform_with = <conversion_function>, default = <default_value>
+/// export_type(<godot_type>), transform_with(<conversion_function>), default(<default_value>)
 /// ```
 impl Parse for GodotExportAttrArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
@@ -122,7 +123,7 @@ fn get_godot_export_type(field: &ComponentField) -> &syn::Type {
 
 /// Parses the following format:
 /// ```ignore
-/// export_type = <godot_type>, transform_with = <conversion_function>, default = <default_value>
+/// export_type(<godot_type>), transform_with(<conversion_function>), default(<default_value>)
 /// ```
 fn parse_godot_export_args(attr: &syn::Attribute) -> syn::Result<Option<GodotExportAttrArgs>> {
     match &attr.meta {
@@ -143,7 +144,7 @@ fn parse_godot_export_args(attr: &syn::Attribute) -> syn::Result<Option<GodotExp
 
 /// Parses the following format:
 /// ```ignore
-/// #[godot_export(export_type = <godot_type>, transform_with = <conversion_function>, default = <default_value>)]
+/// #[godot_export(export_type(<godot_type>), transform_with(<conversion_function>), default(<default_value>))]
 /// <field_name>: <field_type>,
 /// ```
 fn parse_field(field: &syn::Field) -> syn::Result<ComponentField> {

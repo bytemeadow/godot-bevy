@@ -84,19 +84,37 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-/// Automatically registers a Godot node with the name `<struct_name>BevyComponent` for Bevy Components
-/// that derive this macro.
+/// Automatically registers a Godot node based on the annotated Component struct.
+/// This macro has two parts:
+/// - Struct level `godot_node` attribute
+/// - Field level `godot_export` attribute.
 ///
-/// Fields can be exposed to Godot as node properties using the `#[export]` attribute. The attribute
-/// syntax is:
+/// ---
+///
+/// A struct level attribute can be used to specify the Godot class to extend, and the class name:
 ///
 /// ```ignore
-/// #[godot_export(export_type = <GodotType>, transform_with = <conversion_function>)]
+/// #[godot_node(base(<godot_node_type>), class_name(<custom_class_name>))]
+/// ```
+///
+/// - `base` (Default: `Node`) Godot node to extend.
+/// - `class_name` (Default: `<struct_name>BevyComponent`) Name of generated Godot class.
+///
+/// ---
+///
+/// Fields can be exposed to Godot as node properties using the `#[godot_export]` attribute.
+/// The attribute syntax is:
+///
+/// ```ignore
+/// #[godot_export(export_type(<godot_type>), transform_with(<conversion_function>), default(<value>))]
 /// ```
 ///
 /// For fields with types incompatible with Godot-Rust's `#[export]` macro:
 /// - Use `export_type` to specify an alternate Godot-compatible type
 /// - Use `transform_with` to provide a conversion function from the Godot type to the field type
+/// - Use `default` to provide an initial value to the exported Godot field.
+///
+/// ---
 ///
 /// Uses the `inventory` crate
 #[proc_macro_derive(ComponentAsGodotNode, attributes(godot_export, godot_node))]

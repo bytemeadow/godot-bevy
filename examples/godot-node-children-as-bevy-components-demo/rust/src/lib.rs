@@ -1,8 +1,8 @@
-use godot::builtin::Vector2;
 use bevy::ecs::system::Query;
 use bevy::math::Vec2;
 use bevy::prelude::{App, Component, Res, Time, Update};
 use bevy::transform::components::Transform;
+use godot::builtin::Vector2;
 use godot::global::godot_print;
 use godot_bevy::plugins::GodotDefaultPlugins;
 use godot_bevy::prelude::godot_prelude::gdextension;
@@ -56,9 +56,13 @@ struct InitialPosition {
 
 /// This component tracks the angle at which the Node2D is orbiting its starting position.
 #[derive(Debug, Default, Clone, Component, ComponentAsGodotNode)]
-#[godot_node(base = Node2D, class_name = OrbiterCmp)]
+#[godot_node(base(Node2D), class_name(OrbiterCmp))]
 struct Orbiter {
-    #[godot_export(export_type = Vector2, transform_with = vector2_to_vec2, default = Vector2::new(1.5, 0.5))]
+    #[godot_export(
+        export_type(Vector2),
+        transform_with(vector2_to_vec2),
+        default(Vector2::new(1.5, 0.5))
+    )]
     amplitude: Vec2,
     angle: f32,
 }
