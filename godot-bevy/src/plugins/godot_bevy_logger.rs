@@ -7,33 +7,42 @@ use bevy::{
 };
 use chrono::Local;
 use godot::global::{godot_error, godot_print, godot_print_rich, godot_warn};
-use std::path::{MAIN_SEPARATOR_STR, Path};
+use std::{
+    error::Error,
+    path::{MAIN_SEPARATOR_STR, Path},
+    string::ParseError,
+};
 use tracing_subscriber::{
-    Layer, field::Visit, filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt,
+    Layer, field::Visit, filter::FromEnvError, layer::SubscriberExt, util::SubscriberInitExt,
 };
 
 /// NOTE: This plugin is only available if the `godot_bevy_log` feature is enabled
 pub struct GodotBevyLogPlugin {
-    /// Logs messages of this level or higher severity. Defaults to `LevelFilter::INFO`
-    level_filter: LevelFilter,
+    /// Filters logs using the [`EnvFilter`] format
+    /// Behaves identically to Bevy's LogPlugin filter field, see https://docs.rs/bevy/latest/bevy/log/struct.LogPlugin.html
+    pub filter: String,
+
+    /// Filters out logs that are "less than" the given level.
+    /// This can be further filtered using the `filter` setting.
+    /// Behaves identically to Bevy's LogPlugin level field, see https://docs.rs/bevy/latest/bevy/log/struct.LogPlugin.html
+    pub level: Level,
 
     /// Enable/disable color in output. NOTE: Enabling this incurs
     /// a performance penalty. Defaults to true.
-    color: bool,
+    pub color: bool,
 
     /// Accepts timestamp formatting, see <https://docs.rs/chrono/0.4.41/chrono/format/strftime/index.html>
     /// You can disable the timestamp entirely by providing `None`.
     /// Example default format: `11:30:37.631`
-    timestamp_format: Option<String>,
+    pub timestamp_format: Option<String>,
 }
 
 impl Default for GodotBevyLogPlugin {
     fn default() -> Self {
         Self {
-            level_filter: LevelFilter::INFO,
-
+            filter: bevy::log::DEFAULT_FILTER.to_string(),
+            level: Level::INFO,
             color: true,
-
             // Timestamp formatting reference https://docs.rs/chrono/0.4.41/chrono/format/strftime/index.html
             timestamp_format: Some("%T%.3f".to_owned()),
         }
@@ -42,10 +51,23 @@ impl Default for GodotBevyLogPlugin {
 
 impl Plugin for GodotBevyLogPlugin {
     fn build(&self, _app: &mut App) {
-        let env_filter = EnvFilter::builder()
-            .with_default_directive(self.level_filter.into())
-            // Add override support via RUST_LOG env variable, e.g., `RUST_LOG=WARN cargo run` will filter-in warning and higher messages only
-            .from_env_lossy();
+        // Copied behavior from https://docs.rs/bevy_log/0.16.1/src/bevy_log/lib.rs.html#279
+        let default_filter = { format!("{},{}", self.level, self.filter) };
+        let filter_layer = EnvFilter::try_from_default_env()
+            .or_else(|from_env_error| {
+                _ = from_env_error
+                    .source()
+                    .and_then(|source| source.downcast_ref::<ParseError>())
+                    .map(|parse_err| {
+                        // we cannot use the `error!` macro here because the logger is not ready yet.
+                        eprintln!(
+                            "GodotBevyLogPlugin failed to parse filter from env: {parse_err}"
+                        );
+                    });
+
+                Ok::<EnvFilter, FromEnvError>(EnvFilter::builder().parse_lossy(&default_filter))
+            })
+            .unwrap();
 
         let godot_proxy_layer = GodotProxyLayer {
             color: self.color,
@@ -55,14 +77,14 @@ impl Plugin for GodotBevyLogPlugin {
         #[cfg(feature = "trace_tracy")]
         tracing_subscriber::registry()
             .with(godot_proxy_layer)
-            .with(env_filter)
+            .with(filter_layer)
             .with(tracing_tracy::TracyLayer::default())
             .init();
 
         #[cfg(not(feature = "trace_tracy"))]
         tracing_subscriber::registry()
             .with(godot_proxy_layer)
-            .with(env_filter)
+            .with(filter_layer)
             .init();
     }
 }
