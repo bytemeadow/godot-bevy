@@ -38,3 +38,8 @@
 
 - [v0.6 to v0.7](./migration/v0.6-to-v0.7.md)
 - [v0.7 to v0.8](./migration/v0.7-to-v0.8.md)
+- [v0.8 to v0.9](./migration/v0.8-to-v0.9.md)
+
+# Profiling
+
+- [Bevy Godot Profiling](./profiling/profiling.md)
