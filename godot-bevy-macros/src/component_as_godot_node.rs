@@ -316,5 +316,8 @@ pub fn component_as_godot_node_impl(input: TokenStream2) -> syn::Result<TokenStr
         #godot_node_struct
     };
 
+    // println!("{}", final_output.to_string());
+    // println!("count: {}", default_export_fields.len());
+
     Ok(final_output)
 }
