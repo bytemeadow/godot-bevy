@@ -91,25 +91,18 @@ impl Parse for GodotExportAttrArgs {
                 return Err(syn::Error::new(
                     argument.key.span(),
                     format!(
-                        "Unknown parameter: `{}`. Expected `export_type` or `transform_with`.",
+                        "Unknown parameter: `{}`. Expected `export_type`, `transform_with`, or `default`.",
                         argument.key
                     ),
                 ));
             }
         }
 
-        if export_type.is_some() && transform_with.is_some() {
-            Ok(GodotExportAttrArgs {
-                export_type,
-                transform_with,
-                default,
-            })
-        } else {
-            Err(syn::Error::new(
-                input.span(),
-                "Both `export_type` and `transform_with` must be provided".to_string(),
-            ))
-        }
+        Ok(GodotExportAttrArgs {
+            export_type,
+            transform_with,
+            default,
+        })
     }
 }
 
