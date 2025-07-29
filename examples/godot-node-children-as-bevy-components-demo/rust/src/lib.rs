@@ -61,7 +61,7 @@ struct Orbiter {
     #[godot_export(
         export_type(Vector2),
         transform_with(vector2_to_vec2),
-        default(Vector2::new(1.5, 0.5))
+        default(Vector2::new(5.0, 2.5))
     )]
     amplitude: Vec2,
     angle: f32,
