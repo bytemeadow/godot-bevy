@@ -55,25 +55,16 @@ struct InitialPosition {
 }
 
 /// This component tracks the angle at which the Node2D is orbiting its starting position.
-#[derive(Debug, Clone, Component, ComponentAsGodotNode)]
+#[derive(Debug, Default, Clone, Component, ComponentAsGodotNode)]
 #[godot_node(base = Node2D, class_name = OrbiterCmp)]
 struct Orbiter {
-    #[godot_export(export_type = Vector2, transform_with = vector2_to_vec2)]
+    #[godot_export(export_type = Vector2, transform_with = vector2_to_vec2, default = Vector2::new(1.5, 0.5))]
     amplitude: Vec2,
     angle: f32,
 }
 
 fn vector2_to_vec2(v: Vector2) -> Vec2 {
     Vec2::new(v.x, v.y)
-}
-
-impl Default for Orbiter {
-    fn default() -> Self {
-        Self {
-            amplitude: Vec2::new(1.0, 1.0),
-            angle: 0.0,
-        }
-    }
 }
 
 // This system orbits entities created above

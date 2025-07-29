@@ -7,10 +7,9 @@
 [node name="OrbitingIcon" type="Sprite2D" parent="."]
 texture = ExtResource("1_ig7tw")
 
-[node name="OrbiterBevyComponent" type="OrbiterBevyComponent" parent="OrbitingIcon"]
-amplitude = Vector2(5, 2)
-
 [node name="InitialPositionBevyComponent" type="InitialPositionBevyComponent" parent="OrbitingIcon"]
+
+[node name="OrbiterCmp" type="OrbiterCmp" parent="OrbitingIcon"]
 
 [node name="StationaryIcon" type="Sprite2D" parent="."]
 texture = ExtResource("1_ig7tw")
