@@ -45,7 +45,7 @@ impl Parse for KeyValue {
 /// ```
 impl Parse for GodotNodeAttrArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let arguments = Punctuated::<KeyValue, Token![,]>::parse_terminated(&input)?;
+        let arguments = Punctuated::<KeyValue, Token![,]>::parse_terminated(input)?;
         let mut base = None;
         let mut class_name = None;
 
@@ -124,7 +124,7 @@ fn parse_godot_export_args(attr: &syn::Attribute) -> syn::Result<Option<GodotExp
             Ok(export_type_transform) => Ok(Some(export_type_transform)),
             Err(error) => Err(syn::Error::new(
                 error.span(),
-                format!("Failed to parse export parameters: {}", error),
+                format!("Failed to parse export parameters: {error}"),
             )),
         },
         Meta::NameValue(_) => Err(syn::Error::new(
@@ -166,17 +166,11 @@ pub fn component_as_godot_node_impl(input: TokenStream2) -> syn::Result<TokenStr
     let struct_name: &syn::Ident = &input.ident;
 
     let struct_fields: Vec<ComponentField> = match &input.data {
-        Data::Struct(data_struct) => {
-            match data_struct
-                .fields
-                .iter()
-                .map(|field| parse_field(field))
-                .collect::<syn::Result<Vec<ComponentField>>>()
-            {
-                Ok(fields) => fields,
-                Err(err) => return Err(err),
-            }
-        }
+        Data::Struct(data_struct) => data_struct
+            .fields
+            .iter()
+            .map(parse_field)
+            .collect::<syn::Result<Vec<ComponentField>>>()?,
         _ => return Err(syn::Error::new(input.span(), "Only works on structs")),
     };
 
@@ -262,7 +256,7 @@ pub fn component_as_godot_node_impl(input: TokenStream2) -> syn::Result<TokenStr
         })
         .collect::<Vec<TokenStream2>>();
 
-    let bevy_bundle_init = if field_names.len() == 0 {
+    let bevy_bundle_init = if field_names.is_empty() {
         quote! {
             #[bevy_bundle( (#struct_name) )]
         }
