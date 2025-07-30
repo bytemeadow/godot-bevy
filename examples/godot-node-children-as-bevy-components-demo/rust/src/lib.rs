@@ -46,18 +46,14 @@ fn build_app(app: &mut App) {
     app.add_systems(Update, orbit_system);
 }
 
-// Components are data that can be attached to entities.
-// This one will store the starting position of a Node2D.
-#[derive(Debug, Default, Clone, Component, ComponentAsGodotNode)]
-struct InitialPosition {
-    initialized: bool,
-    pos: Vec2,
-}
-
 /// This component tracks the angle at which the Node2D is orbiting its starting position.
 #[derive(Debug, Default, Clone, Component, ComponentAsGodotNode)]
-#[godot_node(base(Node2D), class_name(OrbiterCmp))]
+#[godot_node(base(Sprite2D), class_name(OrbitingIcon))]
 struct Orbiter {
+    #[godot_export(default(true))]
+    initial_position_is_center: bool,
+    #[godot_export(export_type(Vector2), transform_with(vector2_to_vec2))]
+    center: Vec2,
     #[godot_export(
         export_type(Vector2),
         transform_with(vector2_to_vec2),
@@ -76,19 +72,19 @@ fn orbit_system(
     // The `query` parameter is a Bevy `Query` that matches all `Transform` components.
     // `Transform` is a Godot-Bevy-provided component that matches all Node2Ds in the scene.
     // (https://docs.rs/godot-bevy/latest/godot_bevy/plugins/core/transforms/struct.Transform.html)
-    mut query: Query<(&mut Transform, &mut InitialPosition, &mut Orbiter)>,
+    mut query: Query<(&mut Transform, &mut Orbiter)>,
 
     // This is equivalent to Godot's `_process` `delta: float` parameter.
     process_delta: Res<Time>,
 ) {
     // For single matches, you can use `single_mut()` instead:
     // `if let Ok(mut transform) = transform.single_mut() {`
-    for (mut transform, mut initial_position, mut orbiter) in query.iter_mut() {
-        if !initial_position.initialized {
-            initial_position.initialized = true;
-            initial_position.pos = Vec2::new(transform.translation.x, transform.translation.y);
+    for (mut transform, mut orbiter) in query.iter_mut() {
+        if !orbiter.initial_position_is_center {
+            orbiter.initial_position_is_center = true;
+            orbiter.center = Vec2::new(transform.translation.x, transform.translation.y);
         }
-        let position2d = initial_position.pos + Vec2::from_angle(orbiter.angle) * 100.0;
+        let position2d = orbiter.center + Vec2::from_angle(orbiter.angle) * 100.0;
         transform.translation.x = position2d.x * orbiter.amplitude.x;
         transform.translation.y = position2d.y * orbiter.amplitude.y;
         orbiter.angle += process_delta.as_ref().delta_secs();

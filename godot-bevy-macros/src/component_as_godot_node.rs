@@ -262,21 +262,20 @@ pub fn component_as_godot_node_impl(input: TokenStream2) -> syn::Result<TokenStr
         })
         .collect::<Vec<TokenStream2>>();
 
-    let bundle_init = if field_names.len() == 0 {
-        quote!()
+    let bevy_bundle_init = if field_names.len() == 0 {
+        quote! {
+            #[bevy_bundle( (#struct_name) )]
+        }
     } else {
         quote! {
-            { #(#field_names: #field_names),* }
+            #[bevy_bundle( (#struct_name{ #(#field_names: #field_names),* }) )]
         }
     };
 
     let godot_node_struct = quote! {
         #[derive(godot::prelude::GodotClass, godot_bevy::prelude::BevyBundle)]
         #[class(base=#godot_node_type)]
-        #[bevy_bundle(
-            (godot_bevy::plugins::component_as_godot_node_child::UninitializedBevyComponentNode),
-            (#struct_name #bundle_init)
-        )]
+        #bevy_bundle_init
         pub struct #godot_node_name {
             base: godot::prelude::Base<godot::classes::#godot_node_type>,
             #(#godot_node_fields),*
@@ -292,26 +291,5 @@ pub fn component_as_godot_node_impl(input: TokenStream2) -> syn::Result<TokenStr
         }
     };
 
-    let inventory_registration = quote! {
-        ::godot_bevy::inventory::submit! {
-            ::godot_bevy::plugins::component_as_godot_node_child::ChildComponentRegistry {
-                create_system_fn: |app| {
-                    app.add_systems(
-                        bevy::app::PreUpdate,
-                        ::godot_bevy::plugins::component_as_godot_node_child::move_component_from_child_to_parent::<#struct_name>
-                    );
-                }
-            }
-        }
-    };
-
-    let final_output = quote! {
-        #inventory_registration
-        #godot_node_struct
-    };
-
-    // println!("{}", final_output.to_string());
-    // println!("count: {}", default_export_fields.len());
-
-    Ok(final_output)
+    Ok(godot_node_struct)
 }

@@ -4,12 +4,8 @@
 
 [node name="Node" type="Node"]
 
-[node name="OrbitingIcon" type="Sprite2D" parent="."]
+[node name="OrbitingIcon" type="OrbitingIcon" parent="."]
 texture = ExtResource("1_ig7tw")
-
-[node name="InitialPositionBevyComponent" type="InitialPositionBevyComponent" parent="OrbitingIcon"]
-
-[node name="OrbiterCmp" type="OrbiterCmp" parent="OrbitingIcon"]
 
 [node name="StationaryIcon" type="Sprite2D" parent="."]
 texture = ExtResource("1_ig7tw")
