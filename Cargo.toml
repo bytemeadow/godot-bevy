@@ -18,7 +18,6 @@ members = [
   "examples/simple-node2d-movement/rust",
   "examples/boids-perf-test/rust",
   "examples/two-way-sync-demo/rust",
-  "examples/godot-node-children-as-bevy-components-demo/rust",
 ]
 resolver = "2"
 
