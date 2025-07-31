@@ -47,7 +47,8 @@ pub struct Player;
 pub struct Enemy;
 
 /// Component marking an entity as a gem
-#[derive(Component, Debug, Clone, Default)]
+#[derive(Component, ComponentAsGodotNode, Default, Debug, Clone)]
+#[godot_node(base(Area2D), class_name(Gem2D))]
 pub struct Gem;
 
 /// Component marking an entity as a door
