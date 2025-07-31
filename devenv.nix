@@ -1,17 +1,14 @@
 {
   pkgs,
-  nixpkgs,
-  rust-overlay,
   lib,
   inputs,
   # config,
-  # inputs,
   ...
 }:
 let
-  overlays = [ (import rust-overlay) ];
+  overlays = [ (import inputs.rust-overlay) ];
   system = pkgs.stdenv.system;
-  rustPkgs = import nixpkgs { inherit system overlays; };
+  rustPkgs = import inputs.nixpkgs { inherit system overlays; };
   # visit rust-toolchain.toml to specify rust toolchain version and associated tools (clippy, etc)
   rust-toolchain = rustPkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
   tracy = inputs.tracy.packages.${pkgs.stdenv.system}.default;
@@ -43,7 +40,6 @@ in
       just # simple command runner via justfile, ref https://github.com/casey/just
       python3 # for godot type generation script
       rust-toolchain
-      tracy # profiler
     ]
     ++ lib.optionals pkgs.stdenv.isLinux [
       #
@@ -68,7 +64,10 @@ in
       steam-run
 
       # faster link times
-      mold
+      mold-wrapped
+
+      # TODO this works fine on linux, and *should* work on mac (moved to the category above) but currently fails.
+      tracy # profiler
     ]
     ++ lib.optionals pkgs.stdenv.isDarwin (
       with pkgs.darwin.apple_sdk;
@@ -80,13 +79,17 @@ in
   # speed up rust builds through caching
   env.RUSTC_WRAPPER = "${pkgs.sccache}/bin/sccache";
 
-  # On linux, we get ~5x faster link times using mold
-  # https://bevy.org/learn/quick-start/getting-started/setup/#enable-fast-compiles-optional
-  files = {
-    ".cargo/config.toml".text = ''
-      [target.x86_64-unknown-linux-gnu]
-      linker = "${pkgs.clang}/bin/clang"
-      rustflags = ["-C", "link-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold"]
-    '';
-  };
+  files =
+    if pkgs.stdenv.isLinux then
+      # On linux, we get ~5x faster link times using mold
+      # https://bevy.org/learn/quick-start/getting-started/setup/#enable-fast-compiles-optional
+      {
+        ".cargo/config.toml".text = ''
+          [target.x86_64-unknown-linux-gnu]
+          linker = "${pkgs.clang}/bin/clang"
+          rustflags = ["-C", "link-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold"]
+        '';
+      }
+    else
+      { };
 }
