@@ -1,31 +1,7 @@
 use crate::components::{Door, Player};
-use crate::level_manager::{LevelId, LoadLevelEvent};
+use crate::level_manager::LoadLevelEvent;
 use bevy::prelude::*;
-use godot::{
-    classes::{Area2D, IArea2D},
-    prelude::*,
-};
 use godot_bevy::prelude::Collisions;
-use godot_bevy::prelude::*;
-
-#[derive(GodotClass, BevyBundle)]
-#[class(base=Area2D)]
-#[bevy_bundle((Door: level))]
-pub struct Door2D {
-    base: Base<Area2D>,
-    #[export]
-    level: LevelId,
-}
-
-#[godot_api]
-impl IArea2D for Door2D {
-    fn init(base: Base<Area2D>) -> Self {
-        Self {
-            base,
-            level: LevelId::Level1,
-        }
-    }
-}
 
 pub struct DoorPlugin;
 
@@ -53,7 +29,9 @@ fn detect_door_collisions(
     for (door, collisions) in doors.iter() {
         for &player_entity in collisions.recent_collisions() {
             if players.get(player_entity).is_ok() {
-                load_level_events.write(LoadLevelEvent { level_id: door.0 });
+                load_level_events.write(LoadLevelEvent {
+                    level_id: door.level_id,
+                });
             }
         }
     }

@@ -4,9 +4,9 @@
 //! entity types (players, enemies, etc.) to avoid duplication when using
 //! the BevyComponent macro.
 
-use bevy::prelude::*;
-
 use crate::level_manager::LevelId;
+use bevy::prelude::*;
+use godot_bevy::prelude::ComponentAsGodotNode;
 
 /// Component representing movement speed in pixels per second
 #[derive(Component, Debug, Clone, PartialEq)]
@@ -51,5 +51,9 @@ pub struct Enemy;
 pub struct Gem;
 
 /// Component marking an entity as a door
-#[derive(Component, Debug, Clone)]
-pub struct Door(pub LevelId);
+#[derive(Component, ComponentAsGodotNode, Default, Debug, Clone)]
+#[godot_node(base(Area2D), class_name(Door2D))]
+pub struct Door {
+    #[godot_export(default(LevelId::Level1))]
+    pub level_id: LevelId,
+}

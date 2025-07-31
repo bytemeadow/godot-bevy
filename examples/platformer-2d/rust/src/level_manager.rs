@@ -7,9 +7,10 @@ use godot_bevy::prelude::*;
 use crate::scene_management::SceneOperationEvent;
 
 /// Simple level identifier
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, GodotConvert, Var, Export)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, GodotConvert, Var, Export)]
 #[godot(via = GString)]
 pub enum LevelId {
+    #[default]
     Level1,
     Level2,
     Level3,
