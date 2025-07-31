@@ -24,3 +24,5 @@ devenv.local.nix
 
 # tracy profiler captures
 *.tracy
+
+.cargo/

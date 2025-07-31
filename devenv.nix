@@ -3,6 +3,7 @@
   nixpkgs,
   rust-overlay,
   lib,
+  inputs,
   # config,
   # inputs,
   ...
@@ -13,6 +14,7 @@ let
   rustPkgs = import nixpkgs { inherit system overlays; };
   # visit rust-toolchain.toml to specify rust toolchain version and associated tools (clippy, etc)
   rust-toolchain = rustPkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+  tracy = inputs.tracy.packages.${pkgs.stdenv.system}.default;
 in
 {
   # https://devenv.sh/basics/
@@ -37,11 +39,11 @@ in
       #
 
       # dev tools
-      samply # profiler, ref https://github.com/mstange/samply
       sccache # cache rust build artifacts, ref https://github.com/mozilla/sccache
       just # simple command runner via justfile, ref https://github.com/casey/just
       python3 # for godot type generation script
       rust-toolchain
+      tracy # profiler
     ]
     ++ lib.optionals pkgs.stdenv.isLinux [
       #
@@ -64,6 +66,9 @@ in
       # execution of godot-exported binaries in a FHS-like environment
       # https://nix.dev/permalink/stub-ld
       steam-run
+
+      # faster link times
+      mold
     ]
     ++ lib.optionals pkgs.stdenv.isDarwin (
       with pkgs.darwin.apple_sdk;
@@ -74,4 +79,14 @@ in
 
   # speed up rust builds through caching
   env.RUSTC_WRAPPER = "${pkgs.sccache}/bin/sccache";
+
+  # On linux, we get ~5x faster link times using mold
+  # https://bevy.org/learn/quick-start/getting-started/setup/#enable-fast-compiles-optional
+  files = {
+    ".cargo/config.toml".text = ''
+      [target.x86_64-unknown-linux-gnu]
+      linker = "${pkgs.clang}/bin/clang"
+      rustflags = ["-C", "link-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold"]
+    '';
+  };
 }

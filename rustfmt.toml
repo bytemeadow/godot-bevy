@@ -4,3 +4,4 @@
 # not explicitly configured. For consistent parsing between rustfmt and cargo
 # fmt you should configure the edition. For example in your rustfmt.toml file:
 edition = "2024"
+style_edition = "2024"

@@ -6,6 +6,10 @@ inputs:
   # https://devenv.sh/common-patterns/
   nixpkgs:
     url: github:nixos/nixpkgs/nixpkgs-unstable
+  tracy:
+    # pin the git commit so we get the precise version of tracy we need: 0.12.2
+    # for navigating version alignment, see https://github.com/bevyengine/bevy/blob/main/docs/profiling.md
+    url: github:allyourcodebase/tracy/2ffcfc74dd24e77113fb07b3044a3fb2f5c2c325
   rust-overlay:
     url: github:oxalica/rust-overlay
     inputs:
