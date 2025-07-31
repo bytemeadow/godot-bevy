@@ -287,3 +287,45 @@ pub fn component_as_godot_node_impl(input: TokenStream2) -> syn::Result<TokenStr
 
     Ok(godot_node_struct)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::parse_quote;
+
+    #[test]
+    fn test_no_parameters() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Component, ComponentAsGodotNode)]
+            pub struct Player {
+                #[godot_export]
+                pub position: f32,
+            }
+        };
+
+        let result = component_as_godot_node_impl(input.into_token_stream());
+        assert!(result.is_ok(), "Basic syntax should parse successfully");
+    }
+
+    #[test]
+    fn test_all_parameters() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Component, ComponentAsGodotNode)]
+            #[godot_node(base(Node2D), class_name(PlayerNode))]
+            pub struct Player {
+                #[godot_export(
+                    export_type(Vector2),
+                    transform_with(transform_to_vec2),
+                    default(Vector2::new(5.0, 15.0))
+                )]
+                pub position: Vec2,
+            }
+        };
+
+        let result = component_as_godot_node_impl(input.into_token_stream());
+        assert!(
+            result.is_ok(),
+            "All parameter syntax should parse successfully"
+        );
+    }
+}
