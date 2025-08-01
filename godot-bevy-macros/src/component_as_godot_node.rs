@@ -296,7 +296,7 @@ mod tests {
     #[test]
     fn test_no_parameters() {
         let input: DeriveInput = parse_quote! {
-            #[derive(Component, ComponentAsGodotNode)]
+            #[derive(Component, GodotNode)]
             pub struct Player {
                 #[godot_export]
                 pub position: f32,
@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn test_all_parameters() {
         let input: DeriveInput = parse_quote! {
-            #[derive(Component, ComponentAsGodotNode)]
+            #[derive(Component, GodotNode)]
             #[godot_node(base(Node2D), class_name(PlayerNode))]
             pub struct Player {
                 #[godot_export(

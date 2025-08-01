@@ -1,10 +1,10 @@
 # Nodes from Components
 
 Often, we want to make a Godot node from a component.
-We can easily generate a node by using the `ComponentAsGodotNode` derive macro.
+We can easily generate a node by using the `GodotNode` derive macro.
 
 ```rust
-#[derive(Component, ComponentAsGodotNode)]
+#[derive(Component, GodotNode)]
 #[godot_node(base(Node2D), class_name(PlayerNode))]
 pub struct Player {
     #[godot_export]
@@ -23,4 +23,4 @@ pub struct Player {
 This will generate a `PlayerNode` node that can be added to the scene tree.
 The `Player` Bevy component will be automatically added to the node.
 
-[See the ComponentAsGodotNode Rust docs for more information about parameters and syntax.](https://docs.rs/godot-bevy/latest/godot_bevy/prelude/derive.ComponentAsGodotNode.html)
+[See the GodotNode Rust docs for more information about parameters and syntax.](https://docs.rs/godot-bevy/latest/godot_bevy/prelude/derive.GodotNode.html)

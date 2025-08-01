@@ -6,7 +6,7 @@
 
 use crate::level_manager::LevelId;
 use bevy::prelude::*;
-use godot_bevy::prelude::ComponentAsGodotNode;
+use godot_bevy::prelude::GodotNode;
 
 /// Component representing movement speed in pixels per second
 #[derive(Component, Debug, Clone, PartialEq)]
@@ -47,12 +47,12 @@ pub struct Player;
 pub struct Enemy;
 
 /// Component marking an entity as a gem
-#[derive(Component, ComponentAsGodotNode, Default, Debug, Clone)]
+#[derive(Component, GodotNode, Default, Debug, Clone)]
 #[godot_node(base(Area2D), class_name(Gem2D))]
 pub struct Gem;
 
 /// Component marking an entity as a door
-#[derive(Component, ComponentAsGodotNode, Default, Debug, Clone)]
+#[derive(Component, GodotNode, Default, Debug, Clone)]
 #[godot_node(base(Area2D), class_name(Door2D))]
 pub struct Door {
     #[godot_export(default(LevelId::Level1))]
