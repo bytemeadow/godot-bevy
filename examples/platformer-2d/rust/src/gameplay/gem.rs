@@ -2,7 +2,7 @@ use crate::components::Gem;
 use crate::components::Player;
 use crate::gameplay::audio::PlaySfxEvent;
 use bevy::prelude::*;
-use godot::{classes::Area2D, prelude::*};
+use godot::classes::Area2D;
 use godot_bevy::prelude::Collisions;
 use godot_bevy::prelude::*;
 
