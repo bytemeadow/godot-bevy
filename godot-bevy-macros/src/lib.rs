@@ -507,10 +507,18 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
                         })
                         .collect();
 
+                    // Avoid Clippy warning: struct update has no effect, all the fields in the struct have already been specified
+                    // https://rust-lang.github.io/rust-clippy/master/index.html#needless_update
+                    let default_unpacking = if field_inits.len() == field_mappings.len() {
+                        quote!()
+                    } else {
+                        quote!(..default::default())
+                    };
+
                     quote! {
                         #field_ident: #component_name {
                             #(#field_inits),*,
-                            ..Default::default()
+                            #default_unpacking
                         }
                     }
                 }
