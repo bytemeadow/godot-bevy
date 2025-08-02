@@ -164,6 +164,7 @@ macro_rules! add_transform_sync_systems {
                 use godot::global::godot_print;
                 use godot::prelude::{Array, Dictionary, ToGodot};
 
+                let _span = tracing::info_span!("bulk_data_preparation", system = stringify!($name)).entered();
                 let mut updates_3d = Array::new();
                 let mut updates_2d = Array::new();
 
@@ -196,6 +197,9 @@ macro_rules! add_transform_sync_systems {
                     }
                 }
 
+                // End data preparation phase
+                drop(_span);
+
                 // Make bulk FFI calls if we have updates
                 let total_updates = updates_3d.len() + updates_2d.len();
                 if total_updates > 0 {
@@ -215,9 +219,11 @@ macro_rules! add_transform_sync_systems {
                     }
 
                     if !updates_3d.is_empty() {
+                        let _span = tracing::info_span!("bulk_ffi_call_3d", entities = updates_3d.len(), system = stringify!($name)).entered();
                         batch_singleton.call("update_transforms_bulk_3d", &[updates_3d.to_variant()]);
                     }
                     if !updates_2d.is_empty() {
+                        let _span = tracing::info_span!("bulk_ffi_call_2d", entities = updates_2d.len(), system = stringify!($name)).entered();
                         batch_singleton.call("update_transforms_bulk_2d", &[updates_2d.to_variant()]);
                     }
                 }
@@ -257,9 +263,11 @@ macro_rules! add_transform_sync_systems {
 
                     // Handle both 2D and 3D nodes in a single system
                     if node2d.is_some() {
+                        let _span = tracing::info_span!("individual_ffi_call_2d", system = stringify!($name)).entered();
                         let mut obj = reference.get::<Node2D>();
                         obj.set_transform(transform_ref.to_godot_transform_2d());
                     } else if node3d.is_some() {
+                        let _span = tracing::info_span!("individual_ffi_call_3d", system = stringify!($name)).entered();
                         let mut obj = reference.get::<Node3D>();
                         obj.set_transform(transform_ref.to_godot_transform());
                     }

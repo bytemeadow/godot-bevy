@@ -85,6 +85,7 @@ pub fn post_update_godot_transforms(
                             );
                         }
                     }
+                    let _bulk_span = tracing::info_span!("using_bulk_optimization").entered();
                     post_update_godot_transforms_bulk(
                         change_tick,
                         entities,
@@ -121,6 +122,7 @@ fn post_update_godot_transforms_bulk(
     >,
     mut batch_singleton: Gd<Object>,
 ) {
+    let _span = tracing::info_span!("bulk_data_preparation").entered();
     let mut updates_3d = Array::new();
     let mut updates_2d = Array::new();
 
@@ -153,6 +155,9 @@ fn post_update_godot_transforms_bulk(
         }
     }
 
+    // End data preparation phase
+    drop(_span);
+
     // Make bulk FFI calls if we have updates
     let total_updates = updates_3d.len() + updates_2d.len();
     if total_updates > 0 {
@@ -170,11 +175,19 @@ fn post_update_godot_transforms_bulk(
             }
         }
 
+        let _ffi_calls_span = tracing::info_span!("bulk_ffi_calls", total_entities = total_updates).entered();
+        
         if !updates_3d.is_empty() {
+            let _span = tracing::info_span!("bulk_ffi_call_3d", entities = updates_3d.len()).entered();
+            godot_print!("About to call bulk 3D update for {} entities", updates_3d.len());
             batch_singleton.call("update_transforms_bulk_3d", &[updates_3d.to_variant()]);
+            godot_print!("Finished bulk 3D update");
         }
         if !updates_2d.is_empty() {
+            let _span = tracing::info_span!("bulk_ffi_call_2d", entities = updates_2d.len()).entered();
+            godot_print!("About to call bulk 2D update for {} entities", updates_2d.len());
             batch_singleton.call("update_transforms_bulk_2d", &[updates_2d.to_variant()]);
+            godot_print!("Finished bulk 2D update");
         }
     }
 }
@@ -205,9 +218,11 @@ fn post_update_godot_transforms_individual(
         }
 
         if node2d.is_some() {
+            let _span = tracing::info_span!("individual_ffi_call_2d").entered();
             let mut obj = reference.get::<Node2D>();
             obj.set_transform(transform_ref.to_godot_transform_2d());
         } else if node3d.is_some() {
+            let _span = tracing::info_span!("individual_ffi_call_3d").entered();
             let mut obj = reference.get::<Node3D>();
             obj.set_transform(transform_ref.to_godot_transform());
         }
