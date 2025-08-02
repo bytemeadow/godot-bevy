@@ -23,10 +23,6 @@ func update_transforms_bulk_3d(updates: Array):
 		else:
 			failed += 1
 	
-	# Log processing stats every 60 calls (once per second at 60fps)
-	log_counter_3d += 1
-	if log_counter_3d % 60 == 1:
-		print(\"GDScript: Processed \", processed, \" 3D transforms, failed: \", failed)
 
 func update_transforms_bulk_2d(updates: Array):
 	# Each update contains: { instance_id: i64, transform: Transform2D }
@@ -41,10 +37,6 @@ func update_transforms_bulk_2d(updates: Array):
 		else:
 			failed += 1
 	
-	# Log processing stats every 60 calls (once per second at 60fps)
-	log_counter_2d += 1
-	if log_counter_2d % 60 == 1:
-		print(\"GDScript: Processed \", processed, \" 2D transforms, failed: \", failed)
 
 # Raw array versions for maximum performance - no Dictionary allocations!
 func update_transforms_raw_3d(instance_ids: PackedInt64Array, positions: PackedVector3Array, rotations: PackedVector3Array, scales: PackedVector3Array):
