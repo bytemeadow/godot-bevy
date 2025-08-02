@@ -39,7 +39,7 @@ pub struct NeedsColorization;
 pub struct Velocity(pub Vector2);
 
 /// Resource for particle simulation parameters
-#[derive(Resource)]
+#[derive(Resource, Debug)]
 pub struct ParticleConfig {
     pub world_bounds: Vec2,
     pub gravity: f32,
