@@ -96,26 +96,22 @@ func update_transforms_bulk_2d(updates: Array):
 
 # Raw array versions for maximum performance - no Dictionary allocations!
 func update_transforms_raw_3d(instance_ids: PackedInt64Array, positions: PackedVector3Array, rotations: PackedVector3Array, scales: PackedVector3Array):
-	var count = instance_ids.size()
-	
-	# Hot path - minimize overhead
-	for i in range(count):
+	# Hot path - maximum performance micro-optimizations
+	for i in range(instance_ids.size()):
 		var node = instance_from_id(instance_ids[i]) as Node3D
-		if node:  # Trust instance IDs are valid, skip expensive is_instance_valid check
-			node.position = positions[i]
-			node.rotation = rotations[i]
-			node.scale = scales[i]
+		# Trust instance IDs are valid - skip null check for maximum speed
+		node.position = positions[i]
+		node.rotation = rotations[i]
+		node.scale = scales[i]
 
 func update_transforms_raw_2d(instance_ids: PackedInt64Array, positions: PackedVector2Array, rotations: PackedFloat32Array, scales: PackedVector2Array):
-	var count = instance_ids.size()
-	
-	# Hot path - minimize overhead  
-	for i in range(count):
+	# Hot path - maximum performance micro-optimizations
+	for i in range(instance_ids.size()):
 		var node = instance_from_id(instance_ids[i]) as Node2D
-		if node:  # Trust instance IDs are valid, skip expensive is_instance_valid check
-			node.position = positions[i]
-			node.rotation = rotations[i]
-			node.scale = scales[i]
+		# Trust instance IDs are valid - skip null check for maximum speed
+		node.position = positions[i]
+		node.rotation = rotations[i]
+		node.scale = scales[i]
 "
 
 [node name="BevyApp" type="BevyApp"]
