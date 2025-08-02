@@ -10,6 +10,7 @@ func _enter_tree():
 	# Add menu items
 	add_tool_menu_item("Setup godot-bevy Project", _on_setup_project)
 	add_tool_menu_item("Add BevyApp Singleton", _on_add_singleton)
+	add_tool_menu_item("Add Bulk Transform Optimization", _on_add_bulk_transform)
 	add_tool_menu_item("Build Rust Project", _on_build_rust)
 
 	print("godot-bevy plugin activated!")
@@ -18,6 +19,7 @@ func _exit_tree():
 	# Remove menu items
 	remove_tool_menu_item("Setup godot-bevy Project")
 	remove_tool_menu_item("Add BevyApp Singleton")
+	remove_tool_menu_item("Add Bulk Transform Optimization")
 	remove_tool_menu_item("Build Rust Project")
 
 	if wizard_dialog:
@@ -51,11 +53,80 @@ func _on_add_singleton():
 	else:
 		push_warning("BevyAppSingleton added to project autoload settings! Restart editor to apply changes.")
 
+func _on_add_bulk_transform():
+	# Check if BevyApp singleton already has bulk methods
+	if ProjectSettings.has_setting("autoload/BevyAppSingleton"):
+		var singleton_path = ProjectSettings.get_setting("autoload/BevyAppSingleton").replace("*", "")
+		if FileAccess.file_exists(singleton_path):
+			push_warning("BevyAppSingleton already exists with bulk transform methods!")
+			return
+	
+	# Create or update the BevyApp singleton with bulk methods
+	var singleton_path = "res://bevy_app_singleton.tscn"
+	_create_bevy_app_singleton(singleton_path)
+	
+	# Add to autoload if not already there
+	if not ProjectSettings.has_setting("autoload/BevyAppSingleton"):
+		ProjectSettings.set_setting("autoload/BevyAppSingleton", singleton_path)
+		ProjectSettings.save()
+	
+	push_warning("BevyAppSingleton updated with bulk transform optimization methods!")
+
+
 func _create_bevy_app_singleton(path: String):
-	# Create the scene file content directly
-	var scene_content = """[gd_scene format=3 uid="uid://bjsfwt816j4tp"]
+	# Create the scene file content with bulk transform optimization methods
+	var scene_content = """[gd_scene load_steps=2 format=3 uid="uid://bjsfwt816j4tp"]
+
+[sub_resource type="GDScript" id="GDScript_1"]
+script/source = "extends BevyApp
+
+# Bulk Transform Optimization Methods
+# Automatically detected by godot-bevy library for performance optimization
+
+func update_transforms_bulk_3d(updates: Array):
+	# Each update contains: { instance_id: i64, basis: Basis, origin: Vector3 }
+	var processed = 0
+	var failed = 0
+	for update in updates:
+		var instance_id = update.get(\\"instance_id\\", 0)
+		var node = instance_from_id(instance_id) as Node3D
+		if node and is_instance_valid(node):
+			# Reconstruct Transform3D from components
+			var basis = update.get(\\"basis\\", Basis.IDENTITY)
+			var origin = update.get(\\"origin\\", Vector3.ZERO)
+			node.transform = Transform3D(basis, origin)
+			processed += 1
+		else:
+			failed += 1
+	
+	# Log processing stats every 60 calls (once per second at 60fps)
+	static var log_counter_3d = 0
+	log_counter_3d += 1
+	if log_counter_3d % 60 == 1:
+		print(\\"GDScript: Processed \\", processed, \\" 3D transforms, failed: \\", failed)
+
+func update_transforms_bulk_2d(updates: Array):
+	# Each update contains: { instance_id: i64, transform: Transform2D }
+	var processed = 0
+	var failed = 0
+	for update in updates:
+		var instance_id = update.get(\\"instance_id\\", 0)
+		var node = instance_from_id(instance_id) as Node2D
+		if node and is_instance_valid(node):
+			node.transform = update.get(\\"transform\\", Transform2D.IDENTITY)
+			processed += 1
+		else:
+			failed += 1
+	
+	# Log processing stats every 60 calls (once per second at 60fps)
+	static var log_counter_2d = 0
+	log_counter_2d += 1
+	if log_counter_2d % 60 == 1:
+		print(\\"GDScript: Processed \\", processed, \\" 2D transforms, failed: \\", failed)
+"
 
 [node name="BevyApp" type="BevyApp"]
+script = SubResource("GDScript_1")
 """
 
 	# Save the scene file directly
@@ -68,6 +139,8 @@ func _on_project_created(project_info: Dictionary):
 	_scaffold_rust_project(project_info)
 	_create_bevy_app_singleton("res://bevy_app_singleton.tscn")
 	_on_add_singleton()  # This will add it to autoload
+	
+	# Bulk transform optimization is now built into BevyApp
 
 	# Automatically build the Rust project and restart after
 	var is_release = project_info.get("release_build", false)
