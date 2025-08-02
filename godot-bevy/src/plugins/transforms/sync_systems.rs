@@ -123,8 +123,14 @@ fn post_update_godot_transforms_bulk(
     mut batch_singleton: Gd<Object>,
 ) {
     let _span = tracing::info_span!("bulk_data_preparation").entered();
+    
+    // Pre-allocate arrays - estimate capacity based on entity count
+    let _entity_count = entities.iter().count();
     let mut updates_3d = Array::new();
     let mut updates_2d = Array::new();
+    
+    // Reserve capacity if we can (Godot arrays might not support this, but worth trying)
+    // This could reduce reallocations during push operations
 
     for (transform_ref, reference, metadata, (node2d, node3d)) in entities.iter_mut() {
         // Check if we have sync information for this entity
@@ -138,19 +144,29 @@ fn post_update_godot_transforms_bulk(
             }
         }
 
+        let _entity_prep_span = tracing::info_span!("prepare_entity").entered();
+        
         let instance_id = reference.instance_id();
 
         if node2d.is_some() {
+            let _dict_span = tracing::info_span!("create_2d_dict").entered();
             let mut update = Dictionary::new();
             update.set("instance_id", instance_id);
             update.set("transform", transform_ref.to_godot_transform_2d());
+            drop(_dict_span);
+            let _push_span = tracing::info_span!("push_2d_update").entered();
             updates_2d.push(&update);
         } else if node3d.is_some() {
+            let _transform_span = tracing::info_span!("convert_3d_transform").entered();
             let godot_transform = transform_ref.to_godot_transform();
+            drop(_transform_span);
+            let _dict_span = tracing::info_span!("create_3d_dict").entered();
             let mut update = Dictionary::new();
             update.set("instance_id", instance_id);
             update.set("basis", godot_transform.basis);
             update.set("origin", godot_transform.origin);
+            drop(_dict_span);
+            let _push_span = tracing::info_span!("push_3d_update").entered();
             updates_3d.push(&update);
         }
     }

@@ -165,8 +165,14 @@ macro_rules! add_transform_sync_systems {
                 use godot::prelude::{Array, Dictionary, ToGodot};
 
                 let _span = tracing::info_span!("bulk_data_preparation", system = stringify!($name)).entered();
+                
+                // Pre-allocate arrays - estimate capacity based on entity count
+                let _entity_count = entities.iter().count();
                 let mut updates_3d = Array::new();
                 let mut updates_2d = Array::new();
+                
+                // Reserve capacity if we can (Godot arrays might not support this, but worth trying)
+                // This could reduce reallocations during push operations
 
                 for (transform_ref, reference, metadata, (node2d, node3d)) in entities.iter_mut() {
                     // Check if we have sync information for this entity
@@ -180,19 +186,29 @@ macro_rules! add_transform_sync_systems {
                         }
                     }
 
+                    let _entity_prep_span = tracing::info_span!("prepare_entity", system = stringify!($name)).entered();
+                    
                     let instance_id = reference.instance_id();
 
                     if node2d.is_some() {
+                        let _dict_span = tracing::info_span!("create_2d_dict", system = stringify!($name)).entered();
                         let mut update = Dictionary::new();
                         update.set("instance_id", instance_id);
                         update.set("transform", transform_ref.to_godot_transform_2d());
+                        drop(_dict_span);
+                        let _push_span = tracing::info_span!("push_2d_update", system = stringify!($name)).entered();
                         updates_2d.push(&update);
                     } else if node3d.is_some() {
+                        let _transform_span = tracing::info_span!("convert_3d_transform", system = stringify!($name)).entered();
                         let godot_transform = transform_ref.to_godot_transform();
+                        drop(_transform_span);
+                        let _dict_span = tracing::info_span!("create_3d_dict", system = stringify!($name)).entered();
                         let mut update = Dictionary::new();
                         update.set("instance_id", instance_id);
                         update.set("basis", godot_transform.basis);
                         update.set("origin", godot_transform.origin);
+                        drop(_dict_span);
+                        let _push_span = tracing::info_span!("push_3d_update", system = stringify!($name)).entered();
                         updates_3d.push(&update);
                     }
                 }
@@ -218,13 +234,19 @@ macro_rules! add_transform_sync_systems {
                         }
                     }
 
+                    let _ffi_calls_span = tracing::info_span!("bulk_ffi_calls", total_entities = total_updates, system = stringify!($name)).entered();
+                    
                     if !updates_3d.is_empty() {
                         let _span = tracing::info_span!("bulk_ffi_call_3d", entities = updates_3d.len(), system = stringify!($name)).entered();
+                        godot_print!("About to call bulk 3D update for {} entities in {}", updates_3d.len(), stringify!($name));
                         batch_singleton.call("update_transforms_bulk_3d", &[updates_3d.to_variant()]);
+                        godot_print!("Finished bulk 3D update for {}", stringify!($name));
                     }
                     if !updates_2d.is_empty() {
                         let _span = tracing::info_span!("bulk_ffi_call_2d", entities = updates_2d.len(), system = stringify!($name)).entered();
+                        godot_print!("About to call bulk 2D update for {} entities in {}", updates_2d.len(), stringify!($name));
                         batch_singleton.call("update_transforms_bulk_2d", &[updates_2d.to_variant()]);
+                        godot_print!("Finished bulk 2D update for {}", stringify!($name));
                     }
                 }
             }
