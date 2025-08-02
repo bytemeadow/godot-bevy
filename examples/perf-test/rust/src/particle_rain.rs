@@ -7,11 +7,11 @@ use bevy::{
     prelude::*,
 };
 
+use crate::container::{ParticleContainer, ParticleRain};
 use godot::builtin::Color as GodotColor;
 use godot::classes::Node as GodotNode;
 use godot::prelude::*;
 use godot_bevy::prelude::*;
-use crate::container::{ParticleContainer, ParticleRain};
 
 /// Resource tracking simulation state
 #[derive(Resource, Default, PartialEq)]
@@ -201,11 +201,7 @@ fn spawn_particles(
         let entity = commands
             .spawn_empty()
             .insert(GodotScene::from_handle(particle_scene.0.clone()))
-            .insert((
-                Particle,
-                Velocity(velocity),
-                transform,
-            ))
+            .insert((Particle, Velocity(velocity), transform))
             .id();
 
         // We'll set the color after the entity is spawned in the next frame

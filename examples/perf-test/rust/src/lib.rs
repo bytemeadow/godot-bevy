@@ -3,8 +3,9 @@
 
 use bevy::prelude::*;
 use godot_bevy::prelude::{
-    godot_prelude::{gdextension, ExtensionLibrary},
-    GodotTransformSyncPlugin, *,
+    GodotTransformSyncPlugin,
+    godot_prelude::{ExtensionLibrary, gdextension},
+    *,
 };
 
 use crate::particle_rain::ParticleRainPlugin;
