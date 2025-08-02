@@ -10,7 +10,7 @@ Visual frames run at your display's refresh rate and handle the main Bevy update
 
 **What runs:** The complete `app.update()` cycle
 - `First`
-- `PreUpdate` 
+- `PreUpdate`
 - `Update`
 - `FixedUpdate`
 - `PostUpdate`
@@ -173,9 +173,3 @@ app.add_systems(FixedUpdate, update_ai);
 4. Transform syncing happens at schedule boundaries
 
 > **Note:** Scene tree entities are initialized during `PreStartup`, before any `Startup` systems run. This means you can safely query Godot scene entities in your `Startup` systems! See [Scene Tree Initialization and Timing](../scene-tree/timing.md) for details.
-
-## Next Steps
-
-- Learn about the [PhysicsUpdate Schedule](./physics-update.md) in detail
-- Understand [Transform Syncing](../transforms/sync-modes.md) timing
-- Explore [Performance Optimization](../reference/performance.md) techniques

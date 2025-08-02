@@ -563,7 +563,7 @@ offset_bottom = -8.0
 text = "Level 1"
 
 [node name="Door2" parent="." instance=ExtResource("3_osote")]
-level = "Level3"
+level_id = "Level3"
 position = Vector2(544, 248)
 
 [node name="Label" type="Label" parent="Door2"]

@@ -2,10 +2,7 @@ use crate::components::Gem;
 use crate::components::Player;
 use crate::gameplay::audio::PlaySfxEvent;
 use bevy::prelude::*;
-use godot::{
-    classes::{Area2D, IArea2D},
-    prelude::*,
-};
+use godot::classes::Area2D;
 use godot_bevy::prelude::Collisions;
 use godot_bevy::prelude::*;
 
@@ -22,20 +19,6 @@ pub struct GemCollectedEvent {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default, Resource)]
 pub struct GemsCollected(pub i64);
-
-#[derive(GodotClass, BevyBundle)]
-#[class(base=Area2D)]
-#[bevy_bundle((Gem))]
-pub struct Gem2D {
-    base: Base<Area2D>,
-}
-
-#[godot_api]
-impl IArea2D for Gem2D {
-    fn init(base: Base<Area2D>) -> Self {
-        Self { base }
-    }
-}
 
 pub struct GemPlugin;
 

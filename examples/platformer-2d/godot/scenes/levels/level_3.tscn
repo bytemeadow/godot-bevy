@@ -553,7 +553,7 @@ layer_0/tile_data = PackedInt32Array(1048599, 524288, 4, 1048600, 524288, 4, 104
 position = Vector2(360, 251)
 
 [node name="Door" parent="." instance=ExtResource("5_i6qe7")]
-level = "Level2"
+level_id = "Level2"
 position = Vector2(336, 250)
 
 [node name="Label" type="Label" parent="Door"]

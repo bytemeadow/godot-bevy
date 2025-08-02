@@ -1,3 +1,6 @@
+mod component_as_godot_node;
+
+use crate::component_as_godot_node::component_as_godot_node_impl;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned};
@@ -97,6 +100,46 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
     let expanded = bevy_bundle(input).unwrap_or_else(Error::into_compile_error);
 
     TokenStream::from(expanded)
+}
+
+/// Automatically registers a Godot node based on the annotated Component struct.
+/// This macro has two parts:
+/// - Struct level `godot_node` attribute
+/// - Field level `godot_export` attribute.
+///
+/// ---
+///
+/// A struct level attribute can be used to specify the Godot class to extend, and the class name:
+///
+/// ```ignore
+/// #[godot_node(base(<godot_node_type>), class_name(<custom_class_name>))]
+/// ```
+///
+/// - `base` (Default: `Node`) Godot node to extend.
+/// - `class_name` (Default: `<struct_name>BevyComponent`) Name of generated Godot class.
+///
+/// ---
+///
+/// Fields can be exposed to Godot as node properties using the `#[godot_export]` attribute.
+/// The attribute syntax is:
+///
+/// ```ignore
+/// #[godot_export(export_type(<godot_type>), transform_with(<conversion_function>), default(<value>))]
+/// ```
+///
+/// For fields with types incompatible with Godot-Rust's `#[export]` macro:
+/// - Use `export_type` to specify an alternate Godot-compatible type
+/// - Use `transform_with` to provide a conversion function from the Godot type to the field type
+/// - Use `default` to provide an initial value to the exported Godot field.
+///
+/// ---
+///
+/// Uses the `inventory` crate
+#[proc_macro_derive(GodotNode, attributes(godot_export, godot_node))]
+pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
+    component_as_godot_node_impl(input.into())
+        .unwrap_or_else(Error::into_compile_error)
+        .into()
 }
 
 fn node_tree_view(input: DeriveInput) -> Result<TokenStream2> {
@@ -482,10 +525,18 @@ fn bevy_bundle(input: DeriveInput) -> Result<TokenStream2> {
                         })
                         .collect();
 
+                    // Avoid Clippy warning: struct update has no effect, all the fields in the struct have already been specified
+                    // https://rust-lang.github.io/rust-clippy/master/index.html#needless_update
+                    let default_unpacking = if field_inits.len() == field_mappings.len() {
+                        quote!()
+                    } else {
+                        quote!(..default::default())
+                    };
+
                     quote! {
                         #field_ident: #component_name {
                             #(#field_inits),*,
-                            ..Default::default()
+                            #default_unpacking
                         }
                     }
                 }
