@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{ToTokens, format_ident, quote};
+use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -82,9 +82,23 @@ impl Parse for GodotExportAttrArgs {
 
         for argument in arguments {
             if argument.key == "export_type" {
-                export_type = Some(parse2::<syn::Type>(argument.value.to_token_stream())?);
+                export_type = Some(
+                    parse2::<syn::Type>(argument.value.to_token_stream()).map_err(|err| {
+                        syn::Error::new(
+                            argument.value.span(),
+                            format!("Failed to parse `export_type` parameter: {err}"),
+                        )
+                    })?,
+                );
             } else if argument.key == "transform_with" {
-                transform_with = Some(parse2::<syn::Type>(argument.value.to_token_stream())?);
+                transform_with = Some(
+                    parse2::<syn::Type>(argument.value.to_token_stream()).map_err(|err| {
+                        syn::Error::new(
+                            argument.value.span(),
+                            format!("Failed to parse `transform_with` parameter: {err}"),
+                        )
+                    })?,
+                );
             } else if argument.key == "default" {
                 default = Some(argument.value);
             } else {
@@ -106,12 +120,19 @@ impl Parse for GodotExportAttrArgs {
     }
 }
 
-fn get_godot_export_type(field: &ComponentField) -> &syn::Type {
+fn get_godot_export_type(field: &ComponentField) -> TokenStream2 {
     field
         .export_attribute
         .as_ref()
-        .and_then(|args| args.export_type.as_ref())
-        .unwrap_or(&field.field_type)
+        .and_then(|args| {
+            args.export_type
+                .as_ref()
+                .map(|ty| quote_spanned! {ty.span()=>#ty})
+        })
+        .unwrap_or_else(|| {
+            let ty = &field.field_type;
+            quote_spanned! {field.field_type.span()=>#ty}
+        })
 }
 
 /// Parses the following format:
@@ -221,13 +242,13 @@ pub fn component_as_godot_node_impl(input: TokenStream2) -> syn::Result<TokenStr
                         transform_with.to_token_stream().to_string().as_str(),
                         transform_with.span(),
                     );
-                    quote! {
+                    quote_spanned! {transform_with.span()=>
                         #[export]
                         #[bevy_bundle(transform_with=#transform_with_str_lit)]
                         #field_name: #export_type
                     }
                 } else {
-                    quote! {
+                    quote_spanned! {export_type.span()=>
                         #[export]
                         #field_name: #export_type
                     }
@@ -243,13 +264,13 @@ pub fn component_as_godot_node_impl(input: TokenStream2) -> syn::Result<TokenStr
         .filter(|field| field.export_attribute.is_some())
         .map(|field| {
             let name = &field.name;
-            let ty = get_godot_export_type(field);
+            let export_type = get_godot_export_type(field);
             let default = field
                 .export_attribute
                 .as_ref()
                 .and_then(|attr| attr.default.as_ref())
                 .map(|default_expr| quote!(#default_expr))
-                .unwrap_or(quote!(#ty::default()));
+                .unwrap_or(quote!(#export_type::default()));
             quote! {
                 #name: #default
             }
