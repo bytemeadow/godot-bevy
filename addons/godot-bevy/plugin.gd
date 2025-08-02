@@ -10,7 +10,6 @@ func _enter_tree():
 	# Add menu items
 	add_tool_menu_item("Setup godot-bevy Project", _on_setup_project)
 	add_tool_menu_item("Add BevyApp Singleton", _on_add_singleton)
-	add_tool_menu_item("Add Bulk Transform Optimization", _on_add_bulk_transform)
 	add_tool_menu_item("Build Rust Project", _on_build_rust)
 
 	print("godot-bevy plugin activated!")
@@ -19,7 +18,6 @@ func _exit_tree():
 	# Remove menu items
 	remove_tool_menu_item("Setup godot-bevy Project")
 	remove_tool_menu_item("Add BevyApp Singleton")
-	remove_tool_menu_item("Add Bulk Transform Optimization")
 	remove_tool_menu_item("Build Rust Project")
 
 	if wizard_dialog:
@@ -52,25 +50,6 @@ func _on_add_singleton():
 		push_warning("BevyAppSingleton updated in project autoload settings! Restart editor to apply changes.")
 	else:
 		push_warning("BevyAppSingleton added to project autoload settings! Restart editor to apply changes.")
-
-func _on_add_bulk_transform():
-	# Check if BevyApp singleton already has bulk methods
-	if ProjectSettings.has_setting("autoload/BevyAppSingleton"):
-		var singleton_path = ProjectSettings.get_setting("autoload/BevyAppSingleton").replace("*", "")
-		if FileAccess.file_exists(singleton_path):
-			push_warning("BevyAppSingleton already exists with bulk transform methods!")
-			return
-	
-	# Create or update the BevyApp singleton with bulk methods
-	var singleton_path = "res://bevy_app_singleton.tscn"
-	_create_bevy_app_singleton(singleton_path)
-	
-	# Add to autoload if not already there
-	if not ProjectSettings.has_setting("autoload/BevyAppSingleton"):
-		ProjectSettings.set_setting("autoload/BevyAppSingleton", singleton_path)
-		ProjectSettings.save()
-	
-	push_warning("BevyAppSingleton updated with bulk transform optimization methods!")
 
 
 func _create_bevy_app_singleton(path: String):
