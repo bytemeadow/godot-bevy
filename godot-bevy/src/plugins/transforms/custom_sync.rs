@@ -112,13 +112,6 @@ macro_rules! add_transform_sync_systems {
                                 static mut BULK_LOG_COUNTER: u32 = 0;
                                 unsafe {
                                     BULK_LOG_COUNTER += 1;
-                                    if BULK_LOG_COUNTER % 60 == 1 {
-                                        // Log once per second at 60fps
-                                        godot_print!(
-                                            "godot-bevy: Using raw array transform optimization via BevyApp for {}",
-                                            stringify!($name)
-                                        );
-                                    }
                                 }
                                 [<post_update_godot_transforms_ $name:lower _bulk>](
                                     change_tick,
@@ -135,10 +128,6 @@ macro_rules! add_transform_sync_systems {
                 static mut INDIVIDUAL_LOG_COUNTER: u32 = 0;
                 unsafe {
                     INDIVIDUAL_LOG_COUNTER += 1;
-                    if INDIVIDUAL_LOG_COUNTER % 60 == 1 {
-                        // Log once per second at 60fps
-                        godot_print!("godot-bevy: Using individual transform sync (fallback) for {}", stringify!($name));
-                    }
                 }
                 [<post_update_godot_transforms_ $name:lower _individual>](change_tick, entities);
             }
@@ -236,23 +225,12 @@ macro_rules! add_transform_sync_systems {
                     static mut BATCH_LOG_COUNTER: u32 = 0;
                     unsafe {
                         BATCH_LOG_COUNTER += 1;
-                        if BATCH_LOG_COUNTER % 60 == 1 {
-                            // Log once per second at 60fps
-                            godot_print!(
-                                "godot-bevy: Raw array sync processing {} entities ({} 3D, {} 2D) for {}",
-                                total_updates,
-                                instance_ids_3d.len(),
-                                instance_ids_2d.len(),
-                                stringify!($name)
-                            );
-                        }
                     }
 
                     let _ffi_calls_span = tracing::info_span!("raw_array_ffi_calls", total_entities = total_updates, system = stringify!($name)).entered();
                     
                     if has_3d_updates {
                         let _span = tracing::info_span!("raw_ffi_call_3d", entities = instance_ids_3d.len(), system = stringify!($name)).entered();
-                        godot_print!("About to call raw 3D update for {} entities in {}", instance_ids_3d.len(), stringify!($name));
                         
                         // Convert to packed arrays
                         let instance_ids_packed = godot::prelude::PackedInt64Array::from(instance_ids_3d.as_slice());
@@ -266,11 +244,9 @@ macro_rules! add_transform_sync_systems {
                             rotations_packed.to_variant(),
                             scales_packed.to_variant()
                         ]);
-                        godot_print!("Finished raw 3D update for {}", stringify!($name));
                     }
                     if has_2d_updates {
                         let _span = tracing::info_span!("raw_ffi_call_2d", entities = instance_ids_2d.len(), system = stringify!($name)).entered();
-                        godot_print!("About to call raw 2D update for {} entities in {}", instance_ids_2d.len(), stringify!($name));
                         
                         // Convert to packed arrays
                         let instance_ids_packed = godot::prelude::PackedInt64Array::from(instance_ids_2d.as_slice());
@@ -284,7 +260,6 @@ macro_rules! add_transform_sync_systems {
                             rotations_packed.to_variant(),
                             scales_packed.to_variant()
                         ]);
-                        godot_print!("Finished raw 2D update for {}", stringify!($name));
                     }
                 }
             }

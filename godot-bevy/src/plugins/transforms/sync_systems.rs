@@ -7,7 +7,6 @@ use bevy::ecs::query::{AnyOf, Changed};
 use bevy::ecs::system::{Query, SystemChangeTick};
 use bevy::prelude::Transform as BevyTransform;
 use godot::classes::{Engine, Node2D, Node3D, Object, SceneTree};
-use godot::global::godot_print;
 use godot::prelude::{Gd, ToGodot};
 
 use super::change_filter::TransformSyncMetadata;
@@ -72,20 +71,12 @@ pub fn post_update_godot_transforms(
     {
         if let Some(root) = scene_tree.get_root() {
             if let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton") {
-                godot_print!("Found BevyAppSingleton, checking for raw array methods...");
                 // Check if this BevyApp has the raw array methods (prefer these over bulk Dictionary methods)
                 if bevy_app.has_method("update_transforms_raw_3d") {
-                    godot_print!("Found update_transforms_raw_3d method!");
                     // Use bulk optimization path
                     static mut BULK_LOG_COUNTER: u32 = 0;
                     unsafe {
                         BULK_LOG_COUNTER += 1;
-                        if BULK_LOG_COUNTER % 60 == 1 {
-                            // Log once per second at 60fps
-                            godot_print!(
-                                "godot-bevy: Using raw array transform optimization via BevyApp"
-                            );
-                        }
                     }
                     let _bulk_span = tracing::info_span!("using_bulk_optimization").entered();
                     post_update_godot_transforms_bulk(
@@ -103,10 +94,6 @@ pub fn post_update_godot_transforms(
     static mut INDIVIDUAL_LOG_COUNTER: u32 = 0;
     unsafe {
         INDIVIDUAL_LOG_COUNTER += 1;
-        if INDIVIDUAL_LOG_COUNTER % 60 == 1 {
-            // Log once per second at 60fps
-            godot_print!("godot-bevy: Using individual transform sync (fallback)");
-        }
     }
     post_update_godot_transforms_individual(change_tick, entities);
 }
@@ -196,22 +183,12 @@ fn post_update_godot_transforms_bulk(
         static mut BATCH_LOG_COUNTER: u32 = 0;
         unsafe {
             BATCH_LOG_COUNTER += 1;
-            if BATCH_LOG_COUNTER % 60 == 1 {
-                // Log once per second at 60fps
-                godot_print!(
-                    "godot-bevy: Raw array sync processing {} entities ({} 3D, {} 2D)",
-                    total_updates,
-                    instance_ids_3d.len(),
-                    instance_ids_2d.len()
-                );
-            }
         }
 
         let _ffi_calls_span = tracing::info_span!("raw_array_ffi_calls", total_entities = total_updates).entered();
         
         if has_3d_updates {
             let _span = tracing::info_span!("raw_ffi_call_3d", entities = instance_ids_3d.len()).entered();
-            godot_print!("About to call raw 3D update for {} entities", instance_ids_3d.len());
             
             // Convert to packed arrays
             let instance_ids_packed = godot::prelude::PackedInt64Array::from(instance_ids_3d.as_slice());
@@ -225,11 +202,9 @@ fn post_update_godot_transforms_bulk(
                 rotations_packed.to_variant(),
                 scales_packed.to_variant()
             ]);
-            godot_print!("Finished raw 3D update");
         }
         if has_2d_updates {
             let _span = tracing::info_span!("raw_ffi_call_2d", entities = instance_ids_2d.len()).entered();
-            godot_print!("About to call raw 2D update for {} entities", instance_ids_2d.len());
             
             // Convert to packed arrays
             let instance_ids_packed = godot::prelude::PackedInt64Array::from(instance_ids_2d.as_slice());
@@ -243,7 +218,6 @@ fn post_update_godot_transforms_bulk(
                 rotations_packed.to_variant(),
                 scales_packed.to_variant()
             ]);
-            godot_print!("Finished raw 2D update");
         }
     }
 }
