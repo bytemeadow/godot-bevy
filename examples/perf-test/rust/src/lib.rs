@@ -1,4 +1,5 @@
 #![allow(clippy::type_complexity)]
+#![allow(unexpected_cfgs)] // silence potential `tracy_trace` feature config warning brought in by `bevy_app` macro
 
 use bevy::prelude::*;
 use godot_bevy::prelude::{
@@ -19,6 +20,7 @@ mod particle_rain;
 #[bevy_app]
 fn build_app(app: &mut App) {
     app.add_plugins(GodotPackedScenePlugin)
+        .add_plugins(GodotBevyLogPlugin::default())
         .add_plugins(GodotAssetsPlugin)
         .add_plugins(GodotTransformSyncPlugin::default().without_auto_sync())
         .add_plugins(ParticleRainPlugin);
