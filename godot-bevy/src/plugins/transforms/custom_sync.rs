@@ -106,8 +106,8 @@ macro_rules! add_transform_sync_systems {
                 {
                     if let Some(root) = scene_tree.get_root() {
                         if let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton") {
-                            // Check if this BevyApp has the bulk transform methods by trying to call one
-                            if bevy_app.has_method("update_transforms_bulk_3d") {
+                            // Check if this BevyApp has the raw array methods (prefer these over bulk Dictionary methods)
+                            if bevy_app.has_method("update_transforms_raw_3d") {
                                 // Use bulk optimization path
                                 static mut BULK_LOG_COUNTER: u32 = 0;
                                 unsafe {
@@ -115,7 +115,7 @@ macro_rules! add_transform_sync_systems {
                                     if BULK_LOG_COUNTER % 60 == 1 {
                                         // Log once per second at 60fps
                                         godot_print!(
-                                            "godot-bevy: Using bulk transform optimization via BevyApp for {}",
+                                            "godot-bevy: Using raw array transform optimization via BevyApp for {}",
                                             stringify!($name)
                                         );
                                     }
@@ -162,18 +162,23 @@ macro_rules! add_transform_sync_systems {
                 use $crate::plugins::transforms::{IntoGodotTransform, IntoGodotTransform2D};
                 use bevy::ecs::change_detection::DetectChanges;
                 use godot::global::godot_print;
-                use godot::prelude::{Array, Dictionary, ToGodot};
+                use godot::prelude::ToGodot;
 
-                let _span = tracing::info_span!("bulk_data_preparation", system = stringify!($name)).entered();
+                let _span = tracing::info_span!("bulk_data_preparation_optimized", system = stringify!($name)).entered();
                 
-                // Pre-allocate arrays - estimate capacity based on entity count
-                let _entity_count = entities.iter().count();
-                let mut updates_3d = Array::new();
-                let mut updates_2d = Array::new();
+                // Raw array approach: collect data into packed arrays (no Dictionary allocations!)
+                let mut instance_ids_3d = Vec::new();
+                let mut positions_3d = Vec::new();
+                let mut rotations_3d = Vec::new();
+                let mut scales_3d = Vec::new();
                 
-                // Reserve capacity if we can (Godot arrays might not support this, but worth trying)
-                // This could reduce reallocations during push operations
-
+                let mut instance_ids_2d = Vec::new();
+                let mut positions_2d = Vec::new();
+                let mut rotations_2d = Vec::new();
+                let mut scales_2d = Vec::new();
+                
+                // Collect raw transform data (no FFI allocations)
+                let _collect_span = tracing::info_span!("collect_raw_arrays", system = stringify!($name)).entered();
                 for (transform_ref, reference, metadata, (node2d, node3d)) in entities.iter_mut() {
                     // Check if we have sync information for this entity
                     if let Some(sync_tick) = metadata.last_sync_tick {
@@ -186,38 +191,47 @@ macro_rules! add_transform_sync_systems {
                         }
                     }
 
-                    let _entity_prep_span = tracing::info_span!("prepare_entity", system = stringify!($name)).entered();
-                    
                     let instance_id = reference.instance_id();
 
                     if node2d.is_some() {
-                        let _dict_span = tracing::info_span!("create_2d_dict", system = stringify!($name)).entered();
-                        let mut update = Dictionary::new();
-                        update.set("instance_id", instance_id);
-                        update.set("transform", transform_ref.to_godot_transform_2d());
-                        drop(_dict_span);
-                        let _push_span = tracing::info_span!("push_2d_update", system = stringify!($name)).entered();
-                        updates_2d.push(&update);
+                        let transform_2d = transform_ref.to_godot_transform_2d();
+                        instance_ids_2d.push(instance_id.to_i64());
+                        positions_2d.push(godot::prelude::Vector2::new(transform_2d.origin.x, transform_2d.origin.y));
+                        rotations_2d.push(transform_2d.rotation());
+                        scales_2d.push(godot::prelude::Vector2::new(transform_2d.scale().x, transform_2d.scale().y));
                     } else if node3d.is_some() {
-                        let _transform_span = tracing::info_span!("convert_3d_transform", system = stringify!($name)).entered();
-                        let godot_transform = transform_ref.to_godot_transform();
-                        drop(_transform_span);
-                        let _dict_span = tracing::info_span!("create_3d_dict", system = stringify!($name)).entered();
-                        let mut update = Dictionary::new();
-                        update.set("instance_id", instance_id);
-                        update.set("basis", godot_transform.basis);
-                        update.set("origin", godot_transform.origin);
-                        drop(_dict_span);
-                        let _push_span = tracing::info_span!("push_3d_update", system = stringify!($name)).entered();
-                        updates_3d.push(&update);
+                        // Use Bevy transform components directly (avoid complex conversions)
+                        instance_ids_3d.push(instance_id.to_i64());
+                        positions_3d.push(godot::prelude::Vector3::new(
+                            transform_ref.translation.x,
+                            transform_ref.translation.y,
+                            transform_ref.translation.z
+                        ));
+                        
+                        // Convert Bevy rotation (quaternion) to Euler angles
+                        let (x, y, z) = transform_ref.rotation.to_euler(bevy::math::EulerRot::XYZ);
+                        rotations_3d.push(godot::prelude::Vector3::new(x, y, z));
+                        
+                        scales_3d.push(godot::prelude::Vector3::new(
+                            transform_ref.scale.x,
+                            transform_ref.scale.y,
+                            transform_ref.scale.z
+                        ));
                     }
                 }
+                drop(_collect_span);
+                
+                // Convert to Godot packed arrays (much more efficient than Dictionary arrays)
+                let _convert_span = tracing::info_span!("convert_to_packed_arrays", system = stringify!($name)).entered();
+                let has_3d_updates = !instance_ids_3d.is_empty();
+                let has_2d_updates = !instance_ids_2d.is_empty();
+                drop(_convert_span);
 
                 // End data preparation phase
                 drop(_span);
 
-                // Make bulk FFI calls if we have updates
-                let total_updates = updates_3d.len() + updates_2d.len();
+                // Make raw array FFI calls if we have updates
+                let total_updates = instance_ids_3d.len() + instance_ids_2d.len();
                 if total_updates > 0 {
                     static mut BATCH_LOG_COUNTER: u32 = 0;
                     unsafe {
@@ -225,28 +239,52 @@ macro_rules! add_transform_sync_systems {
                         if BATCH_LOG_COUNTER % 60 == 1 {
                             // Log once per second at 60fps
                             godot_print!(
-                                "godot-bevy: Bulk sync processing {} entities ({} 3D, {} 2D) for {}",
+                                "godot-bevy: Raw array sync processing {} entities ({} 3D, {} 2D) for {}",
                                 total_updates,
-                                updates_3d.len(),
-                                updates_2d.len(),
+                                instance_ids_3d.len(),
+                                instance_ids_2d.len(),
                                 stringify!($name)
                             );
                         }
                     }
 
-                    let _ffi_calls_span = tracing::info_span!("bulk_ffi_calls", total_entities = total_updates, system = stringify!($name)).entered();
+                    let _ffi_calls_span = tracing::info_span!("raw_array_ffi_calls", total_entities = total_updates, system = stringify!($name)).entered();
                     
-                    if !updates_3d.is_empty() {
-                        let _span = tracing::info_span!("bulk_ffi_call_3d", entities = updates_3d.len(), system = stringify!($name)).entered();
-                        godot_print!("About to call bulk 3D update for {} entities in {}", updates_3d.len(), stringify!($name));
-                        batch_singleton.call("update_transforms_bulk_3d", &[updates_3d.to_variant()]);
-                        godot_print!("Finished bulk 3D update for {}", stringify!($name));
+                    if has_3d_updates {
+                        let _span = tracing::info_span!("raw_ffi_call_3d", entities = instance_ids_3d.len(), system = stringify!($name)).entered();
+                        godot_print!("About to call raw 3D update for {} entities in {}", instance_ids_3d.len(), stringify!($name));
+                        
+                        // Convert to packed arrays
+                        let instance_ids_packed = godot::prelude::PackedInt64Array::from(instance_ids_3d.as_slice());
+                        let positions_packed = godot::prelude::PackedVector3Array::from(positions_3d.as_slice());
+                        let rotations_packed = godot::prelude::PackedVector3Array::from(rotations_3d.as_slice());
+                        let scales_packed = godot::prelude::PackedVector3Array::from(scales_3d.as_slice());
+                        
+                        batch_singleton.call("update_transforms_raw_3d", &[
+                            instance_ids_packed.to_variant(),
+                            positions_packed.to_variant(),
+                            rotations_packed.to_variant(),
+                            scales_packed.to_variant()
+                        ]);
+                        godot_print!("Finished raw 3D update for {}", stringify!($name));
                     }
-                    if !updates_2d.is_empty() {
-                        let _span = tracing::info_span!("bulk_ffi_call_2d", entities = updates_2d.len(), system = stringify!($name)).entered();
-                        godot_print!("About to call bulk 2D update for {} entities in {}", updates_2d.len(), stringify!($name));
-                        batch_singleton.call("update_transforms_bulk_2d", &[updates_2d.to_variant()]);
-                        godot_print!("Finished bulk 2D update for {}", stringify!($name));
+                    if has_2d_updates {
+                        let _span = tracing::info_span!("raw_ffi_call_2d", entities = instance_ids_2d.len(), system = stringify!($name)).entered();
+                        godot_print!("About to call raw 2D update for {} entities in {}", instance_ids_2d.len(), stringify!($name));
+                        
+                        // Convert to packed arrays
+                        let instance_ids_packed = godot::prelude::PackedInt64Array::from(instance_ids_2d.as_slice());
+                        let positions_packed = godot::prelude::PackedVector2Array::from(positions_2d.as_slice());
+                        let rotations_packed = godot::prelude::PackedFloat32Array::from(rotations_2d.as_slice());
+                        let scales_packed = godot::prelude::PackedVector2Array::from(scales_2d.as_slice());
+                        
+                        batch_singleton.call("update_transforms_raw_2d", &[
+                            instance_ids_packed.to_variant(),
+                            positions_packed.to_variant(),
+                            rotations_packed.to_variant(),
+                            scales_packed.to_variant()
+                        ]);
+                        godot_print!("Finished raw 2D update for {}", stringify!($name));
                     }
                 }
             }

@@ -80,6 +80,12 @@ func _create_bevy_app_singleton(path: String):
 [sub_resource type="GDScript" id="GDScript_1"]
 script/source = "extends BevyApp
 
+# Static counters for logging
+var log_counter_3d = 0
+var log_counter_2d = 0
+var log_counter_raw_3d = 0
+var log_counter_raw_2d = 0
+
 # Bulk Transform Optimization Methods
 # Automatically detected by godot-bevy library for performance optimization
 
@@ -100,7 +106,6 @@ func update_transforms_bulk_3d(updates: Array):
 			failed += 1
 	
 	# Log processing stats every 60 calls (once per second at 60fps)
-	static var log_counter_3d = 0
 	log_counter_3d += 1
 	if log_counter_3d % 60 == 1:
 		print(\\"GDScript: Processed \\", processed, \\" 3D transforms, failed: \\", failed)
@@ -119,10 +124,50 @@ func update_transforms_bulk_2d(updates: Array):
 			failed += 1
 	
 	# Log processing stats every 60 calls (once per second at 60fps)
-	static var log_counter_2d = 0
 	log_counter_2d += 1
 	if log_counter_2d % 60 == 1:
 		print(\\"GDScript: Processed \\", processed, \\" 2D transforms, failed: \\", failed)
+
+# Raw array versions for maximum performance - no Dictionary allocations!
+func update_transforms_raw_3d(instance_ids: PackedInt64Array, positions: PackedVector3Array, rotations: PackedVector3Array, scales: PackedVector3Array):
+	var processed = 0
+	var failed = 0
+	var count = instance_ids.size()
+	
+	for i in range(count):
+		var node = instance_from_id(instance_ids[i]) as Node3D
+		if node and is_instance_valid(node):
+			node.position = positions[i]
+			node.rotation = rotations[i]
+			node.scale = scales[i]
+			processed += 1
+		else:
+			failed += 1
+	
+	# Log processing stats every 60 calls (once per second at 60fps)
+	log_counter_raw_3d += 1
+	if log_counter_raw_3d % 60 == 1:
+		print(\\"GDScript RAW: Processed \\", processed, \\" 3D transforms, failed: \\", failed)
+
+func update_transforms_raw_2d(instance_ids: PackedInt64Array, positions: PackedVector2Array, rotations: PackedFloat32Array, scales: PackedVector2Array):
+	var processed = 0
+	var failed = 0
+	var count = instance_ids.size()
+	
+	for i in range(count):
+		var node = instance_from_id(instance_ids[i]) as Node2D
+		if node and is_instance_valid(node):
+			node.position = positions[i]
+			node.rotation = rotations[i]
+			node.scale = scales[i]
+			processed += 1
+		else:
+			failed += 1
+	
+	# Log processing stats every 60 calls (once per second at 60fps)
+	log_counter_raw_2d += 1
+	if log_counter_raw_2d % 60 == 1:
+		print(\\"GDScript RAW: Processed \\", processed, \\" 2D transforms, failed: \\", failed)
 "
 
 [node name="BevyApp" type="BevyApp"]
