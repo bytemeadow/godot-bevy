@@ -1,22 +1,22 @@
-# Boids Performance Benchmarking
+# Performance Benchmarking
 
-This directory contains automated benchmarking tools for comparing the performance of Godot (GDScript) and Bevy (Rust) boids implementations.
+This directory contains automated benchmarking tools for comparing the performance of Godot (GDScript) and Bevy (Rust) implementations across different performance tests.
 
 ## Quick Start
 
 ### Run a single benchmark:
 ```bash
-# Test Godot implementation with 5000 boids
-./benchmark.sh -i godot -b 5000
+# Test Godot implementation with 5000 entities
+./benchmark.sh -i godot -c 5000
 
-# Test Bevy implementation with 5000 boids
-./benchmark.sh -i bevy -b 5000
+# Test Bevy implementation with 5000 entities
+./benchmark.sh -i bevy -c 5000
 ```
 
 ### Run regression tests:
 ```bash
-# Run full comparison across multiple boid counts
-./regression_test.py --boids 1000 2000 5000 10000
+# Run full comparison across multiple entity counts
+./regression_test.py --counts 1000 2000 5000 10000
 
 # Save results as baseline
 ./regression_test.py --save-baseline baseline.json
@@ -32,14 +32,14 @@ The benchmarks can be run directly using Godot's command line:
 ```bash
 godot --headless godot/project.godot \
     --implementation=godot \
-    --boid-count=5000 \
+    --entity-count=5000 \
     --duration=10 \
     --output=results.json
 ```
 
 ### Parameters:
 - `--implementation`: Choose `godot` or `bevy`
-- `--boid-count`: Number of boids to simulate
+- `--entity-count`: Number of entities to simulate
 - `--duration`: Test duration in seconds
 - `--output`: JSON file to save results
 
@@ -51,7 +51,7 @@ Simple shell script for running individual benchmarks.
 Options:
 - `--godot PATH`: Path to Godot executable
 - `-i, --implementation`: Implementation to test (godot or bevy)
-- `-b, --boids`: Number of boids
+- `-c, --count`: Number of entities
 - `-d, --duration`: Test duration in seconds
 - `-o, --output`: Output directory
 
@@ -60,7 +60,7 @@ Python script for automated regression testing.
 
 Options:
 - `--godot`: Path to Godot executable
-- `--boids`: List of boid counts to test
+- `--counts`: List of entity counts to test
 - `--duration`: Duration of each benchmark
 - `--baseline`: Baseline file for regression testing
 - `--save-baseline`: Save results as new baseline
@@ -73,7 +73,7 @@ Benchmark results are saved as JSON with the following structure:
 ```json
 {
     "implementation": "godot",
-    "boid_count": 5000,
+    "entity_count": 5000,
     "duration": 10.0,
     "frame_count": 600,
     "avg_fps": 60.0,
@@ -94,9 +94,9 @@ To use in CI/CD pipelines:
 
 ```yaml
 # Example GitHub Actions workflow
-- name: Run Boids Benchmark
+- name: Run Performance Benchmark
   run: |
-    cd examples/boids-perf-test
+    cd examples/perf-test
     ./regression_test.py --baseline baseline.json --threshold 0.85
 ```
 

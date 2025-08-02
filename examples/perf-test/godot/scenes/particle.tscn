@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3 uid="uid://cqgvd8ndkntsk"]
+
+[ext_resource type="Texture2D" uid="uid://dbilirhfqdt47" path="res://textures/boid_circle.tres" id="1_joc4e"]
+
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_1"]
+blend_mode = 1
+
+[node name="Particle" type="Node2D"]
+
+[node name="Sprite" type="Sprite2D" parent="."]
+material = SubResource("CanvasItemMaterial_1")
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("1_joc4e")

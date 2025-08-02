@@ -3,28 +3,28 @@ use godot::prelude::*;
 use godot_bevy::prelude::*;
 
 #[derive(Component, Default)]
-pub struct BoidsContainer;
+pub struct ParticleContainer;
 
 #[derive(GodotClass, BevyBundle)]
 #[class(base=Node2D)]
-#[bevy_bundle((BoidsContainer))]
-pub struct BevyBoids {
+#[bevy_bundle((ParticleContainer))]
+pub struct ParticleRain {
     base: Base<Node2D>,
     pub is_running: bool,
     pub screen_size: Vector2,
-    pub current_boid_count: i32,
-    pub target_boid_count: i32,
+    pub current_particle_count: i32,
+    pub target_particle_count: i32,
 }
 
 #[godot_api]
-impl INode2D for BevyBoids {
+impl INode2D for ParticleRain {
     fn init(base: Base<Node2D>) -> Self {
         Self {
             base,
             is_running: false,
             screen_size: Vector2::new(1920.0, 1080.0),
-            current_boid_count: 0,
-            target_boid_count: 0,
+            current_particle_count: 0,
+            target_particle_count: 0,
         }
     }
 
@@ -35,21 +35,21 @@ impl INode2D for BevyBoids {
 }
 
 #[godot_api]
-impl BevyBoids {
+impl ParticleRain {
     #[func]
-    fn get_boid_count(&self) -> i32 {
-        self.current_boid_count
+    fn get_particle_count(&self) -> i32 {
+        self.current_particle_count
     }
 
     #[func]
-    fn set_target_boid_count(&mut self, count: i32) {
-        self.target_boid_count = count;
+    fn set_target_particle_count(&mut self, count: i32) {
+        self.target_particle_count = count;
     }
 
     #[func]
-    pub fn start_benchmark(&mut self, boid_count: i32) {
+    pub fn start_benchmark(&mut self, particle_count: i32) {
         self.is_running = true;
-        self.target_boid_count = boid_count;
+        self.target_particle_count = particle_count;
     }
 
     #[func]

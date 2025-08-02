@@ -1,11 +1,11 @@
 extends Control
 
-## Main controller for the boids performance benchmark
+## Main controller for the particle rain performance benchmark
 ## Coordinates between Godot-only and godot-bevy implementations
 
 @onready var implementation_option: OptionButton = $UI/VBoxContainer/ImplementationContainer/ImplementationOption
-@onready var boid_count_slider: HSlider = $UI/VBoxContainer/BoidCountContainer/BoidCountSlider
-@onready var boid_count_label: Label = $UI/VBoxContainer/BoidCountContainer/BoidCountLabel
+@onready var particle_count_slider: HSlider = $UI/VBoxContainer/ParticleCountContainer/ParticleCountSlider
+@onready var particle_count_label: Label = $UI/VBoxContainer/ParticleCountContainer/ParticleCountLabel
 @onready var start_button: Button = $UI/VBoxContainer/ControlsContainer/StartButton
 @onready var stop_button: Button = $UI/VBoxContainer/ControlsContainer/StopButton
 @onready var reset_button: Button = $UI/VBoxContainer/ControlsContainer/ResetButton
@@ -14,11 +14,11 @@ extends Control
 @onready var avg_fps_label: Label = $UI/VBoxContainer/PerformanceContainer/AvgFPSLabel
 @onready var min_fps_label: Label = $UI/VBoxContainer/PerformanceContainer/MinFPSLabel
 @onready var max_fps_label: Label = $UI/VBoxContainer/PerformanceContainer/MaxFPSLabel
-@onready var boids_count_label: Label = $UI/VBoxContainer/PerformanceContainer/BoidsCountLabel
+@onready var particles_count_label: Label = $UI/VBoxContainer/PerformanceContainer/ParticlesCountLabel
 @onready var benchmark_status: Label = $UI/VBoxContainer/PerformanceContainer/BenchmarkStatus
 
-@onready var godot_boids: Node2D = $GodotBoidsContainer
-@onready var bevy_boids: Node2D = $BevyBoidsContainer
+@onready var godot_particles: Node2D = $GodotParticlesContainer
+@onready var bevy_particles: Node2D = $BevyParticlesContainer
 
 enum Implementation {
 	GODOT = 0,
@@ -27,7 +27,7 @@ enum Implementation {
 
 var current_implementation: Implementation = Implementation.GODOT
 var is_benchmark_running: bool = false
-var target_boid_count: int = 20000
+var target_particle_count: int = 20000
 
 # Performance tracking
 var frame_times: Array[float] = []
@@ -39,15 +39,15 @@ var max_fps: float = 0.0
 func _ready():
 	# Set initial UI state
 	stop_button.disabled = true
-	_update_boid_count_label()
+	_update_particle_count_label()
 	_update_status("Ready")
 
 	# Set up performance tracking
 	reset_performance_metrics()
 
-	print("🎮 Boids Performance Benchmark Ready!")
+	print("🎮 Particle Rain Performance Benchmark Ready!")
 	print("   - Switch between Godot (GDScript) and godot-bevy (Rust + ECS)")
-	print("   - Adjust boid count to test performance limits")
+	print("   - Adjust particle count to test performance limits")
 	print("   - Compare FPS metrics between implementations")
 
 func _process(_delta):
@@ -59,7 +59,7 @@ func _update_performance_metrics():
 	var avg_fps = current_fps
 	var min_fps_val = min_fps
 	var max_fps_val = max_fps
-	var current_boid_count = 0
+	var current_particle_count = 0
 
 	# Use Godot's metrics for Godot implementation
 	# Track frame times for rolling average
@@ -86,16 +86,16 @@ func _update_performance_metrics():
 
 	match current_implementation:
 		Implementation.GODOT:
-			current_boid_count = godot_boids.get_boid_count()
+			current_particle_count = godot_particles.get_particle_count()
 		Implementation.BEVY:
-			current_boid_count = bevy_boids.get_boid_count()
+			current_particle_count = bevy_particles.get_particle_count()
 
 	# Update UI
 	fps_label.text = "FPS: %.1f" % current_fps
 	avg_fps_label.text = "Avg FPS: %.1f" % avg_fps
 	min_fps_label.text = "Min FPS: %.1f" % min_fps_val
 	max_fps_label.text = "Max FPS: %.1f" % max_fps_val
-	boids_count_label.text = "Active Boids: %d" % current_boid_count
+	particles_count_label.text = "Active Particles: %d" % current_particle_count
 
 func reset_performance_metrics():
 	frame_times.clear()
@@ -103,8 +103,8 @@ func reset_performance_metrics():
 	max_fps = 0.0
 	performance_start_time = Time.get_ticks_msec() / 1000.0
 
-func _update_boid_count_label():
-	boid_count_label.text = str(int(boid_count_slider.value))
+func _update_particle_count_label():
+	particle_count_label.text = str(int(particle_count_slider.value))
 
 func _update_status(status: String):
 	benchmark_status.text = "Status: " + status
@@ -123,17 +123,17 @@ func _on_implementation_changed(index: int):
 		Implementation.BEVY:
 			_update_status("Switched to godot-bevy (Rust + ECS)")
 
-func _on_boid_count_changed(value: float):
-	target_boid_count = int(value)
-	_update_boid_count_label()
+func _on_particle_count_changed(value: float):
+	target_particle_count = int(value)
+	_update_particle_count_label()
 
 	# Update active implementation if benchmark is running
 	if is_benchmark_running:
 		match current_implementation:
 			Implementation.GODOT:
-				godot_boids.set_target_boid_count(target_boid_count)
+				godot_particles.set_target_particle_count(target_particle_count)
 			Implementation.BEVY:
-				bevy_boids.set_target_boid_count(target_boid_count)
+				bevy_particles.set_target_particle_count(target_particle_count)
 
 func _on_start_pressed():
 	_start_benchmark()
@@ -179,18 +179,18 @@ func _stop_benchmark():
 
 func _start_godot_benchmark():
 	_update_status("Running Godot benchmark...")
-	godot_boids.start_benchmark(target_boid_count)
+	godot_particles.start_benchmark(target_particle_count)
 
 func _start_bevy_benchmark():
 	_update_status("Running godot-bevy benchmark...")
-	bevy_boids.start_benchmark(target_boid_count)
+	bevy_particles.start_benchmark(target_particle_count)
 
 func _stop_current_benchmark():
 	match current_implementation:
 		Implementation.GODOT:
-			godot_boids.stop_benchmark()
+			godot_particles.stop_benchmark()
 		Implementation.BEVY:
-			bevy_boids.stop_benchmark()
+			bevy_particles.stop_benchmark()
 
 ## Performance Comparison Utilities
 
@@ -203,7 +203,7 @@ func get_performance_summary() -> Dictionary:
 
 	return {
 		"implementation": Implementation.keys()[current_implementation],
-		"boid_count": target_boid_count,
+		"particle_count": target_particle_count,
 		"avg_fps": 1.0 / avg_frame_time if avg_frame_time > 0 else 0.0,
 		"min_fps": min_fps if min_fps != INF else 0.0,
 		"max_fps": max_fps,
@@ -215,7 +215,7 @@ func print_performance_summary():
 	var summary = get_performance_summary()
 	print("\n📊 Performance Summary:")
 	print("   Implementation: %s" % summary.implementation)
-	print("   Boid Count: %d" % summary.boid_count)
+	print("   Particle Count: %d" % summary.particle_count)
 	print("   Average FPS: %.1f" % summary.avg_fps)
 	print("   Min FPS: %.1f" % summary.min_fps)
 	print("   Max FPS: %.1f" % summary.max_fps)

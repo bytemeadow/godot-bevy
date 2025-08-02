@@ -1,22 +1,22 @@
 [package]
-name = "rustboids"
+name = "rust-perf-test"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+rust-version = "1.82"
 
 [lib]
 crate-type = ["cdylib"]
 
 [[bin]]
 path = "../../run_godot.rs"
-name = "boids-benchmark"
+name = "perf-benchmark"
 
 [dependencies]
 bevy = { version = "0.16", default-features = false }
-bevy_spatial = "0.11.0"
 fastrand = "2.3.0"
 godot = "0.3"
 godot-bevy = { path = "../../../godot-bevy" }
-which = "8"
+which = "7.0.3"
 tracing = "0.1"
 tracing-tracy = { version = "0.11.4", default-features = false, features = [
   "enable",

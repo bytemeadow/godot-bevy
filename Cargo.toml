@@ -16,7 +16,7 @@ members = [
   "examples/input-event-demo/rust",
   "examples/platformer-2d/rust",
   "examples/simple-node2d-movement/rust",
-  "examples/boids-perf-test/rust",
+  "examples/perf-test/rust",
   "examples/two-way-sync-demo/rust",
 ]
 resolver = "2"
