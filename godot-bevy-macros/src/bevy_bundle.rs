@@ -199,18 +199,16 @@ pub fn bevy_bundle(input: DeriveInput) -> syn::Result<TokenStream2> {
                         })
                         .collect();
 
-                    // Avoid Clippy warning: struct update has no effect, all the fields in the struct have already been specified
+                    // Avoid Clippy warning: struct update has no effect,
+                    // all the fields in the struct have already been specified
                     // https://rust-lang.github.io/rust-clippy/master/index.html#needless_update
-                    let default_unpacking = if field_inits.len() == field_mappings.len() {
-                        quote!()
-                    } else {
-                        quote!(..default::default())
-                    };
-
+                    // It's not possible to determine how many fields the component
+                    // struct has from this macro, so we have to allow the warning.
                     quote! {
+                        #[allow(clippy::needless_update)]
                         #field_ident: #component_name {
                             #(#field_inits),*,
-                            #default_unpacking
+                            ..Default::default()
                         }
                     }
                 }
