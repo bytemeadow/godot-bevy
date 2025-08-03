@@ -57,7 +57,7 @@ jobs:
             const path = require('path');
 
             // Read benchmark results
-            const resultsDir = 'benchmark-results/examples/boids-perf-test/benchmark_results';
+            const resultsDir = 'benchmark-results/examples/perf-test/benchmark_results';
             if (!fs.existsSync(resultsDir)) {
               console.log('No benchmark results directory found');
               return;
@@ -96,7 +96,7 @@ jobs:
                   
                   let performanceChanges = [];
                   
-                  // Check each implementation and boid count
+                  // Check each implementation and entity count
                   for (const impl of ["godot", "bevy"]) {
                     const currentImpl = currentResults[impl] || {};
                     const baselineImpl = baseline[impl] || {};
@@ -132,8 +132,8 @@ jobs:
 
 
             if (Object.keys(ratios).length > 0) {
-              comment += "| Boid Count | Godot FPS | +Bevy FPS | Speedup |\n";
-              comment += "|------------|-----------|----------|----------|\n";
+              comment += "| Entity Count | Godot FPS | +Bevy FPS | Speedup |\n";
+              comment += "|--------------|-----------|----------|----------|\n";
 
               for (const [count, r] of Object.entries(ratios).sort((a, b) => Number(a[0]) - Number(b[0]))) {
                 comment += `| ${Number(count).toLocaleString()} | ${r.godot_fps.toFixed(1)} | ${r.bevy_fps.toFixed(1)} | **${r.speedup.toFixed(2)}x** |\n`;
@@ -149,10 +149,10 @@ jobs:
             // Add performance comparison vs baseline at the end
             if (regressionStatus?.status === 'comparison') {
               comment += "\n## 📈 Performance vs Baseline\n\n";
-              comment += "| Boid Count | Godot Change | Bevy Change |\n";
-              comment += "|------------|--------------|-------------|\n";
+              comment += "| Entity Count | Godot Change | Bevy Change |\n";
+              comment += "|--------------|--------------|-------------|\n";
               
-              // Get all unique boid counts and sort them
+              // Get all unique entity counts and sort them
               const allCounts = [...new Set(regressionStatus.changes.map(c => c.count))].sort((a, b) => a - b);
               
               for (const count of allCounts) {

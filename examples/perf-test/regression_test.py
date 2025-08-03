@@ -19,22 +19,22 @@ class BenchmarkRunner:
         self.results_dir = "benchmark_results"
         os.makedirs(self.results_dir, exist_ok=True)
 
-    def run_benchmark(self, implementation: str, boid_count: int, duration: float = 10.0) -> Dict:
+    def run_benchmark(self, implementation: str, entity_count: int, duration: float = 10.0) -> Dict:
         """Run a single benchmark and return results"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = f"{self.results_dir}/benchmark_{implementation}_{boid_count}boids_{timestamp}.json"
+        output_file = f"{self.results_dir}/benchmark_{implementation}_{entity_count}entities_{timestamp}.json"
 
         # Build command
         cmd = [
             self.godot_path,
             "--headless",
             f"--implementation={implementation}",
-            f"--boid-count={boid_count}",
+            f"--entity-count={entity_count}",
             f"--duration={duration}",
             f"--output={output_file}"
         ]
 
-        print(f"🚀 Running {implementation} benchmark with {boid_count} boids...")
+        print(f"🚀 Running {implementation} benchmark with {entity_count} entities...")
         print(f"   Command: {' '.join(cmd)}")
 
         try:
@@ -44,8 +44,8 @@ class BenchmarkRunner:
 
             # Run benchmark with timeout and without capturing output
             # This prevents hanging on output buffer issues
-            # Calculate timeout based on boid count - higher counts need more warmup time
-            warmup_time = min(60, max(30, boid_count // 200))  # 30-60s warmup based on boid count
+            # Calculate timeout based on entity count - higher counts need more warmup time
+            warmup_time = min(60, max(30, entity_count // 200))  # 30-60s warmup based on entity count
             total_timeout = duration + warmup_time + 30  # warmup + benchmark + shutdown
             
             result = subprocess.run(
@@ -100,20 +100,20 @@ class BenchmarkRunner:
             os.chdir(original_dir)
             return None
 
-    def run_comparison(self, boid_counts: List[int], duration: float = 10.0) -> Dict:
-        """Run benchmarks for both implementations across multiple boid counts"""
+    def run_comparison(self, entity_counts: List[int], duration: float = 10.0) -> Dict:
+        """Run benchmarks for both implementations across multiple entity counts"""
         results = {
             "godot": {},
             "bevy": {},
             "metadata": {
                 "timestamp": datetime.now().isoformat(),
                 "duration": duration,
-                "boid_counts": boid_counts
+                "entity_counts": entity_counts
             }
         }
 
-        for count in boid_counts:
-            print(f"\n📊 Testing with {count} boids...")
+        for count in entity_counts:
+            print(f"\n📊 Testing with {count} entities...")
 
             # Run Godot benchmark
             godot_result = self.run_benchmark("godot", count, duration)
@@ -134,7 +134,7 @@ class BenchmarkRunner:
             "summary": {}
         }
 
-        for count in results["metadata"]["boid_counts"]:
+        for count in results["metadata"]["entity_counts"]:
             if count in results["godot"] and count in results["bevy"]:
                 godot_fps = results["godot"][count]["avg_fps"]
                 bevy_fps = results["bevy"][count]["avg_fps"]
@@ -177,7 +177,7 @@ class BenchmarkRunner:
                     if current_fps < baseline_fps * threshold:
                         percent_drop = ((baseline_fps - current_fps) / baseline_fps) * 100
                         regressions.append(
-                            f"{impl} @ {count} boids: {current_fps:.1f} FPS "
+                            f"{impl} @ {count} entities: {current_fps:.1f} FPS "
                             f"(was {baseline_fps:.1f} FPS, -{percent_drop:.1f}%)"
                         )
 
@@ -189,8 +189,8 @@ class BenchmarkRunner:
 def main():
     parser = argparse.ArgumentParser(description="Boids Performance Regression Test")
     parser.add_argument("--godot", default="godot", help="Path to Godot executable")
-    parser.add_argument("--boids", nargs="+", type=int, default=[1000, 2000, 5000, 10000],
-                      help="List of boid counts to test")
+    parser.add_argument("--entity-counts", nargs="+", type=int, default=[1000, 2000, 5000, 10000],
+                      help="List of entity counts to test")
     parser.add_argument("--duration", type=float, default=10.0,
                       help="Duration of each benchmark in seconds")
     parser.add_argument("--baseline", help="Baseline results file for regression testing")
@@ -206,7 +206,7 @@ def main():
 
     # Run benchmarks
     runner = BenchmarkRunner(args.godot)
-    results = runner.run_comparison(args.boids, args.duration)
+    results = runner.run_comparison(args.entity_counts, args.duration)
 
     # Analyze results
     analysis = runner.analyze_results(results)

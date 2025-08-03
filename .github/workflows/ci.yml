@@ -109,7 +109,7 @@ jobs:
             benchmark:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
-              - 'examples/boids-perf-test/**'
+              - 'examples/perf-test/**'
               - '.github/workflows/ci.yml'
               - 'Cargo.toml'
               - 'Cargo.lock'
@@ -209,7 +209,7 @@ jobs:
           if-no-files-found: error
 
   benchmark:
-    name: performance / boids benchmark
+    name: performance / particle benchmark
     runs-on: blaze/compute/ubuntu-latest-amd64
     needs: [rust, changes]
     if: |
@@ -293,24 +293,24 @@ jobs:
       - name: Cache Godot imports
         uses: actions/cache@v4
         with:
-          path: examples/boids-perf-test/godot/.godot
-          key: ${{ runner.os }}-godot-imports-boids-${{ hashFiles('examples/boids-perf-test/godot/**/*.import') }}
+          path: examples/perf-test/godot/.godot
+          key: ${{ runner.os }}-godot-imports-perf-test-${{ hashFiles('examples/perf-test/godot/**/*.import') }}
           restore-keys: |
-            ${{ runner.os }}-godot-imports-boids-
+            ${{ runner.os }}-godot-imports-perf-test-
 
-      - name: Build boids benchmark
-        run: cargo build --release --manifest-path examples/boids-perf-test/rust/Cargo.toml
+      - name: Build perf-test benchmark
+        run: cargo build --release --manifest-path examples/perf-test/rust/Cargo.toml
 
       - name: Import Godot project
-        working-directory: examples/boids-perf-test/godot
+        working-directory: examples/perf-test/godot
         run: $GODOT_EXECUTABLE --editor --headless --quit || true
 
       - name: Download baseline for regression check
         if: github.event_name == 'pull_request'
-        working-directory: examples/boids-perf-test
+        working-directory: examples/perf-test
         run: |
           # Download baseline from main branch for regression testing
-          if curl -f -o main-baseline.json https://raw.githubusercontent.com/${{ github.repository }}/main/examples/boids-perf-test/baseline.json; then
+          if curl -f -o main-baseline.json https://raw.githubusercontent.com/${{ github.repository }}/main/examples/perf-test/baseline.json; then
             # Check if this is a CI-generated baseline
             if jq -e '.ci_metadata' main-baseline.json > /dev/null; then
               echo "Found CI-generated baseline from commit $(jq -r '.ci_metadata.commit' main-baseline.json)"
@@ -326,11 +326,11 @@ jobs:
 
       - name: Run performance benchmark with regression check
         id: benchmark
-        working-directory: examples/boids-perf-test
+        working-directory: examples/perf-test
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             # On main branch: always save baseline
-            if python3 regression_test.py --boids 500 1000 2000 5000 10000 20000 --save-baseline baseline.json --godot "$GODOT_EXECUTABLE"; then
+            if python3 regression_test.py --entity-counts 500 1000 2000 5000 10000 20000 --save-baseline baseline.json --godot "$GODOT_EXECUTABLE"; then
               echo "benchmark_success=true" >> $GITHUB_OUTPUT
               echo "baseline_created=true" >> $GITHUB_OUTPUT
             else
@@ -340,7 +340,7 @@ jobs:
           elif [ "$BASELINE_AVAILABLE" = "true" ]; then
             # On PR with baseline: run regression check
             echo "Running benchmark with regression check against main baseline..."
-            if python3 regression_test.py --boids 500 1000 2000 5000 10000 20000 --baseline main-baseline.json --threshold 0.85 --godot "$GODOT_EXECUTABLE"; then
+            if python3 regression_test.py --entity-counts 500 1000 2000 5000 10000 20000 --baseline main-baseline.json --threshold 0.85 --godot "$GODOT_EXECUTABLE"; then
               echo "benchmark_success=true" >> $GITHUB_OUTPUT
             else
               echo "::warning::Performance regression detected! Bevy implementation performance dropped more than 15%"
@@ -350,7 +350,7 @@ jobs:
           else
             # On PR without baseline: just run benchmark
             echo "Running benchmark without regression check (no baseline available)..."
-            if python3 regression_test.py --boids 500 1000 2000 5000 10000 20000 --godot "$GODOT_EXECUTABLE"; then
+            if python3 regression_test.py --entity-counts 500 1000 2000 5000 10000 20000 --godot "$GODOT_EXECUTABLE"; then
               echo "benchmark_success=true" >> $GITHUB_OUTPUT
             else
               echo "benchmark_success=false" >> $GITHUB_OUTPUT
@@ -360,7 +360,7 @@ jobs:
 
       - name: Generate benchmark summary
         if: always() && steps.benchmark.outputs.benchmark_success == 'true'
-        working-directory: examples/boids-perf-test
+        working-directory: examples/perf-test
         run: |
           echo "## 🚀 Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -387,7 +387,7 @@ jobs:
         with:
           name: benchmark-results
           path: |
-            examples/boids-perf-test/benchmark_results/
-            examples/boids-perf-test/benchmark_output.txt
-            examples/boids-perf-test/baseline.json
+            examples/perf-test/benchmark_results/
+            examples/perf-test/benchmark_output.txt
+            examples/perf-test/baseline.json
             benchmark-artifacts/

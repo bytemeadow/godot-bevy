@@ -43,7 +43,7 @@ jobs:
           fi
           
           # Check if CI generated a baseline file
-          if [ -f "benchmark-artifacts/examples/boids-perf-test/baseline.json" ]; then
+          if [ -f "benchmark-artifacts/examples/perf-test/baseline.json" ]; then
             echo "found=true" >> $GITHUB_OUTPUT
             echo "✅ Found baseline.json in artifacts"
           else
@@ -58,12 +58,12 @@ jobs:
         if: steps.check.outputs.found == 'true'
         run: |
           # Copy baseline to the correct location
-          cp benchmark-artifacts/examples/boids-perf-test/baseline.json examples/boids-perf-test/baseline.json
+          cp benchmark-artifacts/examples/perf-test/baseline.json examples/perf-test/baseline.json
           
           # Add CI metadata
           jq '. + {"ci_metadata": {"commit": "${{ github.event.workflow_run.head_sha }}", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'", "runner": "GitHub Actions"}}' \
-            examples/boids-perf-test/baseline.json > baseline.tmp.json
-          mv baseline.tmp.json examples/boids-perf-test/baseline.json
+            examples/perf-test/baseline.json > baseline.tmp.json
+          mv baseline.tmp.json examples/perf-test/baseline.json
 
       - name: Commit and push
         if: steps.check.outputs.found == 'true'
@@ -71,7 +71,7 @@ jobs:
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-          git add -f examples/boids-perf-test/baseline.json
+          git add -f examples/perf-test/baseline.json
           
           # Check if there are changes to commit
           if git diff --cached --quiet; then
