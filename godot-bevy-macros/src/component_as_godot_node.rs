@@ -152,7 +152,12 @@ fn parse_godot_export_args(attr: &syn::Attribute) -> syn::Result<Option<GodotExp
             attr.span(),
             "Unexpected named value attribute.",
         )),
-        Meta::Path(_) => Ok(None), // Plain #[export] attribute is allowed.
+        // #[godot_export] without attributes is allowed.
+        Meta::Path(_) => Ok(Some(GodotExportAttrArgs {
+            export_type: None,
+            transform_with: None,
+            default: None,
+        })),
     }
 }
 
@@ -315,7 +320,47 @@ mod tests {
     use syn::parse_quote;
 
     #[test]
-    fn test_no_parameters() {
+    fn test_godot_node_base() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode)]
+            #[godot_node(base(Sprite2D))]
+            pub struct Sprite;
+        };
+
+        let result = component_as_godot_node_impl(input.into_token_stream());
+        assert!(result.is_ok(), "Syntax should parse successfully");
+
+        let result = result.unwrap();
+        assert!(result.to_string().contains("# [class (base = Sprite2D)]"));
+        assert!(
+            result
+                .to_string()
+                .contains("base : godot :: prelude :: Base < godot :: classes :: Sprite2D >")
+        );
+    }
+
+    #[test]
+    fn test_godot_node_class_name() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode)]
+            #[godot_node(class_name(MyNode))]
+            pub struct MyComponent;
+        };
+
+        let result = component_as_godot_node_impl(input.into_token_stream());
+        assert!(result.is_ok(), "Syntax should parse successfully");
+
+        let result = result.unwrap();
+        assert!(result.to_string().contains("pub struct MyNode"));
+        assert!(
+            result
+                .to_string()
+                .contains("impl godot :: classes :: INode for MyNode")
+        );
+    }
+
+    #[test]
+    fn test_simple_export_field() {
         let input: DeriveInput = parse_quote! {
             #[derive(Component, GodotNode)]
             pub struct Player {
@@ -325,7 +370,47 @@ mod tests {
         };
 
         let result = component_as_godot_node_impl(input.into_token_stream());
-        assert!(result.is_ok(), "Basic syntax should parse successfully");
+        assert!(result.is_ok(), "Syntax should parse successfully");
+
+        let result = result.unwrap();
+        assert!(
+            result
+                .to_string()
+                .contains("Player { position : position }")
+        );
+        assert!(result.to_string().contains("# [export] position : f32"));
+        assert!(result.to_string().contains("position : f32 :: default ()"));
+    }
+
+    #[test]
+    fn test_advanced_godot_export() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode)]
+            pub struct Player {
+                #[godot_export(
+                    export_type(Vector2),
+                    transform_with(transform_to_vec2),
+                    default(Vector2::new(5.0, 15.0)),
+                )]
+                pub position: Vec2,
+            }
+        };
+
+        let result = component_as_godot_node_impl(input.into_token_stream());
+        assert!(result.is_ok(), "Syntax should parse successfully");
+
+        let result = result.unwrap();
+        assert!(result.to_string().contains("position : Vector2"));
+        assert!(
+            result
+                .to_string()
+                .contains("# [bevy_bundle (transform_with = \"transform_to_vec2\")]")
+        );
+        assert!(
+            result
+                .to_string()
+                .contains("position : Vector2 :: new (5.0 , 15.0)")
+        );
     }
 
     #[test]
@@ -344,9 +429,6 @@ mod tests {
         };
 
         let result = component_as_godot_node_impl(input.into_token_stream());
-        assert!(
-            result.is_ok(),
-            "All parameter syntax should parse successfully"
-        );
+        assert!(result.is_ok(), "Syntax should parse successfully");
     }
 }
