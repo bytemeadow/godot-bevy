@@ -7,52 +7,18 @@ script/source = "extends BevyApp
 # Bulk Transform Optimization Methods
 # Automatically detected by godot-bevy library for performance optimization
 
-func update_transforms_bulk_3d(updates: Array):
-	# Each update contains: { instance_id: i64, basis: Basis, origin: Vector3 }
-	var processed = 0
-	var failed = 0
-	for update in updates:
-		var instance_id = update.get(\"instance_id\", 0)
-		var node = instance_from_id(instance_id) as Node3D
-		if node and is_instance_valid(node):
-			# Reconstruct Transform3D from components
-			var basis = update.get(\"basis\", Basis.IDENTITY)
-			var origin = update.get(\"origin\", Vector3.ZERO)
-			node.transform = Transform3D(basis, origin)
-			processed += 1
-		else:
-			failed += 1
-	
-
-func update_transforms_bulk_2d(updates: Array):
-	# Each update contains: { instance_id: i64, transform: Transform2D }
-	var processed = 0
-	var failed = 0
-	for update in updates:
-		var instance_id = update.get(\"instance_id\", 0)
-		var node = instance_from_id(instance_id) as Node2D
-		if node and is_instance_valid(node):
-			node.transform = update.get(\"transform\", Transform2D.IDENTITY)
-			processed += 1
-		else:
-			failed += 1
-	
-
-# Raw array versions for maximum performance - no Dictionary allocations!
-func update_transforms_raw_3d(instance_ids: PackedInt64Array, positions: PackedVector3Array, rotations: PackedVector3Array, scales: PackedVector3Array):
-	# Hot path - maximum performance micro-optimizations
+func bulk_update_transforms_3d(instance_ids: PackedInt64Array, positions: PackedVector3Array, rotations: PackedVector3Array, scales: PackedVector3Array):
 	for i in range(instance_ids.size()):
 		var node = instance_from_id(instance_ids[i]) as Node3D
-		# Trust instance IDs are valid - skip null check for maximum speed
+		# Trust instance IDs are valid
 		node.position = positions[i]
 		node.rotation = rotations[i]
 		node.scale = scales[i]
 
-func update_transforms_raw_2d(instance_ids: PackedInt64Array, positions: PackedVector2Array, rotations: PackedFloat32Array, scales: PackedVector2Array):
-	# Hot path - maximum performance micro-optimizations
+func bulk_update_transforms_2d(instance_ids: PackedInt64Array, positions: PackedVector2Array, rotations: PackedFloat32Array, scales: PackedVector2Array):
 	for i in range(instance_ids.size()):
 		var node = instance_from_id(instance_ids[i]) as Node2D
-		# Trust instance IDs are valid - skip null check for maximum speed
+		# Trust instance IDs are valid
 		node.position = positions[i]
 		node.rotation = rotations[i]
 		node.scale = scales[i]

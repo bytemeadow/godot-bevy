@@ -107,7 +107,7 @@ macro_rules! add_transform_sync_systems {
                     if let Some(root) = scene_tree.get_root() {
                         if let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton") {
                             // Check if this BevyApp has the raw array methods (prefer these over bulk Dictionary methods)
-                            if bevy_app.has_method("update_transforms_raw_3d") {
+                            if bevy_app.has_method("bulk_update_transforms_3d") {
                                 // Use bulk optimization path
                                 [<post_update_godot_transforms_ $name:lower _bulk>](
                                     change_tick,
@@ -231,7 +231,7 @@ macro_rules! add_transform_sync_systems {
                         let rotations_packed = godot::prelude::PackedVector3Array::from(rotations_3d.as_slice());
                         let scales_packed = godot::prelude::PackedVector3Array::from(scales_3d.as_slice());
 
-                        batch_singleton.call("update_transforms_raw_3d", &[
+                        batch_singleton.call("bulk_update_transforms_3d", &[
                             instance_ids_packed.to_variant(),
                             positions_packed.to_variant(),
                             rotations_packed.to_variant(),
@@ -247,7 +247,7 @@ macro_rules! add_transform_sync_systems {
                         let rotations_packed = godot::prelude::PackedFloat32Array::from(rotations_2d.as_slice());
                         let scales_packed = godot::prelude::PackedVector2Array::from(scales_2d.as_slice());
 
-                        batch_singleton.call("update_transforms_raw_2d", &[
+                        batch_singleton.call("bulk_update_transforms_2d", &[
                             instance_ids_packed.to_variant(),
                             positions_packed.to_variant(),
                             rotations_packed.to_variant(),

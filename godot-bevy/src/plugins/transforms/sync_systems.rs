@@ -72,7 +72,7 @@ pub fn post_update_godot_transforms(
         if let Some(root) = scene_tree.get_root() {
             if let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton") {
                 // Check if this BevyApp has the raw array methods (prefer these over bulk Dictionary methods)
-                if bevy_app.has_method("update_transforms_raw_3d") {
+                if bevy_app.has_method("bulk_update_transforms_3d") {
                     // Use bulk optimization path
                     let _bulk_span = tracing::info_span!("using_bulk_optimization").entered();
                     post_update_godot_transforms_bulk(
@@ -195,7 +195,7 @@ fn post_update_godot_transforms_bulk(
             let scales_packed = godot::prelude::PackedVector3Array::from(scales_3d.as_slice());
 
             batch_singleton.call(
-                "update_transforms_raw_3d",
+                "bulk_update_transforms_3d",
                 &[
                     instance_ids_packed.to_variant(),
                     positions_packed.to_variant(),
@@ -218,7 +218,7 @@ fn post_update_godot_transforms_bulk(
             let scales_packed = godot::prelude::PackedVector2Array::from(scales_2d.as_slice());
 
             batch_singleton.call(
-                "update_transforms_raw_2d",
+                "bulk_update_transforms_2d",
                 &[
                     instance_ids_packed.to_variant(),
                     positions_packed.to_variant(),
