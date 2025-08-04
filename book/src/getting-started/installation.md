@@ -10,7 +10,59 @@ Before you begin, ensure you have:
 - **Godot 4.3** - [Download Godot](https://godotengine.org/download)
 - Basic familiarity with both Rust and Godot
 
-## Create a New Project
+## Installation Methods
+
+There are two ways to set up godot-bevy in your project:
+
+1. **[Plugin Installation (Recommended)](#plugin-installation)** - Use the godot-bevy editor plugin for automatic setup
+2. **[Manual Installation](#manual-installation)** - Set up the project manually
+
+## Plugin Installation
+
+The easiest way to get started is using the godot-bevy editor plugin, which automatically generates the Rust project and configures the BevyApp singleton.
+
+### 1. Install the Plugin
+
+1. Download the `addons/godot-bevy` folder from the [godot-bevy repository](https://github.com/dtaralla/godot-bevy)
+2. Copy it to your Godot project's `addons/` directory
+3. In Godot, go to **Project > Project Settings > Plugins**
+4. Enable the "Godot-Bevy Integration" plugin
+
+### 2. Create Your Project
+
+1. Go to **Project > Tools > Setup godot-bevy Project**
+2. Configure your project settings:
+   - **Project name**: Used for the Rust crate name
+   - **godot-bevy version**: Library version (default: 0.9.0)  
+   - **Release build**: Whether to build in release mode initially
+3. Click **"Create Project"**
+
+The plugin will automatically:
+- Create a `rust/` directory with Cargo.toml and lib.rs
+- Generate the `.gdextension` file with correct platform paths
+- Create and register the BevyApp singleton scene
+- Build the Rust project
+- Restart the editor to apply changes
+
+### 3. Run Your Project
+
+After the editor restarts:
+1. Press **F5** or click the play button
+2. You should see "Hello from Bevy ECS!" in the output console every second
+
+The generated `rust/src/lib.rs` includes a complete example.
+
+### 4. Plugin Features
+
+The plugin provides additional useful features:
+
+- **Add BevyApp Singleton Only**: If you already have a Rust project, use **Project > Tools > Add BevyApp Singleton** to just create and register the singleton
+- **Build Rust Project**: Use **Project > Tools > Build Rust Project** to rebuild without restarting the editor
+- **Bulk Transform Optimization**: The generated singleton includes optimized bulk transform methods that godot-bevy automatically detects and uses for better performance
+
+## Manual Installation
+
+If you prefer to set up everything manually, follow these steps:
 
 ### 1. Set Up Godot Project
 
@@ -123,7 +175,27 @@ cargo build
 
 ## Troubleshooting
 
-### Common Issues
+### Plugin Installation Issues
+
+**"Plugin not found" or "Plugin failed to load"**
+
+- Ensure the `addons/godot-bevy` folder is in the correct location
+- Check that all plugin files are present (plugin.cfg, plugin.gd, etc.)
+- Restart the Godot editor after copying the plugin files
+
+**"Setup godot-bevy Project" menu item missing**
+
+- Verify the plugin is enabled in Project Settings > Plugins
+- Check the Godot console for plugin error messages
+- Try disabling and re-enabling the plugin
+
+**Plugin setup fails or hangs**
+
+- Ensure you have `cargo` installed and available in your system PATH
+- Check that you have write permissions in the project directory
+- Look for error messages in the Godot output console
+
+### Manual Installation Issues
 
 **"Can't open dynamic library"**
 
@@ -145,4 +217,8 @@ cargo build
 
 ## Next Steps
 
-Congratulations! You've successfully set up godot-bevy. Continue to [Your First Project](./first-project.md) to build something more substantial.
+Congratulations! You've successfully set up godot-bevy using either the plugin or manual installation method. 
+
+The plugin installation automatically includes the new bulk transform API optimizations, while manual installations can add these by updating their BevyApp singleton scene.
+
+Continue to [Basic Concepts](./basic-concepts.md) to learn more about godot-bevy's architecture and capabilities.

@@ -95,8 +95,6 @@ func _on_project_created(project_info: Dictionary):
 	_create_bevy_app_singleton("res://bevy_app_singleton.tscn")
 	_on_add_singleton()  # This will add it to autoload
 	
-	# Bulk transform optimization is now built into BevyApp
-
 	# Automatically build the Rust project and restart after
 	var is_release = project_info.get("release_build", false)
 	_should_restart_after_build = true
