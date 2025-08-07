@@ -78,15 +78,12 @@ impl GodotScene {
     }
 }
 
-#[derive(Component, Debug, Default)]
-struct GodotSceneSpawned;
-
 #[main_thread_system]
 fn spawn_scene(
     mut commands: Commands,
     mut new_scenes: Query<
         (&mut GodotScene, Entity, Option<&Transform>),
-        Without<GodotSceneSpawned>,
+        Without<GodotNodeHandle>,
     >,
     mut scene_tree: SceneTreeRef,
     mut assets: ResMut<Assets<GodotResource>>,
@@ -143,7 +140,6 @@ fn spawn_scene(
 
         commands
             .entity(ent)
-            .insert(GodotNodeHandle::new(instance))
-            .insert(GodotSceneSpawned);
+            .insert(GodotNodeHandle::new(instance));
     }
 }
