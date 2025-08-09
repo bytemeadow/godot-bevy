@@ -11,26 +11,26 @@ Both generate a Godot class you can place in the editor and auto‑insert the co
 
 Use when a single component is the natural editor‑facing unit.
 
+Gem marker component:
+
 ```rust
-#[derive(Component, GodotNode)]
-#[godot_node(base(Node2D), class_name(PlayerNode))]
-pub struct Player {
-    #[godot_export]
-    pub active: bool,
+#[derive(Component, GodotNode, Default, Debug, Clone)]
+#[godot_node(base(Area2D), class_name(Gem2D))]
+pub struct Gem;
+```
 
-    #[godot_export(
-        export_type(Vector2),
-        transform_with(transform_to_vec2),
-        default(Vector2::new(5.0, 15.0)),
-    )]
-    pub position: Vec2,
+Door with an exported property:
 
-    // Won't be exposed to Godot
-    pub internal_data: Vec<f32>,
+```rust
+#[derive(Component, GodotNode, Default, Debug, Clone)]
+#[godot_node(base(Area2D), class_name(Door2D))]
+pub struct Door {
+    #[godot_export(default(LevelId::Level1))]
+    pub level_id: LevelId,
 }
 ```
 
-This generates a `PlayerNode` Godot class with exported properties for fields marked with `#[godot_export]` and inserts the `Player` component when the node is discovered.
+Each derive generates a corresponding Godot class (e.g., `Gem2D`, `Door2D`) and inserts the component when the node is discovered. Fields marked with `#[godot_export]` become Godot editor properties.
 
 See the `GodotNode` Rust docs for full syntax and options: `https://docs.rs/godot-bevy/latest/godot_bevy/prelude/derive.GodotNode.html`.
 
@@ -81,7 +81,3 @@ Construction rules:
 - Nested bundles are allowed and will be flattened by Bevy on insertion; only top‑level fields can export properties
 
 This derive generates a Godot class (`Player2D` above) and an autosync registration so the bundle is inserted automatically for matching nodes.
-
-Note: GodotNode automatically switches to bundle mode when it sees `#[godot_props(...)]` on any field.
-
-
