@@ -51,17 +51,17 @@ fn detect_gem_player_collision(
 ) {
     for (gem_entity, mut handle, collisions) in gems.iter_mut() {
         for &player_entity in collisions.recent_collisions() {
-            if players.get(player_entity).is_ok() {
-                if let Some(mut area) = handle.try_get::<Area2D>() {
-                    // Remove the gem from the scene
-                    area.queue_free();
+            if players.get(player_entity).is_ok()
+                && let Some(mut area) = handle.try_get::<Area2D>()
+            {
+                // Remove the gem from the scene
+                area.queue_free();
 
-                    // Fire event for gem collection
-                    gem_collected_events.write(GemCollectedEvent {
-                        player_entity,
-                        gem_entity,
-                    });
-                }
+                // Fire event for gem collection
+                gem_collected_events.write(GemCollectedEvent {
+                    player_entity,
+                    gem_entity,
+                });
             }
         }
     }

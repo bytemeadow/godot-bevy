@@ -136,37 +136,37 @@ fn listen_for_button_press(
         }
 
         if evt.name == "pressed" {
-            if let Some(start_button) = &menu_assets.start_button {
-                if &evt.target == start_button {
-                    println!("Start button pressed");
-                    app_state.set(GameState::InGame);
-                    level_load_events.write(LoadLevelEvent {
-                        level_id: LevelId::Level1,
-                    });
-                    continue;
-                }
+            if let Some(start_button) = &menu_assets.start_button
+                && &evt.target == start_button
+            {
+                println!("Start button pressed");
+                app_state.set(GameState::InGame);
+                level_load_events.write(LoadLevelEvent {
+                    level_id: LevelId::Level1,
+                });
+                continue;
             }
 
-            if let Some(fullscreen_button) = &menu_assets.fullscreen_button {
-                if &evt.target == fullscreen_button {
-                    println!("Fullscreen button pressed");
-                    if DisplayServer::singleton().window_get_mode() == WindowMode::FULLSCREEN {
-                        DisplayServer::singleton().window_set_mode(WindowMode::WINDOWED);
-                    } else if DisplayServer::singleton().window_get_mode() == WindowMode::WINDOWED {
-                        DisplayServer::singleton().window_set_mode(WindowMode::FULLSCREEN);
-                    }
-                    continue;
+            if let Some(fullscreen_button) = &menu_assets.fullscreen_button
+                && &evt.target == fullscreen_button
+            {
+                println!("Fullscreen button pressed");
+                if DisplayServer::singleton().window_get_mode() == WindowMode::FULLSCREEN {
+                    DisplayServer::singleton().window_set_mode(WindowMode::WINDOWED);
+                } else if DisplayServer::singleton().window_get_mode() == WindowMode::WINDOWED {
+                    DisplayServer::singleton().window_set_mode(WindowMode::FULLSCREEN);
                 }
+                continue;
             }
 
-            if let Some(quit_button) = &menu_assets.quit_button {
-                if &evt.target == quit_button {
-                    println!("Quit button pressed");
-                    if let Some(button) = evt.target.clone().try_get::<Button>() {
-                        if let Some(mut tree) = button.get_tree() {
-                            tree.quit();
-                        }
-                    }
+            if let Some(quit_button) = &menu_assets.quit_button
+                && &evt.target == quit_button
+            {
+                println!("Quit button pressed");
+                if let Some(button) = evt.target.clone().try_get::<Button>()
+                    && let Some(mut tree) = button.get_tree()
+                {
+                    tree.quit();
                 }
             }
         }

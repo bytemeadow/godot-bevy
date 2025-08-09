@@ -10,18 +10,18 @@ pub fn derive_godot_node(input: DeriveInput) -> syn::Result<TokenStream2> {
     let mut derives_bundle = false;
     let mut derives_component = false;
     for attr in &input.attrs {
-        if attr.path().is_ident("derive") {
-            if let Meta::List(list) = &attr.meta {
-                // The tokens are a comma-separated list of paths: e.g. (Bundle, Component)
-                let tokens = list.tokens.clone().into_iter();
-                for tt in tokens {
-                    if let proc_macro2::TokenTree::Ident(ident) = tt {
-                        if ident == "Bundle" {
-                            derives_bundle = true;
-                        }
-                        if ident == "Component" {
-                            derives_component = true;
-                        }
+        if attr.path().is_ident("derive")
+            && let Meta::List(list) = &attr.meta
+        {
+            // The tokens are a comma-separated list of paths: e.g. (Bundle, Component)
+            let tokens = list.tokens.clone().into_iter();
+            for tt in tokens {
+                if let proc_macro2::TokenTree::Ident(ident) = tt {
+                    if ident == "Bundle" {
+                        derives_bundle = true;
+                    }
+                    if ident == "Component" {
+                        derives_component = true;
                     }
                 }
             }

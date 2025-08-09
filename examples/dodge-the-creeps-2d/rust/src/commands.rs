@@ -173,24 +173,24 @@ fn process_ui_commands(mut ui_commands: EventReader<UICommand>, ui_handles: Res<
     for command in ui_commands.read() {
         match command {
             UICommand::SetText { target, text } => {
-                if let Some(handle) = ui_handles.get_handle(target) {
-                    if let Some(mut label) = handle.clone().try_get::<Label>() {
-                        label.set_text(text);
-                    }
+                if let Some(handle) = ui_handles.get_handle(target)
+                    && let Some(mut label) = handle.clone().try_get::<Label>()
+                {
+                    label.set_text(text);
                 }
             }
             UICommand::SetVisible { target, visible } => {
-                if let Some(handle) = ui_handles.get_handle(target) {
-                    if let Some(mut button) = handle.clone().try_get::<Button>() {
-                        button.set_visible(*visible);
-                    }
+                if let Some(handle) = ui_handles.get_handle(target)
+                    && let Some(mut button) = handle.clone().try_get::<Button>()
+                {
+                    button.set_visible(*visible);
                 }
             }
             UICommand::ShowMessage { text } => {
-                if let Some(handle) = ui_handles.get_handle(&UIElement::MessageLabel) {
-                    if let Some(mut label) = handle.clone().try_get::<Label>() {
-                        label.set_text(text);
-                    }
+                if let Some(handle) = ui_handles.get_handle(&UIElement::MessageLabel)
+                    && let Some(mut label) = handle.clone().try_get::<Label>()
+                {
+                    label.set_text(text);
                 }
             }
         }
@@ -209,25 +209,25 @@ fn process_node_commands(
     for command in node_commands.read() {
         match command {
             NodeCommand::SetVisible { entity, visible } => {
-                if let Ok(mut handle) = nodes.get_mut(*entity) {
-                    if let Some(mut canvas_item) = handle.try_get::<CanvasItem>() {
-                        canvas_item.set_visible(*visible);
-                    }
+                if let Ok(mut handle) = nodes.get_mut(*entity)
+                    && let Some(mut canvas_item) = handle.try_get::<CanvasItem>()
+                {
+                    canvas_item.set_visible(*visible);
                 }
             }
             NodeCommand::Destroy { entity } => {
-                if let Ok(mut handle) = nodes.get_mut(*entity) {
-                    if let Some(mut node) = handle.try_get::<Node>() {
-                        node.queue_free();
-                    }
+                if let Ok(mut handle) = nodes.get_mut(*entity)
+                    && let Some(mut node) = handle.try_get::<Node>()
+                {
+                    node.queue_free();
                 }
                 commands.entity(*entity).despawn();
             }
             NodeCommand::SetPosition { entity, position } => {
-                if let Ok(mut handle) = nodes.get_mut(*entity) {
-                    if let Some(mut node) = handle.try_get::<godot::classes::Node2D>() {
-                        node.set_position(*position);
-                    }
+                if let Ok(mut handle) = nodes.get_mut(*entity)
+                    && let Some(mut node) = handle.try_get::<godot::classes::Node2D>()
+                {
+                    node.set_position(*position);
                 }
             }
         }
@@ -243,22 +243,22 @@ fn process_animation_commands(
     use godot::classes::AnimatedSprite2D;
 
     for command in animation_commands.read() {
-        if let Ok(mut handle) = nodes.get_mut(command.entity()) {
-            if let Some(mut sprite) = handle.try_get::<AnimatedSprite2D>() {
-                match command {
-                    AnimationCommand::Play { animation, .. } => {
-                        if let Some(anim) = animation {
-                            sprite.set_animation(anim);
-                        }
-                        sprite.play();
+        if let Ok(mut handle) = nodes.get_mut(command.entity())
+            && let Some(mut sprite) = handle.try_get::<AnimatedSprite2D>()
+        {
+            match command {
+                AnimationCommand::Play { animation, .. } => {
+                    if let Some(anim) = animation {
+                        sprite.set_animation(anim);
                     }
-                    AnimationCommand::Stop { .. } => {
-                        sprite.stop();
-                    }
-                    AnimationCommand::SetFlip { flip_h, flip_v, .. } => {
-                        sprite.set_flip_h(*flip_h);
-                        sprite.set_flip_v(*flip_v);
-                    }
+                    sprite.play();
+                }
+                AnimationCommand::Stop { .. } => {
+                    sprite.stop();
+                }
+                AnimationCommand::SetFlip { flip_h, flip_v, .. } => {
+                    sprite.set_flip_h(*flip_h);
+                    sprite.set_flip_v(*flip_v);
                 }
             }
         }

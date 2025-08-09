@@ -143,27 +143,26 @@ fn add_avian_collider(
 ) -> Result {
     for collider_required in events.read() {
         let mut entity_commands = commands.get_entity(collider_required.0).unwrap();
-        if let Ok(mut node_handle) = query.get_mut(entity_commands.id()) {
-            if let Ok(box_mesh) = node_handle
+        if let Ok(mut node_handle) = query.get_mut(entity_commands.id())
+            && let Ok(box_mesh) = node_handle
                 .get::<MeshInstance3D>()
                 .get_mesh()
                 .unwrap()
                 .try_cast::<BoxMesh>()
-            {
-                let box_mesh_size = box_mesh.get_size();
-                entity_commands.insert_if_new(Collider::cuboid(
-                    box_mesh_size.x,
-                    box_mesh_size.y,
-                    box_mesh_size.z,
-                ));
+        {
+            let box_mesh_size = box_mesh.get_size();
+            entity_commands.insert_if_new(Collider::cuboid(
+                box_mesh_size.x,
+                box_mesh_size.y,
+                box_mesh_size.z,
+            ));
 
-                debug!(
-                    "Added collider matching Godot's BoxMesh size of {:?}",
-                    box_mesh_size
-                );
-            }
-            // You can, of course, add support for the other godot Mesh types
+            debug!(
+                "Added collider matching Godot's BoxMesh size of {:?}",
+                box_mesh_size
+            );
         }
+        // You can, of course, add support for the other godot Mesh types
     }
 
     Ok(())
