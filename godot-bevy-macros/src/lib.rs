@@ -98,22 +98,7 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-/// Derive a Godot Node from a Bevy Bundle.
-///
-/// Usage:
-/// - On a struct that derives `Bundle`, add `#[derive(GodotNode)]` and
-///   `#[godot_node(base(Node2D), class_name(MyNode))]`.
-/// - For each component field that should expose Godot editor properties add
-///   `#[godot_props((field, export_type(Type), transform_with(path::to::fn), default(expr)), ...)]`.
-/// - Tuple/newtype components use `(:, export_type(Type), ...)` to map to the bundle field name.
-/// - Fields without `#[godot_props]` are constructed with `Default::default()`.
-///
-/// Automatically registers a Godot node based on the annotated Component struct.
-/// This macro has two parts:
-/// - Struct level `godot_node` attribute
-/// - Field level `godot_export` attribute.
-///
-/// ---
+/// # Generates a Godot Node from a Bevy Component or Bevy Bundle
 ///
 /// A struct level attribute can be used to specify the Godot class to extend, and the class name:
 ///
@@ -124,23 +109,46 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
 /// - `base` (Default: `Node`) Godot node to extend.
 /// - `class_name` (Default: `<struct_name>BevyComponent`) Name of generated Godot class.
 ///
-/// ---
+/// ## Annotating structs that derive `Bundle`
 ///
-/// Fields can be exposed to Godot as node properties using the `#[godot_export]` attribute.
+/// Bundle Component fields can be annotated with `#[export_fields(...)]` to expose them to Godot.
+/// The `export_fields` attribute takes a list of component-fields to export.
+/// Each field listed can take optional parameters to configure aspects of how it will be exported.
+/// See the [export configuration attributes section](#export-configuration-attributes)
+/// for field parameter details.
+///
+/// Example syntax:
+///
+/// ```ignore
+/// #[export_fields(
+///     <field1_name>(
+///         export_type(<godot_type>),
+///         transform_with(<conversion_function>),
+///         default(<value>)
+///     ),
+///     <field2_name>(...),
+///     ...
+/// )]
+/// ```
+///
+/// ## Annotating structs that derive `Component`
+///
+/// Component fields can be exposed to Godot as node properties using the `#[godot_export]` attribute.
 /// The attribute syntax is:
 ///
 /// ```ignore
 /// #[godot_export(export_type(<godot_type>), transform_with(<conversion_function>), default(<value>))]
 /// ```
 ///
+/// See the [export configuration attributes for](#export-configuration-attributes)
+/// for export parameter details.
+///
+/// ## Export configuration attributes
+///
 /// For fields with types incompatible with Godot-Rust's `#[export]` macro:
 /// - Use `export_type` to specify an alternate Godot-compatible type
 /// - Use `transform_with` to provide a conversion function from the Godot type to the field type
 /// - Use `default` to provide an initial value to the exported Godot field.
-///
-/// ---
-///
-/// Uses the `inventory` crate
 #[proc_macro_derive(GodotNode, attributes(godot_export, godot_node, godot_props))]
 pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
     let parsed: DeriveInput = parse_macro_input!(input as DeriveInput);
