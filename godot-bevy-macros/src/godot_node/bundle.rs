@@ -314,7 +314,7 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
             if !seen_prop_names.insert(prop_name_str.clone()) {
                 return Err(Error::new(
                     field.span(),
-                    format!("Duplicate exported property `{}`", prop_name_str),
+                    format!("Duplicate exported property `{prop_name_str}`"),
                 ));
             }
 
@@ -350,7 +350,7 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
                 if !seen_prop_names.insert(prop_name_str.clone()) {
                     return Err(Error::new(
                         field.span(),
-                        format!("Duplicate exported property `{}`", prop_name_str),
+                        format!("Duplicate exported property `{prop_name_str}`"),
                     ));
                 }
 
@@ -414,7 +414,7 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
     // Registration function and inventory submit
     let bundle_name_lower = struct_name.to_string().to_lowercase();
     let create_bundle_fn_name = Ident::new(
-        &format!("__create_{}_bundle", bundle_name_lower),
+        &format!("__create_{bundle_name_lower}_bundle"),
         struct_name.span(),
     );
 

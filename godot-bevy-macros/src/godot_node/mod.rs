@@ -13,8 +13,8 @@ pub fn derive_godot_node(input: DeriveInput) -> syn::Result<TokenStream2> {
         if attr.path().is_ident("derive") {
             if let Meta::List(list) = &attr.meta {
                 // The tokens are a comma-separated list of paths: e.g. (Bundle, Component)
-                let mut tokens = list.tokens.clone().into_iter();
-                while let Some(tt) = tokens.next() {
+                let tokens = list.tokens.clone().into_iter();
+                for tt in tokens {
                     if let proc_macro2::TokenTree::Ident(ident) = tt {
                         if ident == "Bundle" {
                             derives_bundle = true;
