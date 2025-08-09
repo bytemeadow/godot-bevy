@@ -1,6 +1,7 @@
 mod bevy_bundle;
 mod component_as_godot_node;
 mod node_tree_view;
+mod godot_node_bundle;
 
 use crate::component_as_godot_node::component_as_godot_node_impl;
 use proc_macro::TokenStream;
@@ -94,6 +95,26 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
 
     let expanded = bevy_bundle::bevy_bundle(input).unwrap_or_else(Error::into_compile_error);
+
+    TokenStream::from(expanded)
+}
+
+/// Derive a Godot Node from a Bevy Bundle.
+///
+/// Usage:
+/// - On a struct that derives `Bundle`, add `#[derive(GodotNodeBundle)]` and
+///   `#[godot_node(base(Node2D), class_name(MyNode))]`.
+/// - For each component field that should expose Godot editor properties add
+///   `#[godot_props((field, export_type(Type), transform_with(path::to::fn), default(expr)), ...)]`.
+/// - Tuple/newtype components use `(:, export_type(Type), ...)` to map to the bundle field name.
+/// - Fields without `#[godot_props]` are constructed with `Default::default()`.
+/// - Using `#[bundle]` nested bundles in a `GodotNodeBundle` is a compile error.
+#[proc_macro_derive(GodotNodeBundle, attributes(godot_node, godot_props))]
+pub fn derive_godot_node_bundle(item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as DeriveInput);
+
+    let expanded = godot_node_bundle::godot_node_bundle_impl(input)
+        .unwrap_or_else(Error::into_compile_error);
 
     TokenStream::from(expanded)
 }
