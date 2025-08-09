@@ -108,8 +108,8 @@ impl INode for BevyApp {
             return;
         }
 
-        if let Some(app) = self.app.as_mut() {
-            if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
+        if let Some(app) = self.app.as_mut()
+            && let Err(e) = catch_unwind(AssertUnwindSafe(|| {
                 // Run the full Bevy update cycle - much simpler!
                 app.update();
 
@@ -118,12 +118,12 @@ impl INode for BevyApp {
                 tracing_tracy::client::Client::running()
                     .expect("client must be running")
                     .frame_mark();
-            })) {
-                self.app = None;
+            }))
+        {
+            self.app = None;
 
-                eprintln!("bevy app update panicked");
-                resume_unwind(e);
-            }
+            eprintln!("bevy app update panicked");
+            resume_unwind(e);
         }
     }
 
@@ -134,8 +134,8 @@ impl INode for BevyApp {
             return;
         }
 
-        if let Some(app) = self.app.as_mut() {
-            if let Err(e) = catch_unwind(AssertUnwindSafe(|| {
+        if let Some(app) = self.app.as_mut()
+            && let Err(e) = catch_unwind(AssertUnwindSafe(|| {
                 // Update physics delta resource with Godot's delta
                 app.world_mut().resource_mut::<PhysicsDelta>().delta_seconds = delta;
 
@@ -148,12 +148,12 @@ impl INode for BevyApp {
                 tracing_tracy::client::Client::running()
                     .expect("client must be running")
                     .secondary_frame_mark(tracing_tracy::client::frame_name!("physics"));
-            })) {
-                self.app = None;
+            }))
+        {
+            self.app = None;
 
-                eprintln!("bevy app physics update panicked");
-                resume_unwind(e);
-            }
+            eprintln!("bevy app physics update panicked");
+            resume_unwind(e);
         }
     }
 }

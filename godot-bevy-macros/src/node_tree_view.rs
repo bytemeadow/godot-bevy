@@ -163,18 +163,14 @@ fn create_pattern_matching_expr(
 
 // Helper function to extract the inner type of an Option<T>
 fn get_option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
-    if let syn::Type::Path(type_path) = ty {
-        if type_path.path.segments.len() == 1 && type_path.path.segments[0].ident == "Option" {
-            if let syn::PathArguments::AngleBracketed(ref args) =
-                type_path.path.segments[0].arguments
-            {
-                if args.args.len() == 1 {
-                    if let syn::GenericArgument::Type(ref inner_type) = args.args[0] {
-                        return Some(inner_type);
-                    }
-                }
-            }
-        }
+    if let syn::Type::Path(type_path) = ty
+        && type_path.path.segments.len() == 1
+        && type_path.path.segments[0].ident == "Option"
+        && let syn::PathArguments::AngleBracketed(ref args) = type_path.path.segments[0].arguments
+        && args.args.len() == 1
+        && let syn::GenericArgument::Type(ref inner_type) = args.args[0]
+    {
+        return Some(inner_type);
     }
     None
 }

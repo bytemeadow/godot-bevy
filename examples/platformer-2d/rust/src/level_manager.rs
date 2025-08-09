@@ -66,11 +66,6 @@ pub struct PendingLevel {
     pub level_id: Option<LevelId>,
 }
 
-/// Component marking entities that belong to the current level
-/// Useful for cleanup when switching levels
-#[derive(Component)]
-pub struct LevelEntity;
-
 /// Event fired when a level load is requested
 #[derive(Event)]
 pub struct LoadLevelEvent {

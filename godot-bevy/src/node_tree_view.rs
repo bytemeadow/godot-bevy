@@ -55,10 +55,10 @@ fn find_node_recursive(
     if pattern_part == "*" {
         // Try all children
         for i in 0..current_node.get_child_count() {
-            if let Some(child) = current_node.get_child(i) {
-                if let Some(result) = find_node_recursive(&child, pattern_parts, depth + 1) {
-                    return Some(result);
-                }
+            if let Some(child) = current_node.get_child(i)
+                && let Some(result) = find_node_recursive(&child, pattern_parts, depth + 1)
+            {
+                return Some(result);
             }
         }
     } else if pattern_part.contains('*') {
@@ -66,10 +66,10 @@ fn find_node_recursive(
         for i in 0..current_node.get_child_count() {
             if let Some(child) = current_node.get_child(i) {
                 let child_name = child.get_name().to_string();
-                if matches_wildcard_pattern(&child_name, pattern_part) {
-                    if let Some(result) = find_node_recursive(&child, pattern_parts, depth + 1) {
-                        return Some(result);
-                    }
+                if matches_wildcard_pattern(&child_name, pattern_part)
+                    && let Some(result) = find_node_recursive(&child, pattern_parts, depth + 1)
+                {
+                    return Some(result);
                 }
             }
         }

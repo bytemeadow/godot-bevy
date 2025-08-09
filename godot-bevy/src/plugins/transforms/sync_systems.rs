@@ -68,21 +68,15 @@ pub fn post_update_godot_transforms(
     if let Some(scene_tree) = engine
         .get_main_loop()
         .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())
+        && let Some(root) = scene_tree.get_root()
+        && let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton")
     {
-        if let Some(root) = scene_tree.get_root() {
-            if let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton") {
-                // Check if this BevyApp has the raw array methods (prefer these over bulk Dictionary methods)
-                if bevy_app.has_method("bulk_update_transforms_3d") {
-                    // Use bulk optimization path
-                    let _bulk_span = tracing::info_span!("using_bulk_optimization").entered();
-                    post_update_godot_transforms_bulk(
-                        change_tick,
-                        entities,
-                        bevy_app.upcast::<Object>(),
-                    );
-                    return;
-                }
-            }
+        // Check if this BevyApp has the raw array methods (prefer these over bulk Dictionary methods)
+        if bevy_app.has_method("bulk_update_transforms_3d") {
+            // Use bulk optimization path
+            let _bulk_span = tracing::info_span!("using_bulk_optimization").entered();
+            post_update_godot_transforms_bulk(change_tick, entities, bevy_app.upcast::<Object>());
+            return;
         }
     }
 
@@ -121,14 +115,13 @@ fn post_update_godot_transforms_bulk(
     let _collect_span = tracing::info_span!("collect_raw_arrays").entered();
     for (transform_ref, reference, metadata, (node2d, node3d)) in entities.iter_mut() {
         // Check if we have sync information for this entity
-        if let Some(sync_tick) = metadata.last_sync_tick {
-            if !transform_ref
+        if let Some(sync_tick) = metadata.last_sync_tick
+            && !transform_ref
                 .last_changed()
                 .is_newer_than(sync_tick, change_tick.this_run())
-            {
-                // This change was from our Godot sync, skip it
-                continue;
-            }
+        {
+            // This change was from our Godot sync, skip it
+            continue;
         }
 
         let instance_id = reference.instance_id();
@@ -245,14 +238,13 @@ fn post_update_godot_transforms_individual(
     // Original individual FFI approach
     for (transform_ref, mut reference, metadata, (node2d, node3d)) in entities.iter_mut() {
         // Check if we have sync information for this entity
-        if let Some(sync_tick) = metadata.last_sync_tick {
-            if !transform_ref
+        if let Some(sync_tick) = metadata.last_sync_tick
+            && !transform_ref
                 .last_changed()
                 .is_newer_than(sync_tick, change_tick.this_run())
-            {
-                // This change was from our Godot sync, skip it
-                continue;
-            }
+        {
+            // This change was from our Godot sync, skip it
+            continue;
         }
 
         if node2d.is_some() {

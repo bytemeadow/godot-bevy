@@ -348,16 +348,17 @@ fn create_scene_tree_entity(
                 // Try to add any registered bundles for this node type
                 super::autosync::try_add_bundles_for_node(commands, ent, &event.node);
 
-                if config.add_child_relationship && node.instance_id() != scene_root.instance_id() {
-                    if let Some(parent) = node.get_parent() {
-                        let parent_id = parent.instance_id();
-                        if let Some(&parent_entity) = ent_mapping.get(&parent_id) {
-                            commands.entity(parent_entity).add_children(&[ent]);
-                        } else {
-                            warn!(target: "godot_scene_tree_events",
+                if config.add_child_relationship
+                    && node.instance_id() != scene_root.instance_id()
+                    && let Some(parent) = node.get_parent()
+                {
+                    let parent_id = parent.instance_id();
+                    if let Some(&parent_entity) = ent_mapping.get(&parent_id) {
+                        commands.entity(parent_entity).add_children(&[ent]);
+                    } else {
+                        warn!(target: "godot_scene_tree_events",
                             "Parent entity with ID {} not found in ent_mapping. This might indicate a missing or incorrect mapping.",
                             parent_id);
-                        }
                     }
                 }
             }

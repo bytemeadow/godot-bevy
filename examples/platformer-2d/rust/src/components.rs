@@ -42,10 +42,6 @@ impl Default for Gravity {
 #[derive(Component, Debug, Clone, Default)]
 pub struct Player;
 
-/// Component marking an entity as an enemy
-#[derive(Component, Debug, Clone, Default)]
-pub struct Enemy;
-
 /// Component marking an entity as a gem
 #[derive(Component, GodotNode, Default, Debug, Clone)]
 #[godot_node(base(Area2D), class_name(Gem2D))]

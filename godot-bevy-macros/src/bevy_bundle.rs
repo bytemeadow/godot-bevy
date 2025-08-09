@@ -93,26 +93,20 @@ pub fn bevy_bundle(input: DeriveInput) -> syn::Result<TokenStream2> {
     // Helper function to extract transform_with from field attributes
     let extract_transform_with = |field_name: &syn::Ident| -> Option<syn::Path> {
         for field in fields {
-            if let Some(fname) = &field.ident {
-                if fname == field_name {
-                    for attr in &field.attrs {
-                        if attr.path().is_ident("bundle") || attr.path().is_ident("bevy_bundle") {
-                            // Parse the bundle attribute
-                            if let Ok(syn::Meta::NameValue(name_value)) =
-                                attr.parse_args::<syn::Meta>()
-                            {
-                                if name_value.path.is_ident("transform_with") {
-                                    if let syn::Expr::Lit(expr_lit) = &name_value.value {
-                                        if let syn::Lit::Str(lit_str) = &expr_lit.lit {
-                                            let transform_str = lit_str.value();
-                                            if let Ok(path) =
-                                                syn::parse_str::<syn::Path>(&transform_str)
-                                            {
-                                                return Some(path);
-                                            }
-                                        }
-                                    }
-                                }
+            if let Some(fname) = &field.ident
+                && fname == field_name
+            {
+                for attr in &field.attrs {
+                    if attr.path().is_ident("bundle") || attr.path().is_ident("bevy_bundle") {
+                        // Parse the bundle attribute
+                        if let Ok(syn::Meta::NameValue(name_value)) = attr.parse_args::<syn::Meta>()
+                            && name_value.path.is_ident("transform_with")
+                            && let syn::Expr::Lit(expr_lit) = &name_value.value
+                            && let syn::Lit::Str(lit_str) = &expr_lit.lit
+                        {
+                            let transform_str = lit_str.value();
+                            if let Ok(path) = syn::parse_str::<syn::Path>(&transform_str) {
+                                return Some(path);
                             }
                         }
                     }
