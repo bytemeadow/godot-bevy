@@ -474,3 +474,121 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
 
     Ok(expanded)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::parse_quote;
+
+    #[test]
+    fn tuple_entry_parses_and_generates() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Bundle, GodotNodeBundle)]
+            #[godot_node(base(Node2D), class_name(PlayerNode))]
+            struct PlayerBundle {
+                #[godot_props((:, export_type(f32), default(5.0)))]
+                speed: Speed,
+            }
+        };
+
+        let result = godot_node_bundle_impl(input);
+        assert!(result.is_ok(), "Tuple entry should parse");
+        let tokens = result.unwrap().to_string();
+        assert!(tokens.contains("pub struct PlayerNode"));
+        assert!(tokens.contains("# [export] speed : f32"));
+        assert!(tokens.contains("speed : 5.0"));
+        assert!(tokens.contains("PlayerBundle :: from_godot_node"));
+    }
+
+    #[test]
+    fn struct_entries_parses_and_generates() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Bundle, GodotNodeBundle)]
+            #[godot_node(base(Node2D), class_name(PlayerNode))]
+            struct PlayerBundle {
+                #[godot_props(
+                    (current, export_type(i32), default(100)),
+                    (max, export_type(i32))
+                )]
+                health: Health,
+            }
+        };
+
+        let result = godot_node_bundle_impl(input);
+        assert!(result.is_ok(), "Struct entries should parse");
+        let tokens = result.unwrap().to_string();
+        assert!(tokens.contains("# [export] current : i32"));
+        assert!(tokens.contains("# [export] max : i32"));
+        // default(100) appears in init
+        assert!(tokens.contains("current : 100"));
+    }
+
+    #[test]
+    fn transform_and_default_handling() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Bundle, GodotNodeBundle)]
+            #[godot_node(base(Node2D), class_name(PlayerNode))]
+            struct PlayerBundle {
+                #[godot_props(
+                    (pos, export_type(Vector2), transform_with(to_vec2), default(Vector2::ZERO))
+                )]
+                physics: Physics,
+            }
+        };
+
+        let result = godot_node_bundle_impl(input).unwrap();
+        let tokens = result.to_string();
+        assert!(tokens.contains("# [export] pos : Vector2"));
+        assert!(tokens.contains("pos : Vector2 :: ZERO"));
+        // Ensure transform function name is present in constructor path
+        assert!(tokens.contains("to_vec2"));
+    }
+
+    #[test]
+    fn mixed_tuple_and_struct_is_error() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Bundle, GodotNodeBundle)]
+            #[godot_node(base(Node2D), class_name(PlayerNode))]
+            struct PlayerBundle {
+                #[godot_props((:, export_type(f32)), (value, export_type(f32)))]
+                comp: Comp,
+            }
+        };
+
+        let err = godot_node_bundle_impl(input).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("Cannot mix tuple (:) and struct-field entries"));
+    }
+
+    #[test]
+    fn missing_export_type_is_error() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Bundle, GodotNodeBundle)]
+            #[godot_node(base(Node2D), class_name(PlayerNode))]
+            struct PlayerBundle {
+                #[godot_props((value))]
+                comp: Comp,
+            }
+        };
+
+        let err = godot_node_bundle_impl(input).unwrap_err();
+        assert!(err.to_string().contains("Missing export_type(..)"));
+    }
+
+    #[test]
+    fn duplicate_property_across_fields_is_error() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Bundle, GodotNodeBundle)]
+            #[godot_node(base(Node2D), class_name(PlayerNode))]
+            struct PlayerBundle {
+                #[godot_props((hp, export_type(i32)))]
+                health: Health,
+                #[godot_props((hp, export_type(i32)))]
+                stats: Stats,
+            }
+        };
+
+        let err = godot_node_bundle_impl(input).unwrap_err();
+        assert!(err.to_string().contains("Duplicate exported property"));
+    }
+}
