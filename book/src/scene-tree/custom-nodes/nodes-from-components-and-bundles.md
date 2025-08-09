@@ -7,9 +7,9 @@ Often, we want to make a Godot node from Rust ECS types. There are two common fl
 
 Both generate a Godot class you can place in the editor and auto‑insert the corresponding ECS data when the scene is scanned.
 
-## Components → Nodes (GodotNode)
+## Component → Nodes (GodotNode)
 
-Use when a single component is the natural editor‑facing unit.
+Use the following method to create a Godot node from a single component. Use when a single component is the natural editor‑facing unit.
 
 Gem marker component:
 

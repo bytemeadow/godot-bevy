@@ -578,7 +578,7 @@ mod tests {
     #[test]
     fn duplicate_property_across_fields_is_error() {
         let input: DeriveInput = parse_quote! {
-            #[derive(Bundle, GodotNodeBundle)]
+            #[derive(Bundle, GodotNode)]
             #[godot_node(base(Node2D), class_name(PlayerNode))]
             struct PlayerBundle {
                 #[godot_props((hp, export_type(i32)))]
