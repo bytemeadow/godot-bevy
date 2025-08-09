@@ -1,6 +1,6 @@
 mod bevy_bundle;
-mod node_tree_view;
 mod godot_node;
+mod node_tree_view;
 
 use crate::godot_node::derive_godot_node;
 use proc_macro::TokenStream;
