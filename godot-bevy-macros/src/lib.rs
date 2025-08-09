@@ -107,7 +107,7 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
 ///   `#[godot_props((field, export_type(Type), transform_with(path::to::fn), default(expr)), ...)]`.
 /// - Tuple/newtype components use `(:, export_type(Type), ...)` to map to the bundle field name.
 /// - Fields without `#[godot_props]` are constructed with `Default::default()`.
-
+///
 /// Automatically registers a Godot node based on the annotated Component struct.
 /// This macro has two parts:
 /// - Struct level `godot_node` attribute
