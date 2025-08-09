@@ -3,7 +3,7 @@
 Often, we want to make a Godot node from Rust ECS types. There are two common flows:
 
 - Components → Nodes with `#[derive(GodotNode)]`
-- Bundles → Nodes with `#[derive(GodotNodeBundle)]`
+- Bundles → Nodes with `#[derive(GodotNode)]`
 
 Both generate a Godot class you can place in the editor and auto‑insert the corresponding ECS data when the scene is scanned.
 
@@ -34,12 +34,12 @@ This generates a `PlayerNode` Godot class with exported properties for fields ma
 
 See the `GodotNode` Rust docs for full syntax and options: `https://docs.rs/godot-bevy/latest/godot_bevy/prelude/derive.GodotNode.html`.
 
-## Bundles → Nodes (GodotNodeBundle)
+## Bundles → Nodes (GodotNode)
 
 Sometimes a single component isn’t the right abstraction for your editor node. When you want one node to represent an entity with multiple components, derive on a Bevy `Bundle`:
 
 ```rust
-#[derive(Bundle, GodotNodeBundle)]
+#[derive(Bundle, GodotNode)]
 #[godot_node(base(CharacterBody2D), class_name(Player2D))]
 pub struct PlayerBundle {
     // Inserted as Default::default(), no Godot properties
@@ -82,6 +82,6 @@ Construction rules:
 
 This derive generates a Godot class (`Player2D` above) and an autosync registration so the bundle is inserted automatically for matching nodes.
 
-See the `GodotNodeBundle` Rust docs for full syntax and options: `https://docs.rs/godot-bevy/latest/godot_bevy/prelude/derive.GodotNodeBundle.html`.
+Note: GodotNode automatically switches to bundle mode when it sees `#[godot_props(...)]` on any field.
 
 

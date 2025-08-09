@@ -160,7 +160,7 @@ impl Parse for PropEntryParen {
                     PropKind::Tuple => content.span(),
                     PropKind::StructField(ident) => ident.span(),
                 },
-                "Missing export_type(..) – required for GodotNodeBundle",
+                "Missing export_type(..) – required for GodotNode on Bundles",
             )
         })?;
 
@@ -199,7 +199,7 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
         _ => {
             return Err(Error::new_spanned(
                 &input,
-                "GodotNodeBundle can only be used on structs",
+                "GodotNode (bundle mode) can only be used on structs",
             ));
         }
     };
@@ -207,7 +207,7 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
     if matches!(data_struct.fields, Fields::Unit) {
         return Err(Error::new_spanned(
             &input,
-            "GodotNodeBundle must be used on structs with fields",
+            "GodotNode (bundle mode) must be used on structs with fields",
         ));
     }
 
@@ -483,7 +483,7 @@ mod tests {
     #[test]
     fn tuple_entry_parses_and_generates() {
         let input: DeriveInput = parse_quote! {
-            #[derive(Bundle, GodotNodeBundle)]
+            #[derive(Bundle, GodotNode)]
             #[godot_node(base(Node2D), class_name(PlayerNode))]
             struct PlayerBundle {
                 #[godot_props((:, export_type(f32), default(5.0)))]
@@ -503,7 +503,7 @@ mod tests {
     #[test]
     fn struct_entries_parses_and_generates() {
         let input: DeriveInput = parse_quote! {
-            #[derive(Bundle, GodotNodeBundle)]
+            #[derive(Bundle, GodotNode)]
             #[godot_node(base(Node2D), class_name(PlayerNode))]
             struct PlayerBundle {
                 #[godot_props(
@@ -526,7 +526,7 @@ mod tests {
     #[test]
     fn transform_and_default_handling() {
         let input: DeriveInput = parse_quote! {
-            #[derive(Bundle, GodotNodeBundle)]
+            #[derive(Bundle, GodotNode)]
             #[godot_node(base(Node2D), class_name(PlayerNode))]
             struct PlayerBundle {
                 #[godot_props(
@@ -547,7 +547,7 @@ mod tests {
     #[test]
     fn mixed_tuple_and_struct_is_error() {
         let input: DeriveInput = parse_quote! {
-            #[derive(Bundle, GodotNodeBundle)]
+            #[derive(Bundle, GodotNode)]
             #[godot_node(base(Node2D), class_name(PlayerNode))]
             struct PlayerBundle {
                 #[godot_props((:, export_type(f32)), (value, export_type(f32)))]
@@ -563,7 +563,7 @@ mod tests {
     #[test]
     fn missing_export_type_is_error() {
         let input: DeriveInput = parse_quote! {
-            #[derive(Bundle, GodotNodeBundle)]
+            #[derive(Bundle, GodotNode)]
             #[godot_node(base(Node2D), class_name(PlayerNode))]
             struct PlayerBundle {
                 #[godot_props((value))]

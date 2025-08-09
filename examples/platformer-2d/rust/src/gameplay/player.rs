@@ -35,7 +35,7 @@ pub struct PlayerMovementEvent {
     pub facing_left: bool,
 }
 
-#[derive(Bundle, GodotNodeBundle)]
+#[derive(Bundle, GodotNode)]
 #[godot_node(base(CharacterBody2D), class_name(Player2D))]
 pub struct PlayerBundle {
     pub player: Player,
