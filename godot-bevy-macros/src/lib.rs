@@ -1,7 +1,7 @@
 mod bevy_bundle;
 mod component_as_godot_node;
-mod node_tree_view;
 mod godot_node_bundle;
+mod node_tree_view;
 
 use crate::component_as_godot_node::component_as_godot_node_impl;
 use proc_macro::TokenStream;
@@ -113,8 +113,8 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
 pub fn derive_godot_node_bundle(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
 
-    let expanded = godot_node_bundle::godot_node_bundle_impl(input)
-        .unwrap_or_else(Error::into_compile_error);
+    let expanded =
+        godot_node_bundle::godot_node_bundle_impl(input).unwrap_or_else(Error::into_compile_error);
 
     TokenStream::from(expanded)
 }

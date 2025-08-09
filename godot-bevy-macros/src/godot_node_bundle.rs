@@ -1,11 +1,9 @@
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{format_ident, quote, quote_spanned, ToTokens};
+use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{
-    Data, DeriveInput, Error, Expr, Fields, Ident, Meta, Path, Token, Type, parse2,
-};
+use syn::{Data, DeriveInput, Error, Expr, Fields, Ident, Meta, Path, Token, Type, parse2};
 
 // ----------------------------
 // Godot node attributes parser
@@ -254,17 +252,10 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
     let mut exported_props: Vec<(Ident, Type, Option<Expr>)> = Vec::new();
     let mut bundle_field_constructors: Vec<TokenStream2> = Vec::new();
 
-    // Detect forbidden nested bundles via #[bundle] attr on fields
-    for field in data_struct.fields.iter() {
-        for attr in &field.attrs {
-            if attr.path().is_ident("bundle") {
-                return Err(Error::new(
-                    attr.span(),
-                    "Nested #[bundle] fields are not supported when deriving GodotNodeBundle",
-                ));
-            }
-        }
-    }
+    // Note: We intentionally allow nested bundles. Bevy will flatten nested bundles
+    // at insertion time. Detecting nested bundles reliably at macro time is not possible
+    // without unstable negative trait bounds. Components without `#[godot_props]` must
+    // implement `Default` so nested bundles can be constructed.
 
     // Track property name collisions
     use std::collections::HashSet;
@@ -329,10 +320,9 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
 
             // Exported property declaration
             let export_ty = entry.export_type.clone();
-            let default_expr = entry
-                .default_expr
-                .clone()
-                .unwrap_or_else(|| parse2::<Expr>(quote_spanned! {export_ty.span()=> #export_ty :: default()}).unwrap());
+            let default_expr = entry.default_expr.clone().unwrap_or_else(|| {
+                parse2::<Expr>(quote_spanned! {export_ty.span()=> #export_ty :: default()}).unwrap()
+            });
             exported_props.push((prop_ident.clone(), export_ty.clone(), Some(default_expr)));
 
             // Component constructor – apply transform if provided
@@ -365,10 +355,10 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
                 }
 
                 let export_ty = entry.export_type.clone();
-                let default_expr = entry
-                    .default_expr
-                    .clone()
-                    .unwrap_or_else(|| parse2::<Expr>(quote_spanned! {export_ty.span()=> #export_ty :: default()}).unwrap());
+                let default_expr = entry.default_expr.clone().unwrap_or_else(|| {
+                    parse2::<Expr>(quote_spanned! {export_ty.span()=> #export_ty :: default()})
+                        .unwrap()
+                });
                 exported_props.push((prop_ident.clone(), export_ty.clone(), Some(default_expr)));
 
                 let value_tokens = if let Some(transform) = entry.transform_with.clone() {
@@ -403,9 +393,9 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
     let default_export_fields: Vec<TokenStream2> = exported_props
         .iter()
         .map(|(name, ty, default)| {
-            let default_expr = default
-                .clone()
-                .unwrap_or_else(|| parse2::<Expr>(quote_spanned! {ty.span()=> #ty :: default()}).unwrap());
+            let default_expr = default.clone().unwrap_or_else(|| {
+                parse2::<Expr>(quote_spanned! {ty.span()=> #ty :: default()}).unwrap()
+            });
             quote! { #name: #default_expr }
         })
         .collect();
@@ -484,5 +474,3 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
 
     Ok(expanded)
 }
-
-

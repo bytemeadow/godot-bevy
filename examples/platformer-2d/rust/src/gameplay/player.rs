@@ -2,12 +2,9 @@ use crate::components::{Gravity, JumpVelocity, Player, Speed};
 use crate::gameplay::audio::PlaySfxEvent;
 use bevy::app::{App, Plugin};
 use bevy::prelude::*;
+use godot::classes::CharacterBody2D;
 use godot::classes::{AnimatedSprite2D, Input, ProjectSettings};
 use godot::global::move_toward;
-use godot::{
-    classes::{CharacterBody2D, ICharacterBody2D},
-    prelude::*,
-};
 use godot_bevy::plugins::core::PhysicsDelta;
 use godot_bevy::prelude::*;
 
@@ -38,33 +35,22 @@ pub struct PlayerMovementEvent {
     pub facing_left: bool,
 }
 
-#[derive(GodotClass, BevyBundle)]
-#[class(base=CharacterBody2D)]
-#[bevy_bundle((Speed: speed), (JumpVelocity: jump_velocity), (Gravity: gravity), (Player))]
-pub struct Player2D {
-    base: Base<CharacterBody2D>,
-    #[export]
-    speed: f32,
-    #[export]
-    jump_velocity: f32,
-    gravity: f32,
-}
+#[derive(Bundle, GodotNodeBundle)]
+#[godot_node(base(CharacterBody2D), class_name(Player2D))]
+pub struct PlayerBundle {
+    pub player: Player,
 
-#[godot_api]
-impl ICharacterBody2D for Player2D {
-    fn init(base: Base<CharacterBody2D>) -> Self {
-        Self {
-            base,
-            speed: 250.,
-            jump_velocity: -400.,
-            gravity: ProjectSettings::singleton()
-                .get_setting("physics/2d/default_gravity")
-                .try_to::<f32>()
-                .unwrap_or(980.0),
-        }
-    }
+    #[godot_props((:, export_type(f32), default(250.0)))]
+    pub speed: Speed,
 
-    fn ready(&mut self) {}
+    #[godot_props((:, export_type(f32), default(-400.0)))]
+    pub jump_velocity: JumpVelocity,
+
+    #[godot_props((:, export_type(f32), default(ProjectSettings::singleton()
+        .get_setting("physics/2d/default_gravity")
+        .try_to::<f32>()
+        .unwrap_or(980.0))))]
+    pub gravity: Gravity,
 }
 
 pub struct PlayerPlugin;
