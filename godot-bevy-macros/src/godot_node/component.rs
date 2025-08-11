@@ -5,10 +5,7 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Meta, Token, parse_quote, parse2};
 
-struct KeyValue {
-    key: syn::Ident,
-    value: syn::Expr,
-}
+use super::attr::KeyValue;
 
 struct GodotNodeAttrArgs {
     base: Option<syn::Ident>,
@@ -29,15 +26,7 @@ struct ComponentField {
     export_attribute: Option<GodotExportAttrArgs>,
 }
 
-impl Parse for KeyValue {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let name: syn::Ident = input.parse()?;
-        let content;
-        syn::parenthesized!(content in input);
-        let value: syn::Expr = content.parse()?;
-        Ok(KeyValue { key: name, value })
-    }
-}
+// KeyValue parser is shared in attr.rs
 
 /// Parses the following format:
 /// ```ignore

@@ -2,6 +2,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::ToTokens;
 use syn::{DeriveInput, Meta};
 
+mod attr;
 mod bundle;
 mod component;
 

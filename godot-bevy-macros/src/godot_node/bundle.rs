@@ -9,20 +9,7 @@ use syn::{Data, DeriveInput, Error, Expr, Fields, Ident, Meta, Path, Token, Type
 // Godot node attributes parser
 // ----------------------------
 
-struct KeyValueArg {
-    key: Ident,
-    value: syn::Expr,
-}
-
-impl Parse for KeyValueArg {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let key: Ident = input.parse()?;
-        let content;
-        syn::parenthesized!(content in input);
-        let value: syn::Expr = content.parse()?;
-        Ok(KeyValueArg { key, value })
-    }
-}
+use super::attr::KeyValue as KeyValueArg;
 
 #[derive(Clone)]
 struct GodotNodeAttrArgs {
