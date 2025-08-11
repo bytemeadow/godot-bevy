@@ -23,7 +23,7 @@ The easiest way to get started is using the godot-bevy editor plugin, which auto
 
 ### 1. Install the Plugin
 
-1. Download the `addons/godot-bevy` folder from the [godot-bevy repository](https://github.com/dtaralla/godot-bevy)
+1. Download the `addons/godot-bevy` folder from the [godot-bevy repository](https://github.com/bytemeadow/godot-bevy)
 2. Copy it to your Godot project's `addons/` directory
 3. In Godot, go to **Project > Project Settings > Plugins**
 4. Enable the "Godot-Bevy Integration" plugin
