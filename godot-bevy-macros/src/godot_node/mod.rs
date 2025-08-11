@@ -28,17 +28,17 @@ pub fn derive_godot_node(input: DeriveInput) -> syn::Result<TokenStream2> {
         }
     }
 
-    // Fallback: detect bundle mode by presence of any #[godot_props]
-    let has_godot_props = match &input.data {
+    // Fallback: detect bundle mode by presence of any #[export_fields]
+    let has_export_fields = match &input.data {
         syn::Data::Struct(data) => data
             .fields
             .iter()
             .flat_map(|f| f.attrs.iter())
-            .any(|a| a.path().is_ident("godot_props")),
+            .any(|a| a.path().is_ident("export_fields")),
         _ => false,
     };
 
-    if derives_bundle || (!derives_component && has_godot_props) {
+    if derives_bundle || (!derives_component && has_export_fields) {
         bundle::godot_node_bundle_impl(input)
     } else {
         // Component flow expects TokenStream2 of DeriveInput

@@ -40,13 +40,13 @@ pub struct PlayerMovementEvent {
 pub struct PlayerBundle {
     pub player: Player,
 
-    #[godot_props((:, export_type(f32), default(250.0)))]
+    #[export_fields(value(export_type(f32), default(250.0)))]
     pub speed: Speed,
 
-    #[godot_props((:, export_type(f32), default(-400.0)))]
+    #[export_fields(value(export_type(f32), default(-400.0)))]
     pub jump_velocity: JumpVelocity,
 
-    #[godot_props((:, export_type(f32), default(ProjectSettings::singleton()
+    #[export_fields(value(export_type(f32), default(ProjectSettings::singleton()
         .get_setting("physics/2d/default_gravity")
         .try_to::<f32>()
         .unwrap_or(980.0))))]

@@ -57,7 +57,7 @@ impl Parse for GodotNodeAttrArgs {
 }
 
 // ----------------------------
-// godot_props(...) parser
+// export_fields(...) parser
 // ----------------------------
 
 #[derive(Clone)]
@@ -76,74 +76,44 @@ struct GodotPropEntry {
     default_expr: Option<Expr>,
 }
 
-struct GodotPropsAttr {
-    entries: Vec<GodotPropEntry>,
+struct ExportItem {
+    entry: GodotPropEntry,
 }
 
-impl Parse for GodotPropsAttr {
+impl Parse for ExportItem {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        // godot_props((...), (...), ...)
-        let entries_paren = Punctuated::<PropEntryParen, Token![,]>::parse_terminated(input)?;
-        let mut entries = Vec::with_capacity(entries_paren.len());
-        for entry in entries_paren {
-            entries.push(entry.0);
-        }
-        Ok(GodotPropsAttr { entries })
-    }
-}
+        // fieldName(...) or value(...)
+        let name: Ident = input.parse()?;
+        let args_content;
+        syn::parenthesized!(args_content in input);
 
-// A single parenthesized entry: (field?, export_type(..)?, transform_with(..)?, default(..)?)
-struct PropEntryParen(GodotPropEntry);
-
-impl Parse for PropEntryParen {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let content;
-        syn::parenthesized!(content in input);
-
-        // First token: either ':' for tuple or an Ident for struct field
-        let kind = if content.peek(Token![:]) {
-            let _colon: Token![:] = content.parse()?;
-            PropKind::Tuple
-        } else {
-            let field_ident: Ident = content.parse()?;
-            PropKind::StructField(field_ident)
-        };
-
-        // Optional trailing config: comma-separated key(value) entries
+        // Parse key(value) items inside
         let mut export_type: Option<Type> = None;
         let mut transform_with: Option<Path> = None;
         let mut default_expr: Option<Expr> = None;
 
-        while !content.is_empty() {
-            // Consume optional comma
-            if content.peek(Token![,]) {
-                let _comma: Token![,] = content.parse()?;
-                if content.is_empty() {
-                    break;
-                }
-            }
-
-            let key: Ident = content.parse()?;
-            let args;
-            syn::parenthesized!(args in content);
+        while !args_content.is_empty() {
+            let key: Ident = args_content.parse()?;
+            let val_content;
+            syn::parenthesized!(val_content in args_content);
 
             if key == "export_type" {
                 if export_type.is_some() {
                     return Err(Error::new(key.span(), "Duplicate export_type(..)"));
                 }
-                let ty: Type = args.parse()?;
+                let ty: Type = val_content.parse()?;
                 export_type = Some(ty);
             } else if key == "transform_with" {
                 if transform_with.is_some() {
                     return Err(Error::new(key.span(), "Duplicate transform_with(..)"));
                 }
-                let path: Path = args.parse()?;
+                let path: Path = val_content.parse()?;
                 transform_with = Some(path);
             } else if key == "default" {
                 if default_expr.is_some() {
                     return Err(Error::new(key.span(), "Duplicate default(..)"));
                 }
-                let expr: Expr = args.parse()?;
+                let expr: Expr = val_content.parse()?;
                 default_expr = Some(expr);
             } else {
                 return Err(Error::new(
@@ -151,37 +121,61 @@ impl Parse for PropEntryParen {
                     "Unknown key. Expected export_type(..), transform_with(..), or default(..)",
                 ));
             }
+
+            if args_content.peek(Token![,]) {
+                let _comma: Token![,] = args_content.parse()?;
+            }
         }
 
-        // export_type(..) is required because we cannot infer Bevy field types here
+        let kind = if name == "value" {
+            PropKind::Tuple
+        } else {
+            PropKind::StructField(name.clone())
+        };
+
         let export_type = export_type.ok_or_else(|| {
             Error::new(
                 match &kind {
-                    PropKind::Tuple => content.span(),
+                    PropKind::Tuple => name.span(),
                     PropKind::StructField(ident) => ident.span(),
                 },
                 "Missing export_type(..) – required for GodotNode on Bundles",
             )
         })?;
 
-        Ok(PropEntryParen(GodotPropEntry {
-            kind,
-            export_type,
-            transform_with,
-            default_expr,
-        }))
+        Ok(ExportItem {
+            entry: GodotPropEntry {
+                kind,
+                export_type,
+                transform_with,
+                default_expr,
+            },
+        })
     }
 }
 
-fn parse_godot_props_attr(attr: &syn::Attribute) -> syn::Result<Option<GodotPropsAttr>> {
-    if !attr.path().is_ident("godot_props") {
+struct ExportFieldsAttr {
+    entries: Vec<GodotPropEntry>,
+}
+
+impl Parse for ExportFieldsAttr {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let items = Punctuated::<ExportItem, Token![,]>::parse_terminated(input)?;
+        Ok(ExportFieldsAttr {
+            entries: items.into_iter().map(|i| i.entry).collect(),
+        })
+    }
+}
+
+fn parse_export_fields_attr(attr: &syn::Attribute) -> syn::Result<Option<ExportFieldsAttr>> {
+    if !attr.path().is_ident("export_fields") {
         return Ok(None);
     }
     match &attr.meta {
-        Meta::List(list) => parse2::<GodotPropsAttr>(list.tokens.clone()).map(Some),
+        Meta::List(list) => parse2::<ExportFieldsAttr>(list.tokens.clone()).map(Some),
         _ => Err(Error::new(
             attr.span(),
-            "Expected a list of entries: #[godot_props((...), (...))]",
+            "Expected a list of entries: #[export_fields(name(...), ...)]",
         )),
     }
 }
@@ -268,10 +262,10 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
             .ok_or_else(|| Error::new(field.span(), "Bundle fields must be named"))?;
         let field_ty = field.ty.clone();
 
-        // Parse optional godot_props on this field
+        // Parse optional export_fields on this field
         let mut entries: Vec<GodotPropEntry> = Vec::new();
         for attr in &field.attrs {
-            if let Some(parsed) = parse_godot_props_attr(attr)? {
+            if let Some(parsed) = parse_export_fields_attr(attr)? {
                 entries.extend(parsed.entries.into_iter());
             }
         }
@@ -294,7 +288,7 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
         if has_tuple && has_struct {
             return Err(Error::new(
                 field.span(),
-                "Cannot mix tuple (:) and struct-field entries in one #[godot_props(..)]",
+                "Cannot mix value(...) and field(...) entries in one #[export_fields(..)]",
             ));
         }
 
@@ -486,7 +480,7 @@ mod tests {
             #[derive(Bundle, GodotNode)]
             #[godot_node(base(Node2D), class_name(PlayerNode))]
             struct PlayerBundle {
-                #[godot_props((:, export_type(f32), default(5.0)))]
+                #[export_fields(value(export_type(f32), default(5.0)))]
                 speed: Speed,
             }
         };
@@ -506,9 +500,9 @@ mod tests {
             #[derive(Bundle, GodotNode)]
             #[godot_node(base(Node2D), class_name(PlayerNode))]
             struct PlayerBundle {
-                #[godot_props(
-                    (current, export_type(i32), default(100)),
-                    (max, export_type(i32))
+                #[export_fields(
+                    current(export_type(i32), default(100)),
+                    max(export_type(i32))
                 )]
                 health: Health,
             }
@@ -529,8 +523,8 @@ mod tests {
             #[derive(Bundle, GodotNode)]
             #[godot_node(base(Node2D), class_name(PlayerNode))]
             struct PlayerBundle {
-                #[godot_props(
-                    (pos, export_type(Vector2), transform_with(to_vec2), default(Vector2::ZERO))
+                #[export_fields(
+                    pos(export_type(Vector2), transform_with(to_vec2), default(Vector2::ZERO))
                 )]
                 physics: Physics,
             }
@@ -550,14 +544,14 @@ mod tests {
             #[derive(Bundle, GodotNode)]
             #[godot_node(base(Node2D), class_name(PlayerNode))]
             struct PlayerBundle {
-                #[godot_props((:, export_type(f32)), (value, export_type(f32)))]
+                #[export_fields(value(export_type(f32)), val(export_type(f32)))]
                 comp: Comp,
             }
         };
 
         let err = godot_node_bundle_impl(input).unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("Cannot mix tuple (:) and struct-field entries"));
+        assert!(msg.contains("Cannot mix value(...) and field(...) entries"));
     }
 
     #[test]
@@ -566,7 +560,7 @@ mod tests {
             #[derive(Bundle, GodotNode)]
             #[godot_node(base(Node2D), class_name(PlayerNode))]
             struct PlayerBundle {
-                #[godot_props((value))]
+                #[export_fields(value())]
                 comp: Comp,
             }
         };
@@ -581,9 +575,9 @@ mod tests {
             #[derive(Bundle, GodotNode)]
             #[godot_node(base(Node2D), class_name(PlayerNode))]
             struct PlayerBundle {
-                #[godot_props((hp, export_type(i32)))]
+                #[export_fields(hp(export_type(i32)))]
                 health: Health,
-                #[godot_props((hp, export_type(i32)))]
+                #[export_fields(hp(export_type(i32)))]
                 stats: Stats,
             }
         };

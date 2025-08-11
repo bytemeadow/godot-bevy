@@ -111,11 +111,13 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
 ///
 /// ## Annotating structs that derive `Bundle`
 ///
-/// Bundle Component fields can be annotated with `#[export_fields(...)]` to expose them to Godot.
-/// The `export_fields` attribute takes a list of component-fields to export.
-/// Each field listed can take optional parameters to configure aspects of how it will be exported.
-/// See the [export configuration attributes section](#export-configuration-attributes)
-/// for field parameter details.
+/// Bundle component fields can be annotated with `#[export_fields(...)]` to expose them to Godot.
+/// The `export_fields` attribute takes a list of component field entries:
+/// - Struct component fields: `field_name(export_type(Type), transform_with(path::to::fn), default(expr))`
+/// - Tuple/newtype components: `value(export_type(Type), transform_with(path::to::fn), default(expr))`
+///
+/// Each entry can take optional parameters to configure how it will be exported. See
+/// the [export configuration attributes](#export-configuration-attributes) for details.
 ///
 /// Example syntax:
 ///
@@ -149,7 +151,7 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
 /// - Use `export_type` to specify an alternate Godot-compatible type
 /// - Use `transform_with` to provide a conversion function from the Godot type to the field type
 /// - Use `default` to provide an initial value to the exported Godot field.
-#[proc_macro_derive(GodotNode, attributes(godot_export, godot_node, godot_props))]
+#[proc_macro_derive(GodotNode, attributes(godot_export, godot_node, export_fields))]
 pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
     let parsed: DeriveInput = parse_macro_input!(input as DeriveInput);
     derive_godot_node(parsed)

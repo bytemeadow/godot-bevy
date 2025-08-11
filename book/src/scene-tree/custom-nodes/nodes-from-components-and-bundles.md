@@ -46,14 +46,14 @@ pub struct PlayerBundle {
     pub player: Player,
 
     // Tuple/newtype → property name is the bundle field name
-    #[godot_props((:, export_type(f32), default(250.0)))]
+    #[export_fields(value(export_type(f32), default(250.0)))]
     pub speed: Speed,
 
-    #[godot_props((:, export_type(f32), default(-400.0)))]
+    #[export_fields(value(export_type(f32), default(-400.0)))]
     pub jump_velocity: JumpVelocity,
 
     // Custom default pulled from ProjectSettings
-    #[godot_props((:, export_type(f32), default(godot::classes::ProjectSettings::singleton()
+    #[export_fields(value(export_type(f32), default(godot::classes::ProjectSettings::singleton()
         .get_setting("physics/2d/default_gravity")
         .try_to::<f32>()
         .unwrap_or(980.0))))]
@@ -61,7 +61,7 @@ pub struct PlayerBundle {
 }
 ```
 
-What `#[godot_props]` does:
+What `#[export_fields]` does:
 
 - Selects which component data is exported to the Godot editor
 - Sets the Godot property type with `export_type(Type)`
@@ -71,12 +71,12 @@ What `#[godot_props]` does:
 Property naming rules:
 
 - Struct field entries export using the Bevy field name
-- Tuple/newtype entries export using the bundle field name
+- Tuple/newtype entry (value(...)) exports using the bundle field name
 - Renaming is not supported; duplicate property names across the bundle are a compile error
 
 Construction rules:
 
-- Components without `#[godot_props]` are constructed with `Default::default()`
+- Components without `#[export_fields]` are constructed with `Default::default()`
 - For struct components, only the exported fields are set; the rest come from `..Default::default()`
 - Nested bundles are allowed and will be flattened by Bevy on insertion; only top‑level fields can export properties
 
