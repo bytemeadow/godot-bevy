@@ -1,6 +1,6 @@
 use crate::godot_node::attr::GodotNodeAttrArgs;
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{ToTokens, format_ident, quote, quote_spanned};
+use quote::{format_ident, quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
