@@ -1,15 +1,29 @@
 # Nodes from Components and Bundles
 
-Often, we want to make a Godot node from Rust ECS types. There are two common flows:
+Often, we want to make Godot nodes from Rust ECS types. The `GodotNode` derive macro supports two types:
 
-- Component → Node with `#[derive(GodotNode)]`
-- Bundle → Node with `#[derive(GodotNode)]`
+- Component: `#[derive(Component, GodotNode)]`
+- Bundle: `#[derive(Bundle, GodotNode)]`
 
 Both generate a Godot class you can place in the editor and auto‑insert the corresponding ECS data when the scene is scanned.
 
-## Component → Node (GodotNode)
+See the `GodotNode` Rust docs for full syntax and options:
+`https://docs.rs/godot-bevy/latest/godot_bevy/prelude/derive.GodotNode.html`.
 
-Use the following method to create a Godot node from a single component. Use when a single component is the natural editor‑facing unit.
+## Configuring the Node
+
+You can configure the Godot node's base type and class name with the `godot_node` struct-level attribute: 
+
+```rust
+#[derive(GodotNode, ...)]
+#[godot_node(base(Area2D), class_name(Gem2D))]
+pub struct Gem;
+```
+
+## Component + GodotNode → Node
+
+Use the following method to create a Godot node from a single component.
+Use when you want to expose a single component to the editor.
 
 Gem marker component:
 
@@ -32,9 +46,7 @@ pub struct Door {
 
 Each derive generates a corresponding Godot class (e.g., `Gem2D`, `Door2D`) and inserts the component when the node is discovered. Fields marked with `#[godot_export]` become Godot editor properties.
 
-See the `GodotNode` Rust docs for full syntax and options: `https://docs.rs/godot-bevy/latest/godot_bevy/prelude/derive.GodotNode.html`.
-
-## Bundle → Node (GodotNode)
+## Bundle + GodotNode → Node
 
 Sometimes a single component isn’t the right abstraction for your editor node. When you want one node to represent an entity with multiple components, derive on a Bevy `Bundle`:
 
