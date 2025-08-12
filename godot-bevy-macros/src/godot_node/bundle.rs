@@ -1,47 +1,10 @@
+use crate::godot_node::attr::GodotNodeAttrArgs;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Error, Expr, Fields, Ident, Meta, Path, Token, Type, parse2};
-
-// ----------------------------
-// Godot node attributes parser
-// ----------------------------
-
-use super::attr::KeyValue as KeyValueArg;
-
-#[derive(Clone)]
-struct GodotNodeAttrArgs {
-    base: Option<Ident>,
-    class_name: Option<Ident>,
-}
-
-impl Parse for GodotNodeAttrArgs {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let args = Punctuated::<KeyValueArg, Token![,]>::parse_terminated(input)?;
-        let mut base = None;
-        let mut class_name = None;
-
-        for kv in args {
-            if kv.key == "base" {
-                base = Some(parse2::<Ident>(kv.value.to_token_stream())?);
-            } else if kv.key == "class_name" {
-                class_name = Some(parse2::<Ident>(kv.value.to_token_stream())?);
-            } else {
-                return Err(Error::new(
-                    kv.key.span(),
-                    format!(
-                        "Unknown parameter: `{}`. Expected `base` or `class_name`.",
-                        kv.key
-                    ),
-                ));
-            }
-        }
-
-        Ok(GodotNodeAttrArgs { base, class_name })
-    }
-}
 
 // ----------------------------
 // export_fields(...) parser
