@@ -1,6 +1,8 @@
-use super::node_type_checking_generated::add_comprehensive_node_type_markers;
+use super::node_type_checking_generated::{
+    add_comprehensive_node_type_markers, remove_comprehensive_node_type_markers,
+};
 use crate::plugins::core::SceneTreeComponentRegistry;
-use crate::prelude::main_thread_system;
+use crate::prelude::{GodotScene, main_thread_system};
 use crate::{
     interop::GodotNodeHandle,
     plugins::collisions::{
@@ -125,7 +127,7 @@ impl Default for SceneTreeRefImpl {
 fn initialize_scene_tree(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
-    mut entities: Query<(&mut GodotNodeHandle, Entity)>,
+    mut entities: Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
     config: Res<SceneTreeConfig>,
     component_registry: Res<SceneTreeComponentRegistry>,
 ) {
@@ -234,17 +236,24 @@ fn write_scene_tree_events(
     event_writer.write_batch(event_reader.0.try_iter());
 }
 
+/// Marks an entity so it is not despawned when its corresponding Godot Node is freed, breaking
+/// the usual 1-to-1 lifetime between them. This allows game logic to keep running on entities
+/// that have no Node, such as simulating off-screen factory machines or NPCs in inactive scenes.
+/// A Godot Node can be re-associated later by adding a `GodotScene` component to the **entity.**
+#[derive(Component)]
+pub struct ProtectedNodeEntity;
+
 fn create_scene_tree_entity(
     commands: &mut Commands,
     events: impl IntoIterator<Item = SceneTreeEvent>,
     scene_tree: &mut SceneTreeRef,
-    entities: &mut Query<(&mut GodotNodeHandle, Entity)>,
+    entities: &mut Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
     config: &SceneTreeConfig,
     component_registry: &SceneTreeComponentRegistry,
 ) {
     let mut ent_mapping = entities
         .iter()
-        .map(|(reference, ent)| (reference.instance_id(), ent))
+        .map(|(reference, ent, protected)| (reference.instance_id(), (ent, protected)))
         .collect::<HashMap<_, _>>();
     let scene_root = scene_tree.get().get_root().unwrap();
     let collision_watcher = scene_tree
@@ -266,7 +275,7 @@ fn create_scene_tree_entity(
                     continue;
                 }
 
-                let mut ent = if let Some(ent) = ent {
+                let mut ent = if let Some((ent, _)) = ent {
                     commands.entity(ent)
                 } else {
                     commands.spawn_empty()
@@ -343,7 +352,7 @@ fn create_scene_tree_entity(
                 component_registry.add_to_entity(&mut ent, &event.node);
 
                 let ent = ent.id();
-                ent_mapping.insert(node.instance_id(), ent);
+                ent_mapping.insert(node.instance_id(), (ent, None));
 
                 // Try to add any registered bundles for this node type
                 super::autosync::try_add_bundles_for_node(commands, ent, &event.node);
@@ -353,8 +362,8 @@ fn create_scene_tree_entity(
                     && let Some(parent) = node.get_parent()
                 {
                     let parent_id = parent.instance_id();
-                    if let Some(&parent_entity) = ent_mapping.get(&parent_id) {
-                        commands.entity(parent_entity).add_children(&[ent]);
+                    if let Some((parent_entity, _)) = ent_mapping.get(&parent_id) {
+                        commands.entity(*parent_entity).add_children(&[ent]);
                     } else {
                         warn!(target: "godot_scene_tree_events",
                             "Parent entity with ID {} not found in ent_mapping. This might indicate a missing or incorrect mapping.",
@@ -363,8 +372,13 @@ fn create_scene_tree_entity(
                 }
             }
             SceneTreeEventType::NodeRemoved => {
-                if let Some(ent) = ent {
-                    commands.entity(ent).despawn();
+                if let Some((ent, prot_opt)) = ent {
+                    let protected = prot_opt.is_some();
+                    if !protected {
+                        commands.entity(ent).despawn();
+                    } else {
+                        _strip_godot_components(commands, ent);
+                    }
                     ent_mapping.remove(&node.instance_id());
                 } else {
                     // Entity was already despawned (common when using queue_free)
@@ -372,7 +386,7 @@ fn create_scene_tree_entity(
                 }
             }
             SceneTreeEventType::NodeRenamed => {
-                if let Some(ent) = ent {
+                if let Some((ent, _)) = ent {
                     commands
                         .entity(ent)
                         .insert(Name::from(node.get::<Node>().get_name().to_string()));
@@ -384,12 +398,26 @@ fn create_scene_tree_entity(
     }
 }
 
+fn _strip_godot_components(commands: &mut Commands, ent: Entity) {
+    let mut entity_commands = commands.entity(ent);
+    // Remove GodotNodeHandle components
+    entity_commands.remove::<GodotNodeHandle>();
+
+    // Remove all GodotScene components
+    entity_commands.remove::<GodotScene>();
+
+    // Remove automatic markers
+    entity_commands.remove::<Name>();
+    entity_commands.remove::<Groups>();
+    remove_comprehensive_node_type_markers(&mut entity_commands);
+}
+
 #[main_thread_system]
 fn read_scene_tree_events(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
     mut event_reader: EventReader<SceneTreeEvent>,
-    mut entities: Query<(&mut GodotNodeHandle, Entity)>,
+    mut entities: Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
     config: Res<SceneTreeConfig>,
     component_registry: Res<SceneTreeComponentRegistry>,
 ) {

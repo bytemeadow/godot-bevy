@@ -207,6 +207,26 @@ pub fn add_comprehensive_node_type_markers(
     check_universal_node_types_comprehensive(entity_commands, node);
 }}
 
+pub fn remove_comprehensive_node_type_markers(
+    entity_commands: &mut EntityCommands,
+    node: &mut GodotNodeHandle,
+) {{
+    // All nodes inherit from Node, so remove this first
+    entity_commands.remove::<NodeMarker>();
+
+    entity_commands.remove::<Node3DMarker>();
+    remove_3d_node_types_comprehensive(entity_commands, node);
+
+    entity_commands.remove::<Node2DMarker>();
+    entity_commands.remove::<CanvasItemMarker>(); // Node2D inherits from CanvasItem
+    remove_2d_node_types_comprehensive(entity_commands, node);
+
+    entity_commands.remove::<ControlMarker>();
+    remove_control_node_types_comprehensive(entity_commands, node);
+
+    remove_universal_node_types_comprehensive(entity_commands, node);
+}}
+
 '''
 
         # Generate specific checking functions
@@ -294,6 +314,21 @@ pub fn add_comprehensive_node_type_markers(
 '''
 
         content += "}\n\n"
+
+        content += f'''fn remove_{name}_node_types_comprehensive(
+    entity_commands: &mut EntityCommands,
+    node: &mut GodotNodeHandle,
+) {{
+    entity_commands
+
+'''
+
+        for node_type in sorted(types):
+            rust_class_name = self.fix_godot_class_name_for_rust(node_type)
+            content += f'''        .remove::<{node_type}Marker>()
+'''
+
+        content += ";}\n\n"
         return content
 
     def _generate_universal_function_comprehensive(self, types):
@@ -312,6 +347,21 @@ pub fn add_comprehensive_node_type_markers(
 '''
 
         content += "}\n"
+
+        content += '''fn remove_universal_node_types_comprehensive(
+    entity_commands: &mut EntityCommands,
+    node: &mut GodotNodeHandle,
+) {
+    entity_commands
+
+'''
+
+        for node_type in sorted(types):
+            rust_class_name = self.fix_godot_class_name_for_rust(node_type)
+            content += f'''        .remove::<{node_type}Marker>()
+'''
+
+        content += ";}\n"
         return content
 
     def verify_plugin_integration(self):

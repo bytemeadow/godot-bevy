@@ -34,6 +34,23 @@ pub fn add_comprehensive_node_type_markers(
     check_universal_node_types_comprehensive(entity_commands, node);
 }
 
+pub fn remove_comprehensive_node_type_markers(entity_commands: &mut EntityCommands) {
+    // All nodes inherit from Node, so remove this first
+    entity_commands.remove::<NodeMarker>();
+
+    entity_commands.remove::<Node3DMarker>();
+    remove_3d_node_types_comprehensive(entity_commands);
+
+    entity_commands.remove::<Node2DMarker>();
+    entity_commands.remove::<CanvasItemMarker>(); // Node2D inherits from CanvasItem
+    remove_2d_node_types_comprehensive(entity_commands);
+
+    entity_commands.remove::<ControlMarker>();
+    remove_control_node_types_comprehensive(entity_commands);
+
+    remove_universal_node_types_comprehensive(entity_commands);
+}
+
 fn check_3d_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
     node: &mut GodotNodeHandle,
@@ -340,6 +357,82 @@ fn check_3d_node_types_comprehensive(
     }
 }
 
+fn remove_3d_node_types_comprehensive(entity_commands: &mut EntityCommands) {
+    entity_commands
+        .remove::<AnimatableBody3DMarker>()
+        .remove::<AnimatedSprite3DMarker>()
+        .remove::<Area3DMarker>()
+        .remove::<AudioListener3DMarker>()
+        .remove::<AudioStreamPlayer3DMarker>()
+        .remove::<BoneAttachment3DMarker>()
+        .remove::<CPUParticles3DMarker>()
+        .remove::<Camera3DMarker>()
+        .remove::<CharacterBody3DMarker>()
+        .remove::<CollisionObject3DMarker>()
+        .remove::<CollisionPolygon3DMarker>()
+        .remove::<CollisionShape3DMarker>()
+        .remove::<ConeTwistJoint3DMarker>()
+        .remove::<DecalMarker>()
+        .remove::<DirectionalLight3DMarker>()
+        .remove::<GPUParticles3DMarker>()
+        .remove::<GPUParticlesAttractor3DMarker>()
+        .remove::<GPUParticlesAttractorBox3DMarker>()
+        .remove::<GPUParticlesAttractorSphere3DMarker>()
+        .remove::<GPUParticlesAttractorVectorField3DMarker>()
+        .remove::<GPUParticlesCollision3DMarker>()
+        .remove::<GPUParticlesCollisionBox3DMarker>()
+        .remove::<GPUParticlesCollisionHeightField3DMarker>()
+        .remove::<GPUParticlesCollisionSDF3DMarker>()
+        .remove::<GPUParticlesCollisionSphere3DMarker>()
+        .remove::<Generic6DOFJoint3DMarker>()
+        .remove::<GeometryInstance3DMarker>()
+        .remove::<GridMapMarker>()
+        .remove::<HingeJoint3DMarker>()
+        .remove::<Joint3DMarker>()
+        .remove::<Label3DMarker>()
+        .remove::<Light3DMarker>()
+        .remove::<LightmapProbeMarker>()
+        .remove::<LookAtModifier3DMarker>()
+        .remove::<Marker3DMarker>()
+        .remove::<MeshInstance3DMarker>()
+        .remove::<MultiMeshInstance3DMarker>()
+        .remove::<OccluderInstance3DMarker>()
+        .remove::<OmniLight3DMarker>()
+        .remove::<Path3DMarker>()
+        .remove::<PathFollow3DMarker>()
+        .remove::<PhysicalBone3DMarker>()
+        .remove::<PhysicalBoneSimulator3DMarker>()
+        .remove::<PhysicsBody3DMarker>()
+        .remove::<PinJoint3DMarker>()
+        .remove::<RayCast3DMarker>()
+        .remove::<ReflectionProbeMarker>()
+        .remove::<RemoteTransform3DMarker>()
+        .remove::<RetargetModifier3DMarker>()
+        .remove::<RigidBody3DMarker>()
+        .remove::<RootMotionViewMarker>()
+        .remove::<ShapeCast3DMarker>()
+        .remove::<Skeleton3DMarker>()
+        .remove::<SkeletonIK3DMarker>()
+        .remove::<SkeletonModifier3DMarker>()
+        .remove::<SliderJoint3DMarker>()
+        .remove::<SoftBody3DMarker>()
+        .remove::<SpotLight3DMarker>()
+        .remove::<SpringArm3DMarker>()
+        .remove::<SpringBoneCollision3DMarker>()
+        .remove::<SpringBoneCollisionCapsule3DMarker>()
+        .remove::<SpringBoneCollisionPlane3DMarker>()
+        .remove::<SpringBoneCollisionSphere3DMarker>()
+        .remove::<SpringBoneSimulator3DMarker>()
+        .remove::<Sprite3DMarker>()
+        .remove::<SpriteBase3DMarker>()
+        .remove::<StaticBody3DMarker>()
+        .remove::<VehicleBody3DMarker>()
+        .remove::<VehicleWheel3DMarker>()
+        .remove::<VisibleOnScreenEnabler3DMarker>()
+        .remove::<VisibleOnScreenNotifier3DMarker>()
+        .remove::<VisualInstance3DMarker>();
+}
+
 fn check_2d_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
     node: &mut GodotNodeHandle,
@@ -512,6 +605,56 @@ fn check_2d_node_types_comprehensive(
     {
         entity_commands.insert(VisibleOnScreenNotifier2DMarker);
     }
+}
+
+fn remove_2d_node_types_comprehensive(entity_commands: &mut EntityCommands) {
+    entity_commands
+        .remove::<AnimatableBody2DMarker>()
+        .remove::<AnimatedSprite2DMarker>()
+        .remove::<Area2DMarker>()
+        .remove::<AudioListener2DMarker>()
+        .remove::<AudioStreamPlayer2DMarker>()
+        .remove::<BackBufferCopyMarker>()
+        .remove::<Bone2DMarker>()
+        .remove::<CPUParticles2DMarker>()
+        .remove::<Camera2DMarker>()
+        .remove::<CanvasGroupMarker>()
+        .remove::<CanvasModulateMarker>()
+        .remove::<CharacterBody2DMarker>()
+        .remove::<CollisionObject2DMarker>()
+        .remove::<CollisionPolygon2DMarker>()
+        .remove::<CollisionShape2DMarker>()
+        .remove::<DampedSpringJoint2DMarker>()
+        .remove::<DirectionalLight2DMarker>()
+        .remove::<GPUParticles2DMarker>()
+        .remove::<GrooveJoint2DMarker>()
+        .remove::<Joint2DMarker>()
+        .remove::<Light2DMarker>()
+        .remove::<LightOccluder2DMarker>()
+        .remove::<Line2DMarker>()
+        .remove::<Marker2DMarker>()
+        .remove::<MeshInstance2DMarker>()
+        .remove::<MultiMeshInstance2DMarker>()
+        .remove::<ParallaxLayerMarker>()
+        .remove::<Path2DMarker>()
+        .remove::<PathFollow2DMarker>()
+        .remove::<PhysicalBone2DMarker>()
+        .remove::<PhysicsBody2DMarker>()
+        .remove::<PinJoint2DMarker>()
+        .remove::<PointLight2DMarker>()
+        .remove::<Polygon2DMarker>()
+        .remove::<RayCast2DMarker>()
+        .remove::<RemoteTransform2DMarker>()
+        .remove::<RigidBody2DMarker>()
+        .remove::<ShapeCast2DMarker>()
+        .remove::<Skeleton2DMarker>()
+        .remove::<Sprite2DMarker>()
+        .remove::<StaticBody2DMarker>()
+        .remove::<TileMapMarker>()
+        .remove::<TileMapLayerMarker>()
+        .remove::<TouchScreenButtonMarker>()
+        .remove::<VisibleOnScreenEnabler2DMarker>()
+        .remove::<VisibleOnScreenNotifier2DMarker>();
 }
 
 fn check_control_node_types_comprehensive(
@@ -703,6 +846,66 @@ fn check_control_node_types_comprehensive(
     }
 }
 
+fn remove_control_node_types_comprehensive(entity_commands: &mut EntityCommands) {
+    entity_commands
+        .remove::<AspectRatioContainerMarker>()
+        .remove::<BaseButtonMarker>()
+        .remove::<BoxContainerMarker>()
+        .remove::<ButtonMarker>()
+        .remove::<CenterContainerMarker>()
+        .remove::<CheckBoxMarker>()
+        .remove::<CheckButtonMarker>()
+        .remove::<CodeEditMarker>()
+        .remove::<ColorPickerMarker>()
+        .remove::<ColorPickerButtonMarker>()
+        .remove::<ColorRectMarker>()
+        .remove::<ContainerMarker>()
+        .remove::<FlowContainerMarker>()
+        .remove::<GridContainerMarker>()
+        .remove::<HBoxContainerMarker>()
+        .remove::<HFlowContainerMarker>()
+        .remove::<HScrollBarMarker>()
+        .remove::<HSeparatorMarker>()
+        .remove::<HSliderMarker>()
+        .remove::<HSplitContainerMarker>()
+        .remove::<ItemListMarker>()
+        .remove::<LabelMarker>()
+        .remove::<LineEditMarker>()
+        .remove::<LinkButtonMarker>()
+        .remove::<MarginContainerMarker>()
+        .remove::<MenuBarMarker>()
+        .remove::<MenuButtonMarker>()
+        .remove::<NinePatchRectMarker>()
+        .remove::<OptionButtonMarker>()
+        .remove::<PanelMarker>()
+        .remove::<PanelContainerMarker>()
+        .remove::<ProgressBarMarker>()
+        .remove::<RangeMarker>()
+        .remove::<ReferenceRectMarker>()
+        .remove::<RichTextLabelMarker>()
+        .remove::<ScrollBarMarker>()
+        .remove::<ScrollContainerMarker>()
+        .remove::<SeparatorMarker>()
+        .remove::<SliderMarker>()
+        .remove::<SpinBoxMarker>()
+        .remove::<SplitContainerMarker>()
+        .remove::<SubViewportContainerMarker>()
+        .remove::<TabBarMarker>()
+        .remove::<TabContainerMarker>()
+        .remove::<TextEditMarker>()
+        .remove::<TextureButtonMarker>()
+        .remove::<TextureProgressBarMarker>()
+        .remove::<TextureRectMarker>()
+        .remove::<TreeMarker>()
+        .remove::<VBoxContainerMarker>()
+        .remove::<VFlowContainerMarker>()
+        .remove::<VScrollBarMarker>()
+        .remove::<VSeparatorMarker>()
+        .remove::<VSliderMarker>()
+        .remove::<VSplitContainerMarker>()
+        .remove::<VideoStreamPlayerMarker>();
+}
+
 fn check_universal_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
     node: &mut GodotNodeHandle,
@@ -764,4 +967,20 @@ fn check_universal_node_types_comprehensive(
     if node.try_get::<godot::classes::Viewport>().is_some() {
         entity_commands.insert(ViewportMarker);
     }
+}
+fn remove_universal_node_types_comprehensive(entity_commands: &mut EntityCommands) {
+    entity_commands
+        .remove::<AnimationMixerMarker>()
+        .remove::<AudioStreamPlayerMarker>()
+        .remove::<CanvasItemMarker>()
+        .remove::<CanvasLayerMarker>()
+        .remove::<HTTPRequestMarker>()
+        .remove::<InstancePlaceholderMarker>()
+        .remove::<MultiplayerSpawnerMarker>()
+        .remove::<MultiplayerSynchronizerMarker>()
+        .remove::<Node3DMarker>()
+        .remove::<ResourcePreloaderMarker>()
+        .remove::<ShaderGlobalsOverrideMarker>()
+        .remove::<TimerMarker>()
+        .remove::<ViewportMarker>();
 }
