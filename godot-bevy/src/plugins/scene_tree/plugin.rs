@@ -142,41 +142,36 @@ fn initialize_scene_tree(
         // Use optimized GDScript watcher to analyze the initial tree with type information
         tracing::info!("Using optimized initial tree analysis with type pre-analysis");
 
-        if watcher.has_method("analyze_initial_tree") {
-            let analysis_result = watcher.call("analyze_initial_tree", &[]);
-            let array_result =
-                analysis_result.to::<godot::builtin::Array<godot::prelude::Variant>>();
+        let analysis_result = watcher.call("analyze_initial_tree", &[]);
+        let array_result = analysis_result.to::<godot::builtin::Array<godot::prelude::Variant>>();
 
-            let mut node_infos = Vec::new();
-            for i in 0..array_result.len() {
-                if let Some(element) = array_result.get(i)
-                    && let Ok(dict) = element.try_to::<godot::builtin::Dictionary>()
-                {
-                    node_infos.push(dict);
-                }
+        let mut node_infos = Vec::new();
+        for i in 0..array_result.len() {
+            if let Some(element) = array_result.get(i)
+                && let Ok(dict) = element.try_to::<godot::builtin::Dictionary>()
+            {
+                node_infos.push(dict);
             }
-
-            let mut events = Vec::new();
-            for node_info in node_infos {
-                if let (Some(instance_id), Some(node_type)) =
-                    (node_info.get("instance_id"), node_info.get("node_type"))
-                {
-                    let id = instance_id.to::<i64>();
-                    let type_str = node_type.to::<String>();
-                    events.push(SceneTreeEvent {
-                        node: GodotNodeHandle::from_instance_id(
-                            godot::prelude::InstanceId::from_i64(id),
-                        ),
-                        event_type: SceneTreeEventType::NodeAdded,
-                        node_type: Some(type_str),
-                    });
-                }
-            }
-            events
-        } else {
-            // Fallback if method not available
-            traverse_fallback(root.upcast())
         }
+
+        let mut events = Vec::new();
+        for node_info in node_infos {
+            if let (Some(instance_id), Some(node_type)) =
+                (node_info.get("instance_id"), node_info.get("node_type"))
+            {
+                let id = instance_id.to::<i64>();
+                let type_str = node_type.to::<String>();
+                events.push(SceneTreeEvent {
+                    node: GodotNodeHandle::from_instance_id(godot::prelude::InstanceId::from_i64(
+                        id,
+                    )),
+                    event_type: SceneTreeEventType::NodeAdded,
+                    node_type: Some(type_str),
+                });
+            }
+        }
+
+        events
     } else {
         // Use fallback traversal without type optimization
         tracing::info!("Using fallback initial tree analysis (no type optimization)");
