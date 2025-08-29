@@ -84,7 +84,7 @@ fn update_player_input(query: Query<&ActionState<PlayerAction>, With<Player>>) {
     }
 
     // Print debug info every ~2 seconds to help diagnose issues
-    if (current_time as u32) % 120 == 0 {
+    if (current_time as u32).is_multiple_of(120) {
         godot_print!("🔍 LEAFWING DEBUG: Checking input states...");
 
         // Check if any input is being detected

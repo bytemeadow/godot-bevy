@@ -61,7 +61,7 @@ fn first_schedule_system(
     counter.app_update_calls += 1;
 
     // Log every few runs to show execution frequency
-    if stats.first_schedule_runs % 60 == 0 {
+    if stats.first_schedule_runs.is_multiple_of(60) {
         // Every second at 60fps
         godot_print!(
             "🔍 DEBUG: First Schedule #{}: app_update_calls: {}, Time: {:.2}s",
@@ -72,7 +72,7 @@ fn first_schedule_system(
     }
 
     // Original periodic logging
-    if stats.first_schedule_runs % 120 == 0 {
+    if stats.first_schedule_runs.is_multiple_of(120) {
         // Every 2 seconds at 60fps
         godot_print!(
             "📺 First Schedule Run #{}: Time: {:.2}s (runs in app.update())",
@@ -107,7 +107,7 @@ fn fixed_update_system(mut stats: ResMut<TimingStats>, time: Res<Time>) {
     stats.fixed_update_runs += 1;
 
     // FixedUpdate runs as part of app.update(), maintaining its own timing
-    if stats.fixed_update_runs % 128 == 0 {
+    if stats.fixed_update_runs.is_multiple_of(128) {
         // Every ~2 seconds at 64Hz
         godot_print!(
             "🔧 FixedUpdate Run #{}: Time: {:.2}s (Bevy's internal 64Hz timing)",
@@ -147,7 +147,7 @@ fn physics_update_system(
     counter.physics_process_calls += 1;
 
     // This runs in physics_process() at Godot's physics framerate
-    if stats.physics_update_runs % 60 == 0 {
+    if stats.physics_update_runs.is_multiple_of(60) {
         // Every second at 60Hz physics
         godot_print!(
             "⚡ PhysicsUpdate #{}: physics_process_calls: {}, Time: {:.2}s",
