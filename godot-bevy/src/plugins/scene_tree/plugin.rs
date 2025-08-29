@@ -144,7 +144,16 @@ fn initialize_scene_tree(
 
         if watcher.has_method("analyze_initial_tree") {
             let analysis_result = watcher.call("analyze_initial_tree", &[]);
-            let node_infos = analysis_result.to::<Vec<godot::builtin::Dictionary>>();
+            let array_result = analysis_result.to::<godot::builtin::Array<godot::prelude::Variant>>();
+            
+            let mut node_infos = Vec::new();
+            for i in 0..array_result.len() {
+                if let Some(element) = array_result.get(i) {
+                    if let Ok(dict) = element.try_to::<godot::builtin::Dictionary>() {
+                        node_infos.push(dict);
+                    }
+                }
+            }
 
             let mut events = Vec::new();
             for node_info in node_infos {
