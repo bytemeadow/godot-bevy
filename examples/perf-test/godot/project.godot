@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="Boids Comparison"
+config/name="Performance Test"
 run/main_scene="uid://c7q8xvbgkktxh"
 config/features=PackedStringArray("4.4", "Mobile")
 config/icon="res://icon.svg"
