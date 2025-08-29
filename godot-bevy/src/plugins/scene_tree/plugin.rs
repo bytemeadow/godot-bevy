@@ -143,28 +143,20 @@ fn initialize_scene_tree(
         tracing::info!("Using optimized initial tree analysis with type pre-analysis");
 
         let analysis_result = watcher.call("analyze_initial_tree", &[]);
-        let array_result = analysis_result.to::<godot::builtin::Array<godot::prelude::Variant>>();
-
-        let mut node_infos = Vec::new();
-        for i in 0..array_result.len() {
-            if let Some(element) = array_result.get(i)
-                && let Ok(dict) = element.try_to::<godot::builtin::Dictionary>()
-            {
-                node_infos.push(dict);
-            }
-        }
+        // Extract PackedArrays from the result dictionary for maximum performance
+        let result_dict = analysis_result.to::<godot::builtin::Dictionary>();
+        let instance_ids = result_dict.get("instance_ids").unwrap().to::<godot::builtin::PackedInt64Array>();
+        let node_types = result_dict.get("node_types").unwrap().to::<godot::builtin::PackedStringArray>();
 
         let mut events = Vec::new();
-        for node_info in node_infos {
-            if let (Some(instance_id), Some(node_type)) =
-                (node_info.get("instance_id"), node_info.get("node_type"))
-            {
-                let id = instance_id.to::<i64>();
-                let type_str = node_type.to::<String>();
+        // Process parallel arrays - much faster than individual Variant conversions
+        let len = instance_ids.len().min(node_types.len());
+        for i in 0..len {
+            if let (Some(id), Some(type_gstring)) = (instance_ids.get(i), node_types.get(i)) {
+                let type_str = type_gstring.to_string();
+                
                 events.push(SceneTreeEvent {
-                    node: GodotNodeHandle::from_instance_id(godot::prelude::InstanceId::from_i64(
-                        id,
-                    )),
+                    node: GodotNodeHandle::from_instance_id(godot::prelude::InstanceId::from_i64(id)),
                     event_type: SceneTreeEventType::NodeAdded,
                     node_type: Some(type_str),
                 });

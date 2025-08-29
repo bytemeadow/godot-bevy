@@ -284,25 +284,42 @@ func _analyze_node_type(node: Node) -> String:
 	# Default fallback
 	return "Node"
 
-func analyze_initial_tree() -> Array:
+func analyze_initial_tree() -> Dictionary:
 	"""
 	Analyze the entire initial scene tree and return node information with types.
+	Returns a Dictionary with PackedArrays for maximum performance:
+	{
+		"instance_ids": PackedInt64Array,
+		"node_types": PackedStringArray
+	}
 	Used for optimized initial scene tree setup.
 	"""
-	var result = []
+	var instance_ids = PackedInt64Array()
+	var node_types = PackedStringArray()
 	var root = get_tree().get_root()
 	if root:
-		_analyze_node_recursive(root, result)
-	return result
+		_analyze_node_recursive(root, instance_ids, node_types)
+	
+	return {
+		"instance_ids": instance_ids,
+		"node_types": node_types
+	}
 
-func _analyze_node_recursive(node: Node, result: Array):
-	"""Recursively analyze nodes and collect type information"""
+func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_types: PackedStringArray):
+	"""Recursively analyze nodes and collect type information into PackedArrays"""
+	# Check if node is still valid before processing
+	if not is_instance_valid(node):
+		return
+	
 	# Add this node's information with pre-analyzed type
-	result.append({
-		"instance_id": node.get_instance_id(),
-		"node_type": _analyze_node_type(node)
-	})
+	var instance_id = node.get_instance_id()
+	var node_type = _analyze_node_type(node)
+	
+	# Only append if we have valid data
+	if instance_id != 0 and node_type != "":
+		instance_ids.append(instance_id)
+		node_types.append(node_type)
 	
 	# Recursively process children
 	for child in node.get_children():
-		_analyze_node_recursive(child, result)
+		_analyze_node_recursive(child, instance_ids, node_types)

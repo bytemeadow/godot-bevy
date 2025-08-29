@@ -137,3 +137,57 @@ The project uses GitHub Actions CI that runs on Linux, macOS, and Windows:
 - Example project builds and Godot exports
 
 CI configuration is in `.github/workflows/ci.yml` and must pass for all PRs.
+
+## Performance Best Practices
+
+### PackedArray Pattern for Maximum Performance
+
+When transferring bulk data between Rust and GDScript, always use PackedArrays instead of individual Variant conversions to avoid expensive FFI calls.
+
+**Pattern:**
+1. **GDScript side**: Collect data into PackedArrays
+2. **Transfer**: Pass PackedArrays via single `call()` or return in Dictionary
+3. **Rust side**: Process PackedArrays directly
+
+**Example Implementation:**
+```rust
+// Rust: Collect data in Vec/slice, convert to PackedArray
+let ids = PackedInt64Array::from(instance_ids.as_slice());
+let positions = PackedVector3Array::from(positions.as_slice());
+watcher.call("bulk_update", &[ids.to_variant(), positions.to_variant()]);
+
+// Rust: Process received PackedArrays
+let result_dict = watcher.call("analyze_data", &[]).to::<Dictionary>();
+let ids = result_dict.get("ids").unwrap().to::<PackedInt64Array>();
+let types = result_dict.get("types").unwrap().to::<PackedStringArray>();
+for i in 0..ids.len() {
+    if let (Some(id), Some(type_name)) = (ids.get(i), types.get(i)) {
+        // Process data efficiently
+    }
+}
+```
+
+**GDScript Pattern:**
+```gdscript
+# Collect into PackedArrays
+var ids = PackedInt64Array()
+var types = PackedStringArray()
+for node in nodes:
+    ids.append(node.get_instance_id())
+    types.append(node.get_class())
+
+# Return as Dictionary with PackedArrays
+return {"ids": ids, "types": types}
+```
+
+**Performance Benefits:**
+- Eliminates per-element Variant conversion FFI calls
+- Reduces N×FFI to 1×FFI (where N = number of elements)  
+- Can achieve 10-50x performance improvement for bulk operations
+- Used extensively in transform sync system and optimized scene tree analysis
+
+**When to Use:**
+- Bulk data transfer (>10 elements)
+- Performance-critical paths
+- Scene tree operations, transform updates, collision data
+- Any scenario with repeated Variant conversions
