@@ -14,6 +14,10 @@ config/name="Plugin Test"
 config/features=PackedStringArray("4.4", "Mobile")
 config/icon="res://icon.svg"
 
+[autoload]
+
+BevyAppSingleton="*res://addons/godot-bevy/bevy_app_singleton.tscn"
+
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/godot-bevy/plugin.cfg")

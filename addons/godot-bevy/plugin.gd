@@ -44,7 +44,7 @@ func _on_setup_project():
 		else:
 			push_error("Failed to load wizard scene")
 
-	wizard_dialog.popup_centered(Vector2(600, 400))
+	wizard_dialog.popup_centered()
 
 
 func _on_project_created(project_info: Dictionary):
