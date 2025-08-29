@@ -19,10 +19,6 @@ func _ready():
 	var bevy_app = get_node("/root/BevyAppSingleton")
 	if bevy_app:
 		rust_watcher = bevy_app.get_node("SceneTreeWatcher")
-		if rust_watcher:
-			print("OptimizedSceneTreeWatcher: Connected to Rust SceneTreeWatcher with type optimization for 200 node types")
-		else:
-			print("OptimizedSceneTreeWatcher: Could not find Rust SceneTreeWatcher")
 	
 	# Connect to scene tree signals - these will forward to Rust with type info
 	# Use immediate connections for add/remove to get events as early as possible
