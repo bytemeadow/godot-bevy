@@ -92,15 +92,11 @@ crate-type = ["cdylib"]
 [dependencies]
 bevy = { version = "0.16", default-features = false, features = ["bevy_state"] }
 godot = "0.3"
-godot-bevy = "%s"
+godot-bevy = { version = "%s", features = ["default"] }
 
 [workspace]
 # Empty workspace table to make this a standalone project
 """ % [_to_snake_case(project_name), info.godot_bevy_version]
-
-	if info.use_defaults:
-		cargo_content = cargo_content.replace('godot-bevy = "%s"' % info.godot_bevy_version,
-			'godot-bevy = { version = "%s", features = ["default"] }' % info.godot_bevy_version)
 
 	_save_file(rust_path.path_join("Cargo.toml"), cargo_content)
 
