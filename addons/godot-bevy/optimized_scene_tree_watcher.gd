@@ -25,8 +25,9 @@ func _ready():
 			print("OptimizedSceneTreeWatcher: Could not find Rust SceneTreeWatcher")
 	
 	# Connect to scene tree signals - these will forward to Rust with type info
-	get_tree().node_added.connect(_on_node_added, CONNECT_DEFERRED)
-	get_tree().node_removed.connect(_on_node_removed, CONNECT_DEFERRED) 
+	# Use immediate connections for add/remove to get events as early as possible
+	get_tree().node_added.connect(_on_node_added)
+	get_tree().node_removed.connect(_on_node_removed) 
 	get_tree().node_renamed.connect(_on_node_renamed, CONNECT_DEFERRED)
 
 func set_rust_watcher(watcher: Node):
@@ -36,6 +37,10 @@ func set_rust_watcher(watcher: Node):
 func _on_node_added(node: Node):
 	"""Handle node added events with type optimization"""
 	if not rust_watcher:
+		return
+	
+	# Check if node is still valid
+	if not is_instance_valid(node):
 		return
 	
 	# Analyze node type on GDScript side - this is much faster than FFI
@@ -52,12 +57,20 @@ func _on_node_removed(node: Node):
 	"""Handle node removed events - no type analysis needed for removal"""
 	if not rust_watcher:
 		return
+	
+	# This is called immediately (not deferred) so the node should still be valid
+	# We need to send this event so Rust can clean up the corresponding Bevy entity
 	rust_watcher.scene_tree_event(node, "NodeRemoved")
 
 func _on_node_renamed(node: Node):
 	"""Handle node renamed events - no type analysis needed for renaming"""
 	if not rust_watcher:
 		return
+	
+	# Check if node is still valid
+	if not is_instance_valid(node):
+		return
+		
 	rust_watcher.scene_tree_event(node, "NodeRenamed")
 
 func _analyze_node_type(node: Node) -> String:
