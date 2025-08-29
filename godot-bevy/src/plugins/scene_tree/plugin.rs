@@ -1,5 +1,6 @@
 use super::node_type_checking_generated::{
-    add_comprehensive_node_type_markers, remove_comprehensive_node_type_markers,
+    add_comprehensive_node_type_markers, add_node_type_markers_from_string,
+    remove_comprehensive_node_type_markers,
 };
 use crate::plugins::core::SceneTreeComponentRegistry;
 use crate::prelude::{GodotScene, main_thread_system};
@@ -131,20 +132,46 @@ fn initialize_scene_tree(
     config: Res<SceneTreeConfig>,
     component_registry: Res<SceneTreeComponentRegistry>,
 ) {
-    fn traverse(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
-        events.push(SceneTreeEvent {
-            node: GodotNodeHandle::from_instance_id(node.instance_id()),
-            event_type: SceneTreeEventType::NodeAdded,
-        });
-
-        for child in node.get_children().iter_shared() {
-            traverse(child, events);
-        }
-    }
-
     let root = scene_tree.get().get_root().unwrap();
-    let mut events = vec![];
-    traverse(root.upcast(), &mut events);
+
+    // Check if we have the optimized GDScript watcher for type pre-analysis
+    let optimized_watcher =
+        root.try_get_node_as::<Node>("/root/BevyAppSingleton/OptimizedSceneTreeWatcher");
+
+    let events = if let Some(mut watcher) = optimized_watcher {
+        // Use optimized GDScript watcher to analyze the initial tree with type information
+        tracing::info!("Using optimized initial tree analysis with type pre-analysis");
+
+        if watcher.has_method("analyze_initial_tree") {
+            let analysis_result = watcher.call("analyze_initial_tree", &[]);
+            let node_infos = analysis_result.to::<Vec<godot::builtin::Dictionary>>();
+
+            let mut events = Vec::new();
+            for node_info in node_infos {
+                if let (Some(instance_id), Some(node_type)) =
+                    (node_info.get("instance_id"), node_info.get("node_type"))
+                {
+                    let id = instance_id.to::<i64>();
+                    let type_str = node_type.to::<String>();
+                    events.push(SceneTreeEvent {
+                        node: GodotNodeHandle::from_instance_id(
+                            godot::prelude::InstanceId::from_i64(id),
+                        ),
+                        event_type: SceneTreeEventType::NodeAdded,
+                        node_type: Some(type_str),
+                    });
+                }
+            }
+            events
+        } else {
+            // Fallback if method not available
+            traverse_fallback(root.upcast())
+        }
+    } else {
+        // Use fallback traversal without type optimization
+        tracing::info!("Using fallback initial tree analysis (no type optimization)");
+        traverse_fallback(root.upcast())
+    };
 
     create_scene_tree_entity(
         &mut commands,
@@ -156,10 +183,29 @@ fn initialize_scene_tree(
     );
 }
 
+fn traverse_fallback(node: Gd<Node>) -> Vec<SceneTreeEvent> {
+    fn traverse_recursive(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
+        events.push(SceneTreeEvent {
+            node: GodotNodeHandle::from_instance_id(node.instance_id()),
+            event_type: SceneTreeEventType::NodeAdded,
+            node_type: None, // No type optimization available
+        });
+
+        for child in node.get_children().iter_shared() {
+            traverse_recursive(child, events);
+        }
+    }
+
+    let mut events = Vec::new();
+    traverse_recursive(node, &mut events);
+    events
+}
+
 #[derive(Debug, Clone, Event)]
 pub struct SceneTreeEvent {
     pub node: GodotNodeHandle,
     pub event_type: SceneTreeEventType,
+    pub node_type: Option<String>, // Pre-analyzed node type from GDScript watcher
 }
 
 #[derive(Copy, Clone, Debug, GodotConvert)]
@@ -179,26 +225,42 @@ fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
         .unwrap()
         .get_node_as::<Node>("/root/BevyAppSingleton/SceneTreeWatcher");
 
-    scene_tree_gd.connect(
-        "node_added",
-        &watcher
-            .callable("scene_tree_event")
-            .bind(&[SceneTreeEventType::NodeAdded.to_variant()]),
-    );
+    // Check if we have the optimized GDScript watcher
+    let optimized_watcher = scene_tree_gd
+        .get_root()
+        .unwrap()
+        .try_get_node_as::<Node>("/root/BevyAppSingleton/OptimizedSceneTreeWatcher");
 
-    scene_tree_gd.connect(
-        "node_removed",
-        &watcher
-            .callable("scene_tree_event")
-            .bind(&[SceneTreeEventType::NodeRemoved.to_variant()]),
-    );
+    if optimized_watcher.is_some() {
+        // The optimized GDScript watcher handles scene tree connections and forwards
+        // pre-analyzed events to the Rust watcher (which has the MPSC sender)
+        // No need to connect here - it connects automatically in its _ready()
+        tracing::info!("Using optimized GDScript scene tree watcher with type pre-analysis");
+    } else {
+        // Fallback to direct connection without type optimization
+        tracing::info!("Using fallback scene tree connection (no type optimization)");
 
-    scene_tree_gd.connect(
-        "node_renamed",
-        &watcher
-            .callable("scene_tree_event")
-            .bind(&[SceneTreeEventType::NodeRenamed.to_variant()]),
-    );
+        scene_tree_gd.connect(
+            "node_added",
+            &watcher
+                .callable("scene_tree_event")
+                .bind(&[SceneTreeEventType::NodeAdded.to_variant()]),
+        );
+
+        scene_tree_gd.connect(
+            "node_removed",
+            &watcher
+                .callable("scene_tree_event")
+                .bind(&[SceneTreeEventType::NodeRemoved.to_variant()]),
+        );
+
+        scene_tree_gd.connect(
+            "node_renamed",
+            &watcher
+                .callable("scene_tree_event")
+                .bind(&[SceneTreeEventType::NodeRenamed.to_variant()]),
+        );
+    }
 }
 
 #[derive(Component, Debug)]
@@ -284,8 +346,14 @@ fn create_scene_tree_entity(
                 ent.insert(GodotNodeHandle::clone(&node))
                     .insert(Name::from(node.get::<Node>().get_name().to_string()));
 
-                // Add node type marker components
-                add_comprehensive_node_type_markers(&mut ent, &mut node);
+                // Add node type marker components - use optimized version if available
+                if let Some(ref node_type_str) = event.node_type {
+                    // Use pre-analyzed type from GDScript watcher (much faster)
+                    add_node_type_markers_from_string(&mut ent, node_type_str);
+                } else {
+                    // Fallback to comprehensive analysis with FFI calls
+                    add_comprehensive_node_type_markers(&mut ent, &mut node);
+                }
 
                 let mut node = node.get::<Node>();
 
@@ -409,7 +477,10 @@ fn _strip_godot_components(commands: &mut Commands, ent: Entity) {
     // Remove automatic markers
     entity_commands.remove::<Name>();
     entity_commands.remove::<Groups>();
-    remove_comprehensive_node_type_markers(&mut entity_commands);
+    // Create a dummy handle since we're removing components anyway
+    let mut dummy_handle =
+        GodotNodeHandle::from_instance_id(godot::classes::Engine::singleton().instance_id());
+    remove_comprehensive_node_type_markers(&mut entity_commands, &mut dummy_handle);
 }
 
 #[main_thread_system]
