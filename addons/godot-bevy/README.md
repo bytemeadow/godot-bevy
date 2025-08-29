@@ -10,7 +10,8 @@ This Godot editor plugin provides tools to seamlessly integrate Bevy ECS with yo
 - **Platform-aware configuration** - Generates correct .gdextension file for all platforms
 
 ### 🎮 BevyApp Singleton Management
-- **Automatic singleton creation** - Sets up BevyAppSingleton in project autoload
+- **Automatic registration** - BevyAppSingleton is automatically added to autoload when plugin is enabled
+- **No manual setup required** - Singleton is managed by the plugin lifecycle
 - **Scene-based configuration** - Easy to modify and extend
 
 ### 🛠️ Development Tools
@@ -21,6 +22,7 @@ This Godot editor plugin provides tools to seamlessly integrate Bevy ECS with yo
 
 1. Copy the `addons/godot-bevy` folder to your Godot project's `addons` directory
 2. Enable the plugin in Project Settings > Plugins
+3. The BevyAppSingleton will be automatically registered as an autoload
 
 ## Usage
 
@@ -39,27 +41,29 @@ The plugin will:
 - Generate Cargo.toml with selected features
 - Create a starter lib.rs with example system
 - Set up the .gdextension file
-- Create and register BevyAppSingleton
-- Generate build scripts
+- Build the Rust project automatically
+- Restart the editor to apply changes
 
-### Adding BevyApp Singleton Only
+### BevyApp Singleton
 
-If you already have a Rust project and just need the singleton:
+The BevyAppSingleton is automatically managed:
+- **Automatically registered** when the plugin is enabled
+- **Automatically removed** when the plugin is disabled
+- **No manual setup required** - just enable the plugin!
 
-1. Go to **Project > Tools > Add BevyApp Singleton**
-2. The plugin will create and register the singleton automatically
-
-## Generated Project Structure
+## Project Structure
 
 ```
 your_project/
+├── addons/
+│   └── godot-bevy/
+│       ├── bevy_app_singleton.tscn (auto-registered)
+│       └── ... (plugin files)
 ├── rust/
 │   ├── Cargo.toml
 │   └── src/
 │       └── lib.rs
-├── rust.gdextension
-├── build.sh (or build.bat on Windows)
-└── bevy_app_singleton.tscn (autoloaded)
+└── rust.gdextension
 ```
 
 ## Building Your Project

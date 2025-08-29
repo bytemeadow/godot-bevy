@@ -17,8 +17,8 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-BevyAppSingleton="*res://bevy_app_singleton.tscn"
 BenchmarkCLI="*res://scenes/benchmark_cli.tscn"
+BevyAppSingleton="*res://addons/godot-bevy/bevy_app_singleton.tscn"
 
 [display]
 
