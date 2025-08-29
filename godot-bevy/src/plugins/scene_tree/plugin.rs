@@ -145,8 +145,14 @@ fn initialize_scene_tree(
         let analysis_result = watcher.call("analyze_initial_tree", &[]);
         // Extract PackedArrays from the result dictionary for maximum performance
         let result_dict = analysis_result.to::<godot::builtin::Dictionary>();
-        let instance_ids = result_dict.get("instance_ids").unwrap().to::<godot::builtin::PackedInt64Array>();
-        let node_types = result_dict.get("node_types").unwrap().to::<godot::builtin::PackedStringArray>();
+        let instance_ids = result_dict
+            .get("instance_ids")
+            .unwrap()
+            .to::<godot::builtin::PackedInt64Array>();
+        let node_types = result_dict
+            .get("node_types")
+            .unwrap()
+            .to::<godot::builtin::PackedStringArray>();
 
         let mut events = Vec::new();
         // Process parallel arrays - much faster than individual Variant conversions
@@ -154,9 +160,11 @@ fn initialize_scene_tree(
         for i in 0..len {
             if let (Some(id), Some(type_gstring)) = (instance_ids.get(i), node_types.get(i)) {
                 let type_str = type_gstring.to_string();
-                
+
                 events.push(SceneTreeEvent {
-                    node: GodotNodeHandle::from_instance_id(godot::prelude::InstanceId::from_i64(id)),
+                    node: GodotNodeHandle::from_instance_id(godot::prelude::InstanceId::from_i64(
+                        id,
+                    )),
                     event_type: SceneTreeEventType::NodeAdded,
                     node_type: Some(type_str),
                 });
