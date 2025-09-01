@@ -277,9 +277,6 @@ func _analyze_node_type(node: Node) -> String:
 	elif node is ResourcePreloader: return "ResourcePreloader"
 	elif node is ShaderGlobalsOverride: return "ShaderGlobalsOverride"
 	elif node is Viewport: return "Viewport"
-
-	# Base types
-	elif node is CanvasItem: return "CanvasItem"
 	
 	# Default fallback
 	return "Node"

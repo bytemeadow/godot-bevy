@@ -405,14 +405,11 @@ func _ready():
 	var bevy_app = get_node("/root/BevyAppSingleton")
 	if bevy_app:
 		rust_watcher = bevy_app.get_node("SceneTreeWatcher")
-		if rust_watcher:
-			print("OptimizedSceneTreeWatcher: Connected to Rust SceneTreeWatcher with type optimization for {len(valid_types)} node types")
-		else:
-			print("OptimizedSceneTreeWatcher: Could not find Rust SceneTreeWatcher")
 	
 	# Connect to scene tree signals - these will forward to Rust with type info
-	get_tree().node_added.connect(_on_node_added, CONNECT_DEFERRED)
-	get_tree().node_removed.connect(_on_node_removed, CONNECT_DEFERRED) 
+	# Use immediate connections for add/remove to get events as early as possible
+	get_tree().node_added.connect(_on_node_added)
+	get_tree().node_removed.connect(_on_node_removed) 
 	get_tree().node_renamed.connect(_on_node_renamed, CONNECT_DEFERRED)
 
 func set_rust_watcher(watcher: Node):
@@ -422,6 +419,10 @@ func set_rust_watcher(watcher: Node):
 func _on_node_added(node: Node):
 	"""Handle node added events with type optimization"""
 	if not rust_watcher:
+		return
+	
+	# Check if node is still valid
+	if not is_instance_valid(node):
 		return
 	
 	# Analyze node type on GDScript side - this is much faster than FFI
@@ -438,12 +439,20 @@ func _on_node_removed(node: Node):
 	"""Handle node removed events - no type analysis needed for removal"""
 	if not rust_watcher:
 		return
+	
+	# This is called immediately (not deferred) so the node should still be valid
+	# We need to send this event so Rust can clean up the corresponding Bevy entity
 	rust_watcher.scene_tree_event(node, "NodeRemoved")
 
 func _on_node_renamed(node: Node):
 	"""Handle node renamed events - no type analysis needed for renaming"""
 	if not rust_watcher:
 		return
+	
+	# Check if node is still valid
+	if not is_instance_valid(node):
+		return
+		
 	rust_watcher.scene_tree_event(node, "NodeRenamed")
 
 func _analyze_node_type(node: Node) -> String:
@@ -544,36 +553,49 @@ func _analyze_node_type(node: Node) -> String:
             if node_type not in common_universal:
                 lines.append(f"\telif node is {node_type}: return \"{node_type}\"")
         
-        lines.append("")
-        lines.append("\t# Base types")
-        lines.append("\telif node is CanvasItem: return \"CanvasItem\"")
-        
         return '\n'.join(lines)
 
     def _generate_initial_tree_analysis(self):
         """Generate method for analyzing the initial scene tree with type info"""
-        return '''func analyze_initial_tree() -> Array:
+        return '''func analyze_initial_tree() -> Dictionary:
 	"""
 	Analyze the entire initial scene tree and return node information with types.
+	Returns a Dictionary with PackedArrays for maximum performance:
+	{
+		"instance_ids": PackedInt64Array,
+		"node_types": PackedStringArray
+	}
 	Used for optimized initial scene tree setup.
 	"""
-	var result = []
+	var instance_ids = PackedInt64Array()
+	var node_types = PackedStringArray()
 	var root = get_tree().get_root()
 	if root:
-		_analyze_node_recursive(root, result)
-	return result
+		_analyze_node_recursive(root, instance_ids, node_types)
+	
+	return {
+		"instance_ids": instance_ids,
+		"node_types": node_types
+	}
 
-func _analyze_node_recursive(node: Node, result: Array):
-	"""Recursively analyze nodes and collect type information"""
+func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_types: PackedStringArray):
+	"""Recursively analyze nodes and collect type information into PackedArrays"""
+	# Check if node is still valid before processing
+	if not is_instance_valid(node):
+		return
+	
 	# Add this node's information with pre-analyzed type
-	result.append({
-		"instance_id": node.get_instance_id(),
-		"node_type": _analyze_node_type(node)
-	})
+	var instance_id = node.get_instance_id()
+	var node_type = _analyze_node_type(node)
+	
+	# Only append if we have valid data
+	if instance_id != 0 and node_type != "":
+		instance_ids.append(instance_id)
+		node_types.append(node_type)
 	
 	# Recursively process children
 	for child in node.get_children():
-		_analyze_node_recursive(child, result)'''
+		_analyze_node_recursive(child, instance_ids, node_types)'''
 
     def _generate_hierarchy_function_comprehensive(self, name, types):
         """Generate a hierarchy-specific type checking function"""
