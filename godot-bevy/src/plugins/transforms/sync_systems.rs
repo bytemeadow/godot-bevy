@@ -6,7 +6,6 @@ use bevy::ecs::change_detection::{DetectChanges, Ref};
 use bevy::ecs::query::{AnyOf, Changed};
 use bevy::ecs::system::{Query, SystemChangeTick};
 use bevy::prelude::Transform as BevyTransform;
-use godot::builtin::Vector4;
 use godot::classes::{Engine, Node2D, Node3D, Object, SceneTree};
 use godot::prelude::{Gd, ToGodot};
 
@@ -150,7 +149,7 @@ fn post_update_godot_transforms_bulk(
                 transform_ref.translation.z,
             ));
 
-            rotations_3d.push(Vector4 {
+            rotations_3d.push(godot::builtin::Vector4 {
                 x: transform_ref.rotation.x,
                 y: transform_ref.rotation.y,
                 z: transform_ref.rotation.z,
