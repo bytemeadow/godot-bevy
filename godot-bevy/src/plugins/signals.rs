@@ -36,7 +36,6 @@ impl Plugin for GodotSignalsPlugin {
 pub struct RawGodotSignal {
     pub signal_name: String,
     pub source_node: GodotNodeHandle,
-    pub source_entity: Option<Entity>,
     pub arguments: Vec<Variant>,
 }
 
@@ -47,8 +46,6 @@ pub struct GodotSignal {
     pub signal_name: String,
     /// The Godot node that emitted the signal
     pub source_node: GodotNodeHandle,
-    /// Optional Bevy entity associated with the source node
-    pub source_entity: Option<Entity>,
     /// String representations of arguments for debugging
     pub argument_strings: Vec<String>,
 }
@@ -99,22 +96,7 @@ pub struct GodotSignals<'w> {
 impl<'w> GodotSignals<'w> {
     /// Connect to a Godot signal from an existing node
     pub fn connect(&self, node: &mut GodotNodeHandle, signal_name: &str) {
-        connect_godot_signal(node, signal_name, None, self.signal_sender.0.clone());
-    }
-
-    /// Connect and associate with a Bevy entity for easier querying
-    pub fn connect_with_entity(
-        &self,
-        node: &mut GodotNodeHandle,
-        signal_name: &str,
-        entity: Entity,
-    ) {
-        connect_godot_signal(
-            node,
-            signal_name,
-            Some(entity),
-            self.signal_sender.0.clone(),
-        );
+        connect_godot_signal(node, signal_name, self.signal_sender.0.clone());
     }
 
     /// Connect multiple signals at once
@@ -134,7 +116,6 @@ fn write_godot_signal_events(
         let signal = GodotSignal {
             signal_name: raw_signal.signal_name,
             source_node: raw_signal.source_node,
-            source_entity: raw_signal.source_entity,
             argument_strings: raw_signal
                 .arguments
                 .iter()
@@ -148,7 +129,6 @@ fn write_godot_signal_events(
 pub fn connect_godot_signal(
     node: &mut GodotNodeHandle,
     signal_name: &str,
-    source_entity: Option<Entity>,
     signal_sender: std::sync::mpsc::Sender<RawGodotSignal>,
 ) {
     let mut node_ref = node.get::<Node>();
@@ -161,7 +141,6 @@ pub fn connect_godot_signal(
         let _ = signal_sender.send(RawGodotSignal {
             signal_name: signal_name_copy.clone(),
             source_node: source_node.clone(),
-            source_entity,
             arguments,
         });
 
@@ -184,7 +163,6 @@ fn process_deferred_signal_connections(
             connect_godot_signal(
                 &mut handle,
                 signal_name,
-                Some(entity),
                 signal_sender.0.clone(),
             );
         }
