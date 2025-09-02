@@ -10,14 +10,20 @@ script/source = "extends BevyApp
 func bulk_update_transforms_3d(
   instance_ids: PackedInt64Array,
   positions: PackedVector3Array,
-  rotations: PackedVector3Array,
+  rotations: PackedVector4Array,
   scales: PackedVector3Array
 ) -> void:
+	var rotation = Quaternion()
 	for i: int in range(instance_ids.size()):
 		var node: Node3D = instance_from_id(instance_ids[i]) as Node3D
 		# Trust instance IDs are valid
 		node.position = positions[i]
-		node.rotation = rotations[i]
+		# Copy quaternion, avoiding heap allocation
+		rotation.x = rotations[i].x
+		rotation.y = rotations[i].y
+		rotation.z = rotations[i].z
+		rotation.w = rotations[i].w
+		node.quaternion = rotation
 		node.scale = scales[i]
 
 func bulk_update_transforms_2d(
