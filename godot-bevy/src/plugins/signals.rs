@@ -252,21 +252,6 @@ impl<'a> SignalMatcher<'a> {
         self
     }
 
-    /// Handle signals from an optional node (None is ignored)
-    pub fn from_node_opt<F>(self, node: &Option<GodotNodeHandle>, mut handler: F) -> Self
-    where
-        F: FnMut(&GodotSignal),
-    {
-        if let Some(node) = node {
-            for signal in &self.signals {
-                if signal.is_from_node(node) {
-                    handler(signal);
-                }
-            }
-        }
-        self
-    }
-
     /// Handle signals from any of the provided nodes
     pub fn from_any_node<F>(self, nodes: &[&GodotNodeHandle], mut handler: F) -> Self
     where
