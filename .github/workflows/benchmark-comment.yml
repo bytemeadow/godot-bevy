@@ -81,7 +81,7 @@ jobs:
             // Simple regression check against baseline
             let regressionStatus = null;
             try {
-              const baselineUrl = `https://raw.githubusercontent.com/${{ github.repository }}/main/examples/boids-perf-test/baseline.json`;
+              const baselineUrl = `https://raw.githubusercontent.com/${{ github.repository }}/main/examples/perf-test/baseline.json`;
               const baselineResponse = await fetch(baselineUrl);
               
               if (baselineResponse.ok) {
