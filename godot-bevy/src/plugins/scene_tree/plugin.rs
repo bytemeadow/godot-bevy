@@ -143,7 +143,6 @@ fn initialize_scene_tree(
         tracing::info!("Using optimized initial tree analysis with type pre-analysis");
 
         let analysis_result = watcher.call("analyze_initial_tree", &[]);
-        // Extract PackedArrays from the result dictionary for maximum performance
         let result_dict = analysis_result.to::<godot::builtin::Dictionary>();
         let instance_ids = result_dict
             .get("instance_ids")
@@ -155,7 +154,6 @@ fn initialize_scene_tree(
             .to::<godot::builtin::PackedStringArray>();
 
         let mut events = Vec::new();
-        // Process parallel arrays - much faster than individual Variant conversions
         let len = instance_ids.len().min(node_types.len());
         for i in 0..len {
             if let (Some(id), Some(type_gstring)) = (instance_ids.get(i), node_types.get(i)) {
@@ -484,7 +482,7 @@ fn _strip_godot_components(commands: &mut Commands, ent: Entity) {
     entity_commands.remove::<Groups>();
     // Create a dummy handle since we're removing components anyway
     let mut dummy_handle =
-        GodotNodeHandle::from_instance_id(godot::classes::Engine::singleton().instance_id());
+        GodotNodeHandle::from_instance_id(godot::prelude::InstanceId::from_i64(0));
     remove_comprehensive_node_type_markers(&mut entity_commands, &mut dummy_handle);
 }
 

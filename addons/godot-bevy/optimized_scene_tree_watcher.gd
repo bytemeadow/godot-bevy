@@ -7,7 +7,6 @@ class_name OptimizedSceneTreeWatcher
 # Optimized Scene Tree Watcher
 # This GDScript class intercepts scene tree events and performs type analysis
 # on the GDScript side to avoid expensive FFI calls from Rust.
-# Handles 200 different Godot node types.
 
 # Reference to the Rust SceneTreeWatcher
 var rust_watcher: Node = null
