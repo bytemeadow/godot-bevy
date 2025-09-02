@@ -164,9 +164,9 @@ fn new_mob(
 #[main_thread_system]
 fn kill_mob(mut signals: EventReader<GodotSignal>, _node_commands: EventWriter<NodeCommand>) {
     for signal in signals.read() {
-        if signal.name == "screen_exited" {
+        if signal.is_from("screen_exited") {
             // Get the parent node and queue it for destruction via command
-            if let Some(node) = signal.target.clone().try_get::<Node>()
+            if let Some(node) = signal.source_node.clone().try_get::<Node>()
                 && let Some(mut parent) = node.get_parent()
             {
                 // We need the entity ID to send a destroy command

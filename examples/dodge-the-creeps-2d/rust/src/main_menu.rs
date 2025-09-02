@@ -86,7 +86,7 @@ fn listen_for_start_button(
     mut app_state: ResMut<NextState<GameState>>,
 ) {
     for evt in events.read() {
-        if evt.name == "pressed" {
+        if evt.signal_name == "pressed" {
             app_state.set(GameState::Countdown);
         }
     }

@@ -31,7 +31,8 @@ pub use crate::plugins::{
         AutoSyncBundleRegistry, GodotSceneTreePlugin, Groups, SceneTreeConfig, SceneTreeRef,
     },
     signals::{
-        GodotSignal, GodotSignalArgument, GodotSignals, GodotSignalsPlugin, connect_godot_signal,
+        DeferredSignalConnections, GodotSignal, GodotSignals, GodotSignalsPlugin,
+        connect_godot_signal,
     },
     // Scene tree
     transforms::{
