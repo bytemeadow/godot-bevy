@@ -29,8 +29,8 @@ use godot::{
 use godot_bevy::{
     interop::GodotNodeHandle,
     prelude::{
-        AudioChannel, FindEntityByNameExt, GodotResource, GodotScene, GodotSignal, GodotSignals,
-        NodeTreeView, main_thread_system,
+        AudioChannel, FindEntityByNameExt, GodotResource, GodotScene, GodotSignal,
+        GodotSignalReaderExt, GodotSignals, NodeTreeView, main_thread_system,
     },
 };
 use std::f32::consts::PI;
@@ -163,16 +163,14 @@ fn new_mob(
 
 #[main_thread_system]
 fn kill_mob(mut signals: EventReader<GodotSignal>, _node_commands: EventWriter<NodeCommand>) {
-    for signal in signals.read() {
-        if signal.is_from("screen_exited") {
-            // Get the parent node and queue it for destruction via command
-            if let Some(node) = signal.source_node.clone().try_get::<Node>()
-                && let Some(mut parent) = node.get_parent()
-            {
-                // We need the entity ID to send a destroy command
-                // For now, still use direct API but this is safer with try_get
-                parent.queue_free();
-            }
+    signals.handle_signal("screen_exited").any(|signal| {
+        // Get the parent node and queue it for destruction via command
+        if let Some(node) = signal.source_node.clone().try_get::<Node>()
+            && let Some(mut parent) = node.get_parent()
+        {
+            // We need the entity ID to send a destroy command
+            // For now, still use direct API but this is safer with try_get
+            parent.queue_free();
         }
-    }
+    });
 }

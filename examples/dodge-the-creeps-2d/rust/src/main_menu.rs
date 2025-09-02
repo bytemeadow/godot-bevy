@@ -13,7 +13,10 @@ use bevy::{
 };
 use godot_bevy::{
     interop::GodotNodeHandle,
-    prelude::{GodotSignal, GodotSignals, NodeTreeView, SceneTreeRef, main_thread_system},
+    prelude::{
+        GodotSignal, GodotSignalReaderExt, GodotSignals, NodeTreeView, SceneTreeRef,
+        main_thread_system,
+    },
 };
 
 use crate::{
@@ -85,11 +88,9 @@ fn listen_for_start_button(
     mut events: EventReader<GodotSignal>,
     mut app_state: ResMut<NextState<GameState>>,
 ) {
-    for evt in events.read() {
-        if evt.signal_name == "pressed" {
-            app_state.set(GameState::Countdown);
-        }
-    }
+    events.handle_signal("pressed").any(|_| {
+        app_state.set(GameState::Countdown);
+    });
 }
 
 fn hide_play_button(mut ui_commands: EventWriter<UICommand>) {

@@ -16,7 +16,7 @@ use bevy::{
         state::{NextState, OnEnter},
     },
 };
-use godot::classes::{Button, DisplayServer, Node, display_server::WindowMode};
+use godot::classes::{Button, DisplayServer, display_server::WindowMode};
 use godot_bevy::prelude::*;
 
 #[derive(Resource, Default)]
@@ -129,46 +129,29 @@ fn listen_for_button_press(
     mut app_state: ResMut<NextState<GameState>>,
     mut level_load_events: EventWriter<LoadLevelEvent>,
 ) {
-    for evt in events.read() {
-        // Skip events for freed nodes - check if source node still exists
-        if evt.source_node.clone().try_get::<Node>().is_none() {
-            continue;
-        }
-
-        if evt.is_from("pressed") {
-            if let Some(start_button) = &menu_assets.start_button
-                && &evt.source_node == start_button
-            {
-                println!("Start button pressed");
-                app_state.set(GameState::InGame);
-                level_load_events.write(LoadLevelEvent {
-                    level_id: LevelId::Level1,
-                });
-                continue;
+    events
+        .handle_signal("pressed")
+        .from_node_opt(&menu_assets.start_button, |_| {
+            println!("Start button pressed");
+            app_state.set(GameState::InGame);
+            level_load_events.write(LoadLevelEvent {
+                level_id: LevelId::Level1,
+            });
+        })
+        .from_node_opt(&menu_assets.fullscreen_button, |_| {
+            println!("Fullscreen button pressed");
+            if DisplayServer::singleton().window_get_mode() == WindowMode::FULLSCREEN {
+                DisplayServer::singleton().window_set_mode(WindowMode::WINDOWED);
+            } else if DisplayServer::singleton().window_get_mode() == WindowMode::WINDOWED {
+                DisplayServer::singleton().window_set_mode(WindowMode::FULLSCREEN);
             }
-
-            if let Some(fullscreen_button) = &menu_assets.fullscreen_button
-                && &evt.source_node == fullscreen_button
+        })
+        .from_node_opt(&menu_assets.quit_button, |signal| {
+            println!("Quit button pressed");
+            if let Some(button) = signal.source_node.clone().try_get::<Button>()
+                && let Some(mut tree) = button.get_tree()
             {
-                println!("Fullscreen button pressed");
-                if DisplayServer::singleton().window_get_mode() == WindowMode::FULLSCREEN {
-                    DisplayServer::singleton().window_set_mode(WindowMode::WINDOWED);
-                } else if DisplayServer::singleton().window_get_mode() == WindowMode::WINDOWED {
-                    DisplayServer::singleton().window_set_mode(WindowMode::FULLSCREEN);
-                }
-                continue;
+                tree.quit();
             }
-
-            if let Some(quit_button) = &menu_assets.quit_button
-                && &evt.source_node == quit_button
-            {
-                println!("Quit button pressed");
-                if let Some(button) = evt.source_node.clone().try_get::<Button>()
-                    && let Some(mut tree) = button.get_tree()
-                {
-                    tree.quit();
-                }
-            }
-        }
-    }
+        });
 }

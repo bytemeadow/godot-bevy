@@ -58,6 +58,27 @@ impl GodotSignal {
     pub fn get_arg_string(&self, index: usize) -> Option<&str> {
         self.argument_strings.get(index).map(|s| s.as_str())
     }
+
+    /// Check if this signal came from a specific node
+    pub fn is_from_node(&self, node: &GodotNodeHandle) -> bool {
+        self.source_node == *node
+    }
+
+    /// Check if this signal is from a specific signal name AND node
+    pub fn is_from_node_signal(&self, node: &GodotNodeHandle, signal_name: &str) -> bool {
+        self.signal_name == signal_name && self.source_node == *node
+    }
+
+    /// Find the entity that owns this signal's source node
+    pub fn find_entity(&self, query: &Query<(Entity, &GodotNodeHandle)>) -> Option<Entity> {
+        query.iter().find_map(|(entity, handle)| {
+            if *handle == self.source_node {
+                Some(entity)
+            } else {
+                None
+            }
+        })
+    }
 }
 
 /// Component for deferred signal connections - applied to entities
@@ -152,6 +173,157 @@ pub fn connect_godot_signal(
     node_ref.connect(signal_name, &callable);
 }
 
+/// Extension trait for EventReader<GodotSignal> to add syntax sugar
+pub trait GodotSignalReaderExt {
+    /// Process signals of any type
+    fn handle_signal(&mut self, signal_name: &str) -> SignalMatcher<'_>;
+
+    /// Process signals matching a custom predicate
+    fn handle_matching<F>(&mut self, predicate: F) -> SignalMatcher<'_>
+    where
+        F: Fn(&GodotSignal) -> bool;
+
+    /// Process all signals (no filtering)
+    fn handle_all(&mut self) -> SignalMatcher<'_>;
+
+    /// Process multiple signal types at once
+    fn handle_signals(&mut self, signal_names: &[&str]) -> SignalMatcher<'_>;
+}
+
+impl GodotSignalReaderExt for bevy::ecs::event::EventReader<'_, '_, GodotSignal> {
+    fn handle_signal(&mut self, signal_name: &str) -> SignalMatcher<'_> {
+        SignalMatcher::from_signals(self.read().filter(|s| s.is_from(signal_name)).collect())
+    }
+
+    fn handle_matching<F>(&mut self, predicate: F) -> SignalMatcher<'_>
+    where
+        F: Fn(&GodotSignal) -> bool,
+    {
+        SignalMatcher::from_signals(self.read().filter(|s| predicate(s)).collect())
+    }
+
+    fn handle_all(&mut self) -> SignalMatcher<'_> {
+        SignalMatcher::from_signals(self.read().collect())
+    }
+
+    fn handle_signals(&mut self, signal_names: &[&str]) -> SignalMatcher<'_> {
+        SignalMatcher::from_signals(
+            self.read()
+                .filter(|s| signal_names.iter().any(|name| s.is_from(name)))
+                .collect(),
+        )
+    }
+}
+
+/// Helper for chaining signal handling operations
+pub struct SignalMatcher<'a> {
+    signals: Vec<&'a GodotSignal>,
+}
+
+impl<'a> SignalMatcher<'a> {
+    /// Create a new SignalMatcher from a collection of signals
+    pub fn from_signals(signals: Vec<&'a GodotSignal>) -> Self {
+        Self { signals }
+    }
+
+    /// Create an empty SignalMatcher
+    pub fn empty() -> Self {
+        Self {
+            signals: Vec::new(),
+        }
+    }
+
+    /// Create a SignalMatcher from a slice of signals
+    pub fn from_slice(signals: &[&'a GodotSignal]) -> Self {
+        Self {
+            signals: signals.to_vec(),
+        }
+    }
+    /// Handle signals from a specific node
+    pub fn from_node<F>(self, node: &GodotNodeHandle, mut handler: F) -> Self
+    where
+        F: FnMut(&GodotSignal),
+    {
+        for signal in &self.signals {
+            if signal.is_from_node(node) {
+                handler(signal);
+            }
+        }
+        self
+    }
+
+    /// Handle signals from an optional node (None is ignored)
+    pub fn from_node_opt<F>(self, node: &Option<GodotNodeHandle>, mut handler: F) -> Self
+    where
+        F: FnMut(&GodotSignal),
+    {
+        if let Some(node) = node {
+            for signal in &self.signals {
+                if signal.is_from_node(node) {
+                    handler(signal);
+                }
+            }
+        }
+        self
+    }
+
+    /// Handle signals from any of the provided nodes
+    pub fn from_any_node<F>(self, nodes: &[&GodotNodeHandle], mut handler: F) -> Self
+    where
+        F: FnMut(&GodotSignal),
+    {
+        for signal in &self.signals {
+            if nodes.iter().any(|node| signal.is_from_node(node)) {
+                handler(signal);
+            }
+        }
+        self
+    }
+
+    /// Handle all remaining signals (catch-all)
+    pub fn any<F>(self, mut handler: F)
+    where
+        F: FnMut(&GodotSignal),
+    {
+        for signal in &self.signals {
+            handler(signal);
+        }
+    }
+
+    /// Filter signals by a custom predicate and continue chaining
+    pub fn matching<F>(self, predicate: F) -> Self
+    where
+        F: Fn(&GodotSignal) -> bool,
+    {
+        SignalMatcher::from_signals(self.signals.into_iter().filter(|s| predicate(s)).collect())
+    }
+
+    /// Handle the first signal that matches, then stop processing
+    pub fn first<F>(self, mut handler: F)
+    where
+        F: FnMut(&GodotSignal),
+    {
+        if let Some(signal) = self.signals.first() {
+            handler(signal);
+        }
+    }
+
+    /// Get the count of signals in this matcher
+    pub fn count(&self) -> usize {
+        self.signals.len()
+    }
+
+    /// Check if there are any signals in this matcher
+    pub fn is_empty(&self) -> bool {
+        self.signals.is_empty()
+    }
+
+    /// Get an iterator over the signals
+    pub fn iter(&self) -> impl Iterator<Item = &GodotSignal> {
+        self.signals.iter().copied()
+    }
+}
+
 /// Process deferred signal connections for entities that now have GodotNodeHandles
 fn process_deferred_signal_connections(
     mut commands: Commands,
@@ -160,11 +332,7 @@ fn process_deferred_signal_connections(
 ) {
     for (entity, mut handle, deferred) in query.iter_mut() {
         for signal_name in &deferred.connections {
-            connect_godot_signal(
-                &mut handle,
-                signal_name,
-                signal_sender.0.clone(),
-            );
+            connect_godot_signal(&mut handle, signal_name, signal_sender.0.clone());
         }
 
         // Remove the component after processing
