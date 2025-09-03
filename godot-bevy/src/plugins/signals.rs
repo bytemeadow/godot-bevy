@@ -43,7 +43,7 @@ pub struct GodotSignal {
 
 /// Represents the target of a Godot signal, which can be either a node or an entity.
 /// Use with [`GodotSignals::connect_to_target`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum GodotSignalTarget {
     Node(GodotNodeHandle),
     Entity(Entity),

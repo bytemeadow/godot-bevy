@@ -131,13 +131,13 @@ fn listen_for_button_press(
 ) {
     for evt in events.read() {
         // Skip events for freed nodes - check if target node still exists
-        if evt.target.clone().try_get::<Node>().is_none() {
+        if evt.origin.clone().try_get::<Node>().is_none() {
             continue;
         }
 
         if evt.name == "pressed" {
             if let Some(start_button) = &menu_assets.start_button
-                && &evt.target == start_button
+                && &evt.origin == start_button
             {
                 println!("Start button pressed");
                 app_state.set(GameState::InGame);
@@ -148,7 +148,7 @@ fn listen_for_button_press(
             }
 
             if let Some(fullscreen_button) = &menu_assets.fullscreen_button
-                && &evt.target == fullscreen_button
+                && &evt.origin == fullscreen_button
             {
                 println!("Fullscreen button pressed");
                 if DisplayServer::singleton().window_get_mode() == WindowMode::FULLSCREEN {
@@ -160,10 +160,10 @@ fn listen_for_button_press(
             }
 
             if let Some(quit_button) = &menu_assets.quit_button
-                && &evt.target == quit_button
+                && &evt.origin == quit_button
             {
                 println!("Quit button pressed");
-                if let Some(button) = evt.target.clone().try_get::<Button>()
+                if let Some(button) = evt.origin.clone().try_get::<Button>()
                     && let Some(mut tree) = button.get_tree()
                 {
                     tree.quit();
