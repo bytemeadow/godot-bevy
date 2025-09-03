@@ -33,6 +33,23 @@ impl SceneTreeWatcher {
             let _ = channel.send(SceneTreeEvent {
                 node: GodotNodeHandle::from_instance_id(node.instance_id()),
                 event_type,
+                node_type: None, // No type optimization in basic method
+            });
+        }
+    }
+
+    #[func]
+    pub fn scene_tree_event_typed(
+        &self,
+        node: Gd<Node>,
+        event_type: SceneTreeEventType,
+        node_type: String,
+    ) {
+        if let Some(channel) = self.notification_channel.as_ref() {
+            let _ = channel.send(SceneTreeEvent {
+                node: GodotNodeHandle::from_instance_id(node.instance_id()),
+                event_type,
+                node_type: Some(node_type), // Pre-analyzed type from GDScript
             });
         }
     }

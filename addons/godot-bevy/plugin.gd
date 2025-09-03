@@ -2,14 +2,25 @@
 extends EditorPlugin
 
 const WIZARD_SCENE_PATH = "res://addons/godot-bevy/wizard/project_wizard.tscn"
+const AUTOLOAD_NAME = "BevyAppSingleton"
+const AUTOLOAD_PATH = "res://addons/godot-bevy/bevy_app_singleton.tscn"
 
 var wizard_dialog: Window
 var _should_restart_after_build: bool = false
 
+func _enable_plugin():
+	# Automatically register the BevyApp singleton when plugin is enabled
+	add_autoload_singleton(AUTOLOAD_NAME, AUTOLOAD_PATH)
+	print("godot-bevy: BevyAppSingleton autoload registered")
+
+func _disable_plugin():
+	# Remove the autoload when plugin is disabled
+	remove_autoload_singleton(AUTOLOAD_NAME)
+	print("godot-bevy: BevyAppSingleton autoload removed")
+
 func _enter_tree():
 	# Add menu items
 	add_tool_menu_item("Setup godot-bevy Project", _on_setup_project)
-	add_tool_menu_item("Add BevyApp Singleton", _on_add_singleton)
 	add_tool_menu_item("Build Rust Project", _on_build_rust)
 
 	print("godot-bevy plugin activated!")
@@ -17,7 +28,6 @@ func _enter_tree():
 func _exit_tree():
 	# Remove menu items
 	remove_tool_menu_item("Setup godot-bevy Project")
-	remove_tool_menu_item("Add BevyApp Singleton")
 	remove_tool_menu_item("Build Rust Project")
 
 	if wizard_dialog:
@@ -34,66 +44,12 @@ func _on_setup_project():
 		else:
 			push_error("Failed to load wizard scene")
 
-	wizard_dialog.popup_centered(Vector2(600, 400))
+	wizard_dialog.popup_centered()
 
-func _on_add_singleton():
-	var singleton_path = "res://bevy_app_singleton.tscn"
-	
-	# Always create/update the singleton scene with latest template
-	_create_bevy_app_singleton(singleton_path)
-
-	# Add to autoload (this will update if already exists) and ensure it's enabled
-	ProjectSettings.set_setting("autoload/BevyAppSingleton", "*" + singleton_path)
-	ProjectSettings.save()
-
-	if ProjectSettings.has_setting("autoload/BevyAppSingleton"):
-		push_warning("BevyAppSingleton updated in project autoload settings! Restart editor to apply changes.")
-	else:
-		push_warning("BevyAppSingleton added to project autoload settings! Restart editor to apply changes.")
-
-
-func _create_bevy_app_singleton(path: String):
-	# Create the scene file content with bulk transform optimization methods
-	var scene_content = """[gd_scene load_steps=2 format=3 uid="uid://bjsfwt816j4tp"]
-
-[sub_resource type="GDScript" id="GDScript_1"]
-script/source = "extends BevyApp
-
-
-# Bulk Transform Optimization Methods
-# Automatically detected by godot-bevy library for performance optimization
-
-func bulk_update_transforms_3d(instance_ids: PackedInt64Array, positions: PackedVector3Array, rotations: PackedVector3Array, scales: PackedVector3Array):
-	for i in range(instance_ids.size()):
-		var node = instance_from_id(instance_ids[i]) as Node3D
-		# Trust instance IDs are valid
-		node.position = positions[i]
-		node.rotation = rotations[i]
-		node.scale = scales[i]
-
-func bulk_update_transforms_2d(instance_ids: PackedInt64Array, positions: PackedVector2Array, rotations: PackedFloat32Array, scales: PackedVector2Array):
-	for i in range(instance_ids.size()):
-		var node = instance_from_id(instance_ids[i]) as Node2D
-		# Trust instance IDs are valid
-		node.position = positions[i]
-		node.rotation = rotations[i]
-		node.scale = scales[i]
-"
-
-[node name="BevyApp" type="BevyApp"]
-script = SubResource("GDScript_1")
-"""
-
-	# Save the scene file directly
-	_save_file(path, scene_content)
-
-	print("Created BevyApp singleton scene at: ", path)
 
 func _on_project_created(project_info: Dictionary):
 	# Handle the project creation based on wizard input
 	_scaffold_rust_project(project_info)
-	_create_bevy_app_singleton("res://bevy_app_singleton.tscn")
-	_on_add_singleton()  # This will add it to autoload
 	
 	# Automatically build the Rust project and restart after
 	var is_release = project_info.get("release_build", false)
@@ -136,15 +92,11 @@ crate-type = ["cdylib"]
 [dependencies]
 bevy = { version = "0.16", default-features = false, features = ["bevy_state"] }
 godot = "0.3"
-godot-bevy = "%s"
+godot-bevy = { version = "%s", features = ["default"] }
 
 [workspace]
 # Empty workspace table to make this a standalone project
 """ % [_to_snake_case(project_name), info.godot_bevy_version]
-
-	if info.use_defaults:
-		cargo_content = cargo_content.replace('godot-bevy = "%s"' % info.godot_bevy_version,
-			'godot-bevy = { version = "%s", features = ["default"] }' % info.godot_bevy_version)
 
 	_save_file(rust_path.path_join("Cargo.toml"), cargo_content)
 

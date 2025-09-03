@@ -26,6 +26,7 @@ class GodotTypeGenerator:
         self.node_markers_file = self.project_root / "godot-bevy" / "src" / "interop" / "node_markers.rs"
         self.type_checking_file = self.project_root / "godot-bevy" / "src" / "plugins" / "scene_tree" / "node_type_checking_generated.rs"
         self.plugin_file = self.project_root / "godot-bevy" / "src" / "plugins" / "scene_tree" / "plugin.rs"
+        self.gdscript_watcher_file = self.project_root / "addons" / "godot-bevy" / "optimized_scene_tree_watcher.gd"
 
     def run_godot_dump_api(self):
         """Run godot --dump-extension-api to generate extension_api.json"""
@@ -207,6 +208,26 @@ pub fn add_comprehensive_node_type_markers(
     check_universal_node_types_comprehensive(entity_commands, node);
 }}
 
+/// Adds node type markers based on a pre-analyzed type string from GDScript.
+/// This avoids FFI calls by using type information determined on the GDScript side.
+/// This provides significant performance improvements by eliminating multiple
+/// GodotNodeHandle::try_get calls for each node.
+pub fn add_node_type_markers_from_string(
+    entity_commands: &mut EntityCommands,
+    node_type: &str,
+) {{
+    // All nodes inherit from Node
+    entity_commands.insert(NodeMarker);
+    
+    // Add appropriate markers based on the type string
+    match node_type {{
+{self._generate_string_match_arms(categories)}
+        // For any unrecognized type, we already have NodeMarker
+        // This handles custom user types that extend Godot nodes
+        _ => {{}}
+    }}
+}}
+
 pub fn remove_comprehensive_node_type_markers(
     entity_commands: &mut EntityCommands,
     node: &mut GodotNodeHandle,
@@ -298,6 +319,284 @@ pub fn remove_comprehensive_node_type_markers(
 
         return name_fixes.get(class_name, class_name)
 
+    def _generate_string_match_arms(self, categories):
+        """Generate match arms for the string-based marker function"""
+        match_arms = []
+        
+        # Add base types first
+        base_types = [
+            '        "Node3D" => {\n            entity_commands.insert(Node3DMarker);\n        }',
+            '        "Node2D" => {\n            entity_commands.insert(Node2DMarker);\n            entity_commands.insert(CanvasItemMarker);\n        }',
+            '        "Control" => {\n            entity_commands.insert(ControlMarker);\n            entity_commands.insert(CanvasItemMarker);\n        }',
+            '        "CanvasItem" => {\n            entity_commands.insert(CanvasItemMarker);\n        }',
+            '        "Node" => {\n            // NodeMarker already added above\n        }',
+        ]
+        match_arms.extend(base_types)
+        
+        # Generate Node3D types (skip base Node3D since it's already handled)
+        for node_type in categories["3d"]:
+            if node_type == "Node3D":
+                continue  # Skip base type
+            marker_name = f"{node_type}Marker"
+            match_arms.append(f'''        "{node_type}" => {{
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert({marker_name});
+        }}''')
+        
+        # Generate Node2D types (skip base Node2D since it's already handled)
+        for node_type in categories["2d"]:
+            if node_type == "Node2D":
+                continue  # Skip base type
+            marker_name = f"{node_type}Marker"
+            match_arms.append(f'''        "{node_type}" => {{
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert({marker_name});
+        }}''')
+        
+        # Generate Control types (skip base Control since it's already handled)
+        for node_type in categories["control"]:
+            if node_type == "Control":
+                continue  # Skip base type
+            marker_name = f"{node_type}Marker"
+            match_arms.append(f'''        "{node_type}" => {{
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert({marker_name});
+        }}''')
+        
+        # Generate universal (direct Node) types (skip base Node, Node3D, and CanvasItem since already handled)
+        for node_type in categories["universal"]:
+            if node_type in ["Node", "CanvasItem", "Node3D"]:
+                continue  # Skip base types
+            marker_name = f"{node_type}Marker"
+            match_arms.append(f'''        "{node_type}" => {{
+            entity_commands.insert({marker_name});
+        }}''')
+        
+        return '\n'.join(match_arms)
+
+    def generate_gdscript_watcher(self, node_types, parent_map):
+        """Generate the optimized GDScript scene tree watcher with all node types"""
+        print("📜 Generating GDScript optimized scene tree watcher...")
+        
+        # Filter and categorize types
+        valid_types = self.filter_valid_godot_classes(node_types)
+        categories = self.categorize_types_by_hierarchy(valid_types, parent_map)
+        
+        content = f'''extends Node
+class_name OptimizedSceneTreeWatcher
+
+# 🤖 This file is automatically generated by scripts/generate_godot_types.py
+# To regenerate: python scripts/generate_godot_types.py
+
+# Optimized Scene Tree Watcher
+# This GDScript class intercepts scene tree events and performs type analysis
+# on the GDScript side to avoid expensive FFI calls from Rust.
+# Handles {len(valid_types)} different Godot node types.
+
+# Reference to the Rust SceneTreeWatcher
+var rust_watcher: Node = null
+
+func _ready():
+	name = "OptimizedSceneTreeWatcher"
+	
+	# Auto-detect the Rust SceneTreeWatcher
+	var bevy_app = get_node("/root/BevyAppSingleton")
+	if bevy_app:
+		rust_watcher = bevy_app.get_node("SceneTreeWatcher")
+	
+	# Connect to scene tree signals - these will forward to Rust with type info
+	# Use immediate connections for add/remove to get events as early as possible
+	get_tree().node_added.connect(_on_node_added)
+	get_tree().node_removed.connect(_on_node_removed) 
+	get_tree().node_renamed.connect(_on_node_renamed, CONNECT_DEFERRED)
+
+func set_rust_watcher(watcher: Node):
+	"""Called from Rust to set the SceneTreeWatcher reference (optional)"""
+	rust_watcher = watcher
+
+func _on_node_added(node: Node):
+	"""Handle node added events with type optimization"""
+	if not rust_watcher:
+		return
+	
+	# Check if node is still valid
+	if not is_instance_valid(node):
+		return
+	
+	# Analyze node type on GDScript side - this is much faster than FFI
+	var node_type = _analyze_node_type(node)
+	
+	# Forward to Rust watcher with pre-analyzed type - this uses the MPSC sender
+	if rust_watcher.has_method("scene_tree_event_typed"):
+		rust_watcher.scene_tree_event_typed(node, "NodeAdded", node_type)
+	else:
+		# Fallback to regular method if typed method not available
+		rust_watcher.scene_tree_event(node, "NodeAdded")
+
+func _on_node_removed(node: Node):
+	"""Handle node removed events - no type analysis needed for removal"""
+	if not rust_watcher:
+		return
+	
+	# This is called immediately (not deferred) so the node should still be valid
+	# We need to send this event so Rust can clean up the corresponding Bevy entity
+	rust_watcher.scene_tree_event(node, "NodeRemoved")
+
+func _on_node_renamed(node: Node):
+	"""Handle node renamed events - no type analysis needed for renaming"""
+	if not rust_watcher:
+		return
+	
+	# Check if node is still valid
+	if not is_instance_valid(node):
+		return
+		
+	rust_watcher.scene_tree_event(node, "NodeRenamed")
+
+func _analyze_node_type(node: Node) -> String:
+	"""
+	Analyze node type hierarchy on GDScript side.
+	Returns the most specific built-in Godot type name.
+	This avoids multiple FFI calls that would be needed on the Rust side.
+	Generated from Godot extension API to ensure completeness.
+	"""
+	
+{self._generate_gdscript_type_analysis(categories)}
+	
+	# Default fallback
+	return "Node"
+
+{self._generate_initial_tree_analysis()}
+'''
+        
+        with open(self.gdscript_watcher_file, "w") as f:
+            f.write(content)
+        
+        print(f"✅ Generated GDScript watcher with {len(valid_types)} node types")
+
+    def _generate_gdscript_type_analysis(self, categories):
+        """Generate the GDScript node type analysis function"""
+        lines = []
+        
+        # Node3D hierarchy (most common in 3D games)
+        lines.append("\t# Check Node3D hierarchy first (most common in 3D games)")
+        lines.append("\tif node is Node3D:")
+        
+        # Add common 3D types first for better performance
+        common_3d = ["MeshInstance3D", "StaticBody3D", "RigidBody3D", "CharacterBody3D", "Area3D", 
+                     "Camera3D", "DirectionalLight3D", "OmniLight3D", "SpotLight3D", "CollisionShape3D"]
+        
+        for node_type in common_3d:
+            if node_type in categories["3d"]:
+                lines.append(f"\t\tif node is {node_type}: return \"{node_type}\"")
+        
+        # Add remaining 3D types
+        for node_type in sorted(categories["3d"]):
+            if node_type not in common_3d:
+                lines.append(f"\t\tif node is {node_type}: return \"{node_type}\"")
+        
+        lines.append("\t\treturn \"Node3D\"")
+        lines.append("")
+        
+        # Node2D hierarchy (common in 2D games)
+        lines.append("\t# Check Node2D hierarchy (common in 2D games)")
+        lines.append("\telif node is Node2D:")
+        
+        # Add common 2D types first
+        common_2d = ["Sprite2D", "StaticBody2D", "RigidBody2D", "CharacterBody2D", "Area2D", 
+                     "Camera2D", "CollisionShape2D", "AnimatedSprite2D"]
+        
+        for node_type in common_2d:
+            if node_type in categories["2d"]:
+                lines.append(f"\t\tif node is {node_type}: return \"{node_type}\"")
+        
+        # Add remaining 2D types
+        for node_type in sorted(categories["2d"]):
+            if node_type not in common_2d:
+                lines.append(f"\t\tif node is {node_type}: return \"{node_type}\"")
+        
+        lines.append("\t\treturn \"Node2D\"")
+        lines.append("")
+        
+        # Control hierarchy (UI elements)
+        lines.append("\t# Check Control hierarchy (UI elements)")
+        lines.append("\telif node is Control:")
+        
+        # Add common UI types first
+        common_control = ["Button", "Label", "Panel", "VBoxContainer", "HBoxContainer", 
+                         "MarginContainer", "ColorRect", "LineEdit", "TextEdit", "CheckBox"]
+        
+        for node_type in common_control:
+            if node_type in categories["control"]:
+                lines.append(f"\t\tif node is {node_type}: return \"{node_type}\"")
+        
+        # Add remaining Control types
+        for node_type in sorted(categories["control"]):
+            if node_type not in common_control:
+                lines.append(f"\t\tif node is {node_type}: return \"{node_type}\"")
+        
+        lines.append("\t\treturn \"Control\"")
+        lines.append("")
+        
+        # Universal types (direct Node children)
+        lines.append("\t# Check other common node types that inherit directly from Node")
+        common_universal = ["AnimationPlayer", "Timer", "AudioStreamPlayer", "HTTPRequest", "CanvasLayer"]
+        
+        for node_type in common_universal:
+            if node_type in categories["universal"]:
+                lines.append(f"\telif node is {node_type}: return \"{node_type}\"")
+        
+        # Add remaining universal types  
+        for node_type in sorted(categories["universal"]):
+            if node_type not in common_universal:
+                lines.append(f"\telif node is {node_type}: return \"{node_type}\"")
+        
+        return '\n'.join(lines)
+
+    def _generate_initial_tree_analysis(self):
+        """Generate method for analyzing the initial scene tree with type info"""
+        return '''func analyze_initial_tree() -> Dictionary:
+	"""
+	Analyze the entire initial scene tree and return node information with types.
+	Returns a Dictionary with PackedArrays for maximum performance:
+	{
+		"instance_ids": PackedInt64Array,
+		"node_types": PackedStringArray
+	}
+	Used for optimized initial scene tree setup.
+	"""
+	var instance_ids = PackedInt64Array()
+	var node_types = PackedStringArray()
+	var root = get_tree().get_root()
+	if root:
+		_analyze_node_recursive(root, instance_ids, node_types)
+	
+	return {
+		"instance_ids": instance_ids,
+		"node_types": node_types
+	}
+
+func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_types: PackedStringArray):
+	"""Recursively analyze nodes and collect type information into PackedArrays"""
+	# Check if node is still valid before processing
+	if not is_instance_valid(node):
+		return
+	
+	# Add this node's information with pre-analyzed type
+	var instance_id = node.get_instance_id()
+	var node_type = _analyze_node_type(node)
+	
+	# Only append if we have valid data
+	if instance_id != 0 and node_type != "":
+		instance_ids.append(instance_id)
+		node_types.append(node_type)
+	
+	# Recursively process children
+	for child in node.get_children():
+		_analyze_node_recursive(child, instance_ids, node_types)'''
+
     def _generate_hierarchy_function_comprehensive(self, name, types):
         """Generate a hierarchy-specific type checking function"""
         content = f'''fn check_{name}_node_types_comprehensive(
@@ -317,7 +616,7 @@ pub fn remove_comprehensive_node_type_markers(
 
         content += f'''fn remove_{name}_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
-    node: &mut GodotNodeHandle,
+    _node: &mut GodotNodeHandle,
 ) {{
     entity_commands
 
@@ -350,7 +649,7 @@ pub fn remove_comprehensive_node_type_markers(
 
         content += '''fn remove_universal_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
-    node: &mut GodotNodeHandle,
+    _node: &mut GodotNodeHandle,
 ) {
     entity_commands
 
@@ -396,7 +695,10 @@ pub fn remove_comprehensive_node_type_markers(
             # Step 4: Generate type checking code
             self.generate_type_checking_code(node_types, parent_map)
 
-            # Step 5: Verify plugin integration
+            # Step 5: Generate optimized GDScript watcher
+            self.generate_gdscript_watcher(node_types, parent_map)
+
+            # Step 6: Verify plugin integration
             self.verify_plugin_integration()
 
             print(f"""
@@ -405,10 +707,12 @@ pub fn remove_comprehensive_node_type_markers(
 Generated:
   • {len(node_types)} node marker components
   • Complete type checking functions
+  • Optimized GDScript scene tree watcher
 
 Files generated:
   • {self.node_markers_file.relative_to(self.project_root)}
   • {self.type_checking_file.relative_to(self.project_root)}
+  • {self.gdscript_watcher_file.relative_to(self.project_root)}
 
 Next steps:
   • Run 'cargo check' to verify the build
