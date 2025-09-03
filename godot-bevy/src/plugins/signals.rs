@@ -1,7 +1,10 @@
 use bevy::{
     app::{App, First, Plugin},
     ecs::{
-        entity::Entity, event::{event_update_system, Event, EventWriter}, schedule::IntoScheduleConfigs, system::{NonSendMut, SystemParam}
+        entity::Entity,
+        event::{Event, EventWriter, event_update_system},
+        schedule::IntoScheduleConfigs,
+        system::{NonSendMut, SystemParam},
     },
 };
 use godot::{
@@ -38,6 +41,8 @@ pub struct GodotSignal {
     pub arguments: Vec<GodotSignalArgument>,
 }
 
+/// Represents the target of a Godot signal, which can be either a node or an entity.
+/// Use with [`GodotSignals::connect_to_target`].
 #[derive(Debug, Clone)]
 pub enum GodotSignalTarget {
     Node(GodotNodeHandle),
@@ -58,12 +63,31 @@ pub struct GodotSignals<'w> {
 
 impl<'w> GodotSignals<'w> {
     /// Connect a Godot signal to be forwarded to Bevy's event system
+    /// This version connects to the node's signal without a specific target
+    /// Use it in cases where the "listener" is Bevy ECS itself and you can handle
+    /// routing the event. This is similar to wiring up an event in Godot to a singleton
+    /// and letting it handle all events.
     pub fn connect(&self, node: &mut GodotNodeHandle, signal_name: &str) {
         connect_godot_signal(node, signal_name, self.signal_sender.0.clone(), None);
     }
 
-    pub fn connect_to_target(&self, node: &mut GodotNodeHandle, signal_name: &str, target: &GodotSignalTarget) {
-        connect_godot_signal(node, signal_name, self.signal_sender.0.clone(), Some(target.clone()));
+    /// Connect a Godot signal to a specific target in Bevy
+    /// This version connects to a `GodotSignalTarget`, which can be a `GodotNodeHandle`
+    /// or an `Entity`. This is more akin to the traditional Godot style of wiring up a
+    /// specific object as a listener. Use it in cases where you want to make it easier
+    /// to manage signal connections for specific entities or nodes.
+    pub fn connect_to_target(
+        &self,
+        node: &mut GodotNodeHandle,
+        signal_name: &str,
+        target: &GodotSignalTarget,
+    ) {
+        connect_godot_signal(
+            node,
+            signal_name,
+            self.signal_sender.0.clone(),
+            Some(target.clone()),
+        );
     }
 }
 
@@ -94,9 +118,10 @@ pub fn connect_godot_signal(
             .collect();
 
         let origin_handle = GodotNodeHandle::from_instance_id(node_id);
-        let target_handle = signal_target.clone().unwrap_or_else(|| {
-            GodotSignalTarget::Node(origin_handle.clone())
-        });
+        // If no target is specified, use the origin node as the target
+        let target_handle = signal_target
+            .clone()
+            .unwrap_or_else(|| GodotSignalTarget::Node(origin_handle.clone()));
 
         let _ = signal_sender.send(GodotSignal {
             name: signal_name_copy.clone(),

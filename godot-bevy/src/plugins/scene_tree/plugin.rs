@@ -236,10 +236,10 @@ fn write_scene_tree_events(
     event_writer.write_batch(event_reader.0.try_iter());
 }
 
-// Marks an entity as protected from cleanup if an attached node is freed
-// This allows for cases where game logic still runs on things outside of the scene, and you only
-// want Godot Nodes for when something is on screen. Examples include factory games with multiple
-// surfaces, RPGs where you want to simulate NPC behavior outside of the current scene
+/// Marks an entity so it is not despawned when its corresponding Godot Node is freed, breaking
+/// the usual 1-to-1 lifetime between them. This allows game logic to keep running on entities
+/// that have no Node, such as simulating off-screen factory machines or NPCs in inactive scenes.
+/// A Godot Node can be re-associated later by adding a `GodotScene` component to the **entity.**
 #[derive(Component)]
 pub struct ProtectedNodeEntity;
 
@@ -372,13 +372,12 @@ fn create_scene_tree_entity(
                 }
             }
             SceneTreeEventType::NodeRemoved => {
-                if let Some(entmap) = ent {
-                    let ent = entmap.0;
-                    let protected = entmap.1.is_some();
+                if let Some((ent, prot_opt)) = ent {
+                    let protected = prot_opt.is_some();
                     if !protected {
                         commands.entity(ent).despawn();
                     } else {
-                        _strip_godot_components(commands, ent, &mut node);
+                        _strip_godot_components(commands, ent);
                     }
                     ent_mapping.remove(&node.instance_id());
                 } else {
@@ -387,9 +386,9 @@ fn create_scene_tree_entity(
                 }
             }
             SceneTreeEventType::NodeRenamed => {
-                if let Some(ent) = ent {
+                if let Some((ent, _)) = ent {
                     commands
-                        .entity(ent.0)
+                        .entity(ent)
                         .insert(Name::from(node.get::<Node>().get_name().to_string()));
                 } else {
                     trace!(target: "godot_scene_tree_events", "Entity for renamed node was already despawned");
@@ -399,7 +398,7 @@ fn create_scene_tree_entity(
     }
 }
 
-fn _strip_godot_components(commands: &mut Commands, ent: Entity, node: &mut GodotNodeHandle) {
+fn _strip_godot_components(commands: &mut Commands, ent: Entity) {
     let mut entity_commands = commands.entity(ent);
     // Remove GodotNodeHandle components
     entity_commands.remove::<GodotNodeHandle>();
@@ -410,7 +409,7 @@ fn _strip_godot_components(commands: &mut Commands, ent: Entity, node: &mut Godo
     // Remove automatic markers
     entity_commands.remove::<Name>();
     entity_commands.remove::<Groups>();
-    remove_comprehensive_node_type_markers(&mut entity_commands, node);
+    remove_comprehensive_node_type_markers(&mut entity_commands);
 }
 
 #[main_thread_system]

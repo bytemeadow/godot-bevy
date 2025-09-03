@@ -214,21 +214,16 @@ pub fn remove_comprehensive_node_type_markers(
     // All nodes inherit from Node, so remove this first
     entity_commands.remove::<NodeMarker>();
 
-    // Check the major hierarchy branches to minimize FFI calls
-    if node.try_get::<godot::classes::Node3D>().is_some() {{
-        entity_commands.remove::<Node3DMarker>();
-        remove_3d_node_types_comprehensive(entity_commands, node);
-    }} else if node.try_get::<godot::classes::Node2D>().is_some() {{
-        entity_commands.remove::<Node2DMarker>();
-        entity_commands.remove::<CanvasItemMarker>(); // Node2D inherits from CanvasItem
-        remove_2d_node_types_comprehensive(entity_commands, node);
-    }} else if node.try_get::<godot::classes::Control>().is_some() {{
-        entity_commands.remove::<ControlMarker>();
-        entity_commands.remove::<CanvasItemMarker>(); // Control inherits from CanvasItem
-        remove_control_node_types_comprehensive(entity_commands, node);
-    }}
+    entity_commands.remove::<Node3DMarker>();
+    remove_3d_node_types_comprehensive(entity_commands, node);
 
-    // Check node types that inherit directly from Node
+    entity_commands.remove::<Node2DMarker>();
+    entity_commands.remove::<CanvasItemMarker>(); // Node2D inherits from CanvasItem
+    remove_2d_node_types_comprehensive(entity_commands, node);
+
+    entity_commands.remove::<ControlMarker>();
+    remove_control_node_types_comprehensive(entity_commands, node);
+
     remove_universal_node_types_comprehensive(entity_commands, node);
 }}
 
@@ -331,7 +326,6 @@ pub fn remove_comprehensive_node_type_markers(
         for node_type in sorted(types):
             rust_class_name = self.fix_godot_class_name_for_rust(node_type)
             content += f'''        .remove::<{node_type}Marker>()
-
 '''
 
         content += ";}\n\n"
@@ -365,7 +359,6 @@ pub fn remove_comprehensive_node_type_markers(
         for node_type in sorted(types):
             rust_class_name = self.fix_godot_class_name_for_rust(node_type)
             content += f'''        .remove::<{node_type}Marker>()
-
 '''
 
         content += ";}\n"
