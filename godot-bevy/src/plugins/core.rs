@@ -41,6 +41,7 @@ impl PhysicsDelta {
 pub struct MainThreadMarker;
 
 use crate::interop::GodotNodeHandle;
+use crate::prelude::main_thread_system;
 use bevy::ecs::system::EntityCommands;
 use godot::{classes::Node, obj::Gd};
 use tracing::debug;
@@ -223,13 +224,12 @@ where
 }
 
 /// Observer that automatically frees Godot nodes when GodotNodeHandle components are removed
+#[main_thread_system]
 fn on_godot_node_handle_removed(
     trigger: Trigger<OnRemove, GodotNodeHandle>,
     query: Query<&GodotNodeHandle>,
 ) {
-    // Get the component data before it's fully removed
     if let Ok(handle) = query.get(trigger.target()) {
-        // Free the Godot node
         if let Ok(mut node) = Gd::<Node>::try_from_instance_id(handle.instance_id()) {
             debug!(
                 "Freeing Godot node with instance_id {:?}",
