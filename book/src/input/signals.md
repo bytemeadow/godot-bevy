@@ -44,15 +44,45 @@ fn connect_area_signals(
 }
 ```
 
+### Connecting with Entity Association
+
+When connecting signals, you can optionally associate them with a specific Bevy entity. This makes it easier to identify which entity owns the signal source without needing to search through queries:
+
+```rust
+fn connect_button_with_entity(
+    mut buttons: Query<(Entity, &mut GodotNodeHandle), With<Button>>,
+    signals: GodotSignals,
+) {
+    for (entity, mut handle) in buttons.iter_mut() {
+        // Associate the signal with this entity for quick access
+        signals.connect_with_entity(&mut handle, "pressed", entity);
+    }
+}
+
+// Or connect multiple signals with entity association
+fn connect_area_with_entity(
+    mut areas: Query<(Entity, &mut GodotNodeHandle), With<DetectionArea>>,
+    signals: GodotSignals,
+) {
+    for (entity, mut handle) in areas.iter_mut() {
+        signals.connect_many_with_entity(&mut handle, &[
+            "body_entered",
+            "body_exited",
+        ], entity);
+    }
+}
+```
+
 ## Deferred Signal Connections
 
-When spawning entities that will have Godot nodes, you can queue signal connections to be made once the `GodotNodeHandle` becomes available:
+When spawning entities that will have Godot nodes, you can queue signal connections to be made once the `GodotNodeHandle` becomes available. These deferred connections are automatically associated with the entity they're attached to:
 
 ```rust
 fn spawn_interactive_button(mut commands: Commands) {
     commands.spawn((
         ButtonBundle::default(),
         // Signal will be connected when GodotNodeHandle is available
+        // and automatically associated with this entity
         DeferredSignalConnections::single("pressed"),
     ));
 }
@@ -67,6 +97,8 @@ fn spawn_detection_area(mut commands: Commands) {
     ));
 }
 ```
+
+Note: Deferred signal connections automatically include entity association, so the `source_entity` field in `GodotSignal` will be populated with the entity that owns the node.
 
 ## Reading Signal Events with Extension Syntax
 
@@ -140,6 +172,42 @@ fn handle_menu_buttons(
 }
 ```
 
+### Using Entity Association with Extension Syntax
+
+When signals are connected with entity association, you can directly access the entity in your handlers:
+
+```rust
+#[derive(Component)]
+struct InteractiveButton {
+    interaction_count: u32,
+}
+
+fn setup_buttons(
+    mut buttons: Query<(Entity, &mut GodotNodeHandle), Added<InteractiveButton>>,
+    signals: GodotSignals,
+) {
+    for (entity, mut handle) in buttons.iter_mut() {
+        // Connect with entity association
+        signals.connect_with_entity(&mut handle, "pressed", entity);
+    }
+}
+
+fn handle_button_interactions(
+    mut events: EventReader<GodotSignal>,
+    mut buttons: Query<&mut InteractiveButton>,
+) {
+    events.handle_signal("pressed").any(|signal| {
+        // Access the associated entity directly
+        if let Some(entity) = signal.source_entity {
+            if let Ok(mut button) = buttons.get_mut(entity) {
+                button.interaction_count += 1;
+                println!("Button {:?} pressed {} times", entity, button.interaction_count);
+            }
+        }
+    });
+}
+```
+
 ## Direct Signal Handling
 
 For simpler cases, you can read signals directly without the extension syntax:
@@ -163,7 +231,11 @@ fn handle_signals_directly(mut events: EventReader<GodotSignal>) {
 
 ## Finding Entity Owners
 
-When you need to know which Bevy entity owns a signal's source node:
+When you need to know which Bevy entity owns a signal's source node, you have several options:
+
+### Using the source_entity Field
+
+If the signal was connected with entity association (via `connect_with_entity`, `connect_many_with_entity`, or `DeferredSignalConnections`), the entity is directly available:
 
 ```rust
 #[derive(Component)]
@@ -171,7 +243,30 @@ struct MyButton {
     click_count: u32,
 }
 
-fn handle_button_clicks(
+fn handle_button_clicks_with_entity(
+    mut events: EventReader<GodotSignal>,
+    mut buttons: Query<&mut MyButton>,
+) {
+    for signal in events.read() {
+        if signal.is_from("pressed") {
+            // Check if entity was associated during connection
+            if let Some(entity) = signal.source_entity {
+                if let Ok(mut button) = buttons.get_mut(entity) {
+                    button.click_count += 1;
+                    println!("Entity {:?} clicked {} times", entity, button.click_count);
+                }
+            }
+        }
+    }
+}
+```
+
+### Manual Entity Lookup
+
+For signals connected without entity association, you can still find the owning entity:
+
+```rust
+fn handle_button_clicks_manual(
     mut events: EventReader<GodotSignal>,
     mut buttons: Query<(Entity, &GodotNodeHandle, &mut MyButton)>,
 ) {
@@ -200,6 +295,7 @@ fn handle_button_with_helper(
 ) {
     for signal in events.read() {
         if signal.is_from("pressed") {
+            // This helper searches through the query for you
             if let Some(entity) = signal.find_entity(&node_query) {
                 if let Ok(mut button) = buttons.get_mut(entity) {
                     button.click_count += 1;
@@ -313,7 +409,32 @@ for signal in events.read() {
 }
 ```
 
-### 2. **One-time Connection Setup**
+### 2. **Use Entity Association When Appropriate**
+Connect signals with entity association when you need quick access to the owning entity:
+
+```rust
+// Good: When you'll need to access entity components
+fn connect_interactive_elements(
+    mut query: Query<(Entity, &mut GodotNodeHandle), With<InteractiveComponent>>,
+    signals: GodotSignals,
+) {
+    for (entity, mut handle) in query.iter_mut() {
+        signals.connect_with_entity(&mut handle, "interacted", entity);
+    }
+}
+
+// Also good: Plain connection when entity isn't needed
+fn connect_ui_buttons(
+    mut buttons: Query<&mut GodotNodeHandle, With<UiButton>>,
+    signals: GodotSignals,
+) {
+    for mut handle in buttons.iter_mut() {
+        signals.connect(&mut handle, "pressed");
+    }
+}
+```
+
+### 3. **One-time Connection Setup**
 Ensure signals are connected only once:
 
 ```rust
@@ -336,8 +457,8 @@ fn setup_signals(
 }
 ```
 
-### 3. **Use Deferred Connections for Spawned Entities**
-When spawning entities, use `DeferredSignalConnections`:
+### 4. **Use Deferred Connections for Spawned Entities**
+When spawning entities, use `DeferredSignalConnections` (automatically includes entity association):
 
 ```rust
 commands.spawn((
@@ -346,7 +467,7 @@ commands.spawn((
 ));
 ```
 
-### 4. **Create Custom Matchers for Complex Logic**
+### 5. **Create Custom Matchers for Complex Logic**
 For complex signal routing, create custom signal matchers:
 
 ```rust
@@ -370,6 +491,7 @@ fn create_custom_matcher<'a>(
 ### GodotSignal Fields
 - `signal_name: String` - The name of the signal that was emitted
 - `source_node: GodotNodeHandle` - The Godot node that emitted the signal
+- `source_entity: Option<Entity>` - The Bevy entity associated with the signal (when connected with entity association)
 - `argument_strings: Vec<String>` - String representations of signal arguments
 
 ### GodotSignal Methods
@@ -378,6 +500,12 @@ fn create_custom_matcher<'a>(
 - `is_from_node_signal(&GodotNodeHandle, &str) -> bool` - Check both node and signal name
 - `get_arg_string(index) -> Option<&str>` - Get argument as string by index
 - `find_entity(&Query) -> Option<Entity>` - Find the entity that owns the source node
+
+### GodotSignals Methods
+- `connect(&mut GodotNodeHandle, &str)` - Connect to a signal from a node
+- `connect_with_entity(&mut GodotNodeHandle, &str, Entity)` - Connect to a signal and associate with an entity
+- `connect_many(&mut GodotNodeHandle, &[&str])` - Connect to multiple signals from a node
+- `connect_many_with_entity(&mut GodotNodeHandle, &[&str], Entity)` - Connect to multiple signals and associate with an entity
 
 ### GodotSignalReaderExt Methods
 - `handle_signal(&str) -> SignalMatcher` - Filter to specific signal name
