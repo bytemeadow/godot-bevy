@@ -16,7 +16,7 @@ use bevy::{
         state::{NextState, OnEnter},
     },
 };
-use godot::classes::{Button, DisplayServer, Node, display_server::WindowMode};
+use godot::classes::{Button, DisplayServer, display_server::WindowMode};
 use godot_bevy::prelude::*;
 
 #[derive(Resource, Default)]
@@ -129,46 +129,35 @@ fn listen_for_button_press(
     mut app_state: ResMut<NextState<GameState>>,
     mut level_load_events: EventWriter<LoadLevelEvent>,
 ) {
-    for evt in events.read() {
-        // Skip events for freed nodes - check if target node still exists
-        if evt.target.clone().try_get::<Node>().is_none() {
-            continue;
-        }
-
-        if evt.name == "pressed" {
-            if let Some(start_button) = &menu_assets.start_button
-                && &evt.target == start_button
-            {
+    if let (Some(start_button), Some(fullscreen_button), Some(quit_button)) = (
+        &menu_assets.start_button,
+        &menu_assets.fullscreen_button,
+        &menu_assets.quit_button,
+    ) {
+        events
+            .handle_signal("pressed")
+            .from_node(start_button, |_| {
                 println!("Start button pressed");
                 app_state.set(GameState::InGame);
                 level_load_events.write(LoadLevelEvent {
                     level_id: LevelId::Level1,
                 });
-                continue;
-            }
-
-            if let Some(fullscreen_button) = &menu_assets.fullscreen_button
-                && &evt.target == fullscreen_button
-            {
+            })
+            .from_node(fullscreen_button, |_| {
                 println!("Fullscreen button pressed");
                 if DisplayServer::singleton().window_get_mode() == WindowMode::FULLSCREEN {
                     DisplayServer::singleton().window_set_mode(WindowMode::WINDOWED);
                 } else if DisplayServer::singleton().window_get_mode() == WindowMode::WINDOWED {
                     DisplayServer::singleton().window_set_mode(WindowMode::FULLSCREEN);
                 }
-                continue;
-            }
-
-            if let Some(quit_button) = &menu_assets.quit_button
-                && &evt.target == quit_button
-            {
+            })
+            .from_node(quit_button, |signal| {
                 println!("Quit button pressed");
-                if let Some(button) = evt.target.clone().try_get::<Button>()
+                if let Some(button) = signal.source_node.clone().try_get::<Button>()
                     && let Some(mut tree) = button.get_tree()
                 {
                     tree.quit();
                 }
-            }
-        }
+            });
     }
 }
