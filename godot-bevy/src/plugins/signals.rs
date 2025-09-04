@@ -146,7 +146,12 @@ impl<'w> GodotSignals<'w> {
     }
 
     /// Connect multiple signals at once and associate with a Bevy entity
-    pub fn connect_many_with_entity(&self, node: &mut GodotNodeHandle, signal_names: &[&str], entity: Entity) {
+    pub fn connect_many_with_entity(
+        &self,
+        node: &mut GodotNodeHandle,
+        signal_names: &[&str],
+        entity: Entity,
+    ) {
         for signal_name in signal_names {
             self.connect_with_entity(node, signal_name, entity);
         }
