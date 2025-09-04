@@ -20,7 +20,23 @@ func _ready():
 
 	# Connect signals
 	get_ok_button().pressed.connect(_on_create_pressed)
+	
+	# Force proper sizing - known Godot issue workaround
+	call_deferred("_fix_dialog_size")
 
+
+func _fix_dialog_size():
+	# Workaround for Godot's dialog sizing issues
+	# Reset minimum size to force recalculation
+	min_size = Vector2.ZERO
+	size = Vector2.ZERO
+	# Force layout update
+	await get_tree().process_frame
+	# Let dialog calculate proper size
+	reset_size()
+	# Set fixed width but keep auto height
+	size.x = 800
+	min_size.x = 800
 
 func _on_create_pressed():
 	var info = {

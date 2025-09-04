@@ -70,6 +70,25 @@ impl BevyApp {
         self.base_mut().add_child(&collision_watcher);
         app.insert_non_send_resource(CollisionEventReader(receiver));
     }
+
+    fn register_optimized_scene_tree_watcher(&mut self) {
+        // Try to load the OptimizedSceneTreeWatcher GDScript class
+        let mut resource_loader = godot::classes::ResourceLoader::singleton();
+        if let Some(resource) =
+            resource_loader.load("res://addons/godot-bevy/optimized_scene_tree_watcher.gd")
+            && let Ok(mut script) = resource.try_cast::<godot::classes::GDScript>()
+            && let Ok(instance) = script.try_instantiate(&[])
+            && let Ok(mut node) = instance.try_to::<godot::obj::Gd<godot::classes::Node>>()
+        {
+            node.set_name("OptimizedSceneTreeWatcher");
+            self.base_mut().add_child(&node);
+            tracing::info!("Successfully registered OptimizedSceneTreeWatcher");
+            return;
+        }
+
+        // If loading fails, log and continue without optimization
+        tracing::info!("OptimizedSceneTreeWatcher not available - will use fallback method");
+    }
 }
 
 #[godot_api]
@@ -94,6 +113,7 @@ impl INode for BevyApp {
         app_builder_func(&mut app);
 
         self.register_scene_tree_watcher(&mut app);
+        self.register_optimized_scene_tree_watcher();
         self.register_signal_system(&mut app);
         self.register_input_event_watcher(&mut app);
         self.register_collision_watcher(&mut app);

@@ -10,15 +10,15 @@ config_version=5
 
 [application]
 
-config/name="Boids Comparison"
+config/name="Performance Test"
 run/main_scene="uid://c7q8xvbgkktxh"
 config/features=PackedStringArray("4.4", "Mobile")
 config/icon="res://icon.svg"
 
 [autoload]
 
-BevyAppSingleton="*res://bevy_app_singleton.tscn"
 BenchmarkCLI="*res://scenes/benchmark_cli.tscn"
+BevyAppSingleton="*res://addons/godot-bevy/bevy_app_singleton.tscn"
 
 [display]
 
