@@ -42,6 +42,8 @@ pub struct MainThreadMarker;
 
 use crate::interop::GodotNodeHandle;
 use bevy::ecs::system::EntityCommands;
+use godot::{classes::Node, obj::Gd};
+use tracing::debug;
 
 /// Function that adds a component to an entity with access to the Godot node
 type ComponentInserter = Box<dyn Fn(&mut EntityCommands, &GodotNodeHandle) + Send + Sync>;
@@ -166,7 +168,8 @@ impl Plugin for GodotBaseCorePlugin {
             .add_plugins(bevy::diagnostic::DiagnosticsPlugin)
             .init_resource::<PhysicsDelta>()
             .init_non_send_resource::<MainThreadMarker>()
-            .init_resource::<SceneTreeComponentRegistry>();
+            .init_resource::<SceneTreeComponentRegistry>()
+            .add_observer(on_godot_node_handle_removed);
 
         // Add the PhysicsUpdate schedule
         app.add_schedule(Schedule::new(PrePhysicsUpdate));
@@ -216,5 +219,23 @@ where
 {
     fn find_entity_by_name(mut self, name: &str) -> Option<T> {
         self.find_map(|(ent_name, t)| (ent_name.as_str() == name).then_some(t))
+    }
+}
+
+/// Observer that automatically frees Godot nodes when GodotNodeHandle components are removed
+fn on_godot_node_handle_removed(
+    trigger: Trigger<OnRemove, GodotNodeHandle>,
+    query: Query<&GodotNodeHandle>,
+) {
+    // Get the component data before it's fully removed
+    if let Ok(handle) = query.get(trigger.target()) {
+        // Free the Godot node
+        if let Ok(mut node) = Gd::<Node>::try_from_instance_id(handle.instance_id()) {
+            debug!(
+                "Freeing Godot node with instance_id {:?}",
+                handle.instance_id()
+            );
+            node.queue_free();
+        }
     }
 }

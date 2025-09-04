@@ -1,8 +1,5 @@
 use crate::gameplay::audio::GameSfxChannel;
-use crate::{
-    GameState,
-    commands::{AnimationState, NodeCommand},
-};
+use crate::{GameState, commands::AnimationState};
 use bevy::math::{Vec3Swizzles, vec3};
 use bevy::transform::components::Transform;
 use bevy::{
@@ -10,7 +7,8 @@ use bevy::{
     asset::Handle,
     ecs::{
         component::Component,
-        event::{EventReader, EventWriter},
+        entity::Entity,
+        event::EventReader,
         name::Name,
         query::Added,
         resource::Resource,
@@ -24,7 +22,7 @@ use bevy::{
 use bevy_asset_loader::asset_collection::AssetCollection;
 use godot::{
     builtin::Vector2,
-    classes::{AnimatedSprite2D, Node, PathFollow2D, RigidBody2D},
+    classes::{AnimatedSprite2D, PathFollow2D, RigidBody2D},
 };
 use godot_bevy::{
     interop::GodotNodeHandle,
@@ -118,12 +116,21 @@ pub struct MobNodes {
 
 #[main_thread_system]
 fn new_mob(
-    mut entities: Query<(&Mob, &Transform, &mut GodotNodeHandle, &mut AnimationState), Added<Mob>>,
+    mut entities: Query<
+        (
+            Entity,
+            &Mob,
+            &Transform,
+            &mut GodotNodeHandle,
+            &mut AnimationState,
+        ),
+        Added<Mob>,
+    >,
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
     assets: Res<MobAssets>,
     signals: GodotSignals,
 ) {
-    for (mob_data, transform, mut mob, mut anim_state) in entities.iter_mut() {
+    for (entity, mob_data, transform, mut mob, mut anim_state) in entities.iter_mut() {
         let mut mob = mob.get::<RigidBody2D>();
 
         let velocity = Vector2::new(fastrand::f32() * 100.0 + 150.0, 0.0);
@@ -144,7 +151,8 @@ fn new_mob(
         // Use animation state instead of direct API calls
         anim_state.play(Some(animation_name.into()));
 
-        signals.connect(&mut mob_nodes.visibility_notifier, "screen_exited");
+        // Connect with entity attachment so we can destroy the entity when it goes off-screen
+        signals.connect_with_entity(&mut mob_nodes.visibility_notifier, "screen_exited", entity);
 
         // Play 2D positional spawn sound at mob's position with fade-in
         let position = transform.translation.xy();
@@ -161,16 +169,10 @@ fn new_mob(
     }
 }
 
-#[main_thread_system]
-fn kill_mob(mut signals: EventReader<GodotSignal>, _node_commands: EventWriter<NodeCommand>) {
+fn kill_mob(mut commands: Commands, mut signals: EventReader<GodotSignal>) {
     signals.handle_signal("screen_exited").any(|signal| {
-        // Get the parent node and queue it for destruction via command
-        if let Some(node) = signal.source_node.clone().try_get::<Node>()
-            && let Some(mut parent) = node.get_parent()
-        {
-            // We need the entity ID to send a destroy command
-            // For now, still use direct API but this is safer with try_get
-            parent.queue_free();
+        if let Some(entity) = signal.source_entity {
+            commands.entity(entity).despawn();
         }
     });
 }
