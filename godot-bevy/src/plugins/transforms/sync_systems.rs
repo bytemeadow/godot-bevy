@@ -149,7 +149,7 @@ fn post_update_godot_transforms_bulk(
                 transform_ref.translation.z,
             ));
 
-            rotations_3d.push(godot::builtin::Vector4 {
+            rotations_3d.push(godot::prelude::Vector4 {
                 x: transform_ref.rotation.x,
                 y: transform_ref.rotation.y,
                 z: transform_ref.rotation.z,
