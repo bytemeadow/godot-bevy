@@ -149,9 +149,12 @@ fn post_update_godot_transforms_bulk(
                 transform_ref.translation.z,
             ));
 
-            // Convert Bevy rotation (quaternion) to Euler angles
-            let (x, y, z) = transform_ref.rotation.to_euler(bevy::math::EulerRot::XYZ);
-            rotations_3d.push(godot::prelude::Vector3::new(x, y, z));
+            rotations_3d.push(godot::prelude::Vector4 {
+                x: transform_ref.rotation.x,
+                y: transform_ref.rotation.y,
+                z: transform_ref.rotation.z,
+                w: transform_ref.rotation.w,
+            });
 
             scales_3d.push(godot::prelude::Vector3::new(
                 transform_ref.scale.x,
@@ -184,7 +187,7 @@ fn post_update_godot_transforms_bulk(
             let positions_packed =
                 godot::prelude::PackedVector3Array::from(positions_3d.as_slice());
             let rotations_packed =
-                godot::prelude::PackedVector3Array::from(rotations_3d.as_slice());
+                godot::prelude::PackedVector4Array::from(rotations_3d.as_slice());
             let scales_packed = godot::prelude::PackedVector3Array::from(scales_3d.as_slice());
 
             batch_singleton.call(
