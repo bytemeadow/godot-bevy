@@ -112,6 +112,16 @@ impl INode for BevyApp {
         let app_builder_func = BEVY_INIT_FUNC.get().unwrap();
         app_builder_func(&mut app);
 
+        // Finalize plugins before any further operations
+        // This ensures all plugins are fully initialized
+        // before app.update() is called in process()
+        while app.plugins_state() == bevy::app::PluginsState::Adding {
+            #[cfg(not(all(target_arch = "wasm32", feature = "web")))]
+            bevy_tasks::tick_global_task_pools_on_main_thread();
+        }
+        app.finish();
+        app.cleanup();
+
         self.register_scene_tree_watcher(&mut app);
         self.register_optimized_scene_tree_watcher();
         self.register_signal_system(&mut app);
