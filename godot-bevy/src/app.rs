@@ -116,7 +116,9 @@ impl INode for BevyApp {
         // This ensures all plugins are fully initialized
         // before app.update() is called in process()
         while app.plugins_state() == bevy::app::PluginsState::Adding {
-            #[cfg(not(all(target_arch = "wasm32", feature = "web")))]
+            // This is likely not something godot-bevy strives to support anyway, so we might as well remove it.
+            // We could also add `web` as a feature to godot-bevy.
+            //#[cfg(not(all(target_arch = "wasm32", feature = "web")))]
             bevy_tasks::tick_global_task_pools_on_main_thread();
         }
         app.finish();
