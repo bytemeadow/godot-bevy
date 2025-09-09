@@ -22,7 +22,7 @@ pub use crate::plugins::{
     // Collisions
     input::{
         ActionInput, BevyInputBridgePlugin, GodotInputEventPlugin, KeyboardInput, MouseButtonInput,
-        MouseMotion,
+        MouseMotion, MouseWheel,
     },
     // Core functionality
     packed_scene::{GodotPackedScenePlugin, GodotScene},

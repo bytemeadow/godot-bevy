@@ -8,7 +8,7 @@ pub use input_bridge::BevyInputBridgePlugin;
 // Re-export event types for convenience
 pub use events::{
     ActionInput, GamepadAxisInput, GamepadButtonInput, KeyboardInput, MouseButton,
-    MouseButtonInput, MouseMotion, TouchInput,
+    MouseButtonInput, MouseMotion, MouseWheel, TouchInput,
 };
 
 // Re-export input reader types

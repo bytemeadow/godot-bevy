@@ -5,6 +5,7 @@ use bevy::{
         schedule::IntoScheduleConfigs,
         system::NonSendMut,
     },
+    input::mouse::MouseScrollUnit,
     math::Vec2,
 };
 use godot::{
@@ -35,6 +36,7 @@ impl Plugin for GodotInputEventPlugin {
         app.add_systems(First, write_input_events.before(event_update_system))
             .add_event::<KeyboardInput>()
             .add_event::<MouseButtonInput>()
+            .add_event::<MouseWheel>()
             .add_event::<MouseMotion>()
             .add_event::<TouchInput>()
             .add_event::<ActionInput>()
@@ -65,6 +67,14 @@ pub struct MouseButtonInput {
 pub struct MouseMotion {
     pub delta: Vec2,
     pub position: Vec2,
+}
+
+/// Mouse wheel event
+#[derive(Debug, Event, Clone)]
+pub struct MouseWheel {
+    pub unit: MouseScrollUnit,
+    pub x: f32,
+    pub y: f32,
 }
 
 /// Touch input event (for mobile/touchscreen)
@@ -137,6 +147,7 @@ fn write_input_events(
     mut keyboard_events: EventWriter<KeyboardInput>,
     mut mouse_button_events: EventWriter<MouseButtonInput>,
     mut mouse_motion_events: EventWriter<MouseMotion>,
+    mut mouse_wheel_events: EventWriter<MouseWheel>,
     mut touch_events: EventWriter<TouchInput>,
     mut action_events: EventWriter<ActionInput>,
     mut gamepad_button_events: EventWriter<GamepadButtonInput>,
@@ -157,6 +168,7 @@ fn write_input_events(
                     &mut keyboard_events,
                     &mut mouse_button_events,
                     &mut mouse_motion_events,
+                    &mut mouse_wheel_events,
                     &mut touch_events,
                     &mut gamepad_button_events,
                     &mut gamepad_axis_events,
@@ -180,6 +192,7 @@ fn extract_input_events_no_actions(
     keyboard_events: &mut EventWriter<KeyboardInput>,
     mouse_button_events: &mut EventWriter<MouseButtonInput>,
     mouse_motion_events: &mut EventWriter<MouseMotion>,
+    mouse_wheel_events: &mut EventWriter<MouseWheel>,
     touch_events: &mut EventWriter<TouchInput>,
     gamepad_button_events: &mut EventWriter<GamepadButtonInput>,
     gamepad_axis_events: &mut EventWriter<GamepadAxisInput>,
@@ -189,6 +202,7 @@ fn extract_input_events_no_actions(
         keyboard_events,
         mouse_button_events,
         mouse_motion_events,
+        mouse_wheel_events,
         touch_events,
         gamepad_button_events,
         gamepad_axis_events,
@@ -200,6 +214,7 @@ fn extract_basic_input_events(
     keyboard_events: &mut EventWriter<KeyboardInput>,
     mouse_button_events: &mut EventWriter<MouseButtonInput>,
     mouse_motion_events: &mut EventWriter<MouseMotion>,
+    mouse_wheel_events: &mut EventWriter<MouseWheel>,
     touch_events: &mut EventWriter<TouchInput>,
     gamepad_button_events: &mut EventWriter<GamepadButtonInput>,
     gamepad_axis_events: &mut EventWriter<GamepadAxisInput>,
@@ -217,6 +232,23 @@ fn extract_basic_input_events(
     }
     // Mouse button input
     else if let Ok(mouse_button_event) = input_event.clone().try_cast::<InputEventMouseButton>() {
+        // Mouse wheel comes through as a mouse button in Godot
+        if let Some((x, y)) = match mouse_button_event.get_button_index() {
+            godot::global::MouseButton::WHEEL_UP => Some((0.0, mouse_button_event.get_factor())),
+            godot::global::MouseButton::WHEEL_DOWN => Some((0.0, -mouse_button_event.get_factor())),
+            godot::global::MouseButton::WHEEL_LEFT => Some((-mouse_button_event.get_factor(), 0.0)),
+            godot::global::MouseButton::WHEEL_RIGHT => Some((mouse_button_event.get_factor(), 0.0)),
+            _ => None, // not a wheel, fall through to normal mouse buttons
+        } {
+            mouse_wheel_events.write(MouseWheel {
+                unit: MouseScrollUnit::Line,
+                x,
+                y,
+            });
+            // handled as wheel event, stop here
+            return;
+        }
+        // Regular mouse buttons
         let position = mouse_button_event.get_position();
         mouse_button_events.write(MouseButtonInput {
             button: mouse_button_event.get_button_index().into(),
