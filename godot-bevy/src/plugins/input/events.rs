@@ -58,6 +58,7 @@ pub struct MouseButtonInput {
     pub button: MouseButton,
     pub pressed: bool,
     pub position: Vec2,
+    pub factor: f32,
 }
 
 /// Mouse motion event
@@ -222,6 +223,7 @@ fn extract_basic_input_events(
             button: mouse_button_event.get_button_index().into(),
             pressed: mouse_button_event.is_pressed(),
             position: Vec2::new(position.x, position.y),
+            factor: mouse_button_event.get_factor(),
         });
     }
     // Mouse motion

@@ -1,5 +1,5 @@
 use bevy::{
-    app::{App, Last, Plugin, PreUpdate},
+    app::{App, First, Last, Plugin},
     ecs::{
         entity::Entity,
         event::{EventReader, EventWriter},
@@ -9,8 +9,8 @@ use bevy::{
         ButtonInput, ButtonState, InputPlugin,
         keyboard::KeyCode,
         mouse::{
-            AccumulatedMouseMotion, AccumulatedMouseScroll, MouseButton as BevyMouseButton,
-            MouseButtonInput as BevyMouseButtonInput, MouseMotion as BevyMouseMotion,
+            MouseButton as BevyMouseButton, MouseButtonInput as BevyMouseButtonInput,
+            MouseMotion as BevyMouseMotion, MouseScrollUnit, MouseWheel as BevyMouseWheel,
         },
     },
     math::Vec2,
@@ -32,7 +32,7 @@ impl Plugin for BevyInputBridgePlugin {
         app.add_plugins(super::events::GodotInputEventPlugin)
             .add_plugins(InputPlugin)
             .add_systems(
-                PreUpdate,
+                First,
                 (
                     bridge_keyboard_input,
                     bridge_mouse_button_input,
@@ -93,46 +93,53 @@ fn bridge_mouse_button_input(
 fn bridge_mouse_motion(
     mut mouse_motion_events: EventReader<GodotMouseMotion>,
     mut bevy_mouse_motion_events: EventWriter<BevyMouseMotion>,
-    mut accumulated_motion: ResMut<AccumulatedMouseMotion>,
 ) {
-    // Reset accumulated motion at the start of the frame (like Bevy does)
-    accumulated_motion.delta = Vec2::ZERO;
-
-    // Send individual Bevy MouseMotion events AND accumulate for the frame
+    // Send individual Bevy MouseMotion events - bevy input will handle the accumulation
     for event in mouse_motion_events.read() {
-        // Send individual MouseMotion event (for libraries that prefer events)
         bevy_mouse_motion_events.write(BevyMouseMotion { delta: event.delta });
-
-        // Accumulate delta for the AccumulatedMouseMotion resource
-        accumulated_motion.delta += event.delta;
     }
 }
 
 fn bridge_mouse_scroll(
     mut mouse_button_events: EventReader<GodotMouseButtonInput>,
-    mut accumulated_scroll: ResMut<AccumulatedMouseScroll>,
+    mut bevy_mouse_scroll_events: EventWriter<BevyMouseWheel>,
 ) {
-    // Reset accumulated scroll at the start of the frame (like Bevy does)
-    accumulated_scroll.delta = Vec2::ZERO;
-
-    // Convert wheel button events to scroll accumulation for this frame
+    // Send individual Bevy MouseWheel events - bevy input will handle the accumulation
     for event in mouse_button_events.read() {
-        if event.pressed {
-            match event.button {
-                GodotMouseButton::WheelUp => {
-                    accumulated_scroll.delta.y += 1.0;
-                }
-                GodotMouseButton::WheelDown => {
-                    accumulated_scroll.delta.y -= 1.0;
-                }
-                GodotMouseButton::WheelLeft => {
-                    accumulated_scroll.delta.x -= 1.0;
-                }
-                GodotMouseButton::WheelRight => {
-                    accumulated_scroll.delta.x += 1.0;
-                }
-                _ => {} // Ignore non-wheel buttons
+        match event.button {
+            GodotMouseButton::WheelUp => {
+                bevy_mouse_scroll_events.write(BevyMouseWheel {
+                    x: 0.0,
+                    y: event.factor,
+                    unit: MouseScrollUnit::Line,
+                    window: Entity::PLACEHOLDER,
+                });
             }
+            GodotMouseButton::WheelDown => {
+                bevy_mouse_scroll_events.write(BevyMouseWheel {
+                    x: 0.0,
+                    y: -event.factor,
+                    unit: MouseScrollUnit::Line,
+                    window: Entity::PLACEHOLDER,
+                });
+            }
+            GodotMouseButton::WheelLeft => {
+                bevy_mouse_scroll_events.write(BevyMouseWheel {
+                    x: -event.factor,
+                    y: 0.0,
+                    unit: MouseScrollUnit::Line,
+                    window: Entity::PLACEHOLDER,
+                });
+            }
+            GodotMouseButton::WheelRight => {
+                bevy_mouse_scroll_events.write(BevyMouseWheel {
+                    x: event.factor,
+                    y: 0.0,
+                    unit: MouseScrollUnit::Line,
+                    window: Entity::PLACEHOLDER,
+                });
+            }
+            _ => {} // Ignore non-wheel buttons
         }
     }
 }
