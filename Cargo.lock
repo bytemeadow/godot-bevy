@@ -2194,7 +2194,6 @@ name = "godot-bevy"
 version = "0.9.0"
 dependencies = [
  "bevy",
- "bevy_tasks",
  "chrono",
  "futures-lite",
  "godot",

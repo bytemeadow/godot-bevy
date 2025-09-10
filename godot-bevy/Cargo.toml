@@ -31,7 +31,6 @@ tracing-tracy = { version = "0.11.4", default-features = false, features = [
   "enable",
 ], optional = true }
 tracing-subscriber = { version = "0.3.19", optional = true }
-bevy_tasks = "0.16.1"
 
 [features]
 default = ["bevy_gamepad", "godot_bevy_log"]

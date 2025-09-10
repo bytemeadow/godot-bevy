@@ -116,7 +116,7 @@ impl INode for BevyApp {
         if app.plugins_state() != bevy::app::PluginsState::Cleaned {
             while app.plugins_state() == bevy::app::PluginsState::Adding {
                 #[cfg(not(target_arch = "wasm32"))]
-                bevy_tasks::tick_global_task_pools_on_main_thread();
+                bevy::tasks::tick_global_task_pools_on_main_thread();
             }
 
             app.finish();
