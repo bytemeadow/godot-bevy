@@ -13,7 +13,6 @@ use bevy::{
             MouseMotion as BevyMouseMotion, MouseScrollUnit, MouseWheel as BevyMouseWheel,
         },
     },
-    math::Vec2,
 };
 
 use crate::plugins::input::events::{
