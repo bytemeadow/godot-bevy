@@ -17,3 +17,4 @@ godot = "0.3"
 godot-bevy = { path = "../../../godot-bevy" }
 leafwing-input-manager = "0.17.0"
 which = "8"
+bevy_enhanced_input = "0.13.0"

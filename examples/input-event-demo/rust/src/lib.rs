@@ -8,10 +8,12 @@ use godot_bevy::prelude::{
     *,
 };
 
+mod bevy_enhanced_input;
 mod bevy_input;
 mod godot_input;
 mod leafwing_input;
 
+use bevy_enhanced_input::BevyEnhancedInputPlugin;
 use bevy_input::BevyInputTestPlugin;
 use godot_input::GodotInputPlugin;
 use leafwing_input::LeafwingInputTestPlugin;
@@ -48,4 +50,7 @@ fn build_app(app: &mut App) {
 
     // Plugin 3: Leafwing Input Manager - shows if leafwing integration works
     app.add_plugins(LeafwingInputTestPlugin);
+
+    // Plugin 4: Bevy Enhanced Input - shows if enhanced input works
+    app.add_plugins(BevyEnhancedInputPlugin);
 }
