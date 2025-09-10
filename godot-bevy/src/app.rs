@@ -113,16 +113,15 @@ impl INode for BevyApp {
         app_builder_func(&mut app);
 
         // Finalize plugins before any further operations
-        // This ensures all plugins are fully initialized
-        // before app.update() is called in process()
-        while app.plugins_state() == bevy::app::PluginsState::Adding {
-            // This is likely not something godot-bevy strives to support anyway, so we might as well remove it.
-            // We could also add `web` as a feature to godot-bevy.
-            //#[cfg(not(all(target_arch = "wasm32", feature = "web")))]
-            bevy_tasks::tick_global_task_pools_on_main_thread();
+        if app.plugins_state() != bevy::app::PluginsState::Cleaned {
+            while app.plugins_state() == bevy::app::PluginsState::Adding {
+                #[cfg(not(target_arch = "wasm32"))]
+                bevy_tasks::tick_global_task_pools_on_main_thread();
+            }
+
+            app.finish();
+            app.cleanup();
         }
-        app.finish();
-        app.cleanup();
 
         self.register_scene_tree_watcher(&mut app);
         self.register_optimized_scene_tree_watcher();
