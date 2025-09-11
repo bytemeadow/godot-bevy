@@ -48,12 +48,26 @@ pub struct GodotSignalReader(pub std::sync::mpsc::Receiver<GodotSignal>);
 #[doc(hidden)]
 pub struct GodotSignalSender(pub std::sync::mpsc::Sender<GodotSignal>);
 
-/// Generic typed channel for specific Bevy events derived from Godot signals
-#[doc(hidden)]
-pub struct TypedSignalReceiver<T: Event>(pub std::sync::mpsc::Receiver<T>);
+/// Global, type-erased dispatch for typed signal events
+pub(crate) trait TypedDispatch: Send {
+    fn write_into_world(self: Box<Self>, world: &mut bevy::ecs::world::World);
+}
+
+struct TypedEnvelope<T: Event + Send + 'static>(T);
+
+impl<T: Event + Send + 'static> TypedDispatch for TypedEnvelope<T> {
+    fn write_into_world(self: Box<Self>, world: &mut bevy::ecs::world::World) {
+        if let Some(mut events) = world.get_resource_mut::<bevy::ecs::event::Events<T>>() {
+            events.send(self.0);
+        }
+    }
+}
 
 #[doc(hidden)]
-pub struct TypedSignalSender<T: Event>(pub std::sync::mpsc::Sender<T>);
+pub(crate) struct GlobalTypedSignalReceiver(pub std::sync::mpsc::Receiver<Box<dyn TypedDispatch>>);
+
+#[doc(hidden)]
+pub(crate) struct GlobalTypedSignalSender(pub std::sync::mpsc::Sender<Box<dyn TypedDispatch>>);
 
 /// System parameter for connecting Godot signals to Bevy's event system
 /// Legacy SystemParam (deprecated) wrapped in a narrow module-level allow
@@ -172,41 +186,47 @@ impl<T: Event + Send + 'static> Default for GodotTypedSignalsPlugin<T> {
 
 impl<T: Event + Send + 'static> Plugin for GodotTypedSignalsPlugin<T> {
     fn build(&self, app: &mut App) {
-        // Only set up the channel resources once per T
-        if !app.world().contains_non_send::<TypedSignalSender<T>>() {
-            let (sender, receiver) = std::sync::mpsc::channel::<T>();
+        // Ensure the Bevy event type exists
+        app.add_event::<T>();
+
+        // Install global typed signal channel and consolidated drain once
+        if !app.world().contains_non_send::<GlobalTypedSignalSender>() {
+            let (sender, receiver) = std::sync::mpsc::channel::<Box<dyn TypedDispatch>>();
             app.world_mut()
-                .insert_non_send_resource(TypedSignalSender::<T>(sender));
+                .insert_non_send_resource(GlobalTypedSignalSender(sender));
             app.world_mut()
-                .insert_non_send_resource(TypedSignalReceiver::<T>(receiver));
+                .insert_non_send_resource(GlobalTypedSignalReceiver(receiver));
+
+            // One consolidated drain for all typed events
+            app.add_systems(
+                First,
+                drain_global_typed_signals.before(event_update_system),
+            );
         }
 
-        // Ensure the Bevy event type exists and add systems to drain + process deferred
-        app.add_event::<T>().add_systems(
-            First,
-            (
-                drain_typed_godot_signals::<T>.before(event_update_system),
-                process_typed_deferred_signal_connections::<T>,
-            ),
-        );
+        // Per-T deferred connection processor
+        app.add_systems(First, process_typed_deferred_signal_connections::<T>);
     }
 }
 
-fn drain_typed_godot_signals<T: Event + Send + 'static>(
-    receiver: NonSend<TypedSignalReceiver<T>>,
-    mut writer: EventWriter<T>,
-) {
-    // Drain anything sent from Godot thread into Bevy events
-    for ev in receiver.0.try_iter() {
-        writer.write(ev);
+// Exclusive system to drain type-erased global queue into the correct Events<T> resources
+fn drain_global_typed_signals(world: &mut bevy::ecs::world::World) {
+    // Collect first to avoid overlapping mutable borrows of `world`
+    let mut pending: Vec<Box<dyn TypedDispatch>> = Vec::new();
+    if let Some(receiver) = world.get_non_send_resource_mut::<GlobalTypedSignalReceiver>() {
+        pending.extend(receiver.0.try_iter());
+    }
+    for dispatch in pending.drain(..) {
+        dispatch.write_into_world(world);
     }
 }
 
 /// SystemParam providing typed connect helpers for a specific Bevy `Event` T
 #[derive(SystemParam)]
 pub struct TypedGodotSignals<'w, T: Event + Send + 'static> {
-    /// Sender for typed event T. Provided by `GodotTypedSignalsPlugin::<T>`.
-    typed_sender: NonSend<'w, TypedSignalSender<T>>,
+    /// Global type-erased sender. Provided by first `GodotTypedSignalsPlugin` added.
+    typed_sender: NonSend<'w, GlobalTypedSignalSender>,
+    _marker: std::marker::PhantomData<T>,
 }
 
 impl<'w, T: Event + Send + 'static> TypedGodotSignals<'w, T> {
@@ -230,7 +250,7 @@ impl<'w, T: Event + Send + 'static> TypedGodotSignals<'w, T> {
             // Clone variants to owned values we can inspect
             let owned: Vec<Variant> = args.iter().map(|&v| v.clone()).collect();
             let event = mapper(&owned, &source_node, source_entity);
-            let _ = sender_t.send(event);
+            let _ = sender_t.send(Box::new(TypedEnvelope::<T>(event)));
             Ok(Variant::nil())
         };
 
