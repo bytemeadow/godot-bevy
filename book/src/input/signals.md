@@ -4,256 +4,77 @@ Godot signals are a core communication mechanism in the Godot engine, allowing n
 
 ## How Signal Bridging Works
 
-When you connect a Godot signal through godot-bevy, the signal is automatically converted into a `GodotSignal` event that can be read by Bevy systems using `EventReader<GodotSignal>`. The signal source node and arguments are preserved and passed along with the event.
+When you connect a Godot signal through godot-bevy, the signal is automatically converted into a `GodotSignal` event that can be read by Bevy systems using `EventReader<GodotSignal>`. This includes support for signals with arguments - the signal arguments are preserved and passed along with the event.
 
 ## Basic Signal Connection
 
-To connect to a Godot signal, use the `GodotSignals` system parameter to connect to any node's signal:
+To connect to a Godot signal, use the `GodotSignals` resource to connect to any node's signal:
 
 ```rust
 use bevy::prelude::*;
 use godot_bevy::prelude::*;
 
-fn connect_button_signals(
-    mut buttons: Query<&mut GodotNodeHandle, With<Button>>,
+fn connect_signals(
+    mut scene_tree: SceneTreeRef,
     signals: GodotSignals,
 ) {
-    for mut handle in buttons.iter_mut() {
-        signals.connect(&mut handle, "pressed");
-        signals.connect(&mut handle, "mouse_entered");
-        signals.connect(&mut handle, "mouse_exited");
+    if let Some(root) = scene_tree.get().get_root() {
+        if let Some(button) = root.try_get_node_as::<Button>("UI/MyButton") {
+            let mut handle = GodotNodeHandle::from_instance_id(button.instance_id());
+            signals.connect(&mut handle, "pressed");
+        }
     }
 }
 ```
 
-You can also connect multiple signals at once:
+## Reading Signal Events
+
+Once connected, signals become `GodotSignal` events that you can read in any Bevy system:
 
 ```rust
-fn connect_area_signals(
-    mut areas: Query<&mut GodotNodeHandle, With<DetectionArea>>,
-    signals: GodotSignals,
-) {
-    for mut handle in areas.iter_mut() {
-        signals.connect_many(&mut handle, &[
-            "body_entered",
-            "body_exited",
-            "area_entered",
-            "area_exited",
-        ]);
-    }
-}
-```
-
-### Connecting with Entity Association
-
-When connecting signals, you can optionally associate them with a specific Bevy entity. This makes it easier to identify which entity owns the signal source without needing to search through queries:
-
-```rust
-fn connect_button_with_entity(
-    mut buttons: Query<(Entity, &mut GodotNodeHandle), With<Button>>,
-    signals: GodotSignals,
-) {
-    for (entity, mut handle) in buttons.iter_mut() {
-        // Associate the signal with this entity for quick access
-        signals.connect_with_entity(&mut handle, "pressed", entity);
-    }
-}
-
-// Or connect multiple signals with entity association
-fn connect_area_with_entity(
-    mut areas: Query<(Entity, &mut GodotNodeHandle), With<DetectionArea>>,
-    signals: GodotSignals,
-) {
-    for (entity, mut handle) in areas.iter_mut() {
-        signals.connect_many_with_entity(&mut handle, &[
-            "body_entered",
-            "body_exited",
-        ], entity);
-    }
-}
-```
-
-## Deferred Signal Connections
-
-When spawning entities that will have Godot nodes, you can queue signal connections to be made once the `GodotNodeHandle` becomes available. These deferred connections are automatically associated with the entity they're attached to:
-
-```rust
-fn spawn_interactive_button(mut commands: Commands) {
-    commands.spawn((
-        ButtonBundle::default(),
-        // Signal will be connected when GodotNodeHandle is available
-        // and automatically associated with this entity
-        DeferredSignalConnections::single("pressed"),
-    ));
-}
-
-fn spawn_detection_area(mut commands: Commands) {
-    commands.spawn((
-        AreaBundle::default(),
-        DeferredSignalConnections::new(vec![
-            "body_entered".into(),
-            "body_exited".into(),
-        ]),
-    ));
-}
-```
-
-Note: Deferred signal connections automatically include entity association, so the `source_entity` field in `GodotSignal` will be populated with the entity that owns the node.
-
-## Reading Signal Events with Extension Syntax
-
-godot-bevy provides a clean, chainable syntax for handling signals through the `GodotSignalReaderExt` trait:
-
-```rust
-use godot_bevy::prelude::*;
-
-fn handle_button_presses(mut events: EventReader<GodotSignal>) {
-    events.handle_signal("pressed").any(|signal| {
-        println!("Button pressed!");
-        
-        // Access the source node directly
-        let mut button = signal.source_node.get::<Button>();
-        button.set_text("Clicked!".into());
-    });
-}
-```
-
-### Handling Multiple Signal Types
-
-```rust
-fn handle_ui_signals(mut events: EventReader<GodotSignal>) {
-    // Handle multiple signal types at once
-    events.handle_signals(&["pressed", "released", "toggled"])
-        .any(|signal| {
-            println!("UI interaction: {}", signal.signal_name);
-        });
-    
-    // Custom predicate for filtering
-    events.handle_matching(|signal| {
-        signal.signal_name.starts_with("custom_") && 
-        !signal.argument_strings.is_empty()
-    }).any(|signal| {
-        println!("Custom signal with args: {}", signal.signal_name);
-    });
-}
-```
-
-### Signal Routing by Node
-
-You can handle signals based on which node they came from:
-
-```rust
-#[derive(Resource)]
-struct MenuButtons {
-    start_button: Option<GodotNodeHandle>,
-    quit_button: Option<GodotNodeHandle>,
-    settings_button: Option<GodotNodeHandle>,
-}
-
-fn handle_menu_buttons(
-    menu: Res<MenuButtons>,
-    mut events: EventReader<GodotSignal>,
-    mut app_state: ResMut<NextState<GameState>>,
-) {
-    if let (Some(start), Some(quit), Some(settings)) = 
-        (&menu.start_button, &menu.quit_button, &menu.settings_button) 
-    {
-        events.handle_signal("pressed")
-            .from_node(start, |_| {
-                app_state.set(GameState::Playing);
-            })
-            .from_node(quit, |_| {
-                std::process::exit(0);
-            })
-            .from_node(settings, |_| {
-                app_state.set(GameState::Settings);
-            });
-    }
-}
-```
-
-### Using Entity Association with Extension Syntax
-
-When signals are connected with entity association, you can directly access the entity in your handlers:
-
-```rust
-#[derive(Component)]
-struct InteractiveButton {
-    interaction_count: u32,
-}
-
-fn setup_buttons(
-    mut buttons: Query<(Entity, &mut GodotNodeHandle), Added<InteractiveButton>>,
-    signals: GodotSignals,
-) {
-    for (entity, mut handle) in buttons.iter_mut() {
-        // Connect with entity association
-        signals.connect_with_entity(&mut handle, "pressed", entity);
-    }
-}
-
-fn handle_button_interactions(
-    mut events: EventReader<GodotSignal>,
-    mut buttons: Query<&mut InteractiveButton>,
-) {
-    events.handle_signal("pressed").any(|signal| {
-        // Access the associated entity directly
-        if let Some(entity) = signal.source_entity {
-            if let Ok(mut button) = buttons.get_mut(entity) {
-                button.interaction_count += 1;
-                println!("Button {:?} pressed {} times", entity, button.interaction_count);
+fn handle_signals(mut signal_events: EventReader<GodotSignal>) {
+    for signal in signal_events.read() {
+        match signal.name.as_str() {
+            "pressed" => {
+                println!("Button was pressed!");
             }
-        }
-    });
-}
-```
-
-## Direct Signal Handling
-
-For simpler cases, you can read signals directly without the extension syntax:
-
-```rust
-fn handle_signals_directly(mut events: EventReader<GodotSignal>) {
-    for signal in events.read() {
-        if signal.is_from("pressed") {
-            println!("Button pressed!");
-        }
-        
-        if signal.is_from("text_changed") {
-            // Signal arguments are provided as debug strings
-            if let Some(new_text) = signal.get_arg_string(0) {
-                println!("Text changed to: {}", new_text);
+            "toggled" => {
+                println!("Toggle button changed state");
             }
+            _ => {}
         }
     }
 }
 ```
 
-## Finding Entity Owners
+## Signals with Arguments
 
-When you need to know which Bevy entity owns a signal's source node, you have several options:
-
-### Using the source_entity Field
-
-If the signal was connected with entity association (via `connect_with_entity`, `connect_many_with_entity`, or `DeferredSignalConnections`), the entity is directly available:
+Many Godot signals carry arguments that provide additional context about the event. godot-bevy preserves these arguments and makes them available through the `arguments` field:
 
 ```rust
-#[derive(Component)]
-struct MyButton {
-    click_count: u32,
-}
+fn handle_input_signals(mut signal_events: EventReader<GodotSignal>) {
+    for signal in signal_events.read() {
+        if signal.name == "input_event" {
+            println!("Received input_event signal with {} arguments", signal.arguments.len());
 
-fn handle_button_clicks_with_entity(
-    mut events: EventReader<GodotSignal>,
-    mut buttons: Query<&mut MyButton>,
-) {
-    for signal in events.read() {
-        if signal.is_from("pressed") {
-            // Check if entity was associated during connection
-            if let Some(entity) = signal.source_entity {
-                if let Ok(mut button) = buttons.get_mut(entity) {
-                    button.click_count += 1;
-                    println!("Entity {:?} clicked {} times", entity, button.click_count);
+            // CollisionObject2D.input_event has 3 arguments: viewport, event, shape_idx
+            if signal.arguments.len() >= 2 {
+                // The second argument is the InputEvent
+                let event_arg = &signal.arguments[1];
+
+                // Parse the event argument to determine event type
+                if event_arg.value.contains("InputEventMouseButton") {
+                    println!("Mouse button event detected!");
+
+                    if event_arg.value.contains("pressed=true") {
+                        if event_arg.value.contains("button_index=1") {
+                            println!("Left mouse button clicked!");
+                        } else if event_arg.value.contains("button_index=2") {
+                            println!("Right mouse button clicked!");
+                        }
+                    }
+                } else if event_arg.value.contains("InputEventMouseMotion") {
+                    println!("Mouse motion over area");
                 }
             }
         }
@@ -261,181 +82,72 @@ fn handle_button_clicks_with_entity(
 }
 ```
 
-### Manual Entity Lookup
+## Signal Arguments Structure
 
-For signals connected without entity association, you can still find the owning entity:
+Signal arguments are provided as a `Vec<SignalArgument>` where each `SignalArgument` has:
 
-```rust
-fn handle_button_clicks_manual(
-    mut events: EventReader<GodotSignal>,
-    mut buttons: Query<(Entity, &GodotNodeHandle, &mut MyButton)>,
-) {
-    for signal in events.read() {
-        if signal.is_from("pressed") {
-            // Find which entity owns this signal's source node
-            for (entity, handle, mut button) in buttons.iter_mut() {
-                if *handle == signal.source_node {
-                    button.click_count += 1;
-                    println!("Entity {:?} clicked {} times", entity, button.click_count);
-                    break;
-                }
-            }
-        }
-    }
-}
-```
+- `value`: A `String` representation of the argument's value
+- Additional metadata about the argument type (implementation details may vary)
 
-Or use the helper method:
-
-```rust
-fn handle_button_with_helper(
-    mut events: EventReader<GodotSignal>,
-    node_query: Query<(Entity, &GodotNodeHandle)>,
-    mut buttons: Query<&mut MyButton>,
-) {
-    for signal in events.read() {
-        if signal.is_from("pressed") {
-            // This helper searches through the query for you
-            if let Some(entity) = signal.find_entity(&node_query) {
-                if let Ok(mut button) = buttons.get_mut(entity) {
-                    button.click_count += 1;
-                }
-            }
-        }
-    }
-}
-```
-
-## Custom Extension Traits
-
-You can create your own extension traits for domain-specific signal handling:
-
-```rust
-trait GameSignalExt {
-    fn handle_combat_signals(&mut self) -> SignalMatcher<'_>;
-    fn handle_ui_signals(&mut self) -> SignalMatcher<'_>;
-}
-
-impl GameSignalExt for EventReader<'_, '_, GodotSignal> {
-    fn handle_combat_signals(&mut self) -> SignalMatcher<'_> {
-        self.handle_matching(|signal| {
-            matches!(signal.signal_name.as_str(), 
-                "attack" | "defend" | "cast_spell" | "take_damage")
-        })
-    }
-    
-    fn handle_ui_signals(&mut self) -> SignalMatcher<'_> {
-        self.handle_signals(&["pressed", "released", "toggled", "value_changed"])
-    }
-}
-
-// Use your custom extension
-fn game_system(mut events: EventReader<GodotSignal>) {
-    events.handle_combat_signals().any(|signal| {
-        println!("Combat event: {}", signal.signal_name);
-    });
-}
-```
+For complex signal arguments like `InputEvent`, you'll typically need to parse the `value` string to extract the information you need, as shown in the examples above.
 
 ## Common Signal Patterns
 
 ### UI Signals
 ```rust
-fn handle_ui_interactions(mut events: EventReader<GodotSignal>) {
-    events.handle_signal("pressed").any(|_| {
-        println!("Button clicked!");
-    });
-    
-    events.handle_signal("toggled").any(|signal| {
-        // Check button state if needed
-        let button = signal.source_node.get::<CheckBox>();
-        println!("Checkbox is now: {}", button.is_pressed());
-    });
-    
-    events.handle_signal("text_changed").any(|signal| {
-        if let Some(text) = signal.get_arg_string(0) {
-            println!("Text changed to: {}", text);
-        }
-    });
+// Button pressed
+if signal.name == "pressed" {
+    println!("Button clicked!");
+}
+
+// CheckBox toggled
+if signal.name == "toggled" && signal.arguments.len() > 0 {
+    let pressed = signal.arguments[0].value.contains("true");
+    println!("Checkbox is now: {}", if pressed { "checked" } else { "unchecked" });
+}
+
+// LineEdit text changed
+if signal.name == "text_changed" && signal.arguments.len() > 0 {
+    println!("Text changed to: {}", signal.arguments[0].value);
 }
 ```
 
 ### Physics Signals
 
-For physics-related events like collisions, godot-bevy provides the dedicated `Collisions` resource that is more efficient than signals. Use signals only for custom physics events:
+For physics-related events like collisions, godot-bevy provides dedicated resources that are more efficient than signals. Instead of connecting to physics signals, use the `Collisions` resource:
 
 ```rust
-// For standard collisions, use the Collisions resource (more efficient)
-fn check_collisions(
-    mut query: Query<(&mut GodotNodeHandle, &Collisions), With<Player>>,
+// Instead of using signals for collision detection, use the Collisions resource
+fn check_player_death(
+    mut player: Query<(&mut GodotNodeHandle, &Collisions), With<Player>>,
+    mut next_state: ResMut<NextState<GameState>>,
 ) {
-    if let Ok((mut player, collisions)) = query.single_mut() {
-        if !collisions.colliding().is_empty() {
-            player.get::<Node2D>().set_visible(false);
+    if let Ok((mut player, collisions)) = player.single_mut() {
+        if collisions.colliding().is_empty() {
+            return;
         }
+
+        player.get::<Node2D>().set_visible(false);
+        next_state.set(GameState::GameOver);
     }
 }
+```
 
-// For custom physics signals with additional data
-fn handle_custom_physics(mut events: EventReader<GodotSignal>) {
-    events.handle_signal("projectile_hit").any(|signal| {
-        if let Some(damage_str) = signal.get_arg_string(0) {
-            println!("Projectile hit for damage: {}", damage_str);
-        }
-    });
+The `Collisions` resource provides direct access to collision state without the overhead of signal processing, making it ideal for gameplay-critical physics events.
+
+For non-gameplay physics events that need custom data, signals are still appropriate:
+```rust
+// Custom physics events that carry additional data
+if signal.name == "projectile_hit" && signal.arguments.len() > 0 {
+    let damage = signal.arguments[0].value.parse::<f32>().unwrap_or(0.0);
+    println!("Projectile hit for {} damage", damage);
 }
 ```
 
 ## Best Practices
 
-### 1. **Use Extension Syntax for Cleaner Code**
-The extension syntax provides cleaner, more maintainable code:
-
-```rust
-// Clean and declarative
-events.handle_signal("pressed")
-    .from_node(&start_button, |_| { /* start game */ })
-    .from_node(&quit_button, |_| { /* quit game */ });
-
-// Instead of nested if statements
-for signal in events.read() {
-    if signal.is_from("pressed") {
-        if signal.source_node == start_button {
-            // start game
-        } else if signal.source_node == quit_button {
-            // quit game
-        }
-    }
-}
-```
-
-### 2. **Use Entity Association When Appropriate**
-Connect signals with entity association when you need quick access to the owning entity:
-
-```rust
-// Good: When you'll need to access entity components
-fn connect_interactive_elements(
-    mut query: Query<(Entity, &mut GodotNodeHandle), With<InteractiveComponent>>,
-    signals: GodotSignals,
-) {
-    for (entity, mut handle) in query.iter_mut() {
-        signals.connect_with_entity(&mut handle, "interacted", entity);
-    }
-}
-
-// Also good: Plain connection when entity isn't needed
-fn connect_ui_buttons(
-    mut buttons: Query<&mut GodotNodeHandle, With<UiButton>>,
-    signals: GodotSignals,
-) {
-    for mut handle in buttons.iter_mut() {
-        signals.connect(&mut handle, "pressed");
-    }
-}
-```
-
-### 3. **One-time Connection Setup**
-Ensure signals are connected only once:
+### 1. **One-time Connection Setup**
+Use a resource or local state to ensure signals are connected only once:
 
 ```rust
 #[derive(Resource, Default)]
@@ -445,80 +157,35 @@ struct SignalConnectionState {
 
 fn setup_signals(
     mut state: ResMut<SignalConnectionState>,
-    mut handles: Query<&mut GodotNodeHandle>,
-    signals: GodotSignals,
+    // ... other parameters
 ) {
     if !state.connected {
-        for mut handle in handles.iter_mut() {
-            signals.connect(&mut handle, "pressed");
-        }
+        // Connect signals
         state.connected = true;
     }
 }
 ```
 
-### 4. **Use Deferred Connections for Spawned Entities**
-When spawning entities, use `DeferredSignalConnections` (automatically includes entity association):
+### 2. **Signal Name Matching**
+Use string matching or consider creating an enum for frequently used signals:
 
 ```rust
-commands.spawn((
-    MyBundle::default(),
-    DeferredSignalConnections::single("pressed"),
-));
-```
+#[derive(Debug, PartialEq)]
+enum GameSignal {
+    ButtonPressed,
+    PlayerHit,
+    AreaEntered,
+    Unknown(String),
+}
 
-### 5. **Create Custom Matchers for Complex Logic**
-For complex signal routing, create custom signal matchers:
-
-```rust
-fn create_custom_matcher<'a>(
-    events: &mut EventReader<GodotSignal>,
-    important_nodes: &[GodotNodeHandle],
-) -> SignalMatcher<'a> {
-    SignalMatcher::from_signals(
-        events.read()
-            .filter(|s| {
-                s.is_from("pressed") && 
-                important_nodes.contains(&s.source_node)
-            })
-            .collect()
-    )
+impl From<&str> for GameSignal {
+    fn from(name: &str) -> Self {
+        match name {
+            "pressed" => Self::ButtonPressed,
+            "player_hit" => Self::PlayerHit,
+            "body_entered" => Self::AreaEntered,
+            other => Self::Unknown(other.to_string()),
+        }
+    }
 }
 ```
-
-## Signal API Reference
-
-### GodotSignal Fields
-- `signal_name: String` - The name of the signal that was emitted
-- `source_node: GodotNodeHandle` - The Godot node that emitted the signal
-- `source_entity: Option<Entity>` - The Bevy entity associated with the signal (when connected with entity association)
-- `argument_strings: Vec<String>` - String representations of signal arguments
-
-### GodotSignal Methods
-- `is_from(&str) -> bool` - Check if signal has a specific name
-- `is_from_node(&GodotNodeHandle) -> bool` - Check if signal came from a specific node
-- `is_from_node_signal(&GodotNodeHandle, &str) -> bool` - Check both node and signal name
-- `get_arg_string(index) -> Option<&str>` - Get argument as string by index
-- `find_entity(&Query) -> Option<Entity>` - Find the entity that owns the source node
-
-### GodotSignals Methods
-- `connect(&mut GodotNodeHandle, &str)` - Connect to a signal from a node
-- `connect_with_entity(&mut GodotNodeHandle, &str, Entity)` - Connect to a signal and associate with an entity
-- `connect_many(&mut GodotNodeHandle, &[&str])` - Connect to multiple signals from a node
-- `connect_many_with_entity(&mut GodotNodeHandle, &[&str], Entity)` - Connect to multiple signals and associate with an entity
-
-### GodotSignalReaderExt Methods
-- `handle_signal(&str) -> SignalMatcher` - Filter to specific signal name
-- `handle_signals(&[&str]) -> SignalMatcher` - Filter to multiple signal names
-- `handle_matching(predicate) -> SignalMatcher` - Filter with custom predicate
-- `handle_all() -> SignalMatcher` - Get all signals as a matcher
-
-### SignalMatcher Methods
-- `from_node(node, handler)` - Handle signals from specific node
-- `from_any_node(nodes, handler)` - Handle signals from any of the nodes
-- `matching(predicate)` - Additional filtering
-- `any(handler)` - Handle all remaining signals
-- `first(handler)` - Handle only the first signal
-- `count()` - Get number of signals
-- `is_empty()` - Check if matcher has signals
-- `iter()` - Iterate over signals

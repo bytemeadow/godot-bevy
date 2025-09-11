@@ -1,3 +1,4 @@
+use bevy::prelude::Event;
 use bevy::{
     app::{App, Plugin, Update},
     ecs::{
@@ -14,8 +15,7 @@ use bevy::{
 use godot_bevy::{
     interop::GodotNodeHandle,
     prelude::{
-        GodotSignal, GodotSignalReaderExt, GodotSignals, NodeTreeView, SceneTreeRef,
-        main_thread_system,
+        GodotTypedSignalsPlugin, NodeTreeView, SceneTreeRef, TypedGodotSignals, main_thread_system,
     },
 };
 
@@ -34,6 +34,8 @@ pub struct MainMenuPlugin;
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuAssets>()
+            // enable typed signal routing for menu
+            .add_plugins(GodotTypedSignalsPlugin::<StartGameRequested>::default())
             .add_systems(
                 OnExit(GameState::Loading),
                 (
@@ -80,17 +82,28 @@ fn init_menu_assets(
     ui_handles.message_label = Some(menu_ui.message_label.clone());
 }
 
-fn connect_start_button(mut menu_assets: ResMut<MenuAssets>, signals: GodotSignals) {
-    signals.connect(menu_assets.start_button.as_mut().unwrap(), "pressed");
+#[derive(Event, Debug, Clone)]
+struct StartGameRequested;
+
+fn connect_start_button(
+    mut menu_assets: ResMut<MenuAssets>,
+    typed: TypedGodotSignals<StartGameRequested>,
+) {
+    typed.connect_map(
+        menu_assets.start_button.as_mut().unwrap(),
+        "pressed",
+        None,
+        |_args, _node, _ent| StartGameRequested,
+    );
 }
 
 fn listen_for_start_button(
-    mut events: EventReader<GodotSignal>,
+    mut events: EventReader<StartGameRequested>,
     mut app_state: ResMut<NextState<GameState>>,
 ) {
-    events.handle_signal("pressed").any(|_| {
+    for _ in events.read() {
         app_state.set(GameState::Countdown);
-    });
+    }
 }
 
 fn hide_play_button(mut ui_commands: EventWriter<UICommand>) {

@@ -1,6 +1,7 @@
 use crate::gameplay::audio::GameSfxChannel;
 use crate::{GameState, commands::AnimationState};
 use bevy::math::{Vec3Swizzles, vec3};
+use bevy::prelude::Event;
 use bevy::transform::components::Transform;
 use bevy::{
     app::{App, Plugin, Update},
@@ -27,8 +28,8 @@ use godot::{
 use godot_bevy::{
     interop::GodotNodeHandle,
     prelude::{
-        AudioChannel, FindEntityByNameExt, GodotResource, GodotScene, GodotSignal,
-        GodotSignalReaderExt, GodotSignals, NodeTreeView, main_thread_system,
+        AudioChannel, FindEntityByNameExt, GodotResource, GodotScene, GodotTypedSignalsPlugin,
+        NodeTreeView, TypedGodotSignals, main_thread_system,
     },
 };
 use std::f32::consts::PI;
@@ -46,14 +47,17 @@ pub struct MobPlugin;
 
 impl Plugin for MobPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (spawn_mob, new_mob, kill_mob).run_if(in_state(GameState::InGame)),
-        )
-        .insert_resource(MobSpawnTimer(Timer::from_seconds(
-            0.5,
-            TimerMode::Repeating,
-        )));
+        app
+            // enable typed signal routing for mob screen exit
+            .add_plugins(GodotTypedSignalsPlugin::<MobScreenExited>::default())
+            .add_systems(
+                Update,
+                (spawn_mob, new_mob, kill_mob).run_if(in_state(GameState::InGame)),
+            )
+            .insert_resource(MobSpawnTimer(Timer::from_seconds(
+                0.5,
+                TimerMode::Repeating,
+            )));
     }
 }
 
@@ -128,7 +132,7 @@ fn new_mob(
     >,
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
     assets: Res<MobAssets>,
-    signals: GodotSignals,
+    typed: TypedGodotSignals<MobScreenExited>,
 ) {
     for (entity, mob_data, transform, mut mob, mut anim_state) in entities.iter_mut() {
         let mut mob = mob.get::<RigidBody2D>();
@@ -151,8 +155,15 @@ fn new_mob(
         // Use animation state instead of direct API calls
         anim_state.play(Some(animation_name.into()));
 
-        // Connect with entity attachment so we can destroy the entity when it goes off-screen
-        signals.connect_with_entity(&mut mob_nodes.visibility_notifier, "screen_exited", entity);
+        // Connect typed event with entity attachment so we can destroy the entity when it goes off-screen
+        typed.connect_map(
+            &mut mob_nodes.visibility_notifier,
+            "screen_exited",
+            Some(entity),
+            |_args, _node, ent| MobScreenExited {
+                entity: ent.expect("entity was provided"),
+            },
+        );
 
         // Play 2D positional spawn sound at mob's position with fade-in
         let position = transform.translation.xy();
@@ -169,10 +180,13 @@ fn new_mob(
     }
 }
 
-fn kill_mob(mut commands: Commands, mut signals: EventReader<GodotSignal>) {
-    signals.handle_signal("screen_exited").any(|signal| {
-        if let Some(entity) = signal.source_entity {
-            commands.entity(entity).despawn();
-        }
-    });
+#[derive(Event, Debug, Clone, Copy)]
+struct MobScreenExited {
+    entity: Entity,
+}
+
+fn kill_mob(mut commands: Commands, mut events: EventReader<MobScreenExited>) {
+    for ev in events.read() {
+        commands.entity(ev.entity).despawn();
+    }
 }

@@ -5,13 +5,15 @@ use bevy::{
         entity::Entity,
         event::{Event, EventWriter, event_update_system},
         schedule::IntoScheduleConfigs,
-        system::{Commands, NonSendMut, Query, SystemParam},
+        system::{Commands, NonSend, NonSendMut, Query, SystemParam},
     },
 };
 use godot::{
-    classes::Node,
+    classes::{Node, Object},
+    obj::{Gd, InstanceId},
     prelude::{Callable, Variant},
 };
+use std::sync::mpsc::Sender;
 
 use crate::interop::GodotNodeHandle;
 
@@ -20,141 +22,50 @@ pub struct GodotSignalsPlugin;
 
 impl Plugin for GodotSignalsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            First,
-            (
-                write_godot_signal_events.before(event_update_system),
-                process_deferred_signal_connections,
-            ),
-        )
-        .add_event::<GodotSignal>();
+        app.add_systems(First, write_godot_signal_events.before(event_update_system))
+            .add_event::<GodotSignal>();
     }
 }
 
-/// Raw signal data from Godot - contains non-Send Variant data
 #[derive(Debug, Clone)]
-pub struct RawGodotSignal {
-    pub signal_name: String,
-    pub source_node: GodotNodeHandle,
-    pub source_entity: Option<Entity>,
-    pub arguments: Vec<Variant>,
+pub struct GodotSignalArgument {
+    pub type_name: String,
+    pub value: String,
+    pub instance_id: Option<InstanceId>,
 }
 
-/// Event that captures any Godot signal emission - Send + Sync safe
-#[derive(Debug, Event, Clone)]
+#[derive(Debug, Event)]
 pub struct GodotSignal {
-    /// Name of the signal that was emitted
-    pub signal_name: String,
-    /// The Godot node that emitted the signal
-    pub source_node: GodotNodeHandle,
-    /// Optional Bevy entity associated with the source node
-    pub source_entity: Option<Entity>,
-    /// String representations of arguments for debugging
-    pub argument_strings: Vec<String>,
-}
-
-impl GodotSignal {
-    pub fn is_from(&self, signal_name: &str) -> bool {
-        self.signal_name == signal_name
-    }
-
-    pub fn get_arg_string(&self, index: usize) -> Option<&str> {
-        self.argument_strings.get(index).map(|s| s.as_str())
-    }
-
-    /// Check if this signal came from a specific node
-    pub fn is_from_node(&self, node: &GodotNodeHandle) -> bool {
-        self.source_node == *node
-    }
-
-    /// Check if this signal is from a specific signal name AND node
-    pub fn is_from_node_signal(&self, node: &GodotNodeHandle, signal_name: &str) -> bool {
-        self.signal_name == signal_name && self.source_node == *node
-    }
-
-    /// Find the entity that owns this signal's source node
-    pub fn find_entity(&self, query: &Query<(Entity, &GodotNodeHandle)>) -> Option<Entity> {
-        query.iter().find_map(|(entity, handle)| {
-            if *handle == self.source_node {
-                Some(entity)
-            } else {
-                None
-            }
-        })
-    }
-}
-
-/// Component for deferred signal connections - applied to entities
-/// that need signals connected once their GodotNodeHandle is available
-#[derive(Component)]
-pub struct DeferredSignalConnections {
-    pub connections: Vec<String>,
-}
-
-impl DeferredSignalConnections {
-    pub fn new(signals: Vec<String>) -> Self {
-        Self {
-            connections: signals,
-        }
-    }
-
-    pub fn single(signal: impl Into<String>) -> Self {
-        Self {
-            connections: vec![signal.into()],
-        }
-    }
+    pub name: String,
+    pub origin: GodotNodeHandle,
+    pub target: GodotNodeHandle,
+    pub arguments: Vec<GodotSignalArgument>,
 }
 
 #[doc(hidden)]
-pub struct GodotSignalReader(pub std::sync::mpsc::Receiver<RawGodotSignal>);
+pub struct GodotSignalReader(pub std::sync::mpsc::Receiver<GodotSignal>);
 
 #[doc(hidden)]
-pub struct GodotSignalSender(pub std::sync::mpsc::Sender<RawGodotSignal>);
+pub struct GodotSignalSender(pub std::sync::mpsc::Sender<GodotSignal>);
+
+/// Generic typed channel for specific Bevy events derived from Godot signals
+#[doc(hidden)]
+pub struct TypedSignalReceiver<T: Event>(pub std::sync::mpsc::Receiver<T>);
+
+#[doc(hidden)]
+pub struct TypedSignalSender<T: Event>(pub std::sync::mpsc::Sender<T>);
 
 /// System parameter for connecting Godot signals to Bevy's event system
+/// Clean API for connecting Godot signals - hides implementation details from users
 #[derive(SystemParam)]
 pub struct GodotSignals<'w> {
     signal_sender: NonSendMut<'w, GodotSignalSender>,
 }
 
 impl<'w> GodotSignals<'w> {
-    /// Connect to a Godot signal from an existing node
+    /// Connect a Godot signal to be forwarded to Bevy's event system
     pub fn connect(&self, node: &mut GodotNodeHandle, signal_name: &str) {
-        connect_godot_signal(node, signal_name, None, self.signal_sender.0.clone());
-    }
-
-    /// Connect and associate with a Bevy entity for easier querying
-    pub fn connect_with_entity(
-        &self,
-        node: &mut GodotNodeHandle,
-        signal_name: &str,
-        entity: Entity,
-    ) {
-        connect_godot_signal(
-            node,
-            signal_name,
-            Some(entity),
-            self.signal_sender.0.clone(),
-        );
-    }
-
-    /// Connect multiple signals at once
-    pub fn connect_many(&self, node: &mut GodotNodeHandle, signal_names: &[&str]) {
-        for signal_name in signal_names {
-            self.connect(node, signal_name);
-        }
-    }
-
-    /// Connect multiple signals at once and associate with a Bevy entity
-    pub fn connect_many_with_entity(
-        &self,
-        node: &mut GodotNodeHandle,
-        signal_names: &[&str],
-        entity: Entity,
-    ) {
-        for signal_name in signal_names {
-            self.connect_with_entity(node, signal_name, entity);
-        }
+        connect_godot_signal(node, signal_name, self.signal_sender.0.clone());
     }
 }
 
@@ -162,205 +73,238 @@ fn write_godot_signal_events(
     events: NonSendMut<GodotSignalReader>,
     mut event_writer: EventWriter<GodotSignal>,
 ) {
-    for raw_signal in events.0.try_iter() {
-        // Convert raw signal to Send-safe event
-        let signal = GodotSignal {
-            signal_name: raw_signal.signal_name,
-            source_node: raw_signal.source_node,
-            source_entity: raw_signal.source_entity,
-            argument_strings: raw_signal
-                .arguments
-                .iter()
-                .map(|v| v.stringify().to_string())
-                .collect(),
-        };
-        event_writer.write(signal);
-    }
+    event_writer.write_batch(events.0.try_iter());
 }
 
 pub fn connect_godot_signal(
     node: &mut GodotNodeHandle,
     signal_name: &str,
-    source_entity: Option<Entity>,
-    signal_sender: std::sync::mpsc::Sender<RawGodotSignal>,
+    signal_sender: Sender<GodotSignal>,
 ) {
-    let mut node_ref = node.get::<Node>();
+    let mut node = node.get::<Node>();
+    let node_clone = node.clone();
     let signal_name_copy = signal_name.to_string();
-    let source_node = node.clone();
+    let node_id = node_clone.instance_id();
 
     let closure = move |args: &[&Variant]| -> Result<Variant, ()> {
-        let arguments: Vec<Variant> = args.iter().map(|&v| v.clone()).collect();
+        // Use captured sender directly - no global state needed!
+        let arguments: Vec<GodotSignalArgument> = args
+            .iter()
+            .map(|&arg| variant_to_signal_argument(arg))
+            .collect();
 
-        let _ = signal_sender.send(RawGodotSignal {
-            signal_name: signal_name_copy.clone(),
-            source_node: source_node.clone(),
-            source_entity,
+        let origin_handle = GodotNodeHandle::from_instance_id(node_id);
+
+        let _ = signal_sender.send(GodotSignal {
+            name: signal_name_copy.clone(),
+            origin: origin_handle.clone(),
+            target: origin_handle,
             arguments,
         });
 
         Ok(Variant::nil())
     };
 
-    let callable = Callable::from_local_fn(&format!("signal_handler_{}", signal_name), closure);
+    // Create callable from our universal closure
+    let callable = Callable::from_local_fn("universal_signal_handler", closure);
 
-    node_ref.connect(signal_name, &callable);
+    // Connect the signal - this will work with ANY number of arguments!
+    node.connect(signal_name, &callable);
 }
 
-/// Extension trait for EventReader<GodotSignal> to add syntax sugar
-pub trait GodotSignalReaderExt {
-    /// Process signals of any type
-    fn handle_signal(&mut self, signal_name: &str) -> SignalMatcher<'_>;
-
-    /// Process signals matching a custom predicate
-    fn handle_matching<F>(&mut self, predicate: F) -> SignalMatcher<'_>
-    where
-        F: Fn(&GodotSignal) -> bool;
-
-    /// Process all signals (no filtering)
-    fn handle_all(&mut self) -> SignalMatcher<'_>;
-
-    /// Process multiple signal types at once
-    fn handle_signals(&mut self, signal_names: &[&str]) -> SignalMatcher<'_>;
-}
-
-impl GodotSignalReaderExt for bevy::ecs::event::EventReader<'_, '_, GodotSignal> {
-    fn handle_signal(&mut self, signal_name: &str) -> SignalMatcher<'_> {
-        SignalMatcher::from_signals(self.read().filter(|s| s.is_from(signal_name)).collect())
+pub fn variant_to_signal_argument(variant: &Variant) -> GodotSignalArgument {
+    let type_name = match variant.get_type() {
+        godot::prelude::VariantType::NIL => "Nil",
+        godot::prelude::VariantType::BOOL => "Bool",
+        godot::prelude::VariantType::INT => "Int",
+        godot::prelude::VariantType::FLOAT => "Float",
+        godot::prelude::VariantType::STRING => "String",
+        godot::prelude::VariantType::VECTOR2 => "Vector2",
+        godot::prelude::VariantType::VECTOR3 => "Vector3",
+        godot::prelude::VariantType::OBJECT => "Object",
+        _ => "Unknown",
     }
+    .to_string();
 
-    fn handle_matching<F>(&mut self, predicate: F) -> SignalMatcher<'_>
-    where
-        F: Fn(&GodotSignal) -> bool,
-    {
-        SignalMatcher::from_signals(self.read().filter(|s| predicate(s)).collect())
-    }
+    let value = variant.stringify().to_string();
 
-    fn handle_all(&mut self) -> SignalMatcher<'_> {
-        SignalMatcher::from_signals(self.read().collect())
-    }
+    // Extract instance ID for objects
+    let instance_id = if variant.get_type() == godot::prelude::VariantType::OBJECT {
+        variant
+            .try_to::<Gd<Object>>()
+            .ok()
+            .map(|obj| obj.instance_id())
+    } else {
+        None
+    };
 
-    fn handle_signals(&mut self, signal_names: &[&str]) -> SignalMatcher<'_> {
-        SignalMatcher::from_signals(
-            self.read()
-                .filter(|s| signal_names.iter().any(|name| s.is_from(name)))
-                .collect(),
-        )
+    GodotSignalArgument {
+        type_name,
+        value,
+        instance_id,
     }
 }
 
-/// Helper for chaining signal handling operations
-pub struct SignalMatcher<'a> {
-    signals: Vec<&'a GodotSignal>,
+/// Generic plugin to enable typed Godot-signal-to-Bevy-event routing for `T`
+pub struct GodotTypedSignalsPlugin<T: Event + Send + 'static> {
+    _phantom: std::marker::PhantomData<T>,
 }
 
-impl<'a> SignalMatcher<'a> {
-    /// Create a new SignalMatcher from a collection of signals
-    pub fn from_signals(signals: Vec<&'a GodotSignal>) -> Self {
-        Self { signals }
-    }
-
-    /// Create an empty SignalMatcher
-    pub fn empty() -> Self {
+impl<T: Event + Send + 'static> Default for GodotTypedSignalsPlugin<T> {
+    fn default() -> Self {
         Self {
-            signals: Vec::new(),
+            _phantom: Default::default(),
         }
-    }
-
-    /// Create a SignalMatcher from a slice of signals
-    pub fn from_slice(signals: &[&'a GodotSignal]) -> Self {
-        Self {
-            signals: signals.to_vec(),
-        }
-    }
-    /// Handle signals from a specific node
-    pub fn from_node<F>(self, node: &GodotNodeHandle, mut handler: F) -> Self
-    where
-        F: FnMut(&GodotSignal),
-    {
-        for signal in &self.signals {
-            if signal.is_from_node(node) {
-                handler(signal);
-            }
-        }
-        self
-    }
-
-    /// Handle signals from any of the provided nodes
-    pub fn from_any_node<F>(self, nodes: &[&GodotNodeHandle], mut handler: F) -> Self
-    where
-        F: FnMut(&GodotSignal),
-    {
-        for signal in &self.signals {
-            if nodes.iter().any(|node| signal.is_from_node(node)) {
-                handler(signal);
-            }
-        }
-        self
-    }
-
-    /// Handle all remaining signals (catch-all)
-    pub fn any<F>(self, mut handler: F)
-    where
-        F: FnMut(&GodotSignal),
-    {
-        for signal in &self.signals {
-            handler(signal);
-        }
-    }
-
-    /// Filter signals by a custom predicate and continue chaining
-    pub fn matching<F>(self, predicate: F) -> Self
-    where
-        F: Fn(&GodotSignal) -> bool,
-    {
-        SignalMatcher::from_signals(self.signals.into_iter().filter(|s| predicate(s)).collect())
-    }
-
-    /// Handle the first signal that matches, then stop processing
-    pub fn first<F>(self, mut handler: F)
-    where
-        F: FnMut(&GodotSignal),
-    {
-        if let Some(signal) = self.signals.first() {
-            handler(signal);
-        }
-    }
-
-    /// Get the count of signals in this matcher
-    pub fn count(&self) -> usize {
-        self.signals.len()
-    }
-
-    /// Check if there are any signals in this matcher
-    pub fn is_empty(&self) -> bool {
-        self.signals.is_empty()
-    }
-
-    /// Get an iterator over the signals
-    pub fn iter(&self) -> impl Iterator<Item = &GodotSignal> {
-        self.signals.iter().copied()
     }
 }
 
-/// Process deferred signal connections for entities that now have GodotNodeHandles
-fn process_deferred_signal_connections(
-    mut commands: Commands,
-    mut query: Query<(Entity, &mut GodotNodeHandle, &DeferredSignalConnections)>,
-    signal_sender: NonSendMut<GodotSignalSender>,
+impl<T: Event + Send + 'static> Plugin for GodotTypedSignalsPlugin<T> {
+    fn build(&self, app: &mut App) {
+        // Only set up the channel resources once per T
+        if !app.world().contains_non_send::<TypedSignalSender<T>>() {
+            let (sender, receiver) = std::sync::mpsc::channel::<T>();
+            app.world_mut()
+                .insert_non_send_resource(TypedSignalSender::<T>(sender));
+            app.world_mut()
+                .insert_non_send_resource(TypedSignalReceiver::<T>(receiver));
+        }
+
+        // Ensure the Bevy event type exists and add systems to drain + process deferred
+        app.add_event::<T>().add_systems(
+            First,
+            (
+                drain_typed_godot_signals::<T>.before(event_update_system),
+                process_typed_deferred_signal_connections::<T>,
+            ),
+        );
+    }
+}
+
+fn drain_typed_godot_signals<T: Event + Send + 'static>(
+    receiver: NonSend<TypedSignalReceiver<T>>,
+    mut writer: EventWriter<T>,
 ) {
-    for (entity, mut handle, deferred) in query.iter_mut() {
-        for signal_name in &deferred.connections {
-            connect_godot_signal(
+    // Drain anything sent from Godot thread into Bevy events
+    for ev in receiver.0.try_iter() {
+        writer.write(ev);
+    }
+}
+
+/// SystemParam providing typed connect helpers for a specific Bevy `Event` T
+#[derive(SystemParam)]
+pub struct TypedGodotSignals<'w, T: Event + Send + 'static> {
+    /// Sender for typed event T. Provided by `GodotTypedSignalsPlugin::<T>`.
+    typed_sender: NonSend<'w, TypedSignalSender<T>>,
+}
+
+impl<'w, T: Event + Send + 'static> TypedGodotSignals<'w, T> {
+    /// Connect a Godot signal and map it to a typed Bevy Event `T` via `mapper`.
+    /// Multiple connections are supported; each connection sends a `T` when fired.
+    pub fn connect_map<F>(
+        &self,
+        node: &mut GodotNodeHandle,
+        signal_name: &str,
+        source_entity: Option<Entity>,
+        mut mapper: F,
+    ) where
+        F: FnMut(&[Variant], &GodotNodeHandle, Option<Entity>) -> T + Send + 'static,
+    {
+        let mut node_ref = node.get::<Node>();
+        let signal_name_copy = signal_name.to_string();
+        let source_node = node.clone();
+        let sender_t = self.typed_sender.0.clone();
+
+        let closure = move |args: &[&Variant]| -> Result<Variant, ()> {
+            // Clone variants to owned values we can inspect
+            let owned: Vec<Variant> = args.iter().map(|&v| v.clone()).collect();
+            let event = mapper(&owned, &source_node, source_entity);
+            let _ = sender_t.send(event);
+            Ok(Variant::nil())
+        };
+
+        let callable =
+            Callable::from_local_fn(&format!("signal_handler_typed_{signal_name_copy}"), closure);
+        node_ref.connect(signal_name, &callable);
+    }
+}
+
+/// Process typed deferred signal connections for entities that now have GodotNodeHandles
+fn process_typed_deferred_signal_connections<T: Event + Send + 'static>(
+    mut commands: Commands,
+    mut query: Query<(
+        Entity,
+        &mut GodotNodeHandle,
+        &mut TypedDeferredSignalConnections<T>,
+    )>,
+    typed: TypedGodotSignals<T>,
+) {
+    for (entity, mut handle, mut deferred) in query.iter_mut() {
+        for conn in deferred.connections.drain(..) {
+            let signal = conn.signal_name;
+            let mapper = conn.mapper;
+            typed.connect_map(
                 &mut handle,
-                signal_name,
+                &signal,
                 Some(entity),
-                signal_sender.0.clone(),
+                move |args, node, ent| (mapper)(args, node, ent),
             );
         }
-
-        // Remove the component after processing
+        // Remove marker after wiring all deferred connections
         commands
             .entity(entity)
-            .remove::<DeferredSignalConnections>();
+            .remove::<TypedDeferredSignalConnections<T>>();
+    }
+}
+
+// ====================
+// Typed Deferred Connections
+// ====================
+
+/// A single typed deferred connection item for `T` events
+pub struct TypedDeferredConnection<T: Event + Send + 'static> {
+    pub signal_name: String,
+    pub mapper:
+        Box<dyn Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> T + Send + Sync + 'static>,
+}
+
+/// Component to defer Godot signal connections until a `GodotNodeHandle` exists on the entity
+#[derive(Component)]
+pub struct TypedDeferredSignalConnections<T: Event + Send + 'static> {
+    pub connections: Vec<TypedDeferredConnection<T>>,
+}
+
+impl<T: Event + Send + 'static> Default for TypedDeferredSignalConnections<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: Event + Send + 'static> TypedDeferredSignalConnections<T> {
+    pub fn new() -> Self {
+        Self {
+            connections: Vec::new(),
+        }
+    }
+
+    pub fn with_connection<F>(signal_name: impl Into<String>, mapper: F) -> Self
+    where
+        F: Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> T + Send + Sync + 'static,
+    {
+        Self {
+            connections: vec![TypedDeferredConnection {
+                signal_name: signal_name.into(),
+                mapper: Box::new(mapper),
+            }],
+        }
+    }
+
+    pub fn push<F>(&mut self, signal_name: impl Into<String>, mapper: F)
+    where
+        F: Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> T + Send + Sync + 'static,
+    {
+        self.connections.push(TypedDeferredConnection {
+            signal_name: signal_name.into(),
+            mapper: Box::new(mapper),
+        });
     }
 }
