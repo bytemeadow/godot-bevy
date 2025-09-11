@@ -56,18 +56,30 @@ pub struct TypedSignalReceiver<T: Event>(pub std::sync::mpsc::Receiver<T>);
 pub struct TypedSignalSender<T: Event>(pub std::sync::mpsc::Sender<T>);
 
 /// System parameter for connecting Godot signals to Bevy's event system
-/// Clean API for connecting Godot signals - hides implementation details from users
-#[derive(SystemParam)]
-pub struct GodotSignals<'w> {
-    signal_sender: NonSendMut<'w, GodotSignalSender>,
-}
+/// Legacy SystemParam (deprecated) wrapped in a narrow module-level allow
+mod legacy_signals_param {
+    #![allow(deprecated)]
+    use super::*;
 
-impl<'w> GodotSignals<'w> {
-    /// Connect a Godot signal to be forwarded to Bevy's event system
-    pub fn connect(&self, node: &mut GodotNodeHandle, signal_name: &str) {
-        connect_godot_signal(node, signal_name, self.signal_sender.0.clone());
+    /// Clean API for connecting Godot signals - hides implementation details from users
+    #[derive(SystemParam)]
+    #[deprecated(
+        note = "Legacy signal bus. Prefer TypedGodotSignals<T> with GodotTypedSignalsPlugin<T>."
+    )]
+    pub struct GodotSignals<'w> {
+        pub(super) signal_sender: NonSendMut<'w, GodotSignalSender>,
+    }
+
+    impl<'w> GodotSignals<'w> {
+        /// Connect a Godot signal to be forwarded to Bevy's event system
+        pub fn connect(&self, node: &mut GodotNodeHandle, signal_name: &str) {
+            connect_godot_signal(node, signal_name, self.signal_sender.0.clone());
+        }
     }
 }
+
+#[allow(deprecated)]
+pub use legacy_signals_param::GodotSignals;
 
 fn write_godot_signal_events(
     events: NonSendMut<GodotSignalReader>,

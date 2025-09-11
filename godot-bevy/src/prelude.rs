@@ -30,15 +30,18 @@ pub use crate::plugins::{
     scene_tree::{
         AutoSyncBundleRegistry, GodotSceneTreePlugin, Groups, SceneTreeConfig, SceneTreeRef,
     },
-    signals::{
-        GodotSignal, GodotSignals, GodotSignalsPlugin, GodotTypedSignalsPlugin, TypedGodotSignals,
-        connect_godot_signal,
-    },
+    signals::{GodotTypedSignalsPlugin, TypedGodotSignals},
     // Scene tree
     transforms::{
         GodotTransformConfig, GodotTransformSyncPlugin, GodotTransformSyncPluginExt,
         TransformSyncMetadata, TransformSyncMode, add_transform_sync_systems,
     },
+};
+
+// Legacy re-exports (deprecated). Keep available for downstreams while avoiding warnings here.
+#[allow(deprecated)]
+pub use crate::plugins::signals::{
+    GodotSignal, GodotSignals, GodotSignalsPlugin, connect_godot_signal,
 };
 pub use bevy::prelude as bevy_prelude;
 pub use godot::prelude as godot_prelude;
