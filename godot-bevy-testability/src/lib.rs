@@ -7,7 +7,7 @@ pub mod helpers;
 
 pub use godot_testability_runtime::prelude::*;
 pub use godot_testability_runtime::runtime::UserCallbacks;
-pub use helpers::{TestEnvironment, BevyGodotTestContextExt};
+pub use helpers::{BevyGodotTestContextExt, TestEnvironment};
 
 use bevy::app::App;
 use std::sync::mpsc::channel;

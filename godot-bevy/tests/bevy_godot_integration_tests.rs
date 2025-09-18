@@ -3,8 +3,8 @@
 //! Run with: `cargo test --features api-4-3 --test bevy_godot_integration_tests`
 
 use bevy::prelude::*;
-use godot::prelude::*;
 use godot::classes::Node;
+use godot::prelude::*;
 use godot_bevy::interop::{GodotNodeHandle, NodeMarker};
 use godot_bevy_testability::*;
 
@@ -206,9 +206,9 @@ fn test_scene_tree_operations(_ctx: &mut BevyGodotTestContext) -> TestResult<()>
 
 // Test that creating a Godot node and entity with Transform initializes correctly
 fn test_godot_node_creates_entity_with_transform(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
+    use godot_bevy::interop::node_markers::Node3DMarker;
     use godot_bevy::plugins::core::GodotBaseCorePlugin;
     use godot_bevy::plugins::transforms::{GodotTransformSyncPlugin, IntoBevyTransform};
-    use godot_bevy::interop::node_markers::Node3DMarker;
 
     // Initialize resources and add necessary plugins
     ctx.initialize_godot_bevy_resources();
@@ -286,10 +286,10 @@ fn test_godot_node_creates_entity_with_transform(ctx: &mut BevyGodotTestContext)
 
 // Test that modifying a Bevy transform syncs to Godot
 fn test_bevy_transform_syncs_to_godot(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
+    use bevy::math::Vec3;
+    use godot_bevy::interop::node_markers::Node3DMarker;
     use godot_bevy::plugins::core::GodotBaseCorePlugin;
     use godot_bevy::plugins::transforms::{GodotTransformSyncPlugin, TransformSyncMetadata};
-    use godot_bevy::interop::node_markers::Node3DMarker;
-    use bevy::math::Vec3;
 
     // Initialize and add plugins
     ctx.initialize_godot_bevy_resources();
@@ -319,8 +319,11 @@ fn test_bevy_transform_syncs_to_godot(ctx: &mut BevyGodotTestContext) -> TestRes
     ctx.app.update();
 
     // Modify the Bevy transform
-    ctx.app.world_mut().entity_mut(entity)
-        .get_mut::<Transform>().unwrap()
+    ctx.app
+        .world_mut()
+        .entity_mut(entity)
+        .get_mut::<Transform>()
+        .unwrap()
         .translation = Vec3::new(50.0, 75.0, 100.0);
 
     // Update to trigger sync
@@ -352,9 +355,11 @@ fn test_bevy_transform_syncs_to_godot(ctx: &mut BevyGodotTestContext) -> TestRes
 
 // Test two-way transform sync
 fn test_two_way_transform_sync(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
-    use godot_bevy::plugins::core::GodotBaseCorePlugin;
-    use godot_bevy::plugins::transforms::{GodotTransformSyncPlugin, TransformSyncMetadata, TransformSyncMode};
     use godot_bevy::interop::node_markers::Node3DMarker;
+    use godot_bevy::plugins::core::GodotBaseCorePlugin;
+    use godot_bevy::plugins::transforms::{
+        GodotTransformSyncPlugin, TransformSyncMetadata, TransformSyncMode,
+    };
 
     // Initialize and add plugins with two-way sync
     ctx.initialize_godot_bevy_resources();
@@ -409,8 +414,11 @@ fn test_two_way_transform_sync(ctx: &mut BevyGodotTestContext) -> TestResult<()>
     );
 
     // Test 2: Modify Bevy transform and check if Godot updates
-    ctx.app.world_mut().entity_mut(entity)
-        .get_mut::<Transform>().unwrap()
+    ctx.app
+        .world_mut()
+        .entity_mut(entity)
+        .get_mut::<Transform>()
+        .unwrap()
         .translation = Vec3::new(500.0, 600.0, 700.0);
 
     ctx.app.update();
@@ -440,10 +448,10 @@ fn test_two_way_transform_sync(ctx: &mut BevyGodotTestContext) -> TestResult<()>
 
 // Test transform sync with parent-child hierarchy
 fn test_transform_sync_hierarchy(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
+    use godot_bevy::interop::node_markers::Node3DMarker;
     use godot_bevy::plugins::core::GodotBaseCorePlugin;
     use godot_bevy::plugins::scene_tree::GodotSceneTreePlugin;
     use godot_bevy::plugins::transforms::{GodotTransformSyncPlugin, TransformSyncMetadata};
-    use godot_bevy::interop::node_markers::Node3DMarker;
     use std::sync::mpsc::channel;
 
     // Initialize and add plugins
@@ -454,7 +462,10 @@ fn test_transform_sync_hierarchy(ctx: &mut BevyGodotTestContext) -> TestResult<(
 
     // Set up scene tree event channel
     let (_sender, receiver) = channel();
-    ctx.app.insert_non_send_resource(godot_bevy::plugins::scene_tree::SceneTreeEventReader(receiver));
+    ctx.app
+        .insert_non_send_resource(godot_bevy::plugins::scene_tree::SceneTreeEventReader(
+            receiver,
+        ));
 
     // Create parent and child nodes
     let mut parent = Node3D::new_alloc();
@@ -497,8 +508,11 @@ fn test_transform_sync_hierarchy(ctx: &mut BevyGodotTestContext) -> TestResult<(
     ctx.app.update();
 
     // Move parent in Bevy and check both nodes in Godot
-    ctx.app.world_mut().entity_mut(parent_entity)
-        .get_mut::<Transform>().unwrap()
+    ctx.app
+        .world_mut()
+        .entity_mut(parent_entity)
+        .get_mut::<Transform>()
+        .unwrap()
         .translation = Vec3::new(200.0, 100.0, 50.0);
 
     ctx.app.update();

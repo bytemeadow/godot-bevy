@@ -2,19 +2,21 @@
 //!
 //! Run with: `cargo test --features api-4-3 --test full_integration_transform_tests`
 
+use bevy::math::Vec3;
 use bevy::prelude::*;
-use godot::prelude::*;
 use godot::classes::Node;
+use godot::prelude::*;
+use godot_bevy::interop::node_markers::Node3DMarker;
 use godot_bevy::interop::{GodotNodeHandle, NodeMarker};
 use godot_bevy::plugins::transforms::{GodotTransformSyncPlugin, TransformSyncMode};
-use godot_bevy::interop::node_markers::Node3DMarker;
 use godot_bevy_testability::*;
-use bevy::math::Vec3;
 
 use godot_bevy_testability::BevyGodotTestContextExt;
 
 // Test that nodes added to the scene tree automatically get Bevy entities with transforms
-fn test_scene_tree_node_creates_entity_with_transform(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
+fn test_scene_tree_node_creates_entity_with_transform(
+    ctx: &mut BevyGodotTestContext,
+) -> TestResult<()> {
     // Set up full integration environment
     let mut env = ctx.setup_full_integration();
 
@@ -35,7 +37,8 @@ fn test_scene_tree_node_creates_entity_with_transform(ctx: &mut BevyGodotTestCon
 
     // Query for the entity that should have been created
     let world = ctx.app.world_mut();
-    let mut query = world.query_filtered::<(&GodotNodeHandle, &Transform, &Node3DMarker), With<NodeMarker>>();
+    let mut query =
+        world.query_filtered::<(&GodotNodeHandle, &Transform, &Node3DMarker), With<NodeMarker>>();
 
     let mut found = false;
     for (handle, transform, _) in query.iter(&world) {
@@ -92,16 +95,31 @@ fn test_bevy_to_godot_sync_with_scene_tree(ctx: &mut BevyGodotTestContext) -> Te
     };
 
     // Modify the transform
-    ctx.app.world_mut().entity_mut(entity_to_modify).insert(Transform::from_xyz(100.0, 200.0, 300.0));
+    ctx.app
+        .world_mut()
+        .entity_mut(entity_to_modify)
+        .insert(Transform::from_xyz(100.0, 200.0, 300.0));
 
     // Update to trigger sync
     ctx.app.update();
 
     // Verify Godot node was updated
     let pos = node.get_position();
-    assert!((pos.x - 100.0).abs() < 0.01, "X should be 100.0, got {}", pos.x);
-    assert!((pos.y - 200.0).abs() < 0.01, "Y should be 200.0, got {}", pos.y);
-    assert!((pos.z - 300.0).abs() < 0.01, "Z should be 300.0, got {}", pos.z);
+    assert!(
+        (pos.x - 100.0).abs() < 0.01,
+        "X should be 100.0, got {}",
+        pos.x
+    );
+    assert!(
+        (pos.y - 200.0).abs() < 0.01,
+        "Y should be 200.0, got {}",
+        pos.y
+    );
+    assert!(
+        (pos.z - 300.0).abs() < 0.01,
+        "Z should be 300.0, got {}",
+        pos.z
+    );
 
     // Clean up
     node.queue_free();
@@ -163,8 +181,11 @@ fn test_two_way_sync_with_scene_tree(ctx: &mut BevyGodotTestContext) -> TestResu
         found_entity.expect("Should find entity")
     };
 
-    ctx.app.world_mut().entity_mut(entity_to_modify)
-        .get_mut::<Transform>().unwrap()
+    ctx.app
+        .world_mut()
+        .entity_mut(entity_to_modify)
+        .get_mut::<Transform>()
+        .unwrap()
         .translation = Vec3::new(150.0, 160.0, 170.0);
 
     ctx.app.update();
@@ -226,8 +247,11 @@ fn test_hierarchy_transform_sync(ctx: &mut BevyGodotTestContext) -> TestResult<(
         found_entity.expect("Should find parent entity")
     };
 
-    ctx.app.world_mut().entity_mut(parent_entity)
-        .get_mut::<Transform>().unwrap()
+    ctx.app
+        .world_mut()
+        .entity_mut(parent_entity)
+        .get_mut::<Transform>()
+        .unwrap()
         .translation = Vec3::new(200.0, 100.0, 0.0);
 
     ctx.app.update();
@@ -239,7 +263,10 @@ fn test_hierarchy_transform_sync(ctx: &mut BevyGodotTestContext) -> TestResult<(
 
     // Child's local position should remain the same
     let child_pos = child.get_position();
-    assert!((child_pos.x - 50.0).abs() < 0.01, "Child local X should stay 50.0");
+    assert!(
+        (child_pos.x - 50.0).abs() < 0.01,
+        "Child local X should stay 50.0"
+    );
 
     // Clean up
     parent.queue_free(); // This also frees the child

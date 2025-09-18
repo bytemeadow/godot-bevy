@@ -2,13 +2,15 @@
 //!
 //! Run with: `cargo test --features api-4-3 --test simple_transform_sync_tests`
 
+use bevy::math::Vec3;
 use bevy::prelude::*;
 use godot::prelude::*;
-use godot_bevy::interop::{GodotNodeHandle, NodeMarker};
-use godot_bevy::plugins::transforms::{GodotTransformSyncPlugin, TransformSyncMetadata, TransformSyncMode};
 use godot_bevy::interop::node_markers::Node3DMarker;
+use godot_bevy::interop::{GodotNodeHandle, NodeMarker};
+use godot_bevy::plugins::transforms::{
+    GodotTransformSyncPlugin, TransformSyncMetadata, TransformSyncMode,
+};
 use godot_bevy_testability::*;
-use bevy::math::Vec3;
 
 // Test basic transform initialization from Godot node
 fn test_transform_initialization(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
@@ -89,8 +91,11 @@ fn test_bevy_to_godot_sync(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
     ctx.app.update();
 
     // Modify Bevy transform
-    ctx.app.world_mut().entity_mut(entity)
-        .get_mut::<Transform>().unwrap()
+    ctx.app
+        .world_mut()
+        .entity_mut(entity)
+        .get_mut::<Transform>()
+        .unwrap()
         .translation = Vec3::new(100.0, 200.0, 300.0);
 
     // Update to trigger sync
@@ -98,9 +103,21 @@ fn test_bevy_to_godot_sync(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
 
     // Verify Godot node was updated
     let pos = node.get_position();
-    assert!((pos.x - 100.0).abs() < 0.01, "X should be 100.0, got {}", pos.x);
-    assert!((pos.y - 200.0).abs() < 0.01, "Y should be 200.0, got {}", pos.y);
-    assert!((pos.z - 300.0).abs() < 0.01, "Z should be 300.0, got {}", pos.z);
+    assert!(
+        (pos.x - 100.0).abs() < 0.01,
+        "X should be 100.0, got {}",
+        pos.x
+    );
+    assert!(
+        (pos.y - 200.0).abs() < 0.01,
+        "Y should be 200.0, got {}",
+        pos.y
+    );
+    assert!(
+        (pos.z - 300.0).abs() < 0.01,
+        "Z should be 300.0, got {}",
+        pos.z
+    );
 
     // Clean up
     node.queue_free();
@@ -153,17 +170,35 @@ fn test_two_way_sync(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
     assert!((bevy_transform.translation.z - 70.0).abs() < 0.01);
 
     // Test 2: Modify Bevy and verify Godot updates
-    ctx.app.world_mut().entity_mut(entity)
-        .get_mut::<Transform>().unwrap()
+    ctx.app
+        .world_mut()
+        .entity_mut(entity)
+        .get_mut::<Transform>()
+        .unwrap()
         .translation = Vec3::new(150.0, 160.0, 170.0);
 
     ctx.app.update();
 
     let godot_position = node.get_position();
-    println!("After Bevy->Godot sync: Godot position = {:?}", godot_position);
-    assert!((godot_position.x - 150.0).abs() < 0.01, "X: {} vs 150.0", godot_position.x);
-    assert!((godot_position.y - 160.0).abs() < 0.01, "Y: {} vs 160.0", godot_position.y);
-    assert!((godot_position.z - 170.0).abs() < 0.01, "Z: {} vs 170.0", godot_position.z);
+    println!(
+        "After Bevy->Godot sync: Godot position = {:?}",
+        godot_position
+    );
+    assert!(
+        (godot_position.x - 150.0).abs() < 0.01,
+        "X: {} vs 150.0",
+        godot_position.x
+    );
+    assert!(
+        (godot_position.y - 160.0).abs() < 0.01,
+        "Y: {} vs 160.0",
+        godot_position.y
+    );
+    assert!(
+        (godot_position.z - 170.0).abs() < 0.01,
+        "Z: {} vs 170.0",
+        godot_position.z
+    );
 
     // Clean up
     node.queue_free();
@@ -173,8 +208,8 @@ fn test_two_way_sync(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
 
 // Test rotation sync
 fn test_rotation_sync(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
-    use godot_bevy::plugins::core::GodotBaseCorePlugin;
     use bevy::math::Quat;
+    use godot_bevy::plugins::core::GodotBaseCorePlugin;
 
     // Initialize and add plugins
     ctx.initialize_godot_bevy_resources();
@@ -209,14 +244,17 @@ fn test_rotation_sync(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
     ctx.app.update();
 
     // Modify Bevy rotation
-    ctx.app.world_mut().entity_mut(entity)
-        .get_mut::<Transform>().unwrap()
+    ctx.app
+        .world_mut()
+        .entity_mut(entity)
+        .get_mut::<Transform>()
+        .unwrap()
         .rotation = Quat::from_euler(
-            bevy::math::EulerRot::XYZ,
-            30.0_f32.to_radians(),
-            60.0_f32.to_radians(),
-            90.0_f32.to_radians(),
-        );
+        bevy::math::EulerRot::XYZ,
+        30.0_f32.to_radians(),
+        60.0_f32.to_radians(),
+        90.0_f32.to_radians(),
+    );
 
     // Update to trigger sync
     ctx.app.update();
@@ -224,9 +262,21 @@ fn test_rotation_sync(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
     // Verify Godot node rotation was updated (approximately)
     let rotation_deg = node.get_rotation_degrees();
     // Note: Due to Euler angle conversions, we allow more tolerance
-    assert!((rotation_deg.x - 30.0).abs() < 1.0, "X rotation should be ~30.0, got {}", rotation_deg.x);
-    assert!((rotation_deg.y - 60.0).abs() < 1.0, "Y rotation should be ~60.0, got {}", rotation_deg.y);
-    assert!((rotation_deg.z - 90.0).abs() < 1.0, "Z rotation should be ~90.0, got {}", rotation_deg.z);
+    assert!(
+        (rotation_deg.x - 30.0).abs() < 1.0,
+        "X rotation should be ~30.0, got {}",
+        rotation_deg.x
+    );
+    assert!(
+        (rotation_deg.y - 60.0).abs() < 1.0,
+        "Y rotation should be ~60.0, got {}",
+        rotation_deg.y
+    );
+    assert!(
+        (rotation_deg.z - 90.0).abs() < 1.0,
+        "Z rotation should be ~90.0, got {}",
+        rotation_deg.z
+    );
 
     // Clean up
     node.queue_free();

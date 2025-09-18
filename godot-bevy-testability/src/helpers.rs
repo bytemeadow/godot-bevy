@@ -3,13 +3,13 @@
 //! This module provides utilities to set up test environments that closely mimic
 //! the real godot-bevy runtime, including scene tree watchers and proper event flow.
 
-use godot::prelude::*;
-use godot_bevy::watchers::scene_tree_watcher::SceneTreeWatcher;
-use godot_bevy::watchers::collision_watcher::CollisionWatcher;
-use godot_bevy::plugins::scene_tree::{SceneTreeEventReader, SceneTreeEvent};
-use godot_bevy::plugins::collisions::CollisionEventReader;
 use crate::BevyGodotTestContext;
-use std::sync::mpsc::{channel, Sender};
+use godot::prelude::*;
+use godot_bevy::plugins::collisions::CollisionEventReader;
+use godot_bevy::plugins::scene_tree::{SceneTreeEvent, SceneTreeEventReader};
+use godot_bevy::watchers::collision_watcher::CollisionWatcher;
+use godot_bevy::watchers::scene_tree_watcher::SceneTreeWatcher;
+use std::sync::mpsc::{Sender, channel};
 
 /// Try to create a BevyApp instance if the class is registered
 fn try_create_bevy_app() -> Option<Gd<godot_bevy::app::BevyApp>> {
@@ -26,7 +26,8 @@ pub fn setup_test_environment_with_watchers(ctx: &mut BevyGodotTestContext) -> T
         let obj_ptr = ctx.scene_tree_ptr as godot::sys::GDExtensionObjectPtr;
         godot::prelude::Gd::<godot::classes::SceneTree>::from_sys_init_opt(|ptr| {
             *(ptr as *mut godot::sys::GDExtensionObjectPtr) = obj_ptr;
-        }).expect("Failed to get scene tree")
+        })
+        .expect("Failed to get scene tree")
     };
 
     // Try to create the actual BevyApp node now that we have class registration
@@ -53,7 +54,8 @@ pub fn setup_test_environment_with_watchers(ctx: &mut BevyGodotTestContext) -> T
     bevy_app_singleton.add_child(&scene_tree_watcher.clone().upcast::<Node>());
 
     // Register the receiver in the app
-    ctx.app.insert_non_send_resource(SceneTreeEventReader(scene_tree_receiver));
+    ctx.app
+        .insert_non_send_resource(SceneTreeEventReader(scene_tree_receiver));
 
     // Set up CollisionWatcher
     let (collision_sender, collision_receiver) = channel();
@@ -63,7 +65,8 @@ pub fn setup_test_environment_with_watchers(ctx: &mut BevyGodotTestContext) -> T
     bevy_app_singleton.add_child(&collision_watcher.clone().upcast::<Node>());
 
     // Register the collision receiver
-    ctx.app.insert_non_send_resource(CollisionEventReader(collision_receiver));
+    ctx.app
+        .insert_non_send_resource(CollisionEventReader(collision_receiver));
 
     // Note: The GodotSceneTreePlugin will automatically connect the scene tree signals
     // when it runs its connect_scene_tree system in PreStartup, since we've placed the
@@ -117,8 +120,10 @@ impl BevyGodotTestContextExt for BevyGodotTestContext {
         let env = setup_test_environment_with_watchers(self);
 
         // Add required plugins AFTER watchers are in place
-        self.app.add_plugins(godot_bevy::plugins::core::GodotBaseCorePlugin);
-        self.app.add_plugins(godot_bevy::plugins::scene_tree::GodotSceneTreePlugin::default());
+        self.app
+            .add_plugins(godot_bevy::plugins::core::GodotBaseCorePlugin);
+        self.app
+            .add_plugins(godot_bevy::plugins::scene_tree::GodotSceneTreePlugin::default());
 
         env
     }

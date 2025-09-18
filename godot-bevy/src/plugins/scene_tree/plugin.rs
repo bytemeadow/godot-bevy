@@ -137,9 +137,7 @@ fn initialize_scene_tree(
     // Check if we have the optimized GDScript watcher for type pre-analysis
     let optimized_watcher = root
         .try_get_node_as::<Node>("/root/BevyAppSingleton/OptimizedSceneTreeWatcher")
-        .or_else(|| {
-            root.try_get_node_as::<Node>("BevyAppSingleton/OptimizedSceneTreeWatcher")
-        });
+        .or_else(|| root.try_get_node_as::<Node>("BevyAppSingleton/OptimizedSceneTreeWatcher"));
 
     let events = if let Some(mut watcher) = optimized_watcher {
         // Use optimized GDScript watcher to analyze the initial tree with type information
@@ -241,9 +239,7 @@ fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
     // Check if we have the optimized GDScript watcher
     let optimized_watcher = root
         .try_get_node_as::<Node>("/root/BevyAppSingleton/OptimizedSceneTreeWatcher")
-        .or_else(|| {
-            root.try_get_node_as::<Node>("BevyAppSingleton/OptimizedSceneTreeWatcher")
-        });
+        .or_else(|| root.try_get_node_as::<Node>("BevyAppSingleton/OptimizedSceneTreeWatcher"));
 
     if optimized_watcher.is_some() {
         // The optimized GDScript watcher handles scene tree connections and forwards
