@@ -157,16 +157,24 @@ fn test_transform_sync(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
 └─────────────────────────────────────────┘
 ```
 
+## Platform Support
+
+**Important**: Integration tests that use the embedded Godot runtime currently only work on **macOS**. This is because godot-testability-runtime downloads libgodot.dylib from SwiftGodotKit releases.
+
+- ✅ **macOS**: Full support for all integration tests
+- ❌ **Linux**: Integration tests not supported (unit tests work fine)
+- ❌ **Windows**: Integration tests not supported (unit tests work fine)
+
 ## API Version Compatibility
 
 **Important**: The embedded Godot runtime is version 4.3.1, so integration tests must use the `api-4-3` feature:
 
 ```toml
-# In your test files or CI
+# In your test files or CI (macOS only)
 cargo test --features api-4-3 --test my_integration_tests
 ```
 
-For unit tests and builds that don't use the embedded runtime, you can use any supported API version (4.1 through 4.4).
+For unit tests and builds that don't use the embedded runtime, you can use any supported API version (4.1 through 4.4) on all platforms.
 
 ## Examples
 
