@@ -193,6 +193,7 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(LightmapProbeMarker);
         }
+        #[cfg(feature = "api-4-4")]
         "LookAtModifier3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(LookAtModifier3DMarker);
@@ -253,6 +254,7 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(RemoteTransform3DMarker);
         }
+        #[cfg(feature = "api-4-4")]
         "RetargetModifier3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(RetargetModifier3DMarker);
@@ -297,22 +299,27 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(SpringArm3DMarker);
         }
+        #[cfg(feature = "api-4-4")]
         "SpringBoneCollision3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(SpringBoneCollision3DMarker);
         }
+        #[cfg(feature = "api-4-4")]
         "SpringBoneCollisionCapsule3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(SpringBoneCollisionCapsule3DMarker);
         }
+        #[cfg(feature = "api-4-4")]
         "SpringBoneCollisionPlane3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(SpringBoneCollisionPlane3DMarker);
         }
+        #[cfg(feature = "api-4-4")]
         "SpringBoneCollisionSphere3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(SpringBoneCollisionSphere3DMarker);
         }
+        #[cfg(feature = "api-4-4")]
         "SpringBoneSimulator3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(SpringBoneSimulator3DMarker);
@@ -1066,6 +1073,7 @@ fn check_3d_node_types_comprehensive(
     if node.try_get::<godot::classes::LightmapProbe>().is_some() {
         entity_commands.insert(LightmapProbeMarker);
     }
+    #[cfg(feature = "api-4-4")]
     if node.try_get::<godot::classes::LookAtModifier3D>().is_some() {
         entity_commands.insert(LookAtModifier3DMarker);
     }
@@ -1123,6 +1131,7 @@ fn check_3d_node_types_comprehensive(
     {
         entity_commands.insert(RemoteTransform3DMarker);
     }
+    #[cfg(feature = "api-4-4")]
     if node
         .try_get::<godot::classes::RetargetModifier3D>()
         .is_some()
@@ -1162,30 +1171,35 @@ fn check_3d_node_types_comprehensive(
     if node.try_get::<godot::classes::SpringArm3D>().is_some() {
         entity_commands.insert(SpringArm3DMarker);
     }
+    #[cfg(feature = "api-4-4")]
     if node
         .try_get::<godot::classes::SpringBoneCollision3D>()
         .is_some()
     {
         entity_commands.insert(SpringBoneCollision3DMarker);
     }
+    #[cfg(feature = "api-4-4")]
     if node
         .try_get::<godot::classes::SpringBoneCollisionCapsule3D>()
         .is_some()
     {
         entity_commands.insert(SpringBoneCollisionCapsule3DMarker);
     }
+    #[cfg(feature = "api-4-4")]
     if node
         .try_get::<godot::classes::SpringBoneCollisionPlane3D>()
         .is_some()
     {
         entity_commands.insert(SpringBoneCollisionPlane3DMarker);
     }
+    #[cfg(feature = "api-4-4")]
     if node
         .try_get::<godot::classes::SpringBoneCollisionSphere3D>()
         .is_some()
     {
         entity_commands.insert(SpringBoneCollisionSphere3DMarker);
     }
+    #[cfg(feature = "api-4-4")]
     if node
         .try_get::<godot::classes::SpringBoneSimulator3D>()
         .is_some()
@@ -1262,7 +1276,6 @@ fn remove_3d_node_types_comprehensive(
         .remove::<Label3DMarker>()
         .remove::<Light3DMarker>()
         .remove::<LightmapProbeMarker>()
-        .remove::<LookAtModifier3DMarker>()
         .remove::<Marker3DMarker>()
         .remove::<MeshInstance3DMarker>()
         .remove::<MultiMeshInstance3DMarker>()
@@ -1277,7 +1290,6 @@ fn remove_3d_node_types_comprehensive(
         .remove::<RayCast3DMarker>()
         .remove::<ReflectionProbeMarker>()
         .remove::<RemoteTransform3DMarker>()
-        .remove::<RetargetModifier3DMarker>()
         .remove::<RigidBody3DMarker>()
         .remove::<RootMotionViewMarker>()
         .remove::<ShapeCast3DMarker>()
@@ -1288,11 +1300,6 @@ fn remove_3d_node_types_comprehensive(
         .remove::<SoftBody3DMarker>()
         .remove::<SpotLight3DMarker>()
         .remove::<SpringArm3DMarker>()
-        .remove::<SpringBoneCollision3DMarker>()
-        .remove::<SpringBoneCollisionCapsule3DMarker>()
-        .remove::<SpringBoneCollisionPlane3DMarker>()
-        .remove::<SpringBoneCollisionSphere3DMarker>()
-        .remove::<SpringBoneSimulator3DMarker>()
         .remove::<Sprite3DMarker>()
         .remove::<SpriteBase3DMarker>()
         .remove::<StaticBody3DMarker>()
@@ -1301,6 +1308,16 @@ fn remove_3d_node_types_comprehensive(
         .remove::<VisibleOnScreenEnabler3DMarker>()
         .remove::<VisibleOnScreenNotifier3DMarker>()
         .remove::<VisualInstance3DMarker>();
+
+    #[cfg(feature = "api-4-4")]
+    entity_commands
+        .remove::<LookAtModifier3DMarker>()
+        .remove::<RetargetModifier3DMarker>()
+        .remove::<SpringBoneCollision3DMarker>()
+        .remove::<SpringBoneCollisionCapsule3DMarker>()
+        .remove::<SpringBoneCollisionPlane3DMarker>()
+        .remove::<SpringBoneCollisionSphere3DMarker>()
+        .remove::<SpringBoneSimulator3DMarker>();
 }
 
 fn check_2d_node_types_comprehensive(

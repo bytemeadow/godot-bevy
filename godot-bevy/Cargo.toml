@@ -14,7 +14,7 @@ bevy = { version = "0.16", default-features = false, features = [
   "bevy_asset",
   "multi_threaded",
 ] }
-godot = { version = "0.3.0", features = ["experimental-threads"] }
+godot.workspace = true
 godot-bevy-macros.workspace = true
 thiserror = "2.0.12"
 futures-lite = "2.6"
@@ -45,3 +45,25 @@ trace_tracy = [
   "dep:tracing-subscriber",
   "bevy/trace_tracy",
 ]
+# Godot API version features - matches gdext naming convention
+api-4-2 = ["godot/api-4-2"]
+api-4-2-1 = ["godot/api-4-2-1"]
+api-4-2-2 = ["godot/api-4-2-2"]
+api-4-3 = ["godot/api-4-3"]
+api-4-4 = ["godot/api-4-4"]
+
+[dev-dependencies]
+godot-bevy-testability = { path = "../godot-bevy-testability" }
+godot-testability-runtime = "0.1.0"
+
+[[test]]
+name = "bevy_godot_integration_tests"
+harness = false
+
+[[test]]
+name = "full_integration_transform_tests"
+harness = false
+
+[[test]]
+name = "simple_transform_sync_tests"
+harness = false

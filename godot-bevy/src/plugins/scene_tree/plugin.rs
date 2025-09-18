@@ -135,8 +135,11 @@ fn initialize_scene_tree(
     let root = scene_tree.get().get_root().unwrap();
 
     // Check if we have the optimized GDScript watcher for type pre-analysis
-    let optimized_watcher =
-        root.try_get_node_as::<Node>("/root/BevyAppSingleton/OptimizedSceneTreeWatcher");
+    let optimized_watcher = root
+        .try_get_node_as::<Node>("/root/BevyAppSingleton/OptimizedSceneTreeWatcher")
+        .or_else(|| {
+            root.try_get_node_as::<Node>("BevyAppSingleton/OptimizedSceneTreeWatcher")
+        });
 
     let events = if let Some(mut watcher) = optimized_watcher {
         // Use optimized GDScript watcher to analyze the initial tree with type information
@@ -222,17 +225,25 @@ pub enum SceneTreeEventType {
 #[main_thread_system]
 fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
     let mut scene_tree_gd = scene_tree.get();
+    let root = scene_tree_gd.get_root().unwrap();
 
-    let watcher = scene_tree_gd
-        .get_root()
-        .unwrap()
-        .get_node_as::<Node>("/root/BevyAppSingleton/SceneTreeWatcher");
+    // Try multiple paths to find the SceneTreeWatcher - support both production and test environments
+    let watcher = root
+        .try_get_node_as::<Node>("/root/BevyAppSingleton/SceneTreeWatcher")
+        .or_else(|| {
+            // Try without the full path for test environments
+            root.try_get_node_as::<Node>("BevyAppSingleton/SceneTreeWatcher")
+        })
+        .unwrap_or_else(|| {
+            panic!("SceneTreeWatcher not found at expected paths. Make sure it exists at /root/BevyAppSingleton/SceneTreeWatcher or BevyAppSingleton/SceneTreeWatcher");
+        });
 
     // Check if we have the optimized GDScript watcher
-    let optimized_watcher = scene_tree_gd
-        .get_root()
-        .unwrap()
-        .try_get_node_as::<Node>("/root/BevyAppSingleton/OptimizedSceneTreeWatcher");
+    let optimized_watcher = root
+        .try_get_node_as::<Node>("/root/BevyAppSingleton/OptimizedSceneTreeWatcher")
+        .or_else(|| {
+            root.try_get_node_as::<Node>("BevyAppSingleton/OptimizedSceneTreeWatcher")
+        });
 
     if optimized_watcher.is_some() {
         // The optimized GDScript watcher handles scene tree connections and forwards
@@ -321,11 +332,15 @@ fn create_scene_tree_entity(
         .map(|(reference, ent, protected)| (reference.instance_id(), (ent, protected)))
         .collect::<HashMap<_, _>>();
     let scene_root = scene_tree.get().get_root().unwrap();
-    let collision_watcher = scene_tree
-        .get()
-        .get_root()
-        .unwrap()
-        .get_node_as::<Node>("/root/BevyAppSingleton/CollisionWatcher");
+    let collision_watcher = scene_root
+        .try_get_node_as::<Node>("/root/BevyAppSingleton/CollisionWatcher")
+        .or_else(|| {
+            // Try without the full path for test environments
+            scene_root.try_get_node_as::<Node>("BevyAppSingleton/CollisionWatcher")
+        })
+        .unwrap_or_else(|| {
+            panic!("CollisionWatcher not found at expected paths. Make sure it exists at /root/BevyAppSingleton/CollisionWatcher or BevyAppSingleton/CollisionWatcher");
+        });
 
     for event in events.into_iter() {
         trace!(target: "godot_scene_tree_events", event = ?event);

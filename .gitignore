@@ -26,3 +26,4 @@ devenv.local.nix
 *.tracy
 
 .cargo/
+/inspo

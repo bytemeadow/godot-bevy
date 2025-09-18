@@ -76,10 +76,13 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
 
-      - name: Run tests
-        run: cargo test
+      - name: Run unit tests (no runtime)
+        run: cargo test --lib --bins --examples
+
+      - name: Run integration tests with embedded Godot runtime (4.3 API only)
+        run: cargo test --features api-4-3 --test bevy_godot_integration_tests --test full_integration_transform_tests
 
       - name: Build release
         run: cargo build --release

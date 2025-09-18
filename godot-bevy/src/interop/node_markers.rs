@@ -337,6 +337,7 @@ pub struct LineEditMarker;
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LinkButtonMarker;
 
+#[cfg(feature = "api-4-4")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LookAtModifier3DMarker;
 
@@ -532,6 +533,7 @@ pub struct RemoteTransform3DMarker;
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResourcePreloaderMarker;
 
+#[cfg(feature = "api-4-4")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RetargetModifier3DMarker;
 
@@ -601,18 +603,23 @@ pub struct SpotLight3DMarker;
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpringArm3DMarker;
 
+#[cfg(feature = "api-4-4")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpringBoneCollision3DMarker;
 
+#[cfg(feature = "api-4-4")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpringBoneCollisionCapsule3DMarker;
 
+#[cfg(feature = "api-4-4")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpringBoneCollisionPlane3DMarker;
 
+#[cfg(feature = "api-4-4")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpringBoneCollisionSphere3DMarker;
 
+#[cfg(feature = "api-4-4")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpringBoneSimulator3DMarker;
 

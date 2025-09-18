@@ -1,0 +1,46 @@
+[package]
+name = "godot-bevy-testability"
+version = "0.1.0"
+edition = "2021"
+description = "Bevy-specific testing utilities for Godot-Bevy integration projects"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/godot-rust/godot-bevy"
+
+[dependencies]
+# Core embedded testing framework
+godot-testability-runtime = "0.1.1"
+
+# Godot integration (for Bevy-specific utilities)
+godot.workspace = true
+
+# Bevy integration
+bevy = { version = "0.16", default-features = false, features = ["bevy_asset", "multi_threaded"] }
+
+# Godot-bevy integration (for resource initialization)
+godot-bevy = { path = "../godot-bevy", default-features = false }
+
+# Re-export core dependencies (tokio removed - using sync approaches)
+tracing = "0.1"
+
+[dev-dependencies]
+# For example tests
+bevy = { version = "0.16", features = ["bevy_render", "bevy_sprite"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Note: We'll need to investigate libgodot bindings for Rust
+# The Swift version uses a custom libgodot build that can be embedded
+# For now, we'll use the standard godot-rust approach and explore alternatives
+
+[features]
+default = []
+# Enable embedded Godot runtime using libgodot FFI bindings
+embedded_runtime = []
+# Godot API version features - matches gdext naming convention
+api-4-2 = ["godot/api-4-2", "godot-bevy/api-4-2"]
+api-4-2-1 = ["godot/api-4-2-1", "godot-bevy/api-4-2-1"]
+api-4-2-2 = ["godot/api-4-2-2", "godot-bevy/api-4-2-2"]
+api-4-3 = ["godot/api-4-3", "godot-bevy/api-4-3"]
+api-4-4 = ["godot/api-4-4", "godot-bevy/api-4-4"]
+
+[build-dependencies]
+# For the build script that handles libgodot linking

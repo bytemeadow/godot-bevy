@@ -28,6 +28,21 @@ class GodotTypeGenerator:
         self.plugin_file = self.project_root / "godot-bevy" / "src" / "plugins" / "scene_tree" / "plugin.rs"
         self.gdscript_watcher_file = self.project_root / "addons" / "godot-bevy" / "optimized_scene_tree_watcher.gd"
 
+        # Types that require specific Godot API versions
+        # Based on Godot release notes and documentation
+        self.version_gated_types = {
+            "4-4": [  # Types added in Godot 4.4+
+                "LookAtModifier3D",
+                "RetargetModifier3D",
+                "SpringBoneSimulator3D",
+                "SpringBoneCollision3D",
+                "SpringBoneCollisionCapsule3D",
+                "SpringBoneCollisionPlane3D",
+                "SpringBoneCollisionSphere3D",
+            ],
+            # Add more versions as needed
+        }
+
     def run_godot_dump_api(self):
         """Run godot --dump-extension-api to generate extension_api.json"""
         print("🚀 Generating extension_api.json from Godot...")
@@ -104,6 +119,13 @@ class GodotTypeGenerator:
         print(f"✅ Found {len(filtered_types)} node types")
         return filtered_types, parent_map
 
+    def get_type_cfg_attribute(self, node_type):
+        """Get the cfg attribute for a type if it needs version gating."""
+        for version, types in self.version_gated_types.items():
+            if node_type in types:
+                return f'#[cfg(feature = "api-{version}")]\n'
+        return ""
+
     def generate_node_markers(self, node_types):
         """Generate the node_markers.rs file"""
         print("🏷️  Generating node markers...")
@@ -124,6 +146,9 @@ pub struct NodeMarker;
 
         # Generate all markers
         for node_type in node_types:
+            cfg_attr = self.get_type_cfg_attribute(node_type)
+            if cfg_attr:
+                content += cfg_attr
             content += f"#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]\n"
             content += f"pub struct {node_type}Marker;\n\n"
 
@@ -338,7 +363,15 @@ pub fn remove_comprehensive_node_type_markers(
             if node_type == "Node3D":
                 continue  # Skip base type
             marker_name = f"{node_type}Marker"
-            match_arms.append(f'''        "{node_type}" => {{
+            cfg_attr = self.get_type_cfg_attribute(node_type)
+            if cfg_attr:
+                match_arms.append(f'''        {cfg_attr.strip()}
+        "{node_type}" => {{
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert({marker_name});
+        }}''')
+            else:
+                match_arms.append(f'''        "{node_type}" => {{
             entity_commands.insert(Node3DMarker);
             entity_commands.insert({marker_name});
         }}''')
@@ -348,29 +381,54 @@ pub fn remove_comprehensive_node_type_markers(
             if node_type == "Node2D":
                 continue  # Skip base type
             marker_name = f"{node_type}Marker"
-            match_arms.append(f'''        "{node_type}" => {{
+            cfg_attr = self.get_type_cfg_attribute(node_type)
+            if cfg_attr:
+                match_arms.append(f'''        {cfg_attr.strip()}
+        "{node_type}" => {{
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert({marker_name});
         }}''')
-        
+            else:
+                match_arms.append(f'''        "{node_type}" => {{
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert({marker_name});
+        }}''')
+
         # Generate Control types (skip base Control since it's already handled)
         for node_type in categories["control"]:
             if node_type == "Control":
                 continue  # Skip base type
             marker_name = f"{node_type}Marker"
-            match_arms.append(f'''        "{node_type}" => {{
+            cfg_attr = self.get_type_cfg_attribute(node_type)
+            if cfg_attr:
+                match_arms.append(f'''        {cfg_attr.strip()}
+        "{node_type}" => {{
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert({marker_name});
         }}''')
-        
+            else:
+                match_arms.append(f'''        "{node_type}" => {{
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert({marker_name});
+        }}''')
+
         # Generate universal (direct Node) types (skip base Node, Node3D, and CanvasItem since already handled)
         for node_type in categories["universal"]:
             if node_type in ["Node", "CanvasItem", "Node3D"]:
                 continue  # Skip base types
             marker_name = f"{node_type}Marker"
-            match_arms.append(f'''        "{node_type}" => {{
+            cfg_attr = self.get_type_cfg_attribute(node_type)
+            if cfg_attr:
+                match_arms.append(f'''        {cfg_attr.strip()}
+        "{node_type}" => {{
+            entity_commands.insert({marker_name});
+        }}''')
+            else:
+                match_arms.append(f'''        "{node_type}" => {{
             entity_commands.insert({marker_name});
         }}''')
         
@@ -607,7 +665,15 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 
         for node_type in sorted(types):
             rust_class_name = self.fix_godot_class_name_for_rust(node_type)
-            content += f'''    if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
+            cfg_attr = self.get_type_cfg_attribute(node_type)
+            if cfg_attr:
+                content += f'''    {cfg_attr.strip()}
+    if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
+        entity_commands.insert({node_type}Marker);
+    }}
+'''
+            else:
+                content += f'''    if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
         entity_commands.insert({node_type}Marker);
     }}
 '''
@@ -619,15 +685,40 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
     _node: &mut GodotNodeHandle,
 ) {{
     entity_commands
-
 '''
 
+        # Separate regular and version-gated types
+        regular_types = []
+        gated_types = {}
+
         for node_type in sorted(types):
-            rust_class_name = self.fix_godot_class_name_for_rust(node_type)
+            cfg_attr = self.get_type_cfg_attribute(node_type)
+            if cfg_attr:
+                version = cfg_attr.strip()
+                if version not in gated_types:
+                    gated_types[version] = []
+                gated_types[version].append(node_type)
+            else:
+                regular_types.append(node_type)
+
+        # Generate regular removes in a chain
+        for node_type in regular_types:
             content += f'''        .remove::<{node_type}Marker>()
 '''
 
-        content += ";}\n\n"
+        # Close the chain with semicolon
+        content += ";\n"
+
+        # Generate version-gated removes separately
+        for version, types_list in gated_types.items():
+            content += f"\n    {version}\n"
+            content += "    entity_commands\n"
+            for node_type in types_list:
+                content += f'''        .remove::<{node_type}Marker>()
+'''
+            content += ";\n"
+
+        content += "}\n\n"
         return content
 
     def _generate_universal_function_comprehensive(self, types):
@@ -640,7 +731,15 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 
         for node_type in sorted(types):
             rust_class_name = self.fix_godot_class_name_for_rust(node_type)
-            content += f'''    if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
+            cfg_attr = self.get_type_cfg_attribute(node_type)
+            if cfg_attr:
+                content += f'''    {cfg_attr.strip()}
+    if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
+        entity_commands.insert({node_type}Marker);
+    }}
+'''
+            else:
+                content += f'''    if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
         entity_commands.insert({node_type}Marker);
     }}
 '''
@@ -652,15 +751,40 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
     _node: &mut GodotNodeHandle,
 ) {
     entity_commands
-
 '''
 
+        # Separate regular and version-gated types
+        regular_types = []
+        gated_types = {}
+
         for node_type in sorted(types):
-            rust_class_name = self.fix_godot_class_name_for_rust(node_type)
+            cfg_attr = self.get_type_cfg_attribute(node_type)
+            if cfg_attr:
+                version = cfg_attr.strip()
+                if version not in gated_types:
+                    gated_types[version] = []
+                gated_types[version].append(node_type)
+            else:
+                regular_types.append(node_type)
+
+        # Generate regular removes in a chain
+        for node_type in regular_types:
             content += f'''        .remove::<{node_type}Marker>()
 '''
 
-        content += ";}\n"
+        # Close the chain with semicolon
+        content += ";\n"
+
+        # Generate version-gated removes separately
+        for version, types_list in gated_types.items():
+            content += f"\n    {version}\n"
+            content += "    entity_commands\n"
+            for node_type in types_list:
+                content += f'''        .remove::<{node_type}Marker>()
+'''
+            content += ";\n"
+
+        content += "}\n"
         return content
 
     def verify_plugin_integration(self):
