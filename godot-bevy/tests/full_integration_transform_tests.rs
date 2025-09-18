@@ -168,6 +168,10 @@ fn test_two_way_sync_with_scene_tree(ctx: &mut BevyGodotTestContext) -> TestResu
     assert!(verified_bevy_update, "Bevy transform should have updated");
 
     // Test 2: Modify Bevy and verify Godot updates
+    // In two-way sync, we need to modify Bevy transforms in a system that runs during Update
+    // to avoid being overwritten by pre_update_godot_transforms
+
+    // Add a one-shot system to modify the transform
     let entity_to_modify = {
         let world = ctx.app.world_mut();
         let mut query = world.query_filtered::<(Entity, &GodotNodeHandle), With<Node3DMarker>>();
@@ -181,19 +185,36 @@ fn test_two_way_sync_with_scene_tree(ctx: &mut BevyGodotTestContext) -> TestResu
         found_entity.expect("Should find entity")
     };
 
+    // Create a system that will modify the transform during Update schedule
     ctx.app
-        .world_mut()
-        .entity_mut(entity_to_modify)
-        .get_mut::<Transform>()
-        .unwrap()
-        .translation = Vec3::new(150.0, 160.0, 170.0);
+        .add_systems(Update, move |mut query: Query<&mut Transform>| {
+            if let Ok(mut transform) = query.get_mut(entity_to_modify) {
+                transform.translation = Vec3::new(500.0, 600.0, 700.0);
+            }
+        });
 
+    // Run update which will:
+    // 1. Run PreUpdate (pre_update_godot_transforms syncs Godot->Bevy)
+    // 2. Run Update (our system modifies Bevy transform)
+    // 3. Run Last (post_update_godot_transforms syncs Bevy->Godot)
     ctx.app.update();
 
     let pos = node.get_position();
-    assert!((pos.x - 150.0).abs() < 0.01);
-    assert!((pos.y - 160.0).abs() < 0.01);
-    assert!((pos.z - 170.0).abs() < 0.01);
+    assert!(
+        (pos.x - 500.0).abs() < 0.01,
+        "X should be 500.0, got {}",
+        pos.x
+    );
+    assert!(
+        (pos.y - 600.0).abs() < 0.01,
+        "Y should be 600.0, got {}",
+        pos.y
+    );
+    assert!(
+        (pos.z - 700.0).abs() < 0.01,
+        "Z should be 700.0, got {}",
+        pos.z
+    );
 
     // Clean up
     node.queue_free();
