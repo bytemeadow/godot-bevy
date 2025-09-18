@@ -41,7 +41,7 @@ fn test_scene_tree_node_creates_entity_with_transform(
         world.query_filtered::<(&GodotNodeHandle, &Transform, &Node3DMarker), With<NodeMarker>>();
 
     let mut found = false;
-    for (handle, transform, _) in query.iter(&world) {
+    for (handle, transform, _) in query.iter(world) {
         if handle.instance_id() == node.instance_id() {
             found = true;
 
@@ -82,10 +82,10 @@ fn test_bevy_to_godot_sync_with_scene_tree(ctx: &mut BevyGodotTestContext) -> Te
 
     // Find the entity and modify its transform
     let entity_to_modify = {
-        let mut world = ctx.app.world_mut();
+        let world = ctx.app.world_mut();
         let mut query = world.query_filtered::<(Entity, &GodotNodeHandle), With<Node3DMarker>>();
         let mut found_entity = None;
-        for (entity, handle) in query.iter(&world) {
+        for (entity, handle) in query.iter(world) {
             if handle.instance_id() == node.instance_id() {
                 found_entity = Some(entity);
                 break;
@@ -157,7 +157,7 @@ fn test_two_way_sync_with_scene_tree(ctx: &mut BevyGodotTestContext) -> TestResu
     let mut query = world.query_filtered::<(&GodotNodeHandle, &Transform), With<Node3DMarker>>();
 
     let mut verified_bevy_update = false;
-    for (handle, transform) in query.iter(&world) {
+    for (handle, transform) in query.iter(world) {
         if handle.instance_id() == node.instance_id() {
             assert!((transform.translation.x - 50.0).abs() < 0.01);
             assert!((transform.translation.y - 60.0).abs() < 0.01);
@@ -169,10 +169,10 @@ fn test_two_way_sync_with_scene_tree(ctx: &mut BevyGodotTestContext) -> TestResu
 
     // Test 2: Modify Bevy and verify Godot updates
     let entity_to_modify = {
-        let mut world = ctx.app.world_mut();
+        let world = ctx.app.world_mut();
         let mut query = world.query_filtered::<(Entity, &GodotNodeHandle), With<Node3DMarker>>();
         let mut found_entity = None;
-        for (entity, handle) in query.iter(&world) {
+        for (entity, handle) in query.iter(world) {
             if handle.instance_id() == node.instance_id() {
                 found_entity = Some(entity);
                 break;
@@ -228,17 +228,17 @@ fn test_hierarchy_transform_sync(ctx: &mut BevyGodotTestContext) -> TestResult<(
     ctx.app.update();
 
     // Both entities should exist
-    let mut world = ctx.app.world_mut();
+    let world = ctx.app.world_mut();
     let mut query = world.query::<&GodotNodeHandle>();
-    let count = query.iter(&world).count();
+    let count = query.iter(world).count();
     assert!(count >= 2, "Should have at least parent and child entities");
 
     // Find parent entity and move it
     let parent_entity = {
-        let mut world = ctx.app.world_mut();
+        let world = ctx.app.world_mut();
         let mut query = world.query_filtered::<(Entity, &GodotNodeHandle), With<Node3DMarker>>();
         let mut found_entity = None;
-        for (entity, handle) in query.iter(&world) {
+        for (entity, handle) in query.iter(world) {
             if handle.instance_id() == parent.instance_id() {
                 found_entity = Some(entity);
                 break;
