@@ -1,17 +1,17 @@
 # Godot-Bevy Testability
 
-**Bevy-specific testing utilities for Godot-Bevy integration projects**
+**Testing framework for Bevy ECS systems with embedded Godot runtime**
 
-This crate provides specialized testing utilities for projects using the [godot-bevy](../godot-bevy) integration. It builds upon the general-purpose [`godot-testability-runtime`](../godot-testability-runtime) to offer Bevy-specific testing tools.
+This crate provides specialized testing utilities for projects using [godot-bevy](../godot-bevy), enabling you to test Bevy systems that interact with Godot nodes and resources using an embedded Godot runtime.
 
 ## Overview
 
-While `godot-testability-runtime` provides the core embedded Godot testing infrastructure, this crate adds:
+Built on top of [`godot-testability-runtime`](https://crates.io/crates/godot-testability-runtime) v0.1.1+, this crate provides:
 
-- **Transform Synchronization Testing** - Utilities for testing coordinate system conversions between Godot and Bevy
-- **Bevy ECS Testing Helpers** - Simplified testing of Bevy components, entities, and systems
-- **Godot-Bevy Bridge Testing** - Tools for testing the integration points between the two engines
-- **Specialized Test Hosts** - Bevy-aware test environments for comprehensive integration testing
+- **Scene Tree Integration Testing** - Test entity creation and synchronization with Godot's scene tree
+- **Transform Sync Testing** - Validate transform synchronization between Godot nodes and Bevy entities
+- **Plugin Testing** - Test godot-bevy plugins with full scene tree integration
+- **Class Registration** - Support for custom Godot classes in tests (BevyApp, SceneTreeWatcher, etc.)
 
 ## Quick Start
 
@@ -19,157 +19,202 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dev-dependencies]
-godot-bevy-testability = { path = "path/to/godot-bevy-testability" }
-tokio = { version = "1.0", features = ["full"] }
+godot-bevy-testability = "0.1.0"
+
+[[test]]
+name = "my_integration_tests"
+harness = false  # Required for custom test runner
 ```
 
-Write a Bevy-Godot integration test:
+Write integration tests (`tests/my_integration_tests.rs`):
 
 ```rust
-use godot_bevy_testability::prelude::*;
+use godot_bevy_testability::*;
+use bevy::prelude::*;
+use godot::prelude::*;
 
-#[derive(Default)]
-struct TransformSyncTest;
+fn test_scene_tree_integration(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
+    // Set up full scene tree integration
+    let mut env = ctx.setup_full_integration();
 
-#[async_trait]
-impl EmbeddedTestCase for TransformSyncTest {
-    async fn run_test(&mut self) -> TestResult<()> {
-        // Test transform conversion between Godot and Bevy
-        let godot_transform = Transform2D::from_angle_origin(PI/4.0, Vector2::new(10.0, 20.0));
-        let bevy_transform = transforms::godot_transform2d_to_bevy(godot_transform);
-        let converted_back = transforms::bevy_transform_to_godot2d(bevy_transform);
-        
-        transforms::assert_transform2d_approx_eq(godot_transform, converted_back, 0.001)?;
-        
-        // Test Bevy ECS functionality
-        let mut app = bevy_ecs::create_test_app();
-        let entity = app.world_mut().spawn(MyComponent { value: 42 }).id();
-        bevy_ecs::assert_entity_has_component::<MyComponent>(app.world(), entity)?;
-        
-        Ok(())
-    }
-    
-    fn name(&self) -> &str { "TransformSyncTest" }
+    // Add your plugin
+    ctx.app.add_plugins(MyPlugin);
+
+    // Create and add a Godot node to the scene tree
+    let mut node = Node3D::new_alloc();
+    node.set_name("TestNode");
+    node.set_position(Vector3::new(10.0, 20.0, 30.0));
+
+    // Add to scene tree - this triggers scene tree events
+    env.add_node_to_scene(node.clone());
+
+    // Update the app to process events
+    ctx.app.update();
+
+    // Query the Bevy world for the created entity
+    let world = ctx.app.world_mut();
+    let query = world.query_filtered::<&Transform, With<Node3DMarker>>();
+
+    // Verify the entity was created with correct transform
+    assert_eq!(query.iter(&world).count(), 1);
+
+    Ok(())
 }
 
-#[derive(Component)]
-struct MyComponent { value: i32 }
-
-#[tokio::main]
-async fn main() -> TestResult<()> {
-    let mut runner = BevyGodotTestRunner::for_development();
-    let result = runner.run_test(TransformSyncTest::default()).await?;
-    
-    if result.passed {
-        println!("✅ Bevy-Godot integration test passed!");
-    }
-    
-    Ok(())
+// Use the test macro to create the test harness
+bevy_godot_test_main! {
+    test_scene_tree_integration,
+    // Add more test functions here
 }
 ```
 
 ## Key Features
 
-### Transform Testing Utilities
+### BevyGodotTestContext
+
+The main test context provides access to both Bevy and Godot:
 
 ```rust
-use godot_bevy_testability::prelude::*;
-
-// Test 2D transform round-trip conversion
-let godot_2d = Transform2D::from_angle_origin(PI/4.0, Vector2::new(10.0, 20.0));
-let bevy_transform = transforms::godot_transform2d_to_bevy(godot_2d);
-let back_to_godot = transforms::bevy_transform_to_godot2d(bevy_transform);
-transforms::assert_transform2d_approx_eq(godot_2d, back_to_godot, 0.001)?;
-
-// Test 3D transforms
-let godot_3d = Transform3D::new(Basis::from_euler(...), Vector3::new(1.0, 2.0, 3.0));
-let bevy_3d = transforms::godot_transform3d_to_bevy(godot_3d);
-transforms::assert_vector3_approx_eq(bevy_3d.translation, Vec3::new(1.0, 2.0, 3.0), 0.001)?;
+pub struct BevyGodotTestContext {
+    pub app: App,                        // Bevy App instance
+    pub scene_tree_ptr: *mut c_void,     // Godot SceneTree pointer
+}
 ```
 
-### Bevy ECS Testing
+### Test Environment Setup
+
+The `setup_full_integration()` helper sets up a complete test environment:
 
 ```rust
-use godot_bevy_testability::prelude::*;
+fn test_with_watchers(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
+    // Sets up SceneTreeWatcher and CollisionWatcher automatically
+    let env = ctx.setup_full_integration();
 
-// Create test apps with plugins
-let mut app = bevy_ecs::create_test_app_with_plugins(vec![MyPlugin]);
+    // Access the scene tree and watchers
+    env.scene_tree         // Gd<SceneTree>
+    env.scene_tree_watcher // Gd<SceneTreeWatcher>
+    env.collision_watcher  // Gd<CollisionWatcher>
 
-// Test entity creation and components
-let entity = app.world_mut().spawn(TestComponent { value: 42 }).id();
-bevy_ecs::assert_entity_has_component::<TestComponent>(app.world(), entity)?;
-bevy_ecs::assert_entity_count_with_component::<TestComponent>(app.world(), 1)?;
+    // Manually send events if needed
+    env.send_scene_tree_event(SceneTreeEvent { /* ... */ });
 
-// Test component absence
-let empty_entity = app.world_mut().spawn_empty().id();
-bevy_ecs::assert_entity_lacks_component::<TestComponent>(app.world(), empty_entity)?;
+    Ok(())
+}
 ```
 
-### Specialized Test Hosts
+### Transform Sync Testing
+
+Test transform synchronization between Godot and Bevy:
 
 ```rust
-use godot_bevy_testability::prelude::*;
+use godot_bevy::plugins::transforms::{GodotTransformSyncPlugin, TransformSyncMode};
 
-// Create Bevy-aware test runners
-let mut runner = BevyGodotTestRunner::for_development()  // Visual debugging enabled
-// or
-let mut runner = BevyGodotTestRunner::for_ci()           // Headless, timeouts enabled
+fn test_transform_sync(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
+    let env = ctx.setup_full_integration();
 
-// Runs tests in embedded Godot with Bevy-specific setup
-let result = runner.run_test(MyBevyGodotTest::default()).await?;
+    // Add transform sync plugin with desired mode
+    ctx.app.add_plugins(GodotTransformSyncPlugin {
+        sync_mode: TransformSyncMode::BevyToGodot,
+    });
+
+    // Create a node with position
+    let mut node = Node3D::new_alloc();
+    node.set_position(Vector3::new(10.0, 20.0, 30.0));
+    env.add_node_to_scene(node.clone());
+
+    ctx.app.update();
+
+    // Query for the synced entity
+    let world = ctx.app.world_mut();
+    let query = world.query::<&Transform>();
+    for transform in query.iter(&world) {
+        assert_eq!(transform.translation, Vec3::new(10.0, 20.0, 30.0));
+    }
+
+    Ok(())
+}
 ```
 
 ## Architecture
 
-This crate is designed as a thin layer over `godot-testability-runtime`:
-
 ```
 ┌─────────────────────────────────────────┐
+│         Your Test Code                  │
+├─────────────────────────────────────────┤
 │      godot-bevy-testability             │
-│   (Bevy-specific utilities)             │
+│   • BevyGodotTestContext                │
+│   • Test environment helpers            │
+│   • bevy_godot_test_main! macro        │
 ├─────────────────────────────────────────┤
-│      godot-testability-runtime          │
-│   (General embedded testing)            │  
+│      godot-testability-runtime 0.1.1+   │
+│   • Embedded Godot runtime              │
+│   • Class registration support          │
+│   • Test harness infrastructure        │
 ├─────────────────────────────────────────┤
-│           libgodot.dylib                │
-│      (Embedded Godot Engine)            │
+│      libgodot.dylib (4.3.1)            │
+│   • Embedded Godot engine              │
+│   • Scene tree and node system         │
 └─────────────────────────────────────────┘
 ```
 
-**Dependencies:**
-- **Runtime**: All core functionality comes from `godot-testability-runtime`
-- **Bevy Integration**: Adds ECS testing helpers and transform utilities
-- **Godot-Bevy Bridge**: Utilities specific to the `godot-bevy` integration
+## API Version Compatibility
+
+**Important**: The embedded Godot runtime is version 4.3.1, so integration tests must use the `api-4-3` feature:
+
+```toml
+# In your test files or CI
+cargo test --features api-4-3 --test my_integration_tests
+```
+
+For unit tests and builds that don't use the embedded runtime, you can use any supported API version (4.1 through 4.4).
 
 ## Examples
 
-Run the examples to see the utilities in action:
+Check out the test files in the godot-bevy repository:
 
 ```bash
-# Simple Bevy-specific testing demonstration
-cargo run --package godot-bevy-testability --example simple_bevy_test
+# Run transform sync tests
+cargo test --features api-4-3 --test full_integration_transform_tests
 
-# Comprehensive Bevy-Godot integration testing
-cargo run --package godot-bevy-testability --example bevy_godot_integration_test
+# Run basic integration tests
+cargo test --features api-4-3 --test bevy_godot_integration_tests
 ```
 
-## Relationship to General Framework
+## Writing Tests
 
-This crate **extends** rather than **replaces** the general framework:
+### Test Structure
 
-- **Use `godot-testability-runtime`** for general Godot testing needs
-- **Use `godot-bevy-testability`** when you need Bevy-specific testing utilities
-- **Both** provide embedded Godot runtime testing capabilities
-- **This crate** adds transform conversion, ECS helpers, and Bevy-aware test hosts
+1. Create a test file with `harness = false` in Cargo.toml
+2. Define test functions that take `&mut BevyGodotTestContext`
+3. Use the `bevy_godot_test_main!` macro to generate the test harness
 
-## Contributing
+### Available Helpers
 
-Since this crate focuses on Bevy-specific utilities, contributions should:
+- `ctx.setup_full_integration()` - Set up scene tree with watchers
+- `ctx.initialize_godot_bevy_resources()` - Initialize basic resources
+- `env.add_node_to_scene()` - Add nodes to the scene tree
+- `env.send_scene_tree_event()` - Manually trigger events
 
-1. **Enhance Bevy Integration** - Better ECS testing helpers, transform utilities
-2. **Improve Test Ergonomics** - More convenient APIs for common Bevy-Godot testing patterns  
-3. **Add Specialized Helpers** - Testing utilities for specific godot-bevy features
-4. **Maintain Focus** - General testing improvements should go to `godot-testability-runtime`
+### Testing Tips
+
+1. **Always use `api-4-3` feature** for integration tests
+2. **Call `ctx.app.update()`** after scene changes to process events
+3. **Use `setup_full_integration()`** for tests needing scene tree integration
+4. **Check transform sync modes** when testing position/rotation/scale
+
+## Troubleshooting
+
+### "Cannot get class" Errors
+
+The test environment supports custom Godot classes (BevyApp, SceneTreeWatcher, etc.) through class registration in godot-testability-runtime 0.1.1+.
+
+### Version Mismatch Errors
+
+If you see "gdext was compiled against newer Godot version", ensure you're using the `api-4-3` feature flag for integration tests.
+
+### Scene Tree Path Errors
+
+The scene tree plugin looks for watchers at both `/root/BevyAppSingleton/...` and `BevyAppSingleton/...` to support both production and test environments.
 
 ## License
 
@@ -179,7 +224,3 @@ Licensed under either of:
 - MIT License ([LICENSE-MIT](../LICENSE-MIT))
 
 at your option.
-
----
-
-**Focus on what matters:** Test your Bevy-Godot integration with confidence! 🦀🎮
