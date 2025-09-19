@@ -217,7 +217,7 @@ pub fn compound_rotations_sync_correctly(ctx: &mut BevyGodotTestContext) -> Test
     let transform = world.entity(entity).get::<Transform>().unwrap();
 
     // Verify by comparing transformation of multiple test vectors
-    let test_vectors = vec![Vec3::X, Vec3::Y, Vec3::Z];
+    let test_vectors = [Vec3::X, Vec3::Y, Vec3::Z];
     let basis = initial_transform.basis;
 
     for (i, test_vec) in test_vectors.iter().enumerate() {
