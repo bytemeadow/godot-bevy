@@ -83,7 +83,7 @@ jobs:
 
       - name: Run integration tests (macOS only, 4.3 API)
         if: runner.os == 'macOS'
-        run: cargo test --features api-4-3 --test bevy_godot_integration_tests --test full_integration_transform_tests
+        run: cargo test --features api-4-3 --test transforms_test
 
       - name: Build release
         run: cargo build --release
