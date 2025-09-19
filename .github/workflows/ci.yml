@@ -415,10 +415,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            examples/*/rust -> target
+
+      - name: Cache and install Linux dependencies
+        if: runner.os == 'linux'
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libasound2-dev libudev-dev pkg-config
+          version: 1.0
+
       - name: Run benchmark comparison
         uses: boa-dev/criterion-compare-action@v3
         with:
           benchName: "transform_conversions"
           branchName: ${{ github.base_ref }}
-          features: "api-4-3"
           token: ${{ secrets.GITHUB_TOKEN }}
