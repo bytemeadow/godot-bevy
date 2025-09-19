@@ -138,6 +138,42 @@ The project uses GitHub Actions CI that runs on Linux, macOS, and Windows:
 
 CI configuration is in `.github/workflows/ci.yml` and must pass for all PRs.
 
+### Scene Tree Testing
+
+The scene tree integration can be tested using `godot-bevy-testability` even in headless mode. Key findings:
+
+**What Works:**
+- Node creation automatically creates corresponding Bevy entities with `GodotNodeHandle` components
+- Entity-node mapping works correctly via `InstanceId`
+- Scene tree events are processed and entities are created/destroyed appropriately
+- Tests can verify component synchronization (Name, markers, etc.)
+
+**Testing Approach:**
+- Use `BevyGodotTestContextExt::setup_full_integration()` to initialize the scene tree plugin
+- Create nodes with `env.add_node_to_scene()` helper
+- Verify entities with queries for `GodotNodeHandle` components
+- Test both creation and destruction lifecycles
+
+**Headless Mode Limitations:**
+- `node.is_inside_tree()` returns `false` in headless test environment
+- Root Window's internal tree pointer is null, but scene tree events still work
+- Direct Godot signals may not fire, but the plugin's event system functions correctly
+
+**Example Test Pattern:**
+```rust
+fn test_node_creates_entity(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
+    let mut env = ctx.setup_full_integration();
+    let mut node = godot::classes::Node3D::new_alloc();
+    env.add_node_to_scene(node.clone());
+    ctx.app.update();
+
+    // Verify entity was created
+    let entity = find_entity_for_node(ctx, node.instance_id())
+        .expect("Entity should be created");
+    // Test components...
+}
+```
+
 ## Performance Best Practices
 
 ### PackedArray Pattern for Maximum Performance

@@ -59,3 +59,7 @@ godot-testability-runtime = "0.1.0"
 [[test]]
 name = "transforms_test"
 harness = false
+
+[[test]]
+name = "scene_tree_test"
+harness = false
