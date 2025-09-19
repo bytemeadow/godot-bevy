@@ -55,6 +55,7 @@ api-4-4 = ["godot/api-4-4"]
 [dev-dependencies]
 godot-bevy-testability = { path = "../godot-bevy-testability" }
 godot-testability-runtime = "0.1.1"
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [[test]]
 name = "transforms_test"
@@ -66,4 +67,8 @@ harness = false
 
 [[bench]]
 name = "transform_sync_benchmark"
+harness = false
+
+[[bench]]
+name = "transform_conversions"
 harness = false
