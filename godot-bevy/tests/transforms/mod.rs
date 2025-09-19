@@ -1,9 +1,8 @@
 //! Transform synchronization tests
 //!
-//! These tests verify transform sync between Godot and Bevy in various scenarios.
-//! Run with: `cargo test --features api-4-3`
+//! Comprehensive tests for transform sync between Godot and Bevy
+//! organized by functionality and test purpose.
 
-pub mod basic_sync;
-pub mod hierarchy_sync;
-pub mod scene_tree_integration;
-pub mod two_way_sync;
+pub mod hierarchy;
+pub mod sync_modes;
+pub mod transform_initialization;

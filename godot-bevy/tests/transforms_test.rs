@@ -6,21 +6,30 @@ mod transforms;
 
 use godot_bevy_testability::bevy_godot_test_main;
 
-// Import all test functions
-use transforms::basic_sync::{
-    test_bevy_to_godot_sync, test_godot_node_creates_entity_with_transform,
-};
-use transforms::hierarchy_sync::test_hierarchy_transform_sync;
-use transforms::scene_tree_integration::{
-    test_bevy_to_godot_sync_with_scene_tree, test_scene_tree_node_creates_entity_with_transform,
-};
-use transforms::two_way_sync::test_two_way_sync_with_scene_tree;
+// Import test modules
+use transforms::hierarchy::*;
+use transforms::sync_modes::*;
+use transforms::transform_initialization::*;
 
 bevy_godot_test_main! {
-    test_godot_node_creates_entity_with_transform,
-    test_bevy_to_godot_sync,
-    test_hierarchy_transform_sync,
-    test_scene_tree_node_creates_entity_with_transform,
-    test_bevy_to_godot_sync_with_scene_tree,
-    test_two_way_sync_with_scene_tree,
+    // Core initialization tests
+    godot_transform_initializes_bevy_entity,
+    node_at_origin_has_identity_transform,
+    y_axis_rotation_syncs_correctly,
+    compound_rotations_sync_correctly,
+    extreme_position_values_handled_correctly,
+    extreme_scale_values_handled_correctly,
+
+    // Sync mode behavior tests
+    one_way_mode_syncs_bevy_to_godot_only,
+    two_way_mode_syncs_bidirectionally,
+    disabled_mode_prevents_all_sync,
+    sync_mode_can_change_at_runtime,
+
+    // Hierarchy tests
+    child_entity_has_correct_local_transform,
+    parent_movement_updates_child_world_position,
+    parent_rotation_affects_child_transform,
+    parent_scale_affects_child_transform,
+    deep_hierarchy_syncs_correctly,
 }
