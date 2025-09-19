@@ -54,7 +54,7 @@ api-4-4 = ["godot/api-4-4"]
 
 [dev-dependencies]
 godot-bevy-testability = { path = "../godot-bevy-testability" }
-godot-testability-runtime = "0.1.0"
+godot-testability-runtime = "0.1.1"
 
 [[test]]
 name = "transforms_test"
@@ -62,4 +62,8 @@ harness = false
 
 [[test]]
 name = "scene_tree_test"
+harness = false
+
+[[bench]]
+name = "transform_sync_benchmark"
 harness = false
