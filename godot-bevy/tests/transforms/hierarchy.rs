@@ -2,9 +2,10 @@
 
 use bevy::prelude::*;
 use godot::prelude::*;
-use godot_bevy::interop::GodotNodeHandle;
 use godot_bevy::plugins::transforms::GodotTransformSyncPlugin;
 use godot_bevy_testability::*;
+
+use crate::transforms::utils::{assert_vec3_eq, find_entity_for_node};
 
 /// Verifies that child entities are created with correct local transforms
 pub fn child_entity_has_correct_local_transform(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
@@ -286,29 +287,4 @@ pub fn deep_hierarchy_syncs_correctly(ctx: &mut BevyGodotTestContext) -> TestRes
     // Cleanup
     grandparent.queue_free();
     Ok(())
-}
-
-// Helper functions
-fn find_entity_for_node(ctx: &mut BevyGodotTestContext, node_id: InstanceId) -> Option<Entity> {
-    let world = ctx.app.world_mut();
-    let mut query = world.query::<(Entity, &GodotNodeHandle)>();
-    for (entity, handle) in query.iter(world) {
-        if handle.instance_id() == node_id {
-            return Some(entity);
-        }
-    }
-    None
-}
-
-fn assert_vec3_eq(actual: Vec3, expected: Vec3, message: &str) {
-    const TOLERANCE: f32 = 0.1; // Slightly higher tolerance for hierarchy tests
-    let diff = actual - expected;
-    assert!(
-        diff.length() < TOLERANCE,
-        "{}: expected {:?}, got {:?} (diff: {:.3})",
-        message,
-        expected,
-        actual,
-        diff.length()
-    );
 }

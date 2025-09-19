@@ -2,9 +2,10 @@
 
 use bevy::prelude::*;
 use godot::prelude::*;
-use godot_bevy::interop::GodotNodeHandle;
 use godot_bevy::plugins::transforms::GodotTransformSyncPlugin;
 use godot_bevy_testability::*;
+
+use crate::transforms::utils::{assert_vec3_eq_with_tolerance, find_entity_for_node};
 
 /// Verifies that a Godot node's transform is correctly copied to the Bevy entity on creation
 pub fn godot_transform_initializes_bevy_entity(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
@@ -42,7 +43,7 @@ pub fn godot_transform_initializes_bevy_entity(ctx: &mut BevyGodotTestContext) -
         .expect("Entity should have Transform component");
 
     // Verify position
-    assert_eq_with_tolerance(
+    assert_vec3_eq_with_tolerance(
         transform.translation,
         Vec3::new(
             expected_position.x,
@@ -54,7 +55,7 @@ pub fn godot_transform_initializes_bevy_entity(ctx: &mut BevyGodotTestContext) -
     );
 
     // Verify scale
-    assert_eq_with_tolerance(
+    assert_vec3_eq_with_tolerance(
         transform.scale,
         Vec3::new(expected_scale.x, expected_scale.y, expected_scale.z),
         0.001,
@@ -106,7 +107,7 @@ pub fn godot_transform_initializes_bevy_entity(ctx: &mut BevyGodotTestContext) -
         let bevy_rotated = transform.rotation * test_vec;
 
         // They should produce the same result
-        assert_eq_with_tolerance(
+        assert_vec3_eq_with_tolerance(
             bevy_rotated,
             godot_rotated,
             0.001,
@@ -178,7 +179,7 @@ pub fn y_axis_rotation_syncs_correctly(ctx: &mut BevyGodotTestContext) -> TestRe
 
     // After 90° Y rotation, X axis should point toward -Z
     let rotated = transform.rotation * Vec3::X;
-    assert_eq_with_tolerance(
+    assert_vec3_eq_with_tolerance(
         rotated,
         Vec3::new(0.0, 0.0, -1.0),
         0.01,
@@ -227,7 +228,7 @@ pub fn compound_rotations_sync_correctly(ctx: &mut BevyGodotTestContext) -> Test
         };
 
         let rotated = transform.rotation * *test_vec;
-        assert_eq_with_tolerance(
+        assert_vec3_eq_with_tolerance(
             rotated,
             Vec3::new(expected.x, expected.y, expected.z),
             0.001,
@@ -266,7 +267,7 @@ pub fn extreme_position_values_handled_correctly(ctx: &mut BevyGodotTestContext)
     let world = ctx.app.world_mut();
     let transform = world.entity(entity).get::<Transform>().unwrap();
 
-    assert_eq_with_tolerance(
+    assert_vec3_eq_with_tolerance(
         transform.translation,
         Vec3::new(extreme_pos.x, extreme_pos.y, extreme_pos.z),
         0.01,
@@ -301,7 +302,7 @@ pub fn extreme_scale_values_handled_correctly(ctx: &mut BevyGodotTestContext) ->
     let world = ctx.app.world_mut();
     let transform = world.entity(entity).get::<Transform>().unwrap();
 
-    assert_eq_with_tolerance(
+    assert_vec3_eq_with_tolerance(
         transform.scale,
         Vec3::new(extreme_scale.x, extreme_scale.y, extreme_scale.z),
         0.01,
@@ -311,29 +312,4 @@ pub fn extreme_scale_values_handled_correctly(ctx: &mut BevyGodotTestContext) ->
     // Cleanup
     node.queue_free();
     Ok(())
-}
-
-// Helper functions
-fn find_entity_for_node(ctx: &mut BevyGodotTestContext, node_id: InstanceId) -> Option<Entity> {
-    let world = ctx.app.world_mut();
-    let mut query = world.query::<(Entity, &GodotNodeHandle)>();
-    for (entity, handle) in query.iter(world) {
-        if handle.instance_id() == node_id {
-            return Some(entity);
-        }
-    }
-    None
-}
-
-fn assert_eq_with_tolerance(actual: Vec3, expected: Vec3, tolerance: f32, message: &str) {
-    let diff = actual - expected;
-    let distance = diff.length();
-    assert!(
-        distance < tolerance,
-        "{}: expected {:?}, got {:?} (difference: {})",
-        message,
-        expected,
-        actual,
-        distance
-    );
 }

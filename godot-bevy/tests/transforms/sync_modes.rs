@@ -2,9 +2,10 @@
 
 use bevy::prelude::*;
 use godot::prelude::*;
-use godot_bevy::interop::GodotNodeHandle;
 use godot_bevy::plugins::transforms::{GodotTransformSyncPlugin, TransformSyncMode};
 use godot_bevy_testability::*;
+
+use crate::transforms::utils::{assert_vec3_eq, find_entity_for_node};
 
 /// Verifies that OneWay mode only syncs from Bevy to Godot, not vice versa
 pub fn one_way_mode_syncs_bevy_to_godot_only(ctx: &mut BevyGodotTestContext) -> TestResult<()> {
@@ -224,28 +225,4 @@ pub fn sync_mode_can_change_at_runtime(ctx: &mut BevyGodotTestContext) -> TestRe
     // Cleanup
     node.queue_free();
     Ok(())
-}
-
-// Helper functions
-fn find_entity_for_node(ctx: &mut BevyGodotTestContext, node_id: InstanceId) -> Option<Entity> {
-    let world = ctx.app.world_mut();
-    let mut query = world.query::<(Entity, &GodotNodeHandle)>();
-    for (entity, handle) in query.iter(world) {
-        if handle.instance_id() == node_id {
-            return Some(entity);
-        }
-    }
-    None
-}
-
-fn assert_vec3_eq(actual: Vec3, expected: Vec3, message: &str) {
-    const TOLERANCE: f32 = 0.01;
-    let diff = actual - expected;
-    assert!(
-        diff.length() < TOLERANCE,
-        "{}: expected {:?}, got {:?}",
-        message,
-        expected,
-        actual
-    );
 }
