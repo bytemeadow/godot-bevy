@@ -102,6 +102,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       benchmark: ${{ steps.filter.outputs.benchmark }}
+      transform-conversions: ${{ steps.filter.outputs.transform-conversions }}
       dodge-the-creeps-2d: ${{ steps.filter.outputs.dodge-the-creeps-2d }}
       platformer-2d: ${{ steps.filter.outputs.platformer-2d }}
     steps:
@@ -117,6 +118,10 @@ jobs:
               - '.github/workflows/ci.yml'
               - 'Cargo.toml'
               - 'Cargo.lock'
+            transform-conversions:
+              - 'godot-bevy/src/plugins/transforms/**'
+              - 'godot-bevy/benches/transform_conversions.rs'
+              - '.github/workflows/ci.yml'
             dodge-the-creeps-2d:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
@@ -395,3 +400,25 @@ jobs:
             examples/perf-test/benchmark_output.txt
             examples/perf-test/baseline.json
             benchmark-artifacts/
+
+  transform-conversions-bench:
+    name: benchmark / transform conversions
+    runs-on: blaze/compute/ubuntu-latest-amd64
+    needs: [changes]
+    if: |
+      github.event_name == 'pull_request' && (
+        needs.changes.outputs.transform-conversions == 'true' ||
+        contains(github.event.pull_request.labels.*.name, 'benchmark-transforms')
+      )
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run benchmark comparison
+        uses: boa-dev/criterion-compare-action@v3
+        with:
+          benchName: "transform_conversions"
+          branchName: ${{ github.base_ref }}
+          features: "api-4-3"
+          token: ${{ secrets.GITHUB_TOKEN }}
