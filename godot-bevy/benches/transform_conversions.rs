@@ -188,7 +188,7 @@ fn bench_bulk_conversions(c: &mut Criterion) {
 fn bench_vector_conversions(c: &mut Criterion) {
     let mut group = c.benchmark_group("vector_conversions");
 
-    let test_vectors = vec![Vec3::ZERO, Vec3::ONE, Vec3::new(123.456, -789.012, 345.678)];
+    let test_vectors = [Vec3::ZERO, Vec3::ONE, Vec3::new(123.456, -789.012, 345.678)];
 
     // Benchmark Vec3 to Vector3 conversion
     for (i, vec) in test_vectors.iter().enumerate() {
@@ -218,7 +218,7 @@ fn bench_vector_conversions(c: &mut Criterion) {
 fn bench_quaternion_conversions(c: &mut Criterion) {
     let mut group = c.benchmark_group("quaternion_conversions");
 
-    let test_quats = vec![
+    let test_quats = [
         Quat::IDENTITY,
         Quat::from_rotation_x(1.57),
         Quat::from_rotation_y(0.785),

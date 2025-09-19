@@ -164,6 +164,8 @@ impl IntoQuaternion for Quat {
 
 #[cfg(test)]
 mod tests {
+    use std::f32;
+
     use super::*;
 
     const EPSILON: f32 = 1e-5;
@@ -237,7 +239,7 @@ mod tests {
         assert_eq!(bevy_vec.z, godot_vec.z);
 
         // Round trip
-        let original = Vec3::new(1.5, -2.7, 3.14);
+        let original = Vec3::new(1.5, -2.7, f32::consts::PI);
         let round_trip = original.to_vector3().to_vec3();
         assert_vec3_near(original, round_trip, EPSILON);
     }
