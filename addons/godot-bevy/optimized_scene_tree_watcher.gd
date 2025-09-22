@@ -31,21 +31,28 @@ func set_rust_watcher(watcher: Node):
 
 func _on_node_added(node: Node):
 	"""Handle node added events with type optimization"""
+	print("[OptimizedSceneTreeWatcher] _on_node_added called for node: ", node.get_name(), " (ID: ", node.get_instance_id(), ")")
+
 	if not rust_watcher:
+		print("[OptimizedSceneTreeWatcher] WARNING: No rust_watcher, cannot forward event")
 		return
-	
+
 	# Check if node is still valid
 	if not is_instance_valid(node):
+		print("[OptimizedSceneTreeWatcher] WARNING: Node is not valid, skipping")
 		return
-	
+
 	# Analyze node type on GDScript side - this is much faster than FFI
 	var node_type = _analyze_node_type(node)
-	
+	print("[OptimizedSceneTreeWatcher] Node type analyzed as: ", node_type)
+
 	# Forward to Rust watcher with pre-analyzed type - this uses the MPSC sender
 	if rust_watcher.has_method("scene_tree_event_typed"):
+		print("[OptimizedSceneTreeWatcher] Forwarding to rust_watcher.scene_tree_event_typed")
 		rust_watcher.scene_tree_event_typed(node, "NodeAdded", node_type)
 	else:
 		# Fallback to regular method if typed method not available
+		print("[OptimizedSceneTreeWatcher] Fallback to rust_watcher.scene_tree_event")
 		rust_watcher.scene_tree_event(node, "NodeAdded")
 
 func _on_node_removed(node: Node):

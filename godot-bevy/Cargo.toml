@@ -69,6 +69,10 @@ harness = false
 name = "signals_test"
 harness = false
 
+[[test]]
+name = "frame_sync_test"
+harness = false
+
 [[bench]]
 name = "transform_sync_benchmark"
 harness = false

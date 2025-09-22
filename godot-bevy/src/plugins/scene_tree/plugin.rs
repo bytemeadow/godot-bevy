@@ -224,8 +224,10 @@ pub enum SceneTreeEventType {
 
 #[main_thread_system]
 fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
+    godot_print!("[connect_scene_tree] Starting signal connection");
     let mut scene_tree_gd = scene_tree.get();
     let root = scene_tree_gd.get_root().unwrap();
+    godot_print!("[connect_scene_tree] Got root node");
 
     // Try multiple paths to find the SceneTreeWatcher - support both production and test environments
     let watcher = root
@@ -247,18 +249,23 @@ fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
         // The optimized GDScript watcher handles scene tree connections and forwards
         // pre-analyzed events to the Rust watcher (which has the MPSC sender)
         // No need to connect here - it connects automatically in its _ready()
+        godot_print!("[connect_scene_tree] Found OptimizedSceneTreeWatcher - using optimized mode");
         tracing::info!("Using optimized GDScript scene tree watcher with type pre-analysis");
     } else {
         // Fallback to direct connection without type optimization
+        godot_print!("[connect_scene_tree] No OptimizedSceneTreeWatcher - using fallback mode");
         tracing::info!("Using fallback scene tree connection (no type optimization)");
 
+        godot_print!("[connect_scene_tree] Connecting node_added signal");
         scene_tree_gd.connect(
             "node_added",
             &watcher
                 .callable("scene_tree_event")
                 .bind(&[SceneTreeEventType::NodeAdded.to_variant()]),
         );
+        godot_print!("[connect_scene_tree] Connected node_added signal");
 
+        godot_print!("[connect_scene_tree] Connecting node_removed signal");
         scene_tree_gd.connect(
             "node_removed",
             &watcher
@@ -266,12 +273,14 @@ fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
                 .bind(&[SceneTreeEventType::NodeRemoved.to_variant()]),
         );
 
+        godot_print!("[connect_scene_tree] Connecting node_renamed signal");
         scene_tree_gd.connect(
             "node_renamed",
             &watcher
                 .callable("scene_tree_event")
                 .bind(&[SceneTreeEventType::NodeRenamed.to_variant()]),
         );
+        godot_print!("[connect_scene_tree] All signals connected");
     }
 }
 

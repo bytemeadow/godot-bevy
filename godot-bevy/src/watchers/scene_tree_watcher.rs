@@ -29,12 +29,21 @@ impl INode for SceneTreeWatcher {
 impl SceneTreeWatcher {
     #[func]
     pub fn scene_tree_event(&self, node: Gd<Node>, event_type: SceneTreeEventType) {
+        godot_print!(
+            "[SceneTreeWatcher] Received event {:?} for node {} (ID: {})",
+            event_type,
+            node.get_name(),
+            node.instance_id()
+        );
         if let Some(channel) = self.notification_channel.as_ref() {
+            godot_print!("[SceneTreeWatcher] Sending event through channel");
             let _ = channel.send(SceneTreeEvent {
                 node: GodotNodeHandle::from_instance_id(node.instance_id()),
                 event_type,
                 node_type: None, // No type optimization in basic method
             });
+        } else {
+            godot_print!("[SceneTreeWatcher] WARNING: No notification channel!");
         }
     }
 
