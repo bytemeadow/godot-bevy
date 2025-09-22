@@ -65,6 +65,10 @@ harness = false
 name = "scene_tree_test"
 harness = false
 
+[[test]]
+name = "signals_test"
+harness = false
+
 [[bench]]
 name = "transform_sync_benchmark"
 harness = false

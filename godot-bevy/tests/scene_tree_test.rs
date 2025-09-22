@@ -13,6 +13,7 @@ mod scene_tree {
     pub mod markers_and_groups;
     pub mod multiple_nodes;
     pub mod name_synchronization;
+    pub mod parent_mapping;
     pub mod utils;
 }
 
@@ -28,6 +29,9 @@ use scene_tree::multiple_nodes::{
 };
 use scene_tree::name_synchronization::{
     test_initial_node_names_sync_to_entities, test_node_name_changes_update_entity,
+};
+use scene_tree::parent_mapping::{
+    test_normal_parent_child_processing, test_parent_child_with_dynamic_insertion,
 };
 
 bevy_godot_test_main! {
@@ -48,4 +52,8 @@ bevy_godot_test_main! {
     test_node_type_markers,
     test_node_groups_component,
     test_protected_entity_deletion,
+
+    // Parent mapping and race conditions
+    test_normal_parent_child_processing,
+    test_parent_child_with_dynamic_insertion,
 }

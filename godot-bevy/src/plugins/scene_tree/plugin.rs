@@ -11,6 +11,7 @@ use crate::{
         CollisionEventType, Collisions,
     },
 };
+use bevy::log;
 use bevy::{
     app::{App, First, Plugin, PreStartup},
     ecs::{
@@ -323,6 +324,8 @@ fn create_scene_tree_entity(
     config: &SceneTreeConfig,
     component_registry: &SceneTreeComponentRegistry,
 ) {
+    log::info!("Creating scene tree entity");
+
     let mut ent_mapping = entities
         .iter()
         .map(|(reference, ent, protected)| (reference.instance_id(), (ent, protected)))
@@ -339,6 +342,7 @@ fn create_scene_tree_entity(
         });
 
     for event in events.into_iter() {
+        log::info!("Event: {:?}", event);
         trace!(target: "godot_scene_tree_events", event = ?event);
 
         let mut node = event.node.clone();
