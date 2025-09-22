@@ -24,6 +24,7 @@ use bevy::{
     },
     prelude::Resource,
 };
+use godot::prelude::godot_print;
 use godot::{
     builtin::GString,
     classes::{Engine, Node, SceneTree},
@@ -324,12 +325,17 @@ fn create_scene_tree_entity(
     config: &SceneTreeConfig,
     component_registry: &SceneTreeComponentRegistry,
 ) {
-    log::info!("Creating scene tree entity");
+    godot_print!("[create_scene_tree_entity] Starting function");
 
     let mut ent_mapping = entities
         .iter()
         .map(|(reference, ent, protected)| (reference.instance_id(), (ent, protected)))
         .collect::<HashMap<_, _>>();
+
+    godot_print!(
+        "[create_scene_tree_entity] Initial ent_mapping has {} entities",
+        ent_mapping.len()
+    );
     let scene_root = scene_tree.get().get_root().unwrap();
     let collision_watcher = scene_root
         .try_get_node_as::<Node>("/root/BevyAppSingleton/CollisionWatcher")
@@ -350,6 +356,12 @@ fn create_scene_tree_entity(
 
         match event.event_type {
             SceneTreeEventType::NodeAdded => {
+                godot_print!(
+                    "[create_scene_tree_entity] Processing NodeAdded event for node: {} (ID: {})",
+                    node.get::<Node>().get_name(),
+                    node.instance_id()
+                );
+
                 // Skip nodes that have been freed before we process them (can happen in tests)
                 if !node.instance_id().lookup_validity() {
                     continue;
@@ -438,7 +450,13 @@ fn create_scene_tree_entity(
                 component_registry.add_to_entity(&mut ent, &event.node);
 
                 let ent = ent.id();
-                ent_mapping.insert(node.instance_id(), (ent, None));
+                let node_id = node.instance_id();
+                ent_mapping.insert(node_id, (ent, None));
+                godot_print!(
+                    "[create_scene_tree_entity] Added node (ID: {}) to ent_mapping with entity {:?}",
+                    node_id,
+                    ent
+                );
 
                 // Try to add any registered bundles for this node type
                 super::autosync::try_add_bundles_for_node(commands, ent, &event.node);
@@ -448,9 +466,33 @@ fn create_scene_tree_entity(
                     && let Some(parent) = node.get_parent()
                 {
                     let parent_id = parent.instance_id();
+                    godot_print!(
+                        "[create_scene_tree_entity] Node {} (ID: {}) has parent {} (ID: {})",
+                        node.get_name(),
+                        node.instance_id(),
+                        parent.get_name(),
+                        parent_id
+                    );
+
                     if let Some((parent_entity, _)) = ent_mapping.get(&parent_id) {
+                        godot_print!(
+                            "[create_scene_tree_entity] Found parent entity {:?} for parent ID {}",
+                            parent_entity,
+                            parent_id
+                        );
                         commands.entity(*parent_entity).add_children(&[ent]);
                     } else {
+                        godot_print!(
+                            "[create_scene_tree_entity] RACE CONDITION DETECTED: Parent {} (ID: {}) not found in ent_mapping for child {} (ID: {})",
+                            parent.get_name(),
+                            parent_id,
+                            node.get_name(),
+                            node.instance_id()
+                        );
+                        godot_print!(
+                            "[create_scene_tree_entity] Current ent_mapping contains {} entities",
+                            ent_mapping.len()
+                        );
                         warn!(target: "godot_scene_tree_events",
                             "Parent entity with ID {} not found in ent_mapping. This might indicate a missing or incorrect mapping.",
                             parent_id);

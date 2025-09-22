@@ -89,7 +89,8 @@ pub fn test_parent_child_with_dynamic_insertion(ctx: &mut BevyGodotTestContext) 
     // The bug occurs here: sub_node is added while the scene tree plugin is still processing
     env.add_node_to_scene(managed_scene.clone());
 
-    // Process the scene tree changes
+    // Process the scene tree changes - first update processes initial nodes
+    godot_print!("[TEST] First update cycle");
     ctx.app.update();
 
     // Verify that some_node itself has an entity (basic check)
@@ -97,8 +98,10 @@ pub fn test_parent_child_with_dynamic_insertion(ctx: &mut BevyGodotTestContext) 
     if some_node_entity.is_none() {
         return Err(TestError::assertion("some_node entity was not created"));
     }
+    godot_print!("[TEST] some_node entity created: {:?}", some_node_entity);
 
     // Get the spawned child from our custom node
+    godot_print!("[TEST] Checking for spawned child...");
     let sub_node = some_node.bind().get_spawned_child();
     if sub_node.is_none() {
         return Err(TestError::assertion(
