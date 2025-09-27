@@ -51,8 +51,10 @@ If you see the following warning:
 warning: unexpected `cfg` condition value: `trace_tracy`
 ```
 
-after ugprading to Godot Bevy `0.9`, add the following at the top of the problematic file (wherever you use the `bevy_app` macro):
+after ugprading to Godot Bevy `0.9`, add the following to your Cargo.toml file
 
-```rust
-#![allow(unexpected_cfgs)] // silence potential `tracy_trace` feature config warning brought in by `bevy_app` macro
+```toml
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(feature, values("trace_tracy"))']
 ```

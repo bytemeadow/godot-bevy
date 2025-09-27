@@ -96,6 +96,10 @@ godot-bevy = { version = "%s", features = ["default"] }
 
 [workspace]
 # Empty workspace table to make this a standalone project
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(feature, values("trace_tracy"))']
 """ % [_to_snake_case(project_name), info.godot_bevy_version]
 
 	_save_file(rust_path.path_join("Cargo.toml"), cargo_content)
