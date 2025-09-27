@@ -221,6 +221,10 @@ func _to_snake_case(text: String) -> String:
 	var result = ""
 	for i in range(text.length()):
 		var c = text[i]
+		# Convert non-alphanumeric characters to underscores
+		if !c.is_alphanumeric():
+			result += "_"
+			continue
 		# Check if character is uppercase by comparing with lowercase version
 		if c != c.to_lower() and i > 0:
 			result += "_"
