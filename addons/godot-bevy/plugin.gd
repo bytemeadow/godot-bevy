@@ -138,6 +138,7 @@ fn hello_world_system(mut timer: Local<f32>, time: Res<Time>) {
 	var gdextension_content = """[configuration]
 entry_symbol = "gdext_rust_init"
 compatibility_minimum = 4.1
+reloadable = true
 
 [libraries]
 linux.debug.x86_64 = "res://rust/target/debug/lib%s.so"
