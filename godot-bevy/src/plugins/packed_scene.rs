@@ -18,6 +18,7 @@ use bevy::{
 use godot::{
     builtin::GString,
     classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader},
+    obj::Singleton,
 };
 use std::str::FromStr;
 use tracing::error;

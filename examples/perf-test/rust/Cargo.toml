@@ -14,7 +14,7 @@ name = "perf-benchmark"
 [dependencies]
 bevy = { version = "0.16", default-features = false }
 fastrand = "2.3.0"
-godot = "0.3"
+godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }
 which = "7.0.3"
 tracing = "0.1"

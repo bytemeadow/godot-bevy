@@ -8,6 +8,7 @@ use bevy::ecs::system::{Query, SystemChangeTick};
 use bevy::prelude::Transform as BevyTransform;
 use godot::classes::{Engine, Node2D, Node3D, Object, SceneTree};
 use godot::prelude::{Gd, ToGodot};
+use godot::obj::Singleton;
 
 use super::change_filter::TransformSyncMetadata;
 

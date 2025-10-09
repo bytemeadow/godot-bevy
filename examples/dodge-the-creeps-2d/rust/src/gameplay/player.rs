@@ -12,6 +12,7 @@ use bevy_asset_loader::asset_collection::AssetCollection;
 use godot::{
     builtin::{StringName, Vector2},
     classes::{Input, Node2D},
+    obj::Singleton,
 };
 use godot_bevy::{
     plugins::core::PhysicsDelta,
