@@ -81,10 +81,6 @@ jobs:
       - name: Run unit tests (no runtime)
         run: cargo test --lib --bins --examples
 
-      - name: Run integration tests (macOS only, 4.3 API)
-        if: runner.os == 'macOS'
-        run: cargo test --features api-4-3 --test transforms_test
-
       - name: Build release
         run: cargo build --release
 
@@ -102,7 +98,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       benchmark: ${{ steps.filter.outputs.benchmark }}
-      transform-conversions: ${{ steps.filter.outputs.transform-conversions }}
       dodge-the-creeps-2d: ${{ steps.filter.outputs.dodge-the-creeps-2d }}
       platformer-2d: ${{ steps.filter.outputs.platformer-2d }}
     steps:
@@ -118,10 +113,6 @@ jobs:
               - '.github/workflows/ci.yml'
               - 'Cargo.toml'
               - 'Cargo.lock'
-            transform-conversions:
-              - 'godot-bevy/src/plugins/transforms/**'
-              - 'godot-bevy/benches/transform_conversions.rs'
-              - '.github/workflows/ci.yml'
             dodge-the-creeps-2d:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
@@ -216,6 +207,67 @@ jobs:
           name: ${{ matrix.example }}-exports
           path: examples/${{ matrix.example }}/godot/exports/
           if-no-files-found: error
+
+  integration-tests:
+    name: integration tests
+    runs-on: blaze/macos-latest
+    needs: [rust]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            itest/rust -> target
+
+      - name: Install Godot
+        uses: CapsCollective/godot-actions/install-godot@v1.2
+        with:
+          godot-version: ${{ env.GODOT_VERSION }}
+        id: install-godot
+
+      - name: Download Rust libraries
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Setup cross-platform libraries
+        run: |
+          mkdir -p target/{release,debug}
+
+          # Copy all platform libraries to target directories
+          find artifacts/ -name "*rust*" -type f | while read file; do
+            cp "$file" target/release/ 2>/dev/null || true
+            cp "$file" target/debug/ 2>/dev/null || true
+          done
+
+      - name: Cache Godot imports
+        uses: actions/cache@v4
+        with:
+          path: itest/godot/.godot
+          key: ${{ runner.os }}-godot-imports-itest-${{ hashFiles('itest/godot/**/*.import') }}
+          restore-keys: |
+            ${{ runner.os }}-godot-imports-itest-
+
+      - name: Build integration test library
+        run: cargo build --manifest-path itest/rust/Cargo.toml
+
+      - name: Import Godot project
+        working-directory: itest/godot
+        run: ${{ steps.install-godot.outputs.godot-executable }} --editor --headless --quit || true
+
+      - name: Run integration tests
+        working-directory: itest
+        env:
+          GODOT4_BIN: ${{ steps.install-godot.outputs.godot-executable }}
+        run: ./run-tests.sh
 
   benchmark:
     name: performance / particle benchmark
@@ -400,41 +452,3 @@ jobs:
             examples/perf-test/benchmark_output.txt
             examples/perf-test/baseline.json
             benchmark-artifacts/
-
-  transform-conversions-bench:
-    name: benchmark / transform conversions
-    runs-on: blaze/compute/ubuntu-latest-amd64
-    needs: [changes]
-    if: |
-      github.event_name == 'pull_request' && (
-        needs.changes.outputs.transform-conversions == 'true' ||
-        contains(github.event.pull_request.labels.*.name, 'benchmark-transforms')
-      )
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            . -> target
-            examples/*/rust -> target
-
-      - name: Cache and install Linux dependencies
-        if: runner.os == 'linux'
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libasound2-dev libudev-dev pkg-config
-          version: 1.0
-
-      - name: Run benchmark comparison
-        uses: boa-dev/criterion-compare-action@v3
-        with:
-          benchName: "transform_conversions"
-          branchName: ${{ github.base_ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
