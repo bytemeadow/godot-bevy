@@ -1,0 +1,21 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="godot-bevy Integration Tests"
+run/main_scene="res://TestRunner.tscn"
+config/features=PackedStringArray("4.2")
+run/flush_stdout_on_print=true
+
+[debug]
+
+gdscript/warnings/unused_parameter=0
+gdscript/warnings/shadowed_variable=0

@@ -2377,6 +2377,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "godot-bevy-itest"
+version = "0.0.0"
+dependencies = [
+ "bevy",
+ "godot",
+ "godot-bevy",
+ "godot-bevy-itest-macros",
+ "godot-bevy-macros",
+ "parking_lot",
+]
+
+[[package]]
+name = "godot-bevy-itest-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "godot-bevy-macros"
 version = "0.9.1"
 dependencies = [

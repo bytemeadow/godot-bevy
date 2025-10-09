@@ -3,7 +3,6 @@ use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
 use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
 use crate::{
-    GodotPlugin,
     plugins::{
         collisions::CollisionEventReader,
         core::{PhysicsDelta, PhysicsUpdate},
@@ -25,6 +24,10 @@ pub static BEVY_INIT_FUNC: OnceLock<Box<dyn Fn(&mut App) + Send + Sync>> = OnceL
 pub struct BevyApp {
     base: Base<Node>,
     app: Option<App>,
+    // Optional per-instance init function (for tests)
+    // If set, this takes precedence over the global BEVY_INIT_FUNC
+    #[allow(clippy::type_complexity)]
+    instance_init_func: Option<Box<dyn Fn(&mut App) + Send + Sync>>,
 }
 
 impl BevyApp {
@@ -34,6 +37,12 @@ impl BevyApp {
 
     pub fn get_app_mut(&mut self) -> Option<&mut App> {
         self.app.as_mut()
+    }
+
+    /// Set a per-instance init function (for tests)
+    /// This allows each BevyApp instance to have its own configuration
+    pub fn set_instance_init_func(&mut self, func: Box<dyn Fn(&mut App) + Send + Sync>) {
+        self.instance_init_func = Some(func);
     }
 
     fn register_scene_tree_watcher(&mut self, app: &mut App) {
@@ -97,6 +106,7 @@ impl INode for BevyApp {
         Self {
             base,
             app: Default::default(),
+            instance_init_func: None,
         }
     }
 
@@ -106,11 +116,17 @@ impl INode for BevyApp {
         }
 
         let mut app = App::new();
-        app.add_plugins(GodotPlugin);
+        // NOTE: GodotPlugin is NO LONGER added automatically!
+        // Users must add it (or specific plugins) in their #[bevy_app] function.
+        // This gives full control over which plugins are loaded.
 
-        // Call the client's entrypoint (the function they decorated with the `#[bevy_app]` macro)
-        let app_builder_func = BEVY_INIT_FUNC.get().unwrap();
-        app_builder_func(&mut app);
+        // Call the init function - use instance function if set, otherwise global
+        if let Some(ref instance_func) = self.instance_init_func {
+            instance_func(&mut app);
+        } else {
+            let app_builder_func = BEVY_INIT_FUNC.get().unwrap();
+            app_builder_func(&mut app);
+        }
 
         // Finalize plugins before any further operations
         if app.plugins_state() != bevy::app::PluginsState::Cleaned {
@@ -123,11 +139,28 @@ impl INode for BevyApp {
             app.cleanup();
         }
 
-        self.register_scene_tree_watcher(&mut app);
-        self.register_optimized_scene_tree_watcher();
-        self.register_signal_system(&mut app);
-        self.register_input_event_watcher(&mut app);
-        self.register_collision_watcher(&mut app);
+        // Only register watchers if the corresponding plugins were added
+        // Check if SceneTreeEventReader resource exists (added by scene tree plugin)
+        if app.world().contains_non_send::<SceneTreeEventReader>() {
+            self.register_scene_tree_watcher(&mut app);
+            self.register_optimized_scene_tree_watcher();
+        }
+
+        // Check if GodotSignalReader resource was added (by signal plugin)
+        if app.world().contains_non_send::<GodotSignalReader>() {
+            self.register_signal_system(&mut app);
+        }
+
+        // Check if InputEventReader resource was added (by input plugin)
+        if app.world().contains_non_send::<InputEventReader>() {
+            self.register_input_event_watcher(&mut app);
+        }
+
+        // Check if CollisionEventReader resource was added (by collision plugin)
+        if app.world().contains_non_send::<CollisionEventReader>() {
+            self.register_collision_watcher(&mut app);
+        }
+
         app.init_resource::<PhysicsDelta>();
         self.app = Some(app);
     }

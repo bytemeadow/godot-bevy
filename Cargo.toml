@@ -11,6 +11,7 @@ license = "MIT OR Apache-2.0"
 members = [
   "godot-bevy",
   "godot-bevy-macros",
+  "itest/rust",
   "examples/avian-physics-demo/rust",
   "examples/dodge-the-creeps-2d/rust",
   "examples/timing-test/rust",
@@ -23,5 +24,5 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-godot = { version = "0.3.5", features = ["experimental-threads"] }
+godot = { version = "0.3.5", features = ["experimental-threads", "__trace"] }
 godot-bevy-macros = { version = "0.9.1", path = "godot-bevy-macros" }
