@@ -2,7 +2,7 @@ name: benchmark comment
 
 on:
   workflow_run:
-    workflows: ["ci"]
+    workflows: ["benchmarks"]
     types:
       - completed
 
@@ -15,7 +15,7 @@ jobs:
   comment:
     runs-on: ubuntu-latest
     if: github.event.workflow_run.conclusion == 'success'
-    
+
     steps:
       - name: Download benchmark results
         id: download
@@ -26,155 +26,102 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           name: benchmark-results
           path: benchmark-results/
-      
+
       - name: Check if this is a PR with benchmark results
         id: check
         run: |
           # Check if artifacts were downloaded successfully
           if [ "${{ steps.download.outcome }}" != "success" ]; then
             echo "is_pr=false" >> $GITHUB_OUTPUT
-            echo "📋 No benchmark artifacts found (CI may not have run benchmarks)"
+            echo "📋 No benchmark artifacts found"
             exit 0
           fi
-          
-          # Check for PR metadata in benchmark-artifacts subdirectory
-          if [ -f "benchmark-results/benchmark-artifacts/pr_number.txt" ]; then
+
+          # Check for PR metadata
+          if [ -f "benchmark-results/pr_number.txt" ]; then
             echo "is_pr=true" >> $GITHUB_OUTPUT
-            echo "pr_number=$(cat benchmark-results/benchmark-artifacts/pr_number.txt)" >> $GITHUB_OUTPUT
-            echo "pr_sha=$(cat benchmark-results/benchmark-artifacts/pr_sha.txt)" >> $GITHUB_OUTPUT
-            echo "✅ Found PR metadata for PR #$(cat benchmark-results/benchmark-artifacts/pr_number.txt)"
+            echo "pr_number=$(cat benchmark-results/pr_number.txt)" >> $GITHUB_OUTPUT
+            echo "✅ Found PR metadata for PR #$(cat benchmark-results/pr_number.txt)"
           else
             echo "is_pr=false" >> $GITHUB_OUTPUT
             echo "📋 No PR metadata found - this was likely a main branch run"
           fi
-      
+
       - name: Comment PR with results
         if: steps.check.outputs.is_pr == 'true'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const path = require('path');
 
             // Read benchmark results
-            const resultsDir = 'benchmark-results/examples/perf-test/benchmark_results';
-            if (!fs.existsSync(resultsDir)) {
-              console.log('No benchmark results directory found');
-              return;
-            }
-            
-            const files = fs.readdirSync(resultsDir).filter(f => f.startsWith('full_comparison_')).sort().reverse();
+            const results = JSON.parse(fs.readFileSync('benchmark-results/bench-results.json', 'utf8'));
 
-            if (files.length === 0) {
-              console.log('No benchmark result files found');
-              return;
+            // Check if comparison data exists
+            const comparisonPath = 'benchmark-results/bench-results-comparison.json';
+            let comparison = null;
+            if (fs.existsSync(comparisonPath)) {
+              comparison = JSON.parse(fs.readFileSync(comparisonPath, 'utf8'));
             }
 
-            const resultsPath = path.join(resultsDir, files[0]);
-            const data = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+            let comment = '## 📊 Benchmark Results\n\n';
 
-            const analysis = data.analysis || {};
-            const ratios = analysis.performance_ratios || {};
+            if (comparison && comparison.comparisons) {
+              // Enhanced table with baseline comparison
+              comment += '| Benchmark | Current | Baseline | Change |\n';
+              comment += '|-----------|---------|----------|--------|\n';
 
-            let comment = "## 📊 Benchmark Results\n\n";
+              for (const c of comparison.comparisons) {
+                const status_icon = {
+                  'regression': '🔴',
+                  'slower': '🟡',
+                  'faster': '🟢',
+                  'neutral': '⚪',
+                  'new': '🆕'
+                }[c.status] || '⚪';
 
-            // Simple regression check against baseline
-            let regressionStatus = null;
-            try {
-              const baselineUrl = `https://raw.githubusercontent.com/${{ github.repository }}/main/examples/perf-test/baseline.json`;
-              const baselineResponse = await fetch(baselineUrl);
-              
-              if (baselineResponse.ok) {
-                const baseline = await baselineResponse.json();
-                
-                // Check if this is a CI-generated baseline
-                if (baseline.ci_metadata) {
-                  console.log(`Found CI baseline from commit: ${baseline.ci_metadata.commit}`);
-                  
-                  // Compare performance vs baseline and show % differences
-                  const currentResults = data.results || {};
-                  
-                  let performanceChanges = [];
-                  
-                  // Check each implementation and entity count
-                  for (const impl of ["godot", "bevy"]) {
-                    const currentImpl = currentResults[impl] || {};
-                    const baselineImpl = baseline[impl] || {};
-                    
-                    for (const [count, data] of Object.entries(currentImpl)) {
-                      if (baselineImpl[count]) {
-                        const currentFps = data.avg_fps;
-                        const baselineFps = baselineImpl[count].avg_fps;
-                        const percentChange = ((currentFps - baselineFps) / baselineFps) * 100;
-                        
-                        performanceChanges.push({
-                          impl,
-                          count: parseInt(count),
-                          currentFps: currentFps.toFixed(1),
-                          baselineFps: baselineFps.toFixed(1),
-                          percentChange: percentChange.toFixed(1)
-                        });
-                      }
-                    }
-                  }
-                  
-                  regressionStatus = { status: 'comparison', changes: performanceChanges };
-                } else {
-                  regressionStatus = 'no_ci_baseline';
+                let changeStr = '';
+                if (c.status === 'new') {
+                  changeStr = `${status_icon} *new*`;
+                } else if (c.change_pct !== null) {
+                  const sign = c.change_pct > 0 ? '+' : '';
+                  changeStr = `${status_icon} ${sign}${c.change_pct.toFixed(1)}%`;
                 }
-              } else {
-                regressionStatus = 'no_baseline';
+
+                const currentTime = c.current.median_display;
+                const baselineTime = c.baseline ? c.baseline.median_display : '-';
+
+                comment += `| ${c.name} | ${currentTime} | ${baselineTime} | ${changeStr} |\n`;
               }
-            } catch (error) {
-              console.log('Error fetching baseline:', error);
-              regressionStatus = 'error';
-            }
 
+              // Summary
+              const regressions = comparison.comparisons.filter(c => c.status === 'regression');
+              const improvements = comparison.comparisons.filter(c => c.status === 'faster');
 
-            if (Object.keys(ratios).length > 0) {
-              comment += "| Entity Count | Godot FPS | +Bevy FPS | Speedup |\n";
-              comment += "|--------------|-----------|----------|----------|\n";
-
-              for (const [count, r] of Object.entries(ratios).sort((a, b) => Number(a[0]) - Number(b[0]))) {
-                comment += `| ${Number(count).toLocaleString()} | ${r.godot_fps.toFixed(1)} | ${r.bevy_fps.toFixed(1)} | **${r.speedup.toFixed(2)}x** |\n`;
+              comment += '\n';
+              if (regressions.length > 0) {
+                comment += `⚠️ **${regressions.length} regression(s)** detected\n`;
               }
-            }
-
-            if (analysis.summary) {
-              const s = analysis.summary;
-              comment += `\n**Average Speedup**: ${s.avg_speedup.toFixed(2)}x\n`;
-              comment += `**Range**: ${s.min_speedup.toFixed(2)}x - ${s.max_speedup.toFixed(2)}x\n`;
-            }
-
-            // Add performance comparison vs baseline at the end
-            if (regressionStatus?.status === 'comparison') {
-              comment += "\n## 📈 Performance vs Baseline\n\n";
-              comment += "| Entity Count | Godot Change | Bevy Change |\n";
-              comment += "|--------------|--------------|-------------|\n";
-              
-              // Get all unique entity counts and sort them
-              const allCounts = [...new Set(regressionStatus.changes.map(c => c.count))].sort((a, b) => a - b);
-              
-              for (const count of allCounts) {
-                const godotChange = regressionStatus.changes.find(c => c.impl === 'godot' && c.count === count);
-                const bevyChange = regressionStatus.changes.find(c => c.impl === 'bevy' && c.count === count);
-                
-                const godotText = godotChange ? 
-                  `${godotChange.currentFps} FPS (${godotChange.percentChange > 0 ? '+' : ''}${godotChange.percentChange}%)` : 
-                  'N/A';
-                const bevyText = bevyChange ? 
-                  `${bevyChange.currentFps} FPS (${bevyChange.percentChange > 0 ? '+' : ''}${bevyChange.percentChange}%)` : 
-                  'N/A';
-                
-                comment += `| ${count.toLocaleString()} | ${godotText} | ${bevyText} |\n`;
+              if (improvements.length > 0) {
+                comment += `✨ **${improvements.length} improvement(s)** detected\n`;
               }
-            } else if (regressionStatus === 'no_baseline') {
-              comment += "\nℹ️ **Note**: No baseline available for comparison";
-            } else if (regressionStatus === 'no_ci_baseline') {
-              comment += "\nℹ️ **Note**: Baseline not CI-generated";
+              if (regressions.length === 0 && improvements.length === 0) {
+                comment += '✅ Performance is stable\n';
+              }
+
+            } else {
+              // Fallback: simple table without comparison
+              comment += '| Benchmark | Median | Min |\n';
+              comment += '|-----------|--------|-----|\n';
+
+              for (const [name, data] of Object.entries(results.benchmarks)) {
+                comment += `| ${name} | ${data.median_display} | ${data.min_display} |\n`;
+              }
+
+              comment += '\n> 📋 No baseline available for comparison\n';
             }
 
-            comment += "\n\n<sub>🤖 Generated by godot-bevy CI</sub>";
+            comment += '\n<sub>🤖 Generated by godot-bevy CI</sub>';
 
             const prNumber = ${{ steps.check.outputs.pr_number }};
 
@@ -185,8 +132,8 @@ jobs:
               issue_number: prNumber,
             });
 
-            const botComment = comments.find(comment =>
-              comment.user.type === 'Bot' && comment.body.includes('📊 Benchmark Results')
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('📊 Benchmark Results')
             );
 
             if (botComment) {

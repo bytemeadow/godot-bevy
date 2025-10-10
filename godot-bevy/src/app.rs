@@ -1,17 +1,14 @@
 use crate::plugins::core::PrePhysicsUpdate;
+use crate::plugins::{
+    collisions::CollisionEventReader,
+    core::{PhysicsDelta, PhysicsUpdate},
+    input::InputEventReader,
+    scene_tree::SceneTreeEventReader,
+    signals::{GodotSignalReader, GodotSignalSender},
+};
 use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
 use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
-use crate::{
-    GodotPlugin,
-    plugins::{
-        collisions::CollisionEventReader,
-        core::{PhysicsDelta, PhysicsUpdate},
-        input::InputEventReader,
-        scene_tree::SceneTreeEventReader,
-        signals::{GodotSignalReader, GodotSignalSender},
-    },
-};
 use bevy::app::App;
 use godot::prelude::*;
 use std::sync::OnceLock;
@@ -25,6 +22,10 @@ pub static BEVY_INIT_FUNC: OnceLock<Box<dyn Fn(&mut App) + Send + Sync>> = OnceL
 pub struct BevyApp {
     base: Base<Node>,
     app: Option<App>,
+    // Optional per-instance init function (for tests)
+    // If set, this takes precedence over the global BEVY_INIT_FUNC
+    #[allow(clippy::type_complexity)]
+    instance_init_func: Option<Box<dyn Fn(&mut App) + Send + Sync>>,
 }
 
 impl BevyApp {
@@ -36,7 +37,19 @@ impl BevyApp {
         self.app.as_mut()
     }
 
+    /// Set a per-instance init function (for tests)
+    /// This allows each BevyApp instance to have its own configuration
+    pub fn set_instance_init_func(&mut self, func: Box<dyn Fn(&mut App) + Send + Sync>) {
+        self.instance_init_func = Some(func);
+    }
+
     fn register_scene_tree_watcher(&mut self, app: &mut App) {
+        // Check if SceneTreeWatcher already exists (e.g., created by test framework)
+        // If so, don't create a new one or replace the event reader
+        if self.base().has_node("SceneTreeWatcher") {
+            return;
+        }
+
         let (sender, receiver) = channel();
         let mut scene_tree_watcher = SceneTreeWatcher::new_alloc();
         scene_tree_watcher.bind_mut().notification_channel = Some(sender);
@@ -63,6 +76,11 @@ impl BevyApp {
     }
 
     fn register_collision_watcher(&mut self, app: &mut App) {
+        // Check if CollisionWatcher already exists (e.g., created by test framework)
+        if self.base().has_node("CollisionWatcher") {
+            return;
+        }
+
         let (sender, receiver) = channel();
         let mut collision_watcher = CollisionWatcher::new_alloc();
         collision_watcher.bind_mut().notification_channel = Some(sender);
@@ -72,22 +90,31 @@ impl BevyApp {
     }
 
     fn register_optimized_scene_tree_watcher(&mut self) {
-        // Try to load the OptimizedSceneTreeWatcher GDScript class
-        let mut resource_loader = godot::classes::ResourceLoader::singleton();
-        if let Some(resource) =
-            resource_loader.load("res://addons/godot-bevy/optimized_scene_tree_watcher.gd")
-            && let Ok(mut script) = resource.try_cast::<godot::classes::GDScript>()
-            && let Ok(instance) = script.try_instantiate(&[])
-            && let Ok(mut node) = instance.try_to::<godot::obj::Gd<godot::classes::Node>>()
-        {
-            node.set_name("OptimizedSceneTreeWatcher");
-            self.base_mut().add_child(&node);
-            tracing::info!("Successfully registered OptimizedSceneTreeWatcher");
-            return;
-        }
+        // Check if the optimized watcher file exists before trying to load it
+        // This prevents error logs when the file is not present (e.g., in examples)
+        let path = "res://addons/godot-bevy/optimized_scene_tree_watcher.gd";
 
-        // If loading fails, log and continue without optimization
-        tracing::info!("OptimizedSceneTreeWatcher not available - will use fallback method");
+        // Use FileAccess to check if file actually exists (ResourceLoader.exists() may cache)
+        if godot::classes::FileAccess::file_exists(&godot::builtin::GString::from(path)) {
+            let mut resource_loader = godot::classes::ResourceLoader::singleton();
+
+            // Try to load and instantiate the OptimizedSceneTreeWatcher GDScript class
+            if let Some(resource) = resource_loader.load(path)
+                && let Ok(mut script) = resource.try_cast::<godot::classes::GDScript>()
+                && let Ok(instance) = script.try_instantiate(&[])
+                && let Ok(mut node) = instance.try_to::<godot::obj::Gd<godot::classes::Node>>()
+            {
+                node.set_name("OptimizedSceneTreeWatcher");
+                self.base_mut().add_child(&node);
+                tracing::info!("Successfully registered OptimizedSceneTreeWatcher");
+            } else {
+                tracing::warn!(
+                    "Failed to instantiate OptimizedSceneTreeWatcher - using fallback method"
+                );
+            }
+        } else {
+            tracing::debug!("OptimizedSceneTreeWatcher not available - using fallback method");
+        }
     }
 }
 
@@ -97,6 +124,7 @@ impl INode for BevyApp {
         Self {
             base,
             app: Default::default(),
+            instance_init_func: None,
         }
     }
 
@@ -106,13 +134,57 @@ impl INode for BevyApp {
         }
 
         let mut app = App::new();
-        app.add_plugins(GodotPlugin);
+        app.add_plugins(crate::plugins::GodotCorePlugins);
 
-        // Call the client's entrypoint (the function they decorated with the `#[bevy_app]` macro)
-        let app_builder_func = BEVY_INIT_FUNC.get().unwrap();
-        app_builder_func(&mut app);
+        // Call the init function - use instance function if set, otherwise global
+        if let Some(ref instance_func) = self.instance_init_func {
+            instance_func(&mut app);
+        } else {
+            let app_builder_func = BEVY_INIT_FUNC.get().unwrap();
+            app_builder_func(&mut app);
+        }
 
-        // Finalize plugins before any further operations
+        // Create watchers BEFORE app.finish() so PreStartup systems can find them
+        // Check which plugins were added by looking for their resources/events
+
+        // Scene tree plugin check - look for Events<SceneTreeEvent>
+        use crate::plugins::scene_tree::SceneTreeEvent;
+        if app
+            .world()
+            .contains_resource::<bevy::ecs::event::Events<SceneTreeEvent>>()
+        {
+            self.register_scene_tree_watcher(&mut app);
+            self.register_optimized_scene_tree_watcher();
+        }
+
+        // Collision plugin check - similar approach
+        use crate::plugins::collisions::CollisionEvent;
+        if app
+            .world()
+            .contains_resource::<bevy::ecs::event::Events<CollisionEvent>>()
+        {
+            self.register_collision_watcher(&mut app);
+        }
+
+        // Signal plugin check
+        use crate::plugins::signals::GodotSignal;
+        if app
+            .world()
+            .contains_resource::<bevy::ecs::event::Events<GodotSignal>>()
+        {
+            self.register_signal_system(&mut app);
+        }
+
+        // Input event plugin check - check for KeyboardInput as a marker
+        use crate::plugins::input::KeyboardInput;
+        if app
+            .world()
+            .contains_resource::<bevy::ecs::event::Events<KeyboardInput>>()
+        {
+            self.register_input_event_watcher(&mut app);
+        }
+
+        // Finalize plugins - PreStartup systems will now find the watchers
         if app.plugins_state() != bevy::app::PluginsState::Cleaned {
             while app.plugins_state() == bevy::app::PluginsState::Adding {
                 #[cfg(not(target_arch = "wasm32"))]
@@ -123,11 +195,6 @@ impl INode for BevyApp {
             app.cleanup();
         }
 
-        self.register_scene_tree_watcher(&mut app);
-        self.register_optimized_scene_tree_watcher();
-        self.register_signal_system(&mut app);
-        self.register_input_event_watcher(&mut app);
-        self.register_collision_watcher(&mut app);
         app.init_resource::<PhysicsDelta>();
         self.app = Some(app);
     }

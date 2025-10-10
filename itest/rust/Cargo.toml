@@ -1,0 +1,19 @@
+[package]
+name = "godot-bevy-itest"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+godot.workspace = true
+godot-bevy = { path = "../../godot-bevy" }
+godot-bevy-macros = { path = "../../godot-bevy-macros" }
+godot-bevy-itest-macros = { path = "./macros" }
+bevy = { version = "0.16", default-features = false, features = [
+  "bevy_asset",
+  "multi_threaded",
+] }
+parking_lot = "0.12"

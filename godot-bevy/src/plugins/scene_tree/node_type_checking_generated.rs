@@ -907,7 +907,7 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
 
 pub fn remove_comprehensive_node_type_markers(
     entity_commands: &mut EntityCommands,
-    node: &mut GodotNodeHandle,
+    node: &GodotNodeHandle,
 ) {
     // All nodes inherit from Node, so remove this first
     entity_commands.remove::<NodeMarker>();
@@ -1240,7 +1240,7 @@ fn check_3d_node_types_comprehensive(
 
 fn remove_3d_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
-    _node: &mut GodotNodeHandle,
+    _node: &GodotNodeHandle,
 ) {
     entity_commands
         .remove::<AnimatableBody3DMarker>()
@@ -1496,7 +1496,7 @@ fn check_2d_node_types_comprehensive(
 
 fn remove_2d_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
-    _node: &mut GodotNodeHandle,
+    _node: &GodotNodeHandle,
 ) {
     entity_commands
         .remove::<AnimatableBody2DMarker>()
@@ -1738,7 +1738,7 @@ fn check_control_node_types_comprehensive(
 
 fn remove_control_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
-    _node: &mut GodotNodeHandle,
+    _node: &GodotNodeHandle,
 ) {
     entity_commands
         .remove::<AspectRatioContainerMarker>()
@@ -1863,7 +1863,7 @@ fn check_universal_node_types_comprehensive(
 }
 fn remove_universal_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
-    _node: &mut GodotNodeHandle,
+    _node: &GodotNodeHandle,
 ) {
     entity_commands
         .remove::<AnimationMixerMarker>()
