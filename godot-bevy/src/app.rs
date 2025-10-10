@@ -90,22 +90,31 @@ impl BevyApp {
     }
 
     fn register_optimized_scene_tree_watcher(&mut self) {
-        // Try to load the OptimizedSceneTreeWatcher GDScript class
-        let mut resource_loader = godot::classes::ResourceLoader::singleton();
-        if let Some(resource) =
-            resource_loader.load("res://addons/godot-bevy/optimized_scene_tree_watcher.gd")
-            && let Ok(mut script) = resource.try_cast::<godot::classes::GDScript>()
-            && let Ok(instance) = script.try_instantiate(&[])
-            && let Ok(mut node) = instance.try_to::<godot::obj::Gd<godot::classes::Node>>()
-        {
-            node.set_name("OptimizedSceneTreeWatcher");
-            self.base_mut().add_child(&node);
-            tracing::info!("Successfully registered OptimizedSceneTreeWatcher");
-            return;
-        }
+        // Check if the optimized watcher file exists before trying to load it
+        // This prevents error logs when the file is not present (e.g., in examples)
+        let path = "res://addons/godot-bevy/optimized_scene_tree_watcher.gd";
 
-        // If loading fails, log and continue without optimization
-        tracing::info!("OptimizedSceneTreeWatcher not available - will use fallback method");
+        // Use FileAccess to check if file actually exists (ResourceLoader.exists() may cache)
+        if godot::classes::FileAccess::file_exists(&godot::builtin::GString::from(path)) {
+            let mut resource_loader = godot::classes::ResourceLoader::singleton();
+
+            // Try to load and instantiate the OptimizedSceneTreeWatcher GDScript class
+            if let Some(resource) = resource_loader.load(path)
+                && let Ok(mut script) = resource.try_cast::<godot::classes::GDScript>()
+                && let Ok(instance) = script.try_instantiate(&[])
+                && let Ok(mut node) = instance.try_to::<godot::obj::Gd<godot::classes::Node>>()
+            {
+                node.set_name("OptimizedSceneTreeWatcher");
+                self.base_mut().add_child(&node);
+                tracing::info!("Successfully registered OptimizedSceneTreeWatcher");
+            } else {
+                tracing::warn!(
+                    "Failed to instantiate OptimizedSceneTreeWatcher - using fallback method"
+                );
+            }
+        } else {
+            tracing::debug!("OptimizedSceneTreeWatcher not available - using fallback method");
+        }
     }
 }
 
