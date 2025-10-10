@@ -2,5 +2,8 @@
 .godot/
 *.import
 
+# CI-generated library directory
+lib/
+
 # Editor
 .DS_Store
