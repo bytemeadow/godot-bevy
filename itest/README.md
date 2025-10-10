@@ -107,11 +107,12 @@ This ensures we're testing **real integration**, not mocked behavior.
 - Entity persistence
 - Frame pacing
 
-**scene_tree_tests.rs** - Scene tree integration (5 tests)
+**scene_tree_tests.rs** - Scene tree integration (6 tests)
 - Node added creates entity
 - SceneTreeEvent::NodeAdded event
 - Node removal cleanup
 - Node renamed event
+- ProtectedNodeEntity prevents despawn
 - GodotNodeHandle validity
 
 **transform_sync_tests.rs** - Transform synchronization (4 tests)
@@ -119,7 +120,7 @@ This ensures we're testing **real integration**, not mocked behavior.
 - TwoWay mode (Godot→Bevy and bidirectional)
 - Disabled mode
 
-**Total: 13 tests, all passing ✅**
+**Total: 14 tests, all passing ✅**
 
 ## Architecture: How Tests Work with Production Code
 

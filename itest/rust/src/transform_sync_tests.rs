@@ -99,8 +99,6 @@ fn test_godot_to_bevy_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         node.set_position(Vector2::new(0.0, 0.0));
         ctx_clone.scene_tree.clone().add_child(&node);
 
-        let node_id = node.instance_id();
-
         // Create test app with TwoWay transform sync
         let mut app = TestApp::new(&ctx_clone, move |_app| {
             _app.add_plugins(GodotTransformSyncPlugin::default());

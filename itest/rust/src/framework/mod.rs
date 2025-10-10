@@ -11,8 +11,9 @@ use std::time::Instant;
 use godot::builtin::Signal;
 use godot::classes::Engine;
 
-// Plugin registry for async tests only
+// Plugin registries
 godot::sys::plugin_registry!(pub(crate) __GODOT_ASYNC_ITEST: AsyncRustTestCase);
+godot::sys::plugin_registry!(pub(crate) __GODOT_BENCH: RustBenchmark);
 
 /// Context passed to each test
 #[derive(Clone)]
@@ -29,6 +30,16 @@ pub struct AsyncRustTestCase {
     pub focused: bool,
     pub line: u32,
     pub function: fn(&TestContext) -> godot::task::TaskHandle,
+}
+
+/// Represents a single benchmark
+#[derive(Copy, Clone)]
+pub struct RustBenchmark {
+    pub name: &'static str,
+    pub file: &'static str,
+    pub line: u32,
+    pub function: fn(),
+    pub repetitions: usize,
 }
 
 /// Main test runner class exposed to Godot
@@ -68,6 +79,51 @@ impl IntegrationTests {
         // Start async test execution - will call quit when done
         self.run_async_tests(tests.tests, ctx, clock);
     }
+
+    /// Run all registered benchmarks
+    #[func]
+    fn run_all_benchmarks(&mut self, _scene_tree: Gd<Node>) {
+        println!(
+            "\n\n{}Run{} godot-bevy benchmarks...",
+            FMT_CYAN_BOLD, FMT_END
+        );
+
+        // Check for debug builds and warn
+        let rust_debug = cfg!(debug_assertions);
+        let godot_debug = godot::classes::Os::singleton().is_debug_build();
+
+        if rust_debug || godot_debug {
+            print!("  {}Warning: ", FMT_YELLOW);
+            match (rust_debug, godot_debug) {
+                (true, true) => println!("Both Rust and Godot are debug builds"),
+                (true, false) => println!("Rust is a debug build"),
+                (false, true) => println!("Godot is a debug build"),
+                _ => {}
+            }
+            println!("  For accurate benchmarks, use release builds{}", FMT_END);
+        }
+
+        let (benchmarks, file_count) = self.collect_benchmarks();
+        println!(
+            "  Rust: found {} benchmarks in {} files.",
+            benchmarks.len(),
+            file_count
+        );
+
+        // Print header
+        print!("\n{FMT_CYAN}");
+        print!("{:60}", "");
+        for metric in bencher::metrics() {
+            print!("{metric:>13}");
+        }
+        println!("{FMT_END}");
+
+        let clock = Instant::now();
+        self.run_rust_benchmarks(benchmarks);
+        let elapsed = clock.elapsed();
+
+        println!("\nBenchmarks completed in {:.2}s.", elapsed.as_secs_f32());
+    }
 }
 
 impl IntegrationTests {
@@ -105,6 +161,21 @@ impl IntegrationTests {
         }
     }
 
+    fn collect_benchmarks(&self) -> (Vec<RustBenchmark>, usize) {
+        let mut all_files = std::collections::HashSet::new();
+        let mut benchmarks = Vec::new();
+
+        godot::sys::plugin_foreach!(__GODOT_BENCH; |bench: &RustBenchmark| {
+            benchmarks.push(*bench);
+            all_files.insert(bench.file);
+        });
+
+        // Sort for deterministic order
+        benchmarks.sort_by_key(|bench| (bench.file, bench.line));
+
+        (benchmarks, all_files.len())
+    }
+
     fn run_async_tests(
         &self,
         tests: Vec<AsyncRustTestCase>,
@@ -123,6 +194,34 @@ impl IntegrationTests {
 
         // Start with the first test
         run_next_test(0, tests, ctx, state, start_time);
+    }
+
+    fn run_rust_benchmarks(&self, benchmarks: Vec<RustBenchmark>) {
+        let mut last_file = None;
+
+        for bench in benchmarks {
+            // Print file header if different from last
+            if last_file.as_deref() != Some(bench.file) {
+                if last_file.is_some() {
+                    println!();
+                }
+                println!("{}:{}", bench.file, bench.line);
+                last_file = Some(bench.file.to_string());
+            }
+
+            // Print benchmark name
+            print!("  {:58}", bench.name);
+            std::io::Write::flush(&mut std::io::stdout()).ok();
+
+            // Run the benchmark
+            let result = bencher::run_benchmark(bench.function, bench.repetitions);
+
+            // Print results
+            for stat in result.stats {
+                print!(" {:>12.2?}", stat);
+            }
+            println!();
+        }
     }
 }
 
@@ -340,6 +439,9 @@ pub async fn await_frames(count: u32) {
         await_frame().await;
     }
 }
+
+pub mod bencher;
+pub use bencher::*;
 
 pub mod test_helpers;
 pub use test_helpers::*;

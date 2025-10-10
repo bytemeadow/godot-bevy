@@ -11,8 +11,10 @@
  * Uses explicit frame-by-frame control with app.update().await
  */
 
+use bevy::prelude::Entity;
 use godot::obj::NewAlloc;
 use godot::prelude::*;
+use godot_bevy::plugins::scene_tree::ProtectedNodeEntity;
 use godot_bevy::prelude::*;
 use godot_bevy_itest_macros::itest;
 
@@ -226,6 +228,73 @@ fn test_node_renamed_event(ctx: &TestContext) -> godot::task::TaskHandle {
         // Cleanup
         app.cleanup();
         node.queue_free();
+        await_frames(1).await;
+    })
+}
+
+/// Test that ProtectedNodeEntity prevents despawn when node is freed
+#[itest(async)]
+fn test_protected_node_entity(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        await_frames(1).await;
+
+        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+
+        app.update().await;
+
+        // Add a node
+        let mut node = godot::classes::Node2D::new_alloc();
+        node.set_name("ProtectedNode");
+        ctx_clone.scene_tree.clone().add_child(&node);
+
+        let node_id = node.instance_id();
+
+        app.update().await;
+
+        // Mark the entity as protected
+        let entity = app.with_world_mut(|world| {
+            world
+                .query::<(Entity, &GodotNodeHandle)>()
+                .iter(world)
+                .find(|(_, handle)| handle.instance_id() == node_id)
+                .map(|(e, _)| e)
+                .expect("Entity should exist")
+        });
+
+        app.with_world_mut(|world| {
+            world.entity_mut(entity).insert(ProtectedNodeEntity);
+        });
+
+        // Free the node
+        node.queue_free();
+
+        // Frame 1: NodeRemoved event processed, removal commands queued
+        app.update().await;
+
+        // Frame 2: Commands from previous frame are flushed
+        app.update().await;
+
+        // Verify entity still exists (not despawned)
+        let entity_still_exists = app.with_world(|world| world.get_entity(entity).is_ok());
+
+        assert!(
+            entity_still_exists,
+            "Protected entity should not be despawned when node is freed"
+        );
+
+        // Verify GodotNodeHandle was removed
+        let handle_removed = app.with_world(|world| world.get::<GodotNodeHandle>(entity).is_none());
+
+        assert!(
+            handle_removed,
+            "GodotNodeHandle should be removed from protected entity"
+        );
+
+        println!("✓ ProtectedNodeEntity: entity survives, GodotNodeHandle removed");
+
+        app.cleanup();
         await_frames(1).await;
     })
 }

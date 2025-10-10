@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{ItemFn, ReturnType, parse_macro_input};
+use syn::{ItemFn, Lit, Meta, MetaNameValue, ReturnType, parse_macro_input};
 
 /// Attribute macro for integration tests
 ///
@@ -81,4 +81,74 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
             );
         })
     }
+}
+
+/// Attribute macro for benchmarks
+///
+/// Usage:
+/// ```
+/// #[bench]
+/// fn my_benchmark() -> ReturnType {
+///     // benchmark code - must return a value
+/// }
+///
+/// #[bench(repeat = 25)]
+/// fn expensive_benchmark() -> ReturnType {
+///     // custom repetition count
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn bench(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+    let bench_name = &input.sig.ident;
+    let bench_name_str = bench_name.to_string();
+    let visibility = &input.vis;
+    let body = &input.block;
+
+    let default_repetitions = 100;
+    let mut repetitions = default_repetitions;
+
+    if !attr.is_empty() {
+        let attr_meta = parse_macro_input!(attr as Meta);
+        if let Meta::NameValue(MetaNameValue { path, value, .. }) = attr_meta {
+            if path.is_ident("repeat") {
+                if let syn::Expr::Lit(expr_lit) = value {
+                    if let Lit::Int(lit_int) = &expr_lit.lit {
+                        repetitions = lit_int.base10_parse().unwrap_or(default_repetitions);
+                    }
+                }
+            }
+        }
+    }
+
+    let ret_ty = match &input.sig.output {
+        ReturnType::Type(_, ty) => ty,
+        ReturnType::Default => {
+            return TokenStream::from(quote! {
+                compile_error!("#[bench] function must return a value to prevent optimization");
+            });
+        }
+    };
+
+    let reps_literal = syn::Index::from(repetitions);
+
+    TokenStream::from(quote! {
+        #visibility fn #bench_name() {
+            for _ in 0..#reps_literal {
+                let __ret: #ret_ty = #body;
+                std::hint::black_box(__ret);
+            }
+        }
+
+        ::godot::sys::plugin_add!(
+            crate::framework::__GODOT_BENCH;
+            crate::framework::RustBenchmark {
+                name: #bench_name_str,
+                file: file!(),
+                line: line!(),
+                function: #bench_name,
+                repetitions: #reps_literal,
+            }
+        );
+    })
 }

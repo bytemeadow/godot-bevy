@@ -495,7 +495,7 @@ fn create_scene_tree_entity(
                     if !protected {
                         commands.entity(ent).despawn();
                     } else {
-                        _strip_godot_components(commands, ent);
+                        _strip_godot_components(commands, ent, &mut node);
                     }
                     ent_mapping.remove(&node.instance_id());
                 } else {
@@ -516,21 +516,15 @@ fn create_scene_tree_entity(
     }
 }
 
-fn _strip_godot_components(commands: &mut Commands, ent: Entity) {
+fn _strip_godot_components(commands: &mut Commands, ent: Entity, node: &mut GodotNodeHandle) {
     let mut entity_commands = commands.entity(ent);
-    // Remove GodotNodeHandle components
+
     entity_commands.remove::<GodotNodeHandle>();
-
-    // Remove all GodotScene components
     entity_commands.remove::<GodotScene>();
-
-    // Remove automatic markers
     entity_commands.remove::<Name>();
     entity_commands.remove::<Groups>();
-    // Create a dummy handle since we're removing components anyway
-    let mut dummy_handle =
-        GodotNodeHandle::from_instance_id(godot::prelude::InstanceId::from_i64(0));
-    remove_comprehensive_node_type_markers(&mut entity_commands, &mut dummy_handle);
+
+    remove_comprehensive_node_type_markers(&mut entity_commands, node);
 }
 
 #[main_thread_system]

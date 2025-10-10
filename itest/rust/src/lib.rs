@@ -5,6 +5,7 @@
 
 use godot::init::{ExtensionLibrary, gdextension};
 
+mod benchmarks;
 mod framework;
 mod real_frame_tests;
 mod scene_tree_tests;
