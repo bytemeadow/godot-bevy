@@ -39,22 +39,16 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
             app.add_plugins(GodotTransformSyncPlugin::default());
             app.insert_resource(GodotTransformConfig::one_way());
 
-            // Spawn entity with Godot node handle
-            app.add_systems(Startup, move |mut commands: Commands| {
-                commands.spawn((
-                    GodotNodeHandle::from_instance_id(node_id),
-                    Transform::default(),
-                    TransformSyncMetadata::default(),
-                    Node2DMarker,
-                ));
-            });
-
-            // System to move entity each frame
-            app.add_systems(Update, |mut q: Query<&mut Transform>| {
-                for mut transform in q.iter_mut() {
-                    transform.translation.x += 1.0;
-                }
-            });
+            app.add_systems(
+                Update,
+                move |mut q: Query<(&GodotNodeHandle, &mut Transform)>| {
+                    for (handle, mut transform) in q.iter_mut() {
+                        if handle.instance_id() == node_id {
+                            transform.translation.x += 1.0;
+                        }
+                    }
+                },
+            );
         })
         .await;
 
@@ -108,19 +102,9 @@ fn test_godot_to_bevy_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         let node_id = node.instance_id();
 
         // Create test app with TwoWay transform sync
-        let mut app = TestApp::new(&ctx_clone, move |app| {
-            app.add_plugins(GodotTransformSyncPlugin::default());
-            app.insert_resource(GodotTransformConfig::two_way());
-
-            // Spawn entity with Godot node handle
-            app.add_systems(Startup, move |mut commands: Commands| {
-                commands.spawn((
-                    GodotNodeHandle::from_instance_id(node_id),
-                    Transform::default(),
-                    TransformSyncMetadata::default(),
-                    Node2DMarker,
-                ));
-            });
+        let mut app = TestApp::new(&ctx_clone, move |_app| {
+            _app.add_plugins(GodotTransformSyncPlugin::default());
+            _app.insert_resource(GodotTransformConfig::two_way());
         })
         .await;
 
@@ -188,23 +172,6 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
             app.add_plugins(GodotTransformSyncPlugin::default());
             app.insert_resource(GodotTransformConfig::two_way());
 
-            // Spawn entities for both nodes
-            app.add_systems(Startup, move |mut commands: Commands| {
-                commands.spawn((
-                    GodotNodeHandle::from_instance_id(bevy_id),
-                    Transform::default(),
-                    TransformSyncMetadata::default(),
-                    Node2DMarker,
-                ));
-                commands.spawn((
-                    GodotNodeHandle::from_instance_id(godot_id),
-                    Transform::default(),
-                    TransformSyncMetadata::default(),
-                    Node2DMarker,
-                ));
-            });
-
-            // System to move the first entity (Bevy→Godot test)
             app.add_systems(
                 Update,
                 move |mut q: Query<(&GodotNodeHandle, &mut Transform)>| {
@@ -294,22 +261,16 @@ fn test_transform_sync_disabled(ctx: &TestContext) -> godot::task::TaskHandle {
             app.add_plugins(GodotTransformSyncPlugin::default());
             app.insert_resource(GodotTransformConfig::disabled());
 
-            // Spawn entity with Godot node handle
-            app.add_systems(Startup, move |mut commands: Commands| {
-                commands.spawn((
-                    GodotNodeHandle::from_instance_id(node_id),
-                    Transform::default(),
-                    TransformSyncMetadata::default(),
-                    Node2DMarker,
-                ));
-            });
-
-            // System to move entity in Bevy (should NOT sync to Godot)
-            app.add_systems(Update, |mut q: Query<&mut Transform>| {
-                for mut transform in q.iter_mut() {
-                    transform.translation.x += 10.0;
-                }
-            });
+            app.add_systems(
+                Update,
+                move |mut q: Query<(&GodotNodeHandle, &mut Transform)>| {
+                    for (handle, mut transform) in q.iter_mut() {
+                        if handle.instance_id() == node_id {
+                            transform.translation.x += 10.0;
+                        }
+                    }
+                },
+            );
         })
         .await;
 
