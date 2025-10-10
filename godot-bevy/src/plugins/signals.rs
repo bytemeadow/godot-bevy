@@ -112,7 +112,7 @@ pub fn connect_godot_signal(
     let signal_name_copy = signal_name.to_string();
     let node_id = node_clone.instance_id();
 
-    let closure = move |args: &[&Variant]| -> Result<Variant, ()> {
+    let closure = move |args: &[&Variant]| -> Variant {
         // Use captured sender directly - no global state needed!
         let arguments: Vec<GodotSignalArgument> = args
             .iter()
@@ -128,11 +128,11 @@ pub fn connect_godot_signal(
             arguments,
         });
 
-        Ok(Variant::nil())
+        Variant::nil()
     };
 
     // Create callable from our universal closure
-    let callable = Callable::from_local_fn("universal_signal_handler", closure);
+    let callable = Callable::from_fn("universal_signal_handler", closure);
 
     // Connect the signal - this will work with ANY number of arguments!
     node.connect(signal_name, &callable);
@@ -246,16 +246,16 @@ impl<'w, T: Event + Send + 'static> TypedGodotSignals<'w, T> {
         let source_node = node.clone();
         let sender_t = self.typed_sender.0.clone();
 
-        let closure = move |args: &[&Variant]| -> Result<Variant, ()> {
+        let closure = move |args: &[&Variant]| -> Variant {
             // Clone variants to owned values we can inspect
             let owned: Vec<Variant> = args.iter().map(|&v| v.clone()).collect();
             let event = mapper(&owned, &source_node, source_entity);
             let _ = sender_t.send(Box::new(TypedEnvelope::<T>(event)));
-            Ok(Variant::nil())
+            Variant::nil()
         };
 
         let callable =
-            Callable::from_local_fn(&format!("signal_handler_typed_{signal_name_copy}"), closure);
+            Callable::from_fn(&format!("signal_handler_typed_{signal_name_copy}"), closure);
         node_ref.connect(signal_name, &callable);
     }
 }
