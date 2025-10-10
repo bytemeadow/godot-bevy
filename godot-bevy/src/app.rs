@@ -125,9 +125,7 @@ impl INode for BevyApp {
         }
 
         let mut app = App::new();
-        // NOTE: GodotPlugin is NO LONGER added automatically!
-        // Users must add it (or specific plugins) in their #[bevy_app] function.
-        // This gives full control over which plugins are loaded.
+        app.add_plugins(crate::plugins::GodotCorePlugins);
 
         // Call the init function - use instance function if set, otherwise global
         if let Some(ref instance_func) = self.instance_init_func {
