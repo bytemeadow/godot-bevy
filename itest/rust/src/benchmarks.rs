@@ -66,20 +66,18 @@ fn transform_update_bulk_3d() -> i32 {
     if let Some(scene_tree) = Engine::singleton()
         .get_main_loop()
         .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
+        && let Some(root) = scene_tree.get_root()
+        && let Some(mut bevy_app) = root.get_node_or_null("BevyAppSingleton")
     {
-        if let Some(root) = scene_tree.get_root() {
-            if let Some(mut bevy_app) = root.get_node_or_null("BevyAppSingleton") {
-                bevy_app.call(
-                    "bulk_update_transforms_3d",
-                    &[
-                        ids_packed.to_variant(),
-                        pos_packed.to_variant(),
-                        rot_packed.to_variant(),
-                        scale_packed.to_variant(),
-                    ],
-                );
-            }
-        }
+        bevy_app.call(
+            "bulk_update_transforms_3d",
+            &[
+                ids_packed.to_variant(),
+                pos_packed.to_variant(),
+                rot_packed.to_variant(),
+                scale_packed.to_variant(),
+            ],
+        );
     }
 
     // Cleanup
@@ -148,20 +146,18 @@ fn transform_update_bulk_2d() -> i32 {
     if let Some(scene_tree) = Engine::singleton()
         .get_main_loop()
         .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
+        && let Some(root) = scene_tree.get_root()
+        && let Some(mut bevy_app) = root.get_node_or_null("BevyAppSingleton")
     {
-        if let Some(root) = scene_tree.get_root() {
-            if let Some(mut bevy_app) = root.get_node_or_null("BevyAppSingleton") {
-                bevy_app.call(
-                    "bulk_update_transforms_2d",
-                    &[
-                        ids_packed.to_variant(),
-                        pos_packed.to_variant(),
-                        rot_packed.to_variant(),
-                        scale_packed.to_variant(),
-                    ],
-                );
-            }
-        }
+        bevy_app.call(
+            "bulk_update_transforms_2d",
+            &[
+                ids_packed.to_variant(),
+                pos_packed.to_variant(),
+                rot_packed.to_variant(),
+                scale_packed.to_variant(),
+            ],
+        );
     }
 
     // Cleanup

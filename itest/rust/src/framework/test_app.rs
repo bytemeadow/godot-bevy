@@ -109,9 +109,9 @@ impl TestApp {
     }
 
     /// Convenience: Get a component from a single entity
-    pub fn get_single<C: Component>(&mut self) -> C
+    pub fn get_single<C>(&mut self) -> C
     where
-        C: Clone,
+        C: Component + Clone,
     {
         self.with_world_mut(|world| {
             let mut query = world.query::<&C>();
