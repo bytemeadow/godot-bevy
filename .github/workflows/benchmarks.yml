@@ -29,7 +29,7 @@ jobs:
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: itest/rust -> target
+          workspaces: . -> target
 
       - name: Install Linux dependencies
         uses: awalsh128/cache-apt-pkgs-action@latest
@@ -53,6 +53,12 @@ jobs:
       - name: Build itest benchmarks (release)
         working-directory: itest/rust
         run: cargo build --release
+
+      - name: Verify library was built
+        run: |
+          echo "Checking for library..."
+          ls -la target/release/libgodot_bevy_itest.* || echo "Library not found!"
+          echo "Library should be at: $(pwd)/target/release/"
 
       - name: Import Godot project
         working-directory: itest/godot
