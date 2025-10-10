@@ -54,6 +54,10 @@ jobs:
         working-directory: itest/rust
         run: cargo build --release
 
+      - name: Import Godot project
+        working-directory: itest/godot
+        run: godot --editor --headless --quit || true
+
       - name: Download baseline from main (for PR comparison)
         if: github.event_name == 'pull_request'
         run: |
