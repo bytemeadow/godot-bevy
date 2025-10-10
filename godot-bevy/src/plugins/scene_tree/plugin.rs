@@ -357,6 +357,8 @@ fn create_scene_tree_entity(
         .map(|(reference, ent, protected)| (reference.instance_id(), (ent, protected)))
         .collect::<HashMap<_, _>>();
     let scene_root = scene_tree.get().get_root().unwrap();
+
+    // CollisionWatcher is optional - only required if GodotCollisionsPlugin is added
     let collision_watcher = scene_root
         .try_get_node_as::<Node>("/root/BevyAppSingleton/CollisionWatcher")
         .or_else(|| {
@@ -367,9 +369,6 @@ fn create_scene_tree_entity(
             // Fallback: search entire tree for any CollisionWatcher (for test environments)
             tracing::debug!("Searching entire scene tree for CollisionWatcher");
             find_node_by_name(&scene_root.clone().upcast(), "CollisionWatcher")
-        })
-        .unwrap_or_else(|| {
-            panic!("CollisionWatcher not found. Searched /root/BevyAppSingleton/CollisionWatcher, BevyAppSingleton/CollisionWatcher, and entire tree.");
         });
 
     for event in events.into_iter() {
@@ -407,59 +406,62 @@ fn create_scene_tree_entity(
 
                 // Check if the node is a collision body (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.)
                 // These nodes typically have collision detection capabilities
-                let is_collision_body = COLLISION_START_SIGNALS
-                    .iter()
-                    .any(|&signal| node.has_signal(signal));
+                // Only connect if CollisionWatcher exists (i.e., GodotCollisionsPlugin was added)
+                if let Some(ref collision_watcher) = collision_watcher {
+                    let is_collision_body = COLLISION_START_SIGNALS
+                        .iter()
+                        .any(|&signal| node.has_signal(signal));
 
-                if is_collision_body {
-                    debug!(target: "godot_scene_tree_collisions",
-                           node_id = node.instance_id().to_string(),
-                           "is collision body");
+                    if is_collision_body {
+                        debug!(target: "godot_scene_tree_collisions",
+                               node_id = node.instance_id().to_string(),
+                               "is collision body");
 
-                    let node_clone = node.clone();
+                        let node_clone = node.clone();
 
-                    if node.has_signal(BODY_ENTERED) {
-                        node.connect(
-                            BODY_ENTERED,
-                            &collision_watcher.callable("collision_event").bind(&[
-                                node_clone.to_variant(),
-                                CollisionEventType::Started.to_variant(),
-                            ]),
-                        );
+                        if node.has_signal(BODY_ENTERED) {
+                            node.connect(
+                                BODY_ENTERED,
+                                &collision_watcher.callable("collision_event").bind(&[
+                                    node_clone.to_variant(),
+                                    CollisionEventType::Started.to_variant(),
+                                ]),
+                            );
+                        }
+
+                        if node.has_signal(BODY_EXITED) {
+                            node.connect(
+                                BODY_EXITED,
+                                &collision_watcher.callable("collision_event").bind(&[
+                                    node_clone.to_variant(),
+                                    CollisionEventType::Ended.to_variant(),
+                                ]),
+                            );
+                        }
+
+                        if node.has_signal(AREA_ENTERED) {
+                            node.connect(
+                                AREA_ENTERED,
+                                &collision_watcher.callable("collision_event").bind(&[
+                                    node_clone.to_variant(),
+                                    CollisionEventType::Started.to_variant(),
+                                ]),
+                            );
+                        }
+
+                        if node.has_signal(AREA_EXITED) {
+                            node.connect(
+                                AREA_EXITED,
+                                &collision_watcher.callable("collision_event").bind(&[
+                                    node_clone.to_variant(),
+                                    CollisionEventType::Ended.to_variant(),
+                                ]),
+                            );
+                        }
+
+                        // Add Collisions component to track collision state
+                        ent.insert(Collisions::default());
                     }
-
-                    if node.has_signal(BODY_EXITED) {
-                        node.connect(
-                            BODY_EXITED,
-                            &collision_watcher.callable("collision_event").bind(&[
-                                node_clone.to_variant(),
-                                CollisionEventType::Ended.to_variant(),
-                            ]),
-                        );
-                    }
-
-                    if node.has_signal(AREA_ENTERED) {
-                        node.connect(
-                            AREA_ENTERED,
-                            &collision_watcher.callable("collision_event").bind(&[
-                                node_clone.to_variant(),
-                                CollisionEventType::Started.to_variant(),
-                            ]),
-                        );
-                    }
-
-                    if node.has_signal(AREA_EXITED) {
-                        node.connect(
-                            AREA_EXITED,
-                            &collision_watcher.callable("collision_event").bind(&[
-                                node_clone.to_variant(),
-                                CollisionEventType::Ended.to_variant(),
-                            ]),
-                        );
-                    }
-
-                    // Add Collisions component to track collision state
-                    ent.insert(Collisions::default());
                 }
 
                 ent.insert(Groups::from(&node));

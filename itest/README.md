@@ -151,11 +151,11 @@ get_parent().get_node("SceneTreeWatcher")
 
 ### Test Infrastructure for Library Users
 
-When writing your own tests, `TestApp` handles watcher setup automatically:
+`TestApp` provides a Bevy-style testing API for writing integration tests:
 
-1. **Creates watchers before app initialization** (avoiding timing issues)
-2. **Sets up MPSC channels** for scene tree/collision events
-3. **Links OptimizedSceneTreeWatcher** to route Godot signals to Bevy events
-4. **Prevents watcher duplication** by checking if they already exist
+1. **Adds `GodotCorePlugins` automatically** - provides scene tree integration
+2. **Waits for frames** using async/await for real Godot frame progression
+3. **Provides `with_world()` / `with_world_mut()`** for ECS access
+4. **Automatic cleanup** when dropped
 
 This infrastructure is **reusable** - users of godot-bevy can write their own tests following the same patterns shown in this directory.

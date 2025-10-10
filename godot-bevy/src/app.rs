@@ -137,7 +137,47 @@ impl INode for BevyApp {
             app_builder_func(&mut app);
         }
 
-        // Finalize plugins before any further operations
+        // Create watchers BEFORE app.finish() so PreStartup systems can find them
+        // Check which plugins were added by looking for their resources/events
+
+        // Scene tree plugin check - look for Events<SceneTreeEvent>
+        use crate::plugins::scene_tree::SceneTreeEvent;
+        if app
+            .world()
+            .contains_resource::<bevy::ecs::event::Events<SceneTreeEvent>>()
+        {
+            self.register_scene_tree_watcher(&mut app);
+            self.register_optimized_scene_tree_watcher();
+        }
+
+        // Collision plugin check - similar approach
+        use crate::plugins::collisions::CollisionEvent;
+        if app
+            .world()
+            .contains_resource::<bevy::ecs::event::Events<CollisionEvent>>()
+        {
+            self.register_collision_watcher(&mut app);
+        }
+
+        // Signal plugin check
+        use crate::plugins::signals::GodotSignal;
+        if app
+            .world()
+            .contains_resource::<bevy::ecs::event::Events<GodotSignal>>()
+        {
+            self.register_signal_system(&mut app);
+        }
+
+        // Input event plugin check - check for KeyboardInput as a marker
+        use crate::plugins::input::KeyboardInput;
+        if app
+            .world()
+            .contains_resource::<bevy::ecs::event::Events<KeyboardInput>>()
+        {
+            self.register_input_event_watcher(&mut app);
+        }
+
+        // Finalize plugins - PreStartup systems will now find the watchers
         if app.plugins_state() != bevy::app::PluginsState::Cleaned {
             while app.plugins_state() == bevy::app::PluginsState::Adding {
                 #[cfg(not(target_arch = "wasm32"))]
@@ -146,28 +186,6 @@ impl INode for BevyApp {
 
             app.finish();
             app.cleanup();
-        }
-
-        // Only register watchers if the corresponding plugins were added
-        // Check if SceneTreeEventReader resource exists (added by scene tree plugin)
-        if app.world().contains_non_send::<SceneTreeEventReader>() {
-            self.register_scene_tree_watcher(&mut app);
-            self.register_optimized_scene_tree_watcher();
-        }
-
-        // Check if GodotSignalReader resource was added (by signal plugin)
-        if app.world().contains_non_send::<GodotSignalReader>() {
-            self.register_signal_system(&mut app);
-        }
-
-        // Check if InputEventReader resource was added (by input plugin)
-        if app.world().contains_non_send::<InputEventReader>() {
-            self.register_input_event_watcher(&mut app);
-        }
-
-        // Check if CollisionEventReader resource was added (by collision plugin)
-        if app.world().contains_non_send::<CollisionEventReader>() {
-            self.register_collision_watcher(&mut app);
         }
 
         app.init_resource::<PhysicsDelta>();

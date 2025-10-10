@@ -5,12 +5,11 @@
  * - app.world() / app.world_mut() for ECS access (just like Bevy)
  * - app.update().await for frame stepping (async because we wait for Godot)
  * - Automatic cleanup on drop
- * - Sets up required watchers (scene tree, collision, input)
+ * - Relies on library's automatic watcher setup
  */
 
 use bevy::prelude::*;
 use godot::obj::{Gd, NewAlloc};
-use std::sync::mpsc::channel;
 
 use super::{TestContext, await_frame};
 
@@ -37,8 +36,8 @@ impl TestApp {
     /// Create a new test app with custom setup
     ///
     /// The setup function is called during BevyApp initialization.
-    /// GodotBaseCorePlugin is automatically added.
-    /// Watchers (scene tree, collision, input) are automatically set up.
+    /// GodotCorePlugins is automatically added, providing scene tree integration.
+    /// The library handles all watcher creation automatically.
     pub async fn new<F>(ctx: &TestContext, setup: F) -> Self
     where
         F: FnOnce(&mut App) + Send + 'static,
@@ -49,24 +48,13 @@ impl TestApp {
 
         let mut bevy_app = godot_bevy::BevyApp::new_alloc();
 
-        // Set up watchers as children BEFORE app initialization
-        // (so scene tree plugin can find them in PreStartup)
-        let event_readers = Self::setup_watchers_early(&mut bevy_app);
-
-        // Wrap both event readers and user setup in Mutex
-        let readers_mutex = Mutex::new(Some(event_readers));
         let setup_mutex = Mutex::new(Some(setup));
 
-        // Configure the app before initialization
+        // Configure the app - the library will handle all watcher setup
         bevy_app
             .bind_mut()
             .set_instance_init_func(Box::new(move |app: &mut App| {
-                // Insert event readers FIRST (before plugins look for them)
-                if let Some(readers) = readers_mutex.lock().unwrap().take() {
-                    Self::insert_event_readers_direct(app, readers);
-                }
-
-                // Add core plugins (schedules + scene tree with flexible watcher search)
+                // Add core plugins - library creates watchers before plugin finalization
                 app.add_plugins(godot_bevy::plugins::GodotCorePlugins);
 
                 // User setup - take from Mutex to call FnOnce
@@ -85,82 +73,6 @@ impl TestApp {
             ctx: ctx.clone(),
             bevy_app: Some(bevy_app),
         }
-    }
-
-    /// Set up watchers as children (before app initialization)
-    ///
-    /// This manual setup is necessary due to a timing issue in the library:
-    /// - Scene tree plugin's PreStartup systems run during app.finish()
-    /// - They search for watchers that BevyApp only creates AFTER app.finish()
-    /// - Production works because BevyApp autoload exists before ready() is called
-    /// - Tests need to create watchers manually before calling ready()
-    ///
-    /// Note: Only sets up scene tree and collision watchers (input events are not Send-safe)
-    fn setup_watchers_early(
-        bevy_app: &mut Gd<godot_bevy::BevyApp>,
-    ) -> (
-        std::sync::mpsc::Receiver<godot_bevy::plugins::scene_tree::SceneTreeEvent>,
-        std::sync::mpsc::Receiver<godot_bevy::plugins::collisions::CollisionEvent>,
-    ) {
-        use godot::classes::{GDScript, Node, ResourceLoader};
-        use godot_bevy::watchers::{
-            collision_watcher::CollisionWatcher, scene_tree_watcher::SceneTreeWatcher,
-        };
-
-        // Create all watchers and channels
-        let (st_sender, st_receiver) = channel();
-        let mut scene_tree_watcher = SceneTreeWatcher::new_alloc();
-        scene_tree_watcher.bind_mut().notification_channel = Some(st_sender);
-        scene_tree_watcher.set_name("SceneTreeWatcher");
-
-        let (col_sender, col_receiver) = channel();
-        let mut collision_watcher = CollisionWatcher::new_alloc();
-        collision_watcher.bind_mut().notification_channel = Some(col_sender);
-        collision_watcher.set_name("CollisionWatcher");
-
-        // Add watchers as children (BEFORE app init)
-        let mut base = bevy_app.clone().upcast::<godot::classes::Node>();
-        base.add_child(&scene_tree_watcher);
-        base.add_child(&collision_watcher);
-
-        // Create OptimizedSceneTreeWatcher (GDScript) for signal routing
-        // This connects to scene tree signals and forwards events to the Rust watcher
-        match ResourceLoader::singleton()
-            .load("res://addons/godot-bevy/optimized_scene_tree_watcher.gd")
-        {
-            Some(script) => {
-                let mut script = script.cast::<GDScript>();
-                let instance = script.instantiate(&[]);
-                if let Ok(mut optimized_watcher) = instance.try_to::<godot::obj::Gd<Node>>() {
-                    optimized_watcher.set_name("OptimizedSceneTreeWatcher");
-                    // Add as child - it will auto-detect the SceneTreeWatcher sibling in _ready()
-                    base.add_child(&optimized_watcher);
-                }
-            }
-            None => {
-                eprintln!("[TestApp] Failed to load optimized_scene_tree_watcher.gd");
-            }
-        }
-
-        (st_receiver, col_receiver)
-    }
-
-    /// Insert event readers directly into an App (during init)
-    fn insert_event_readers_direct(
-        app: &mut App,
-        readers: (
-            std::sync::mpsc::Receiver<godot_bevy::plugins::scene_tree::SceneTreeEvent>,
-            std::sync::mpsc::Receiver<godot_bevy::plugins::collisions::CollisionEvent>,
-        ),
-    ) {
-        use godot_bevy::plugins::{
-            collisions::CollisionEventReader, scene_tree::SceneTreeEventReader,
-        };
-
-        let (st_receiver, col_receiver) = readers;
-
-        app.insert_non_send_resource(SceneTreeEventReader(st_receiver));
-        app.insert_non_send_resource(CollisionEventReader(col_receiver));
     }
 
     /// Step one frame
