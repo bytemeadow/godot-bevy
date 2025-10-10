@@ -102,14 +102,60 @@ This ensures we're testing **real integration**, not mocked behavior.
 
 ## Current Tests
 
-**transform_sync_tests.rs** - Transform synchronization (4 tests)
-- OneWay mode (Bevy→Godot)
-- TwoWay mode (Godot→Bevy and bidirectional)
-- Disabled mode
-
 **real_frame_tests.rs** - Frame progression (4 tests)
 - Update/PhysicsUpdate schedules
 - Entity persistence
 - Frame pacing
 
-**Total: 8 tests, all passing ✅**
+**scene_tree_tests.rs** - Scene tree integration (5 tests)
+- Node added creates entity
+- SceneTreeEvent::NodeAdded event
+- Node removal cleanup
+- Node renamed event
+- GodotNodeHandle validity
+
+**transform_sync_tests.rs** - Transform synchronization (4 tests)
+- OneWay mode (Bevy→Godot)
+- TwoWay mode (Godot→Bevy and bidirectional)
+- Disabled mode
+
+**Total: 13 tests, all passing ✅**
+
+## Architecture: How Tests Work with Production Code
+
+### Unified Addon Architecture
+
+The test Godot project **symlinks the entire addon directory**, ensuring tests use the exact same code as production:
+
+```bash
+itest/godot/addons/godot-bevy -> ../../../addons/godot-bevy
+```
+
+This means:
+- ✅ All addon files are available in tests (scripts, scenes, resources)
+- ✅ No code duplication or drift between test and production
+- ✅ Changes to the addon are immediately reflected in tests
+- ✅ Users can reference the addon in their test projects the same way
+
+The main addon's `OptimizedSceneTreeWatcher.gd` auto-detects its environment:
+
+**Production path** (autoload singleton):
+```gdscript
+/root/BevyAppSingleton/SceneTreeWatcher
+```
+
+**Test path** (sibling node):
+```gdscript
+get_parent().get_node("SceneTreeWatcher")
+```
+
+### Test Infrastructure for Library Users
+
+When writing your own tests, `TestApp` handles watcher setup automatically:
+
+1. **Creates watchers before app initialization** (avoiding timing issues)
+2. **Sets up MPSC channels** for scene tree/collision events
+3. **Links OptimizedSceneTreeWatcher** to route Godot signals to Bevy events
+4. **Prevents watcher duplication** by checking if they already exist
+
+This infrastructure is **reusable** - users of godot-bevy can write their own tests following the same patterns shown in this directory.

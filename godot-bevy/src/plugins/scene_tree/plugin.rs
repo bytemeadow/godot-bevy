@@ -220,6 +220,26 @@ pub enum SceneTreeEventType {
     NodeRenamed,
 }
 
+/// Helper function to recursively search for a node by name
+fn find_node_by_name(parent: &Gd<Node>, name: &str) -> Option<Gd<Node>> {
+    // Check if this node matches
+    if parent.get_name().to_string() == name {
+        return Some(parent.clone());
+    }
+
+    // Search children recursively
+    for i in 0..parent.get_child_count() {
+        if let Some(child) = parent.get_child(i) {
+            let child_node = child.cast::<Node>();
+            if let Some(found) = find_node_by_name(&child_node, name) {
+                return Some(found);
+            }
+        }
+    }
+
+    None
+}
+
 #[main_thread_system]
 fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
     let mut scene_tree_gd = scene_tree.get();
@@ -232,14 +252,23 @@ fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
             // Try without the full path for test environments
             root.try_get_node_as::<Node>("BevyAppSingleton/SceneTreeWatcher")
         })
+        .or_else(|| {
+            // Fallback: search entire tree for any SceneTreeWatcher (for test environments)
+            tracing::debug!("Searching entire scene tree for SceneTreeWatcher");
+            find_node_by_name(&root.clone().upcast(), "SceneTreeWatcher")
+        })
         .unwrap_or_else(|| {
-            panic!("SceneTreeWatcher not found at expected paths. Make sure it exists at /root/BevyAppSingleton/SceneTreeWatcher or BevyAppSingleton/SceneTreeWatcher");
+            panic!("SceneTreeWatcher not found. Searched /root/BevyAppSingleton/SceneTreeWatcher, BevyAppSingleton/SceneTreeWatcher, and entire tree.");
         });
 
     // Check if we have the optimized GDScript watcher
     let optimized_watcher = root
         .try_get_node_as::<Node>("/root/BevyAppSingleton/OptimizedSceneTreeWatcher")
-        .or_else(|| root.try_get_node_as::<Node>("BevyAppSingleton/OptimizedSceneTreeWatcher"));
+        .or_else(|| root.try_get_node_as::<Node>("BevyAppSingleton/OptimizedSceneTreeWatcher"))
+        .or_else(|| {
+            // Fallback: search entire tree
+            find_node_by_name(&root.clone().upcast(), "OptimizedSceneTreeWatcher")
+        });
 
     if optimized_watcher.is_some() {
         // The optimized GDScript watcher handles scene tree connections and forwards
@@ -334,8 +363,13 @@ fn create_scene_tree_entity(
             // Try without the full path for test environments
             scene_root.try_get_node_as::<Node>("BevyAppSingleton/CollisionWatcher")
         })
+        .or_else(|| {
+            // Fallback: search entire tree for any CollisionWatcher (for test environments)
+            tracing::debug!("Searching entire scene tree for CollisionWatcher");
+            find_node_by_name(&scene_root.clone().upcast(), "CollisionWatcher")
+        })
         .unwrap_or_else(|| {
-            panic!("CollisionWatcher not found at expected paths. Make sure it exists at /root/BevyAppSingleton/CollisionWatcher or BevyAppSingleton/CollisionWatcher");
+            panic!("CollisionWatcher not found. Searched /root/BevyAppSingleton/CollisionWatcher, BevyAppSingleton/CollisionWatcher, and entire tree.");
         });
 
     for event in events.into_iter() {

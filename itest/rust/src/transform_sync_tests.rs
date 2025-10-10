@@ -10,11 +10,11 @@
  */
 
 use bevy::prelude::*;
-use godot::prelude::*;
 use godot::obj::NewAlloc;
+use godot::prelude::*;
 use godot_bevy_itest_macros::itest;
 
-use crate::framework::{TestContext, await_frames, TestApp};
+use crate::framework::{TestApp, TestContext, await_frames};
 
 /// Test that transforms sync from Bevy to Godot (OneWay mode - default)
 #[itest(async)]
@@ -55,7 +55,8 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
                     transform.translation.x += 1.0;
                 }
             });
-        }).await;
+        })
+        .await;
 
         // Frame 1: Initial setup
         app.update().await;
@@ -69,11 +70,17 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
 
         let end_pos = node.get_position().x;
 
-        assert!(end_pos > start_pos,
+        assert!(
+            end_pos > start_pos,
             "Godot node should move (Bevy→Godot sync), start={:.1}, end={:.1}",
-            start_pos, end_pos);
+            start_pos,
+            end_pos
+        );
 
-        println!("✓ Bevy→Godot transform sync: moved from {:.1} to {:.1}", start_pos, end_pos);
+        println!(
+            "✓ Bevy→Godot transform sync: moved from {:.1} to {:.1}",
+            start_pos, end_pos
+        );
 
         // Cleanup: free BevyApp BEFORE freeing node
         app.cleanup();
@@ -114,15 +121,15 @@ fn test_godot_to_bevy_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
                     Node2DMarker,
                 ));
             });
-        }).await;
+        })
+        .await;
 
         // Frame 1: Initial setup
         app.update().await;
 
         let entity = app.single_entity_with::<Transform>();
-        let initial_x = app.with_world(|world| {
-            world.get::<Transform>(entity).unwrap().translation.x
-        });
+        let initial_x =
+            app.with_world(|world| world.get::<Transform>(entity).unwrap().translation.x);
 
         // Move the Godot node (should sync to Bevy in TwoWay mode)
         node.set_position(Vector2::new(10.0, 0.0));
@@ -131,15 +138,19 @@ fn test_godot_to_bevy_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         app.update().await;
         app.update().await;
 
-        let synced_x = app.with_world(|world| {
-            world.get::<Transform>(entity).unwrap().translation.x
-        });
+        let synced_x =
+            app.with_world(|world| world.get::<Transform>(entity).unwrap().translation.x);
 
-        assert!((synced_x - 10.0).abs() < 0.1,
+        assert!(
+            (synced_x - 10.0).abs() < 0.1,
             "Bevy should detect Godot transform changes, expected ~10.0, got {:.1}",
-            synced_x);
+            synced_x
+        );
 
-        println!("✓ Godot→Bevy transform sync: {:.1} → {:.1}", initial_x, synced_x);
+        println!(
+            "✓ Godot→Bevy transform sync: {:.1} → {:.1}",
+            initial_x, synced_x
+        );
 
         // Cleanup: free BevyApp BEFORE freeing node
         app.cleanup();
@@ -194,14 +205,18 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
             });
 
             // System to move the first entity (Bevy→Godot test)
-            app.add_systems(Update, move |mut q: Query<(&GodotNodeHandle, &mut Transform)>| {
-                for (handle, mut transform) in q.iter_mut() {
-                    if handle.instance_id() == bevy_id {
-                        transform.translation.x += 1.0;
+            app.add_systems(
+                Update,
+                move |mut q: Query<(&GodotNodeHandle, &mut Transform)>| {
+                    for (handle, mut transform) in q.iter_mut() {
+                        if handle.instance_id() == bevy_id {
+                            transform.translation.x += 1.0;
+                        }
                     }
-                }
-            });
-        }).await;
+                },
+            );
+        })
+        .await;
 
         // Frame 1: Initial setup
         app.update().await;
@@ -219,9 +234,12 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         let bevy_end = bevy_node.get_position().x;
 
         // Check Bevy→Godot sync
-        assert!(bevy_end > bevy_start,
+        assert!(
+            bevy_end > bevy_start,
             "Bevy-controlled node should move (Bevy→Godot), start={:.1}, end={:.1}",
-            bevy_start, bevy_end);
+            bevy_start,
+            bevy_end
+        );
 
         // Check Godot→Bevy sync
         let godot_entity_x = app.with_world_mut(|world| {
@@ -234,12 +252,16 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
             0.0
         });
 
-        assert!((godot_entity_x - 20.0).abs() < 0.1,
+        assert!(
+            (godot_entity_x - 20.0).abs() < 0.1,
             "Godot-controlled entity should sync to Bevy (Godot→Bevy), expected ~20.0, got {:.1}",
-            godot_entity_x);
+            godot_entity_x
+        );
 
-        println!("✓ Bidirectional sync: Bevy {:.1}→{:.1}, Godot→Bevy {:.1}",
-                 bevy_start, bevy_end, godot_entity_x);
+        println!(
+            "✓ Bidirectional sync: Bevy {:.1}→{:.1}, Godot→Bevy {:.1}",
+            bevy_start, bevy_end, godot_entity_x
+        );
 
         // Cleanup: free BevyApp BEFORE freeing nodes
         app.cleanup();
@@ -288,7 +310,8 @@ fn test_transform_sync_disabled(ctx: &TestContext) -> godot::task::TaskHandle {
                     transform.translation.x += 10.0;
                 }
             });
-        }).await;
+        })
+        .await;
 
         // Frame 1: Initial setup
         app.update().await;
@@ -304,16 +327,23 @@ fn test_transform_sync_disabled(ctx: &TestContext) -> godot::task::TaskHandle {
 
         // Verify Bevy entity moved internally
         let entity = app.single_entity_with::<Transform>();
-        let bevy_x = app.with_world(|world| {
-            world.get::<Transform>(entity).unwrap().translation.x
-        });
+        let bevy_x = app.with_world(|world| world.get::<Transform>(entity).unwrap().translation.x);
 
-        assert!(bevy_x > 0.0, "Bevy entity should move internally, got {:.1}", bevy_x);
-        assert_eq!(end_pos, start_pos,
+        assert!(
+            bevy_x > 0.0,
+            "Bevy entity should move internally, got {:.1}",
+            bevy_x
+        );
+        assert_eq!(
+            end_pos, start_pos,
             "Godot node should NOT move when sync disabled, start={:.1}, end={:.1}",
-            start_pos, end_pos);
+            start_pos, end_pos
+        );
 
-        println!("✓ Transform sync disabled: Godot at {:.1}, Bevy at {:.1} (no sync)", start_pos, bevy_x);
+        println!(
+            "✓ Transform sync disabled: Godot at {:.1}, Bevy at {:.1} (no sync)",
+            start_pos, bevy_x
+        );
 
         // Cleanup: free BevyApp BEFORE freeing node
         app.cleanup();

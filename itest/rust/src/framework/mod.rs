@@ -4,12 +4,12 @@
  */
 
 use godot::classes::Node;
-use godot::obj::{Gd, EngineBitfield};
+use godot::obj::{EngineBitfield, Gd};
 use godot::register::{GodotClass, godot_api};
 use std::time::Instant;
 
-use godot::classes::Engine;
 use godot::builtin::Signal;
+use godot::classes::Engine;
 
 // Plugin registry for async tests only
 godot::sys::plugin_registry!(pub(crate) __GODOT_ASYNC_ITEST: AsyncRustTestCase);
@@ -105,9 +105,14 @@ impl IntegrationTests {
         }
     }
 
-    fn run_async_tests(&self, tests: Vec<AsyncRustTestCase>, ctx: TestContext, start_time: Instant) {
-        use std::rc::Rc;
+    fn run_async_tests(
+        &self,
+        tests: Vec<AsyncRustTestCase>,
+        ctx: TestContext,
+        start_time: Instant,
+    ) {
         use std::cell::RefCell;
+        use std::rc::Rc;
 
         // Shared state for test execution
         let state = Rc::new(RefCell::new(TestRunState {
@@ -119,7 +124,6 @@ impl IntegrationTests {
         // Start with the first test
         run_next_test(0, tests, ctx, state, start_time);
     }
-
 }
 
 struct CollectedTests {
@@ -164,9 +168,7 @@ fn run_next_test(
     std::io::Write::flush(&mut std::io::stdout()).ok();
 
     // Run the test
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        (test.function)(&ctx)
-    }));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| (test.function)(&ctx)));
 
     match result {
         Ok(task_handle) => {
@@ -207,9 +209,9 @@ fn check_async_test(
     state: std::rc::Rc<std::cell::RefCell<TestRunState>>,
     start_time: Instant,
 ) {
+    use godot::builtin::Callable;
     use godot::classes::object::ConnectFlags;
     use godot::task::has_godot_task_panicked;
-    use godot::builtin::Callable;
 
     if !task_handle.is_pending() {
         // Task completed
@@ -233,7 +235,9 @@ fn check_async_test(
 
     let deferred = Callable::from_local_fn("check_async_test", move |_| {
         check_async_test(
-            task_opt.take().expect("Callable should only be called once"),
+            task_opt
+                .take()
+                .expect("Callable should only be called once"),
             test_name.clone(),
             index,
             tests.clone(),
@@ -342,4 +346,3 @@ pub use test_helpers::*;
 
 pub mod test_app;
 pub use test_app::TestApp;
-

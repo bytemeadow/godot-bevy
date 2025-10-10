@@ -7,8 +7,8 @@ use godot::init::{ExtensionLibrary, gdextension};
 
 mod framework;
 mod real_frame_tests;
+mod scene_tree_tests;
 mod transform_sync_tests;
-
 
 // Re-export for tests
 pub use framework::*;

@@ -1,16 +1,14 @@
 use crate::plugins::core::PrePhysicsUpdate;
+use crate::plugins::{
+    collisions::CollisionEventReader,
+    core::{PhysicsDelta, PhysicsUpdate},
+    input::InputEventReader,
+    scene_tree::SceneTreeEventReader,
+    signals::{GodotSignalReader, GodotSignalSender},
+};
 use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
 use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
-use crate::{
-    plugins::{
-        collisions::CollisionEventReader,
-        core::{PhysicsDelta, PhysicsUpdate},
-        input::InputEventReader,
-        scene_tree::SceneTreeEventReader,
-        signals::{GodotSignalReader, GodotSignalSender},
-    },
-};
 use bevy::app::App;
 use godot::prelude::*;
 use std::sync::OnceLock;
@@ -46,6 +44,12 @@ impl BevyApp {
     }
 
     fn register_scene_tree_watcher(&mut self, app: &mut App) {
+        // Check if SceneTreeWatcher already exists (e.g., created by test framework)
+        // If so, don't create a new one or replace the event reader
+        if self.base().has_node("SceneTreeWatcher") {
+            return;
+        }
+
         let (sender, receiver) = channel();
         let mut scene_tree_watcher = SceneTreeWatcher::new_alloc();
         scene_tree_watcher.bind_mut().notification_channel = Some(sender);
@@ -72,6 +76,11 @@ impl BevyApp {
     }
 
     fn register_collision_watcher(&mut self, app: &mut App) {
+        // Check if CollisionWatcher already exists (e.g., created by test framework)
+        if self.base().has_node("CollisionWatcher") {
+            return;
+        }
+
         let (sender, receiver) = channel();
         let mut collision_watcher = CollisionWatcher::new_alloc();
         collision_watcher.bind_mut().notification_channel = Some(sender);
