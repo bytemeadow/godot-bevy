@@ -60,6 +60,20 @@ jobs:
           ls -la target/release/libgodot_bevy_itest.* || echo "Library not found!"
           echo "Library should be at: $(pwd)/target/release/"
 
+      - name: Debug - Check paths from itest directory
+        working-directory: itest
+        run: |
+          echo "=== Current directory ==="
+          pwd
+          echo "=== godot directory contents ==="
+          ls -la godot/
+          echo "=== .gdextension file location ==="
+          ls -la godot/itest.gdextension
+          echo "=== .gdextension file contents ==="
+          cat godot/itest.gdextension
+          echo "=== Checking library path from godot/ ==="
+          cd godot && ls -la ../../target/release/libgodot_bevy_itest.so || echo "Library not found at ../../target/release/"
+
       - name: Import Godot project
         working-directory: itest
         run: godot --editor --headless --path godot --quit || true
