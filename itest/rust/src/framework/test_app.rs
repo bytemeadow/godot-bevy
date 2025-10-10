@@ -21,11 +21,16 @@ use super::{TestContext, await_frame};
 ///     app.add_plugins(GodotTransformSyncPlugin);
 /// }).await;
 ///
-/// let entity = app.world_mut().spawn((Transform::default(),)).id();
+/// let entity = app.with_world_mut(|world| {
+///     world.spawn((Transform::default(),)).id()
+/// });
 ///
 /// app.update().await;
 ///
-/// assert_eq!(app.world().get::<Transform>(entity).unwrap().translation.x, 0.0);
+/// let translation_x = app.with_world(|world| {
+///     world.get::<Transform>(entity).unwrap().translation.x
+/// });
+/// assert_eq!(translation_x, 0.0);
 /// ```
 pub struct TestApp {
     ctx: TestContext,

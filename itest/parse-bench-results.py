@@ -59,6 +59,13 @@ def compare_benchmarks(current: dict, baseline: dict, threshold: float = 0.90) -
     """
     Compare current benchmarks against baseline.
 
+    Args:
+        current: Current benchmark results
+        baseline: Baseline benchmark results to compare against
+        threshold: Performance ratio threshold (default 0.90 = allow 10% slowdown)
+                   Values < 1.0 mean slower is acceptable up to that ratio.
+                   E.g., 0.90 means current can be 1/0.90 = 1.11x slower (11% regression)
+
     Returns:
         (passed, regressions, all_comparisons) where:
         - passed: True if no regressions exceed threshold
