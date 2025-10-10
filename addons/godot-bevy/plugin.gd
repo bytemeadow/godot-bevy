@@ -96,7 +96,7 @@ godot-bevy = { version = "%s", features = ["default"] }
 
 [workspace]
 # Empty workspace table to make this a standalone project
-""" % [_to_snake_case(project_name), info.godot_bevy_version]
+""" % [project_name.to_snake_case(), info.godot_bevy_version]
 
 	_save_file(rust_path.path_join("Cargo.toml"), cargo_content)
 
@@ -138,6 +138,7 @@ fn hello_world_system(mut timer: Local<f32>, time: Res<Time>) {
 	var gdextension_content = """[configuration]
 entry_symbol = "gdext_rust_init"
 compatibility_minimum = 4.1
+reloadable = true
 
 [libraries]
 linux.debug.x86_64 = "res://rust/target/debug/lib%s.so"
@@ -149,14 +150,14 @@ macos.release = "res://rust/target/release/lib%s.dylib"
 macos.debug.arm64 = "res://rust/target/debug/lib%s.dylib"
 macos.release.arm64 = "res://rust/target/release/lib%s.dylib"
 """ % [
-		_to_snake_case(project_name),
-		_to_snake_case(project_name),
-		_to_snake_case(project_name),
-		_to_snake_case(project_name),
-		_to_snake_case(project_name),
-		_to_snake_case(project_name),
-		_to_snake_case(project_name),
-		_to_snake_case(project_name)
+		project_name.to_snake_case(),
+		project_name.to_snake_case(),
+		project_name.to_snake_case(),
+		project_name.to_snake_case(),
+		project_name.to_snake_case(),
+		project_name.to_snake_case(),
+		project_name.to_snake_case(),
+		project_name.to_snake_case(),
 	]
 
 	_save_file(base_path.path_join("rust.gdextension"), gdextension_content)
@@ -215,22 +216,3 @@ func _save_file(path: String, content: String):
 		print("Created: ", path)
 	else:
 		push_error("Failed to create file: " + path)
-
-# Helper functions for case conversion
-func _to_snake_case(text: String) -> String:
-	var result = ""
-	for i in range(text.length()):
-		var c = text[i]
-		# Check if character is uppercase by comparing with lowercase version
-		if c != c.to_lower() and i > 0:
-			result += "_"
-		result += c.to_lower()
-	return result
-
-func _to_pascal_case(text: String) -> String:
-	var words = text.split("_")
-	var result = ""
-	for word in words:
-		if word.length() > 0:
-			result += word[0].to_upper() + word.substr(1).to_lower()
-	return result
