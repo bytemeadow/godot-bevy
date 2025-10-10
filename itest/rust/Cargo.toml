@@ -8,7 +8,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-godot.workspace = true
+godot = { workspace = true, features = ["__trace"] }
 godot-bevy = { path = "../../godot-bevy" }
 godot-bevy-macros = { path = "../../godot-bevy-macros" }
 godot-bevy-itest-macros = { path = "./macros" }

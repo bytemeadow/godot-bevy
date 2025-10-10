@@ -4,7 +4,7 @@
  */
 
 use godot::classes::Node;
-use godot::obj::{EngineBitfield, Gd};
+use godot::obj::{Gd, Singleton};
 use godot::register::{GodotClass, godot_api};
 use std::time::Instant;
 
@@ -332,7 +332,7 @@ fn check_async_test(
     let mut task_opt = Some(task_handle);
     let next_ctx = ctx.clone();
 
-    let deferred = Callable::from_local_fn("check_async_test", move |_| {
+    let deferred = Callable::from_fn("check_async_test", move |_| {
         check_async_test(
             task_opt
                 .take()
@@ -344,13 +344,11 @@ fn check_async_test(
             state.clone(),
             start_time,
         );
-        Ok(godot::builtin::Variant::nil())
+        godot::builtin::Variant::nil()
     });
 
     let mut tree = ctx.scene_tree.get_tree().expect("Scene tree should exist");
-    tree.connect_ex("process_frame", &deferred)
-        .flags(ConnectFlags::ONE_SHOT.ord() as u32)
-        .done();
+    tree.connect_flags("process_frame", &deferred, ConnectFlags::ONE_SHOT);
 }
 
 fn finish_test_run(
