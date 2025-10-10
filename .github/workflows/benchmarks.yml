@@ -1,0 +1,162 @@
+name: benchmarks
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  GODOT_VERSION: "4.4.1"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  itest-benchmarks:
+    name: performance / itest benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: itest/rust -> target
+
+      - name: Install Linux dependencies
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libasound2-dev libudev-dev pkg-config
+          version: 1.0
+
+      - name: Download and cache Godot
+        id: godot-download
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+          include-templates: false
+
+      - name: Verify Godot installation
+        run: |
+          godot --version
+          echo "GODOT_EXECUTABLE=$(which godot)" >> $GITHUB_ENV
+
+      - name: Build itest benchmarks (release)
+        working-directory: itest/rust
+        run: cargo build --release
+
+      - name: Download baseline from main (for PR comparison)
+        if: github.event_name == 'pull_request'
+        run: |
+          if curl -f -o itest/baseline.json https://raw.githubusercontent.com/${{ github.repository }}/main/itest/baseline.json; then
+            echo "✅ Found baseline from main branch"
+            echo "BASELINE_AVAILABLE=true" >> $GITHUB_ENV
+          else
+            echo "📋 No baseline found on main branch"
+            echo "BASELINE_AVAILABLE=false" >> $GITHUB_ENV
+          fi
+
+      - name: Run benchmarks
+        id: bench
+        working-directory: itest
+        run: |
+          set -o pipefail
+          godot --headless --path godot BenchRunner.tscn --quit-after 60000 2>&1 | tee bench-output.txt
+
+      - name: Parse benchmark results
+        working-directory: itest
+        run: |
+          python3 parse-bench-results.py bench-output.txt --output bench-results.json
+          echo "✅ Benchmark results saved"
+
+          # Pretty print for logs
+          echo "📊 Benchmark Results:"
+          jq -r '.benchmarks | to_entries[] | "\(.key): \(.value.median_display)"' bench-results.json
+
+      - name: Check for regressions (PR only)
+        if: github.event_name == 'pull_request' && env.BASELINE_AVAILABLE == 'true'
+        id: regression
+        working-directory: itest
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking for performance regressions..."
+
+          if python3 parse-bench-results.py --json-input --baseline baseline.json --threshold 0.90 bench-results.json > regression-report.txt 2>&1; then
+            echo "status=pass" >> $GITHUB_OUTPUT
+            echo "✅ No regressions detected"
+          else
+            echo "status=fail" >> $GITHUB_OUTPUT
+            echo "⚠️ Performance regressions detected!"
+            cat regression-report.txt
+          fi
+
+      - name: Save PR metadata for comment workflow
+        if: github.event_name == 'pull_request'
+        run: |
+          mkdir -p benchmark-artifacts
+          echo "${{ github.event.number }}" > benchmark-artifacts/pr_number.txt
+          echo "${{ github.event.pull_request.head.sha }}" > benchmark-artifacts/pr_sha.txt
+
+      - name: Upload benchmark results (for PR comments)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            itest/bench-results.json
+            itest/bench-results-comparison.json
+            itest/baseline.json
+            itest/regression-report.txt
+            benchmark-artifacts/
+
+      - name: Save baseline (main branch only)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cp itest/bench-results.json itest/baseline.json
+
+          # Add CI metadata
+          jq '. + {"ci_metadata": {"commit": "${{ github.sha }}", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'", "runner": "GitHub Actions"}}' \
+            itest/baseline.json > baseline.tmp.json
+          mv baseline.tmp.json itest/baseline.json
+
+      - name: Upload baseline artifact (main branch)
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-baseline
+          path: itest/baseline.json
+
+      - name: Commit baseline (main branch)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          git add -f itest/baseline.json
+
+          if git diff --cached --quiet; then
+            echo "📋 No changes to baseline"
+          else
+            git commit -m "chore: update benchmark baseline from CI [skip ci]
+
+            Updated from commit: ${{ github.sha }}
+            Runner: GitHub Actions"
+
+            git push origin main
+            echo "✅ Pushed updated baseline to main"
+          fi
+
+      - name: Fail if regressions detected
+        if: github.event_name == 'pull_request' && steps.regression.outputs.status == 'fail'
+        run: |
+          echo "::error::Performance regressions detected! Check the PR comment for details."
+          exit 1

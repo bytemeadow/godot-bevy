@@ -269,16 +269,14 @@ jobs:
           GODOT4_BIN: ${{ steps.install-godot.outputs.godot-executable }}
         run: ./run-tests.sh
 
+  # NOTE: perf-test benchmark job has been replaced by itest benchmarks
+  # See .github/workflows/benchmarks.yml for the new benchmark workflow
+  # perf-test example is still available for manual testing and demonstration
   benchmark:
-    name: performance / particle benchmark
+    name: performance / particle benchmark (deprecated)
     runs-on: blaze/compute/ubuntu-latest-amd64
     needs: [rust, changes]
-    if: |
-      (needs.changes.outputs.benchmark == 'true' ||
-       contains(github.event.pull_request.labels.*.name, 'benchmark')) && (
-        github.ref == 'refs/heads/main' ||
-        github.event_name == 'pull_request'
-      )
+    if: false  # Disabled - use itest benchmarks instead
 
     steps:
       - name: Checkout code
