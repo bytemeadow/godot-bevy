@@ -60,19 +60,25 @@ jobs:
           ls -la target/release/libgodot_bevy_itest.* || echo "Library not found!"
           echo "Library should be at: $(pwd)/target/release/"
 
-      - name: Debug - Check paths from itest directory
-        working-directory: itest
+      - name: Copy library to godot project (workaround for res:// paths)
         run: |
-          echo "=== Current directory ==="
-          pwd
-          echo "=== godot directory contents ==="
-          ls -la godot/
-          echo "=== .gdextension file location ==="
-          ls -la godot/itest.gdextension
-          echo "=== .gdextension file contents ==="
-          cat godot/itest.gdextension
-          echo "=== Checking library path from godot/ ==="
-          cd godot && ls -la ../../target/release/libgodot_bevy_itest.so || echo "Library not found at ../../target/release/"
+          # Create lib directory in godot project
+          mkdir -p itest/godot/lib
+          # Copy the built library
+          cp target/release/libgodot_bevy_itest.so itest/godot/lib/ || echo "Failed to copy .so"
+          cp target/release/libgodot_bevy_itest.dll itest/godot/lib/ 2>/dev/null || true
+          cp target/release/libgodot_bevy_itest.dylib itest/godot/lib/ 2>/dev/null || true
+          echo "Library copied to itest/godot/lib/"
+          ls -la itest/godot/lib/
+
+      - name: Update .gdextension to use local lib path
+        working-directory: itest/godot
+        run: |
+          # Update .gdextension to point to lib/ directory instead of ../../target/
+          sed -i 's|res://../../target/debug/|res://lib/|g' itest.gdextension
+          sed -i 's|res://../../target/release/|res://lib/|g' itest.gdextension
+          echo "Updated .gdextension file:"
+          cat itest.gdextension
 
       - name: Import Godot project
         working-directory: itest
