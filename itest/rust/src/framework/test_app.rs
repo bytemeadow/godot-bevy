@@ -88,7 +88,13 @@ impl TestApp {
     }
 
     /// Set up watchers as children (before app initialization)
-    /// Returns the event reader receivers to be inserted after app exists
+    ///
+    /// This manual setup is necessary due to a timing issue in the library:
+    /// - Scene tree plugin's PreStartup systems run during app.finish()
+    /// - They search for watchers that BevyApp only creates AFTER app.finish()
+    /// - Production works because BevyApp autoload exists before ready() is called
+    /// - Tests need to create watchers manually before calling ready()
+    ///
     /// Note: Only sets up scene tree and collision watchers (input events are not Send-safe)
     fn setup_watchers_early(
         bevy_app: &mut Gd<godot_bevy::BevyApp>,
