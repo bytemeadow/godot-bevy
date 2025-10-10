@@ -54,12 +54,6 @@ jobs:
         working-directory: itest/rust
         run: cargo build --release
 
-      - name: Verify library was built
-        run: |
-          echo "Checking for library..."
-          ls -la target/release/libgodot_bevy_itest.* || echo "Library not found!"
-          echo "Library should be at: $(pwd)/target/release/"
-
       - name: Copy library to godot project (workaround for res:// paths)
         run: |
           # Create lib directory in godot project
