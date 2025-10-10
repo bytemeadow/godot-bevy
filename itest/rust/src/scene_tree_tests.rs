@@ -44,10 +44,7 @@ fn test_node_added_creates_entity(ctx: &TestContext) -> godot::task::TaskHandle 
         node.set_name("TestNode");
         ctx_clone.scene_tree.clone().add_child(&node);
 
-        // Frame 2: Scene tree should detect new node
-        app.update().await;
-
-        // Frame 3: Entity should be created
+        // Frame 2: Entity created
         app.update().await;
 
         let final_count =
@@ -106,10 +103,7 @@ fn test_scene_tree_event_node_added(ctx: &TestContext) -> godot::task::TaskHandl
 
         let node_id = node.instance_id();
 
-        // Frame 2: Event should be generated
-        app.update().await;
-
-        // Frame 3: Check entity was created (event was processed)
+        // Frame 2: Entity created
         app.update().await;
 
         let entity_exists = app.with_world_mut(|world| {
@@ -157,8 +151,7 @@ fn test_node_removed_cleanup(ctx: &TestContext) -> godot::task::TaskHandle {
 
         let node_id = node.instance_id();
 
-        // Frame 2-3: Wait for entity creation
-        app.update().await;
+        // Frame 2: Entity created
         app.update().await;
 
         // Verify entity exists
@@ -174,8 +167,7 @@ fn test_node_removed_cleanup(ctx: &TestContext) -> godot::task::TaskHandle {
         // Remove the node
         node.queue_free();
 
-        // Frame 4-5: Wait for removal processing
-        app.update().await;
+        // Frame 3: Removal processed
         app.update().await;
 
         println!("✓ Node removal: cleanup handled");
@@ -210,15 +202,13 @@ fn test_node_renamed_event(ctx: &TestContext) -> godot::task::TaskHandle {
 
         let node_id = node.instance_id();
 
-        // Frame 2-3: Wait for entity creation
-        app.update().await;
+        // Frame 2: Entity created
         app.update().await;
 
         // Rename the node
         node.set_name("RenamedNode");
 
-        // Frame 4-5: Wait for rename event
-        app.update().await;
+        // Frame 3: Rename event processed
         app.update().await;
 
         // Verify entity still exists with same handle
@@ -265,8 +255,7 @@ fn test_node_handle_validity(ctx: &TestContext) -> godot::task::TaskHandle {
 
         let node_id = node.instance_id();
 
-        // Frame 2-3: Wait for entity creation
-        app.update().await;
+        // Frame 2: Entity created
         app.update().await;
 
         // Find entity and verify handle points to correct node
