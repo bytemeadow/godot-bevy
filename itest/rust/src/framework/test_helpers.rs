@@ -61,8 +61,6 @@ macro_rules! bevy_app_test {
             let c = $counter.clone();
             bevy_app.bind_mut().set_instance_init_func(Box::new(move |$app: &mut bevy::prelude::App| {
                 let $counter = c.clone();
-                // Add core plugins for schedules, but not the optional plugins (no watchers)
-                $app.add_plugins(godot_bevy::plugins::GodotBaseCorePlugin);
                 // Now add test-specific setup
                 $setup
             }));

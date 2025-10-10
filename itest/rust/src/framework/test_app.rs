@@ -50,13 +50,10 @@ impl TestApp {
 
         let setup_mutex = Mutex::new(Some(setup));
 
-        // Configure the app - the library will handle all watcher setup
+        // Configure the app - the library will handle all watcher setup and core plugins
         bevy_app
             .bind_mut()
             .set_instance_init_func(Box::new(move |app: &mut App| {
-                // Add core plugins - library creates watchers before plugin finalization
-                app.add_plugins(godot_bevy::plugins::GodotCorePlugins);
-
                 // User setup - take from Mutex to call FnOnce
                 if let Some(setup_fn) = setup_mutex.lock().unwrap().take() {
                     setup_fn(app);
