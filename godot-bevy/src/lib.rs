@@ -14,6 +14,9 @@ pub mod prelude;
 pub mod utils;
 pub mod watchers;
 
+// Re-export BevyApp for testing and advanced usage
+pub use app::{BEVY_INIT_FUNC, BevyApp};
+
 // Re-export inventory to avoid requiring users to add it as a dependency
 pub use inventory;
 
