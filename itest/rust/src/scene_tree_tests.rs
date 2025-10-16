@@ -11,7 +11,7 @@
  * Uses explicit frame-by-frame control with app.update().await
  */
 
-use bevy::prelude::Entity;
+use bevy::prelude::{Entity, Name, With};
 use godot::obj::NewAlloc;
 use godot::prelude::*;
 use godot_bevy::plugins::scene_tree::ProtectedNodeEntity;
@@ -351,6 +351,92 @@ fn test_node_handle_validity(ctx: &TestContext) -> godot::task::TaskHandle {
         // Cleanup
         app.cleanup();
         node.queue_free();
+        await_frames(1).await;
+    })
+}
+
+/// Test that entity data survives node reparenting
+/// Bug: When reparenting a node, the entity gets despawned because
+/// NodeRemoved event fires, causing all entity data to be lost
+#[itest(async)]
+fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx_clone, |_app| {
+            // No additional plugins needed
+        })
+        .await;
+
+        // Create two parent nodes
+        let mut parent1 = Node::new_alloc();
+        parent1.set_name("Parent1");
+        let mut parent2 = Node::new_alloc();
+        parent2.set_name("Parent2");
+
+        // Create child node
+        let mut child = Node::new_alloc();
+        child.set_name("Child");
+
+        // Add to scene tree
+        ctx_clone.scene_tree.clone().add_child(&parent1);
+        ctx_clone.scene_tree.clone().add_child(&parent2);
+        parent1.clone().add_child(&child);
+
+        app.update().await;
+
+        // Get the entity and add custom component
+        let entity = app.with_world_mut(|world| {
+            let mut query = world.query_filtered::<Entity, With<GodotNodeHandle>>();
+            query
+                .iter(world)
+                .find(|e| {
+                    world
+                        .get::<Name>(*e)
+                        .map(|n| n.as_str() == "Child")
+                        .unwrap_or(false)
+                })
+                .expect("Child entity should exist")
+        });
+
+        #[derive(bevy::prelude::Component, Clone, Copy, Debug, PartialEq)]
+        struct CustomData(i32);
+
+        app.with_world_mut(|world| {
+            world.entity_mut(entity).insert(CustomData(42));
+        });
+
+        // REPARENT: Move child from parent1 to parent2
+        child.reparent(&parent2);
+
+        app.update().await;
+        app.update().await;
+
+        // Check if entity still exists
+        let entity_exists = app.with_world(|world| world.get_entity(entity).is_ok());
+
+        // BUG: This will fail - entity gets despawned during reparenting
+        assert!(
+            entity_exists,
+            "Entity should still exist after reparenting (BUG: entity gets despawned)"
+        );
+
+        // Also check component data is preserved
+        if entity_exists {
+            let data = app.with_world(|world| world.get::<CustomData>(entity).copied());
+            assert_eq!(
+                data,
+                Some(CustomData(42)),
+                "Component data should be preserved"
+            );
+        }
+
+        println!("✓ Entity and component data preserved during reparenting");
+
+        // Cleanup
+        app.cleanup();
+        parent1.queue_free();
+        parent2.queue_free();
         await_frames(1).await;
     })
 }
