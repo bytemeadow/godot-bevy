@@ -194,6 +194,13 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
+          # Save the benchmark results before switching branches
+          cp itest/bench-results.json /tmp/baseline.json
+
+          # Stash any local changes before switching branches
+          # This includes the modified .gdextension file
+          git stash push -m "Temporary stash for benchmark workflow" || true
+
           # Fetch or create gh-benchmarks branch
           git fetch origin gh-benchmarks 2>/dev/null || true
 
@@ -209,7 +216,7 @@ jobs:
           fi
 
           # Copy and commit new baseline
-          cp itest/bench-results.json baseline.json
+          cp /tmp/baseline.json baseline.json
           git add baseline.json
           git commit -m "Update baseline from ${{ github.sha }}" || echo "No changes"
           git push origin gh-benchmarks
