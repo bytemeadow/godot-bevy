@@ -54,7 +54,8 @@ impl Plugin for GodotTransformSyncPlugin {
             sync_mode: self.sync_mode,
         })
         .register_type::<GodotTransformConfig>()
-        .register_type::<TransformSyncMode>();
+        .register_type::<TransformSyncMode>()
+        .register_type::<TransformSyncMetadata>();
 
         // Only add automatic sync systems if auto_sync is enabled
         if self.auto_sync {

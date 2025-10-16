@@ -3,7 +3,7 @@ mod tests {
     use bevy::reflect::{Reflect, TypeRegistry, ReflectRef};
     use crate::plugins::collisions::Collisions;
     use crate::plugins::scene_tree::Groups;
-    use crate::plugins::transforms::{GodotTransformConfig, TransformSyncMode};
+    use crate::plugins::transforms::{GodotTransformConfig, TransformSyncMode, TransformSyncMetadata};
 
     #[test]
     fn test_collisions_reflection() {
@@ -96,6 +96,32 @@ mod tests {
         // Check struct fields
         if let ReflectRef::Struct(struct_ref) = reflected.reflect_ref() {
             assert!(struct_ref.field("add_child_relationship").is_some());
+        } else {
+            panic!("Expected Struct reflection");
+        }
+    }
+
+    #[test]
+    fn test_transform_sync_metadata_reflection() {
+        let mut registry = TypeRegistry::default();
+        registry.register::<TransformSyncMetadata>();
+
+        assert!(registry.get_type_info(std::any::TypeId::of::<TransformSyncMetadata>()).is_some());
+
+        let metadata = TransformSyncMetadata::default();
+        let reflected = metadata.as_reflect();
+
+        // Check type info
+        let type_info = reflected.get_represented_type_info().unwrap();
+        assert!(type_info.type_path().contains("TransformSyncMetadata"));
+
+        // Since last_sync_tick is marked with #[reflect(ignore)], it won't be accessible
+        // through reflection, but the struct itself is still reflectable
+        if let ReflectRef::Struct(struct_ref) = reflected.reflect_ref() {
+            // The field is ignored, so field_len should be 0
+            assert_eq!(struct_ref.field_len(), 0);
+            // And the field should not be accessible
+            assert!(struct_ref.field("last_sync_tick").is_none());
         } else {
             panic!("Expected Struct reflection");
         }

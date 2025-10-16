@@ -1,16 +1,17 @@
 //! Audio tweening and easing for smooth transitions
 
+use bevy::reflect::Reflect;
 use std::time::Duration;
 
 /// Tweening/easing configuration for smooth audio transitions
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Reflect)]
 pub struct AudioTween {
     pub duration: Duration,
     pub easing: AudioEasing,
 }
 
 /// Audio easing types for smooth transitions
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Reflect)]
 pub enum AudioEasing {
     Linear,
     EaseIn,
