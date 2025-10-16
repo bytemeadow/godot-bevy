@@ -6,6 +6,7 @@ use bevy::{
         system::NonSendMut,
     },
     math::Vec2,
+    reflect::Reflect,
 };
 use godot::{
     classes::{
@@ -41,7 +42,15 @@ impl Plugin for GodotInputEventPlugin {
             .add_event::<ActionInput>()
             .add_event::<GamepadButtonInput>()
             .add_event::<GamepadAxisInput>()
-            .add_event::<PanGestureInput>();
+            .add_event::<PanGestureInput>()
+            .register_type::<MouseButtonInput>()
+            .register_type::<MouseButton>()
+            .register_type::<MouseMotion>()
+            .register_type::<TouchInput>()
+            .register_type::<ActionInput>()
+            .register_type::<GamepadButtonInput>()
+            .register_type::<GamepadAxisInput>()
+            .register_type::<PanGestureInput>();
     }
 }
 
@@ -55,7 +64,7 @@ pub struct KeyboardInput {
 }
 
 /// Mouse button press/release event
-#[derive(Debug, Event, Clone)]
+#[derive(Debug, Event, Clone, Reflect)]
 pub struct MouseButtonInput {
     pub button: MouseButton,
     pub pressed: bool,
@@ -66,14 +75,14 @@ pub struct MouseButtonInput {
 }
 
 /// Mouse motion event
-#[derive(Debug, Event, Clone)]
+#[derive(Debug, Event, Clone, Reflect)]
 pub struct MouseMotion {
     pub delta: Vec2,
     pub position: Vec2,
 }
 
 /// Touch input event (for mobile/touchscreen)
-#[derive(Debug, Event, Clone)]
+#[derive(Debug, Event, Clone, Reflect)]
 pub struct TouchInput {
     pub finger_id: i32,
     pub position: Vec2,
@@ -81,7 +90,7 @@ pub struct TouchInput {
 }
 
 /// Godot action input event (for input map actions)
-#[derive(Debug, Event, Clone)]
+#[derive(Debug, Event, Clone, Reflect)]
 pub struct ActionInput {
     pub action: String,
     pub pressed: bool,
@@ -89,7 +98,7 @@ pub struct ActionInput {
 }
 
 /// Gamepad button input event (from Godot InputEventJoypadButton)
-#[derive(Debug, Event, Clone)]
+#[derive(Debug, Event, Clone, Reflect)]
 pub struct GamepadButtonInput {
     pub device: i32,
     pub button_index: i32,
@@ -98,7 +107,7 @@ pub struct GamepadButtonInput {
 }
 
 /// Gamepad axis input event (from Godot InputEventJoypadMotion)
-#[derive(Debug, Event, Clone)]
+#[derive(Debug, Event, Clone, Reflect)]
 pub struct GamepadAxisInput {
     pub device: i32,
     pub axis: i32,
@@ -106,13 +115,13 @@ pub struct GamepadAxisInput {
 }
 
 /// Two-finger pan gesture input event (from Godot InputEventPanGesture)
-#[derive(Debug, Event, Clone)]
+#[derive(Debug, Event, Clone, Reflect)]
 pub struct PanGestureInput {
     pub delta: Vec2,
 }
 
 /// Mouse button types
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 pub enum MouseButton {
     Left,
     Right,
