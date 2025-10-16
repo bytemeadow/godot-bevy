@@ -1,34 +1,34 @@
 {
-  "timestamp": "2025-10-16T15:35:47.197075",
+  "timestamp": "2025-10-16T15:53:12.483786",
   "benchmarks": {
     "transform_update_individual_3d": {
-      "min_ns": 1550000.0,
-      "median_ns": 1570000.0,
-      "min_display": "1.55ms",
-      "median_display": "1.57ms"
+      "min_ns": 1580000.0,
+      "median_ns": 1590000.0,
+      "min_display": "1.58ms",
+      "median_display": "1.59ms"
     },
     "transform_update_bulk_3d": {
-      "min_ns": 1420000.0,
-      "median_ns": 1430000.0,
-      "min_display": "1.42ms",
-      "median_display": "1.43ms"
+      "min_ns": 1470000.0,
+      "median_ns": 1490000.0,
+      "min_display": "1.47ms",
+      "median_display": "1.49ms"
     },
     "transform_update_individual_2d": {
-      "min_ns": 2730000.0,
-      "median_ns": 2750000.0,
-      "min_display": "2.73ms",
-      "median_display": "2.75ms"
+      "min_ns": 2770000.0,
+      "median_ns": 2810000.0,
+      "min_display": "2.77ms",
+      "median_display": "2.81ms"
     },
     "transform_update_bulk_2d": {
-      "min_ns": 2490000.0,
-      "median_ns": 2510000.0,
-      "min_display": "2.49ms",
-      "median_display": "2.51ms"
+      "min_ns": 2520000.0,
+      "median_ns": 2560000.0,
+      "min_display": "2.52ms",
+      "median_display": "2.56ms"
     }
   },
   "ci_metadata": {
-    "commit": "85a929cb01a71f1d67ccb2e48fbee0af87cc80a1",
-    "timestamp": "2025-10-16T15:35:47Z",
+    "commit": "de6f6a67a957e837c43bd9d0ec1aed27f2437cec",
+    "timestamp": "2025-10-16T15:53:12Z",
     "runner": "GitHub Actions"
   }
 }
