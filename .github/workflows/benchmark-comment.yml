@@ -37,8 +37,20 @@ jobs:
             exit 0
           fi
 
-          # Check for PR metadata
-          if [ -f "benchmark-results/pr_number.txt" ]; then
+          # Debug: List downloaded artifact structure
+          echo "📂 Downloaded artifact structure:"
+          find benchmark-results -type f -name "*.txt" -o -name "*.json" | head -20
+
+          # Check for PR metadata in multiple locations (handles different artifact structures)
+          if [ -f "benchmark-results/itest/benchmark-artifacts/pr_number.txt" ]; then
+            echo "is_pr=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$(cat benchmark-results/itest/benchmark-artifacts/pr_number.txt)" >> $GITHUB_OUTPUT
+            echo "✅ Found PR metadata for PR #$(cat benchmark-results/itest/benchmark-artifacts/pr_number.txt)"
+          elif [ -f "benchmark-results/benchmark-artifacts/pr_number.txt" ]; then
+            echo "is_pr=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$(cat benchmark-results/benchmark-artifacts/pr_number.txt)" >> $GITHUB_OUTPUT
+            echo "✅ Found PR metadata for PR #$(cat benchmark-results/benchmark-artifacts/pr_number.txt)"
+          elif [ -f "benchmark-results/pr_number.txt" ]; then
             echo "is_pr=true" >> $GITHUB_OUTPUT
             echo "pr_number=$(cat benchmark-results/pr_number.txt)" >> $GITHUB_OUTPUT
             echo "✅ Found PR metadata for PR #$(cat benchmark-results/pr_number.txt)"
@@ -53,72 +65,114 @@ jobs:
         with:
           script: |
             const fs = require('fs');
+            const path = require('path');
 
-            // Read benchmark results
-            const results = JSON.parse(fs.readFileSync('benchmark-results/bench-results.json', 'utf8'));
+            // Look for the itest comparison file which is uploaded directly
+            let comparisonFile = null;
 
-            // Check if comparison data exists
-            const comparisonPath = 'benchmark-results/bench-results-comparison.json';
-            let comparison = null;
-            if (fs.existsSync(comparisonPath)) {
-              comparison = JSON.parse(fs.readFileSync(comparisonPath, 'utf8'));
+            // Check for itest/bench-results-comparison.json
+            if (fs.existsSync('benchmark-results/itest/bench-results-comparison.json')) {
+              comparisonFile = 'benchmark-results/itest/bench-results-comparison.json';
+            } else if (fs.existsSync('benchmark-results/bench-results-comparison.json')) {
+              comparisonFile = 'benchmark-results/bench-results-comparison.json';
             }
+
+            if (!comparisonFile) {
+              console.log('No comparison file found - looking for any JSON files...');
+              // Debug: list all JSON files
+              const findJsonFiles = (dir) => {
+                const files = fs.readdirSync(dir);
+                for (const file of files) {
+                  const fullPath = path.join(dir, file);
+                  if (fs.statSync(fullPath).isDirectory()) {
+                    findJsonFiles(fullPath);
+                  } else if (file.endsWith('.json')) {
+                    console.log('Found JSON file:', fullPath);
+                  }
+                }
+              };
+              findJsonFiles('benchmark-results');
+              return;
+            }
+
+            console.log('Reading comparison file:', comparisonFile);
+
+            // Read comparison data
+            const comparison = JSON.parse(fs.readFileSync(comparisonFile, 'utf8'));
 
             let comment = '## 📊 Benchmark Results\n\n';
 
+            // Parse comparison data - the format from parse-bench-results.py
             if (comparison && comparison.comparisons) {
-              // Enhanced table with baseline comparison
               comment += '| Benchmark | Current | Baseline | Change |\n';
               comment += '|-----------|---------|----------|--------|\n';
 
-              for (const c of comparison.comparisons) {
-                const status_icon = {
-                  'regression': '🔴',
-                  'slower': '🟡',
-                  'faster': '🟢',
-                  'neutral': '⚪',
-                  'new': '🆕'
-                }[c.status] || '⚪';
-
+              for (const comp of comparison.comparisons) {
                 let changeStr = '';
-                if (c.status === 'new') {
-                  changeStr = `${status_icon} *new*`;
-                } else if (c.change_pct !== null) {
-                  const sign = c.change_pct > 0 ? '+' : '';
-                  changeStr = `${status_icon} ${sign}${c.change_pct.toFixed(1)}%`;
+                let statusIcon = '⚪';
+
+                // Use the status from the comparison or calculate it
+                if (comp.status === 'new') {
+                  changeStr = `🆕 *new*`;
+                } else if (comp.change_pct !== null && comp.change_pct !== undefined) {
+                  // Determine status based on percent change
+                  if (comp.status === 'regression' || comp.change_pct > 10) {
+                    statusIcon = '🔴'; // regression
+                  } else if (comp.status === 'slower' || comp.change_pct > 5) {
+                    statusIcon = '🟡'; // slower
+                  } else if (comp.status === 'faster' || comp.change_pct < -5) {
+                    statusIcon = '🟢'; // faster
+                  } else {
+                    statusIcon = '⚪'; // neutral
+                  }
+
+                  const sign = comp.change_pct > 0 ? '+' : '';
+                  changeStr = `${statusIcon} ${sign}${comp.change_pct.toFixed(1)}%`;
                 }
 
-                const currentTime = c.current.median_display;
-                const baselineTime = c.baseline ? c.baseline.median_display : '-';
+                // Use display values from the comparison
+                const currentTime = comp.current ? comp.current.median_display : '-';
+                const baselineTime = comp.baseline ? comp.baseline.median_display : '-';
 
-                comment += `| ${c.name} | ${currentTime} | ${baselineTime} | ${changeStr} |\n`;
+                comment += `| ${comp.name} | ${currentTime} | ${baselineTime} | ${changeStr} |\n`;
               }
 
               // Summary
-              const regressions = comparison.comparisons.filter(c => c.status === 'regression');
-              const improvements = comparison.comparisons.filter(c => c.status === 'faster');
+              let regressionCount = 0;
+              let improvementCount = 0;
+
+              for (const comp of comparison.comparisons) {
+                if (comp.status === 'regression') {
+                  regressionCount++;
+                } else if (comp.status === 'faster') {
+                  improvementCount++;
+                }
+              }
 
               comment += '\n';
-              if (regressions.length > 0) {
-                comment += `⚠️ **${regressions.length} regression(s)** detected\n`;
+              if (regressionCount > 0) {
+                comment += `⚠️ **${regressionCount} regression(s)** detected\n`;
               }
-              if (improvements.length > 0) {
-                comment += `✨ **${improvements.length} improvement(s)** detected\n`;
+              if (improvementCount > 0) {
+                comment += `✨ **${improvementCount} improvement(s)** detected\n`;
               }
-              if (regressions.length === 0 && improvements.length === 0) {
+              if (regressionCount === 0 && improvementCount === 0) {
                 comment += '✅ Performance is stable\n';
               }
 
-            } else {
-              // Fallback: simple table without comparison
-              comment += '| Benchmark | Median | Min |\n';
-              comment += '|-----------|--------|-----|\n';
-
-              for (const [name, data] of Object.entries(results.benchmarks)) {
-                comment += `| ${name} | ${data.median_display} | ${data.min_display} |\n`;
+              // Add metadata if available
+              if (comparison.metadata) {
+                comment += '\n';
+                if (comparison.metadata.total_benchmarks) {
+                  comment += `📈 Total benchmarks: ${comparison.metadata.total_benchmarks}\n`;
+                }
+                if (comparison.metadata.environment) {
+                  comment += `🖥️ Environment: ${comparison.metadata.environment}\n`;
+                }
               }
 
-              comment += '\n> 📋 No baseline available for comparison\n';
+            } else {
+              comment += '📋 No benchmark comparison data available\n';
             }
 
             comment += '\n<sub>🤖 Generated by godot-bevy CI</sub>';

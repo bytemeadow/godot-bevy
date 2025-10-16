@@ -128,9 +128,9 @@ jobs:
       - name: Save PR metadata for comment workflow
         if: github.event_name == 'pull_request'
         run: |
-          mkdir -p benchmark-artifacts
-          echo "${{ github.event.number }}" > benchmark-artifacts/pr_number.txt
-          echo "${{ github.event.pull_request.head.sha }}" > benchmark-artifacts/pr_sha.txt
+          mkdir -p itest/benchmark-artifacts
+          echo "${{ github.event.number }}" > itest/benchmark-artifacts/pr_number.txt
+          echo "${{ github.event.pull_request.head.sha }}" > itest/benchmark-artifacts/pr_sha.txt
 
       - name: Upload benchmark results (for PR comments)
         if: github.event_name == 'pull_request'
@@ -142,7 +142,7 @@ jobs:
             itest/bench-results-comparison.json
             itest/baseline.json
             itest/regression-report.txt
-            benchmark-artifacts/
+            itest/benchmark-artifacts/
 
       - name: Save baseline (main branch only)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.repository == 'bytemeadow/godot-bevy'
