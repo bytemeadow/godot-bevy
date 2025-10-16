@@ -37,6 +37,7 @@ pub struct AnimatedSprite2DMarker;
 #[reflect(Component)]
 pub struct AnimatedSprite3DMarker;
 
+#[cfg(feature = "api-4-3")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct AnimationMixerMarker;
@@ -920,6 +921,7 @@ pub struct TextureRectMarker;
 #[reflect(Component)]
 pub struct TileMapMarker;
 
+#[cfg(feature = "api-4-3")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct TileMapLayerMarker;

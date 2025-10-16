@@ -31,16 +31,23 @@ class GodotTypeGenerator:
         # Types that require specific Godot API versions
         # Based on Godot release notes and documentation
         self.version_gated_types = {
-            "4-4": [  # Types added in Godot 4.4+
-                "LookAtModifier3D",
-                "RetargetModifier3D",
-                "SpringBoneSimulator3D",
-                "SpringBoneCollision3D",
-                "SpringBoneCollisionCapsule3D",
-                "SpringBoneCollisionPlane3D",
-                "SpringBoneCollisionSphere3D",
+            "4-3": [  # Types added in Godot 4.3+
+                "TileMapLayer",  # Replaces old TileMap layers system
+                "AnimationMixer",  # Base class for animation (introduced 4.2, enhanced 4.3)
+                "AudioStreamInteractive",  # Interactive music support
+                "AudioStreamPlaylist",  # Playlist support
+                "AudioStreamSynchronized",  # Synchronized audio streams
             ],
-            # Add more versions as needed
+            "4-4": [  # Types added in Godot 4.4+
+                "LookAtModifier3D",  # New 3D animation modifier
+                "RetargetModifier3D",  # Animation retargeting
+                "SpringBoneSimulator3D",  # Physics-based animation
+                "SpringBoneCollision3D",  # Spring bone collision base
+                "SpringBoneCollisionCapsule3D",  # Capsule collision for spring bones
+                "SpringBoneCollisionPlane3D",  # Plane collision for spring bones
+                "SpringBoneCollisionSphere3D",  # Sphere collision for spring bones
+            ],
+            # Note: Godot 4.5 didn't add significant new node types
         }
 
     def run_godot_dump_api(self):
@@ -344,6 +351,8 @@ pub fn remove_comprehensive_node_type_markers(
             'HTTPRequest': 'HttpRequest',
             'SkeletonIK3D': 'SkeletonIk3d',
             'Generic6DOFJoint3D': 'Generic6DofJoint3D',
+            'OpenXRRenderModel': 'OpenXrRenderModel',
+            'OpenXRRenderModelManager': 'OpenXrRenderModelManager',
         }
 
         return name_fixes.get(class_name, class_name)

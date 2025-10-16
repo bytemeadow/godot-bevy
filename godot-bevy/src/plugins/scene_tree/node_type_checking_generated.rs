@@ -597,6 +597,7 @@ pub fn add_node_type_markers_from_string(
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(TileMapMarker);
         }
+        #[cfg(feature = "api-4-3")]
         "TileMapLayer" => {
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
@@ -902,6 +903,7 @@ pub fn add_node_type_markers_from_string(
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(VideoStreamPlayerMarker);
         }
+        #[cfg(feature = "api-4-3")]
         "AnimationMixer" => {
             entity_commands.insert(AnimationMixerMarker);
         }
@@ -1432,6 +1434,7 @@ fn check_2d_node_types_comprehensive(
     if node.try_get::<godot::classes::TileMap>().is_some() {
         entity_commands.insert(TileMapMarker);
     }
+    #[cfg(feature = "api-4-3")]
     if node.try_get::<godot::classes::TileMapLayer>().is_some() {
         entity_commands.insert(TileMapLayerMarker);
     }
@@ -1493,10 +1496,14 @@ fn remove_2d_node_types_comprehensive(
         .remove::<Sprite2DMarker>()
         .remove::<StaticBody2DMarker>()
         .remove::<TileMapMarker>()
-        .remove::<TileMapLayerMarker>()
         .remove::<TouchScreenButtonMarker>()
         .remove::<VisibleOnScreenEnabler2DMarker>()
         .remove::<VisibleOnScreenNotifier2DMarker>()
+;
+
+    #[cfg(feature = "api-4-3")]
+    entity_commands
+        .remove::<TileMapLayerMarker>()
 ;
 }
 
@@ -1746,6 +1753,7 @@ fn check_universal_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
     node: &mut GodotNodeHandle,
 ) {
+    #[cfg(feature = "api-4-3")]
     if node.try_get::<godot::classes::AnimationMixer>().is_some() {
         entity_commands.insert(AnimationMixerMarker);
     }
@@ -1791,7 +1799,6 @@ fn remove_universal_node_types_comprehensive(
     _node: &mut GodotNodeHandle,
 ) {
     entity_commands
-        .remove::<AnimationMixerMarker>()
         .remove::<AudioStreamPlayerMarker>()
         .remove::<CanvasItemMarker>()
         .remove::<CanvasLayerMarker>()
@@ -1804,5 +1811,10 @@ fn remove_universal_node_types_comprehensive(
         .remove::<ShaderGlobalsOverrideMarker>()
         .remove::<TimerMarker>()
         .remove::<ViewportMarker>()
+;
+
+    #[cfg(feature = "api-4-3")]
+    entity_commands
+        .remove::<AnimationMixerMarker>()
 ;
 }
