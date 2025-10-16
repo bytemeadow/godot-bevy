@@ -1041,4 +1041,3 @@ pub struct XRNode3DMarker;
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct XROrigin3DMarker;
-

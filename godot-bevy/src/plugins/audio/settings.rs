@@ -1,7 +1,7 @@
 //! Audio settings and configuration
 
-use bevy::reflect::Reflect;
 use crate::plugins::audio::AudioTween;
+use bevy::reflect::Reflect;
 
 /// Settings for playing audio
 #[derive(Debug, Clone, Reflect)]

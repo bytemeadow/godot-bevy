@@ -1,9 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use bevy::reflect::{Reflect, TypeRegistry, ReflectRef};
     use crate::plugins::collisions::Collisions;
     use crate::plugins::scene_tree::Groups;
-    use crate::plugins::transforms::{GodotTransformConfig, TransformSyncMode, TransformSyncMetadata};
+    use crate::plugins::transforms::{
+        GodotTransformConfig, TransformSyncMetadata, TransformSyncMode,
+    };
+    use bevy::reflect::{Reflect, ReflectRef, TypeRegistry};
 
     #[test]
     fn test_collisions_reflection() {
@@ -12,7 +14,11 @@ mod tests {
         registry.register::<Collisions>();
 
         // Verify the type is registered
-        assert!(registry.get_type_info(std::any::TypeId::of::<Collisions>()).is_some());
+        assert!(
+            registry
+                .get_type_info(std::any::TypeId::of::<Collisions>())
+                .is_some()
+        );
 
         // Test reflection capabilities
         let collisions = Collisions::default();
@@ -41,7 +47,11 @@ mod tests {
         let mut registry = TypeRegistry::default();
         registry.register::<Groups>();
 
-        assert!(registry.get_type_info(std::any::TypeId::of::<Groups>()).is_some());
+        assert!(
+            registry
+                .get_type_info(std::any::TypeId::of::<Groups>())
+                .is_some()
+        );
 
         // Can't easily create Groups without Godot node, but we can test the type is reflectable
         // The actual reflection would work at runtime
@@ -53,8 +63,16 @@ mod tests {
         registry.register::<GodotTransformConfig>();
         registry.register::<TransformSyncMode>();
 
-        assert!(registry.get_type_info(std::any::TypeId::of::<GodotTransformConfig>()).is_some());
-        assert!(registry.get_type_info(std::any::TypeId::of::<TransformSyncMode>()).is_some());
+        assert!(
+            registry
+                .get_type_info(std::any::TypeId::of::<GodotTransformConfig>())
+                .is_some()
+        );
+        assert!(
+            registry
+                .get_type_info(std::any::TypeId::of::<TransformSyncMode>())
+                .is_some()
+        );
 
         let config = GodotTransformConfig::default();
         let reflected = config.as_reflect();
@@ -84,9 +102,15 @@ mod tests {
         let mut registry = TypeRegistry::default();
         registry.register::<SceneTreeConfig>();
 
-        assert!(registry.get_type_info(std::any::TypeId::of::<SceneTreeConfig>()).is_some());
+        assert!(
+            registry
+                .get_type_info(std::any::TypeId::of::<SceneTreeConfig>())
+                .is_some()
+        );
 
-        let config = SceneTreeConfig { add_child_relationship: false };
+        let config = SceneTreeConfig {
+            add_child_relationship: false,
+        };
         let reflected = config.as_reflect();
 
         // Check type info
@@ -106,7 +130,11 @@ mod tests {
         let mut registry = TypeRegistry::default();
         registry.register::<TransformSyncMetadata>();
 
-        assert!(registry.get_type_info(std::any::TypeId::of::<TransformSyncMetadata>()).is_some());
+        assert!(
+            registry
+                .get_type_info(std::any::TypeId::of::<TransformSyncMetadata>())
+                .is_some()
+        );
 
         let metadata = TransformSyncMetadata::default();
         let reflected = metadata.as_reflect();
