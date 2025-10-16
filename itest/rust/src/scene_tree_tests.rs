@@ -440,3 +440,61 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
         await_frames(1).await;
     })
 }
+
+/// Test that remove_child() despawns the entity (unlike reparent which preserves it)
+#[itest(async)]
+fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+
+        // Create parent and child
+        let mut parent = Node::new_alloc();
+        parent.set_name("RemoveChildParent");
+        let mut child = Node::new_alloc();
+        child.set_name("RemoveChildTest");
+
+        // Add to scene tree
+        ctx_clone.scene_tree.clone().add_child(&parent);
+        parent.clone().add_child(&child);
+
+        app.update().await;
+
+        // Get the entity
+        let entity = app.with_world_mut(|world| {
+            let mut query = world.query_filtered::<Entity, With<GodotNodeHandle>>();
+            query
+                .iter(world)
+                .find(|e| {
+                    world
+                        .get::<Name>(*e)
+                        .map(|n| n.as_str() == "RemoveChildTest")
+                        .unwrap_or(false)
+                })
+                .expect("Child entity should exist")
+        });
+
+        // Manually remove child from parent (not reparenting, just removing)
+        parent.remove_child(&child);
+
+        app.update().await;
+        app.update().await;
+
+        // Verify entity was despawned
+        let entity_exists = app.with_world(|world| world.get_entity(entity).is_ok());
+
+        assert!(
+            !entity_exists,
+            "Entity should be despawned after remove_child()"
+        );
+
+        println!("✓ remove_child() correctly despawns entity");
+
+        // Cleanup
+        app.cleanup();
+        parent.queue_free();
+        // Note: Don't queue_free the child - it was already removed and may be auto-freed
+        await_frames(1).await;
+    })
+}
