@@ -9,6 +9,8 @@ use bevy::{
         schedule::IntoScheduleConfigs,
         system::{NonSendMut, Query},
     },
+    prelude::ReflectComponent,
+    reflect::Reflect,
 };
 use godot::prelude::*;
 use std::sync::mpsc::Receiver;
@@ -38,18 +40,20 @@ pub struct CollisionEvent {
 
 impl Plugin for GodotCollisionsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            PrePhysicsUpdate,
-            (
-                write_godot_collision_events.before(event_update_system),
-                update_godot_collisions,
-            ),
-        )
-        .add_event::<CollisionEvent>();
+        app.register_type::<Collisions>()
+            .add_systems(
+                PrePhysicsUpdate,
+                (
+                    write_godot_collision_events.before(event_update_system),
+                    update_godot_collisions,
+                ),
+            )
+            .add_event::<CollisionEvent>();
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Component, Default)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Component, Default, Reflect)]
+#[reflect(Component)]
 pub struct Collisions {
     colliding_entities: Vec<Entity>,
     recent_collisions: Vec<Entity>,

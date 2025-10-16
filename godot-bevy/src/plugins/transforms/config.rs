@@ -1,7 +1,8 @@
 use bevy::prelude::*;
+use bevy::reflect::Reflect;
 
 /// Transform synchronization modes
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 pub enum TransformSyncMode {
     /// No transform syncing - use direct Godot physics (move_and_slide, etc.)
     /// Best for: Platformers, physics-heavy games
@@ -16,7 +17,8 @@ pub enum TransformSyncMode {
 }
 
 /// Configuration resource for transform syncing behavior
-#[derive(Default, Resource, Debug, Clone)]
+#[derive(Default, Resource, Debug, Clone, Reflect)]
+#[reflect(Resource)]
 pub struct GodotTransformConfig {
     pub sync_mode: TransformSyncMode,
 }

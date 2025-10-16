@@ -7,6 +7,7 @@ class_name OptimizedSceneTreeWatcher
 # Optimized Scene Tree Watcher
 # This GDScript class intercepts scene tree events and performs type analysis
 # on the GDScript side to avoid expensive FFI calls from Rust.
+# Handles 208 different Godot node types.
 
 # Reference to the Rust SceneTreeWatcher
 var rust_watcher: Node = null
@@ -101,15 +102,19 @@ func _analyze_node_type(node: Node) -> String:
 		if node is OmniLight3D: return "OmniLight3D"
 		if node is SpotLight3D: return "SpotLight3D"
 		if node is CollisionShape3D: return "CollisionShape3D"
+		if node is AimModifier3D: return "AimModifier3D"
 		if node is AnimatableBody3D: return "AnimatableBody3D"
 		if node is AnimatedSprite3D: return "AnimatedSprite3D"
 		if node is AudioListener3D: return "AudioListener3D"
 		if node is AudioStreamPlayer3D: return "AudioStreamPlayer3D"
 		if node is BoneAttachment3D: return "BoneAttachment3D"
+		if node is BoneConstraint3D: return "BoneConstraint3D"
 		if node is CPUParticles3D: return "CPUParticles3D"
 		if node is CollisionObject3D: return "CollisionObject3D"
 		if node is CollisionPolygon3D: return "CollisionPolygon3D"
 		if node is ConeTwistJoint3D: return "ConeTwistJoint3D"
+		if node is ConvertTransformModifier3D: return "ConvertTransformModifier3D"
+		if node is CopyTransformModifier3D: return "CopyTransformModifier3D"
 		if node is Decal: return "Decal"
 		if node is GPUParticles3D: return "GPUParticles3D"
 		if node is GPUParticlesAttractor3D: return "GPUParticlesAttractor3D"
@@ -131,8 +136,11 @@ func _analyze_node_type(node: Node) -> String:
 		if node is LightmapProbe: return "LightmapProbe"
 		if node is LookAtModifier3D: return "LookAtModifier3D"
 		if node is Marker3D: return "Marker3D"
+		if node is ModifierBoneTarget3D: return "ModifierBoneTarget3D"
 		if node is MultiMeshInstance3D: return "MultiMeshInstance3D"
 		if node is OccluderInstance3D: return "OccluderInstance3D"
+		if node is OpenXRRenderModel: return "OpenXRRenderModel"
+		if node is OpenXRRenderModelManager: return "OpenXRRenderModelManager"
 		if node is Path3D: return "Path3D"
 		if node is PathFollow3D: return "PathFollow3D"
 		if node is PhysicalBone3D: return "PhysicalBone3D"
@@ -237,6 +245,7 @@ func _analyze_node_type(node: Node) -> String:
 		if node is ColorPickerButton: return "ColorPickerButton"
 		if node is Container: return "Container"
 		if node is FlowContainer: return "FlowContainer"
+		if node is FoldableContainer: return "FoldableContainer"
 		if node is GridContainer: return "GridContainer"
 		if node is HFlowContainer: return "HFlowContainer"
 		if node is HScrollBar: return "HScrollBar"

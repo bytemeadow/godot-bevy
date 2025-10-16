@@ -2,8 +2,9 @@
 use crate::interop::GodotNodeHandle;
 use crate::plugins::assets::GodotResource;
 use crate::plugins::audio::{
-    ActiveTween, AudioChannel, AudioChannelMarker, AudioCommand, AudioOutput, AudioPlayerType,
-    AudioSettings, ChannelId, ChannelState, MainAudioTrack, PlayCommand, SoundId, TweenType,
+    ActiveTween, AudioChannel, AudioChannelMarker, AudioCommand, AudioEasing, AudioOutput,
+    AudioPlayerType, AudioSettings, AudioTween, ChannelId, ChannelState, MainAudioTrack,
+    PlayCommand, SoundId, TweenType,
 };
 use crate::plugins::scene_tree::SceneTreeRef;
 use crate::prelude::main_thread_system;
@@ -26,6 +27,9 @@ impl Plugin for GodotAudioPlugin {
         app.init_resource::<GodotAudioChannels>()
             .init_resource::<AudioOutput>()
             .add_audio_channel::<MainAudioTrack>()
+            .register_type::<AudioSettings>()
+            .register_type::<AudioTween>()
+            .register_type::<AudioEasing>()
             .add_systems(Update, (cleanup_finished_sounds, update_audio_tweens));
     }
 }

@@ -21,7 +21,8 @@ use bevy::{
         schedule::IntoScheduleConfigs,
         system::{Commands, NonSendMut, Query, Res, SystemParam},
     },
-    prelude::Resource,
+    prelude::{ReflectComponent, ReflectResource, Resource},
+    reflect::Reflect,
 };
 use godot::{
     builtin::GString,
@@ -59,7 +60,8 @@ impl Default for GodotSceneTreePlugin {
 }
 
 /// Configuration resource for scene tree behavior
-#[derive(Resource)]
+#[derive(Resource, Reflect)]
+#[reflect(Resource)]
 pub struct SceneTreeConfig {
     /// When true, adds a parent child entity relationship in ECS
     /// that mimics Godot's parent child node relationship.
@@ -78,6 +80,8 @@ impl Plugin for GodotSceneTreePlugin {
             .insert_resource(SceneTreeConfig {
                 add_child_relationship: self.add_child_relationship,
             })
+            .register_type::<SceneTreeConfig>()
+            .register_type::<Groups>()
             .add_event::<SceneTreeEvent>()
             .add_systems(
                 PreStartup,
@@ -302,7 +306,8 @@ fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
     }
 }
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Reflect)]
+#[reflect(Component)]
 pub struct Groups {
     groups: Vec<String>,
 }
@@ -524,7 +529,7 @@ fn _strip_godot_components(commands: &mut Commands, ent: Entity, node: &GodotNod
     entity_commands.remove::<Name>();
     entity_commands.remove::<Groups>();
 
-    remove_comprehensive_node_type_markers(&mut entity_commands, node);
+    remove_comprehensive_node_type_markers(&mut entity_commands, &mut node.clone());
 }
 
 #[main_thread_system]

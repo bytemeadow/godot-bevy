@@ -14,6 +14,9 @@ pub mod prelude;
 pub mod utils;
 pub mod watchers;
 
+#[cfg(test)]
+mod tests;
+
 // Re-export BevyApp for testing and advanced usage
 pub use app::{BEVY_INIT_FUNC, BevyApp};
 

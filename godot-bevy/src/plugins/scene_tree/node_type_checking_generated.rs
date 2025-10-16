@@ -5,7 +5,7 @@ use crate::interop::{GodotNodeHandle, node_markers::*};
 use bevy::ecs::system::EntityCommands;
 
 /// Adds appropriate marker components to an entity based on the Godot node type.
-/// This function is automatically generated and handles all 200 Godot node types.
+/// This function is automatically generated and handles all 208 Godot node types.
 ///
 /// Godot's hierarchy: Node -> {Node3D, CanvasItem -> {Node2D, Control}, Others}
 /// We check the major branches: 3D, 2D, Control (UI), and Universal (direct Node children)
@@ -61,6 +61,10 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
         "Node" => {
             // NodeMarker already added above
         }
+        "AimModifier3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(AimModifier3DMarker);
+        }
         "AnimatableBody3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(AnimatableBody3DMarker);
@@ -84,6 +88,10 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
         "BoneAttachment3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(BoneAttachment3DMarker);
+        }
+        "BoneConstraint3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(BoneConstraint3DMarker);
         }
         "CPUParticles3D" => {
             entity_commands.insert(Node3DMarker);
@@ -112,6 +120,14 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
         "ConeTwistJoint3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(ConeTwistJoint3DMarker);
+        }
+        "ConvertTransformModifier3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(ConvertTransformModifier3DMarker);
+        }
+        "CopyTransformModifier3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(CopyTransformModifier3DMarker);
         }
         "Decal" => {
             entity_commands.insert(Node3DMarker);
@@ -206,6 +222,10 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(MeshInstance3DMarker);
         }
+        "ModifierBoneTarget3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(ModifierBoneTarget3DMarker);
+        }
         "MultiMeshInstance3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(MultiMeshInstance3DMarker);
@@ -217,6 +237,14 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
         "OmniLight3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(OmniLight3DMarker);
+        }
+        "OpenXRRenderModel" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(OpenXRRenderModelMarker);
+        }
+        "OpenXRRenderModelManager" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(OpenXRRenderModelManagerMarker);
         }
         "Path3D" => {
             entity_commands.insert(Node3DMarker);
@@ -566,6 +594,7 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(TileMapMarker);
         }
+        #[cfg(feature = "api-4-3")]
         "TileMapLayer" => {
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
@@ -650,6 +679,11 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(FlowContainerMarker);
+        }
+        "FoldableContainer" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(FoldableContainerMarker);
         }
         "GridContainer" => {
             entity_commands.insert(ControlMarker);
@@ -866,6 +900,7 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(VideoStreamPlayerMarker);
         }
+        #[cfg(feature = "api-4-3")]
         "AnimationMixer" => {
             entity_commands.insert(AnimationMixerMarker);
         }
@@ -907,7 +942,7 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
 
 pub fn remove_comprehensive_node_type_markers(
     entity_commands: &mut EntityCommands,
-    node: &GodotNodeHandle,
+    node: &mut GodotNodeHandle,
 ) {
     // All nodes inherit from Node, so remove this first
     entity_commands.remove::<NodeMarker>();
@@ -929,6 +964,9 @@ fn check_3d_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
     node: &mut GodotNodeHandle,
 ) {
+    if node.try_get::<godot::classes::AimModifier3D>().is_some() {
+        entity_commands.insert(AimModifier3DMarker);
+    }
     if node.try_get::<godot::classes::AnimatableBody3D>().is_some() {
         entity_commands.insert(AnimatableBody3DMarker);
     }
@@ -949,6 +987,9 @@ fn check_3d_node_types_comprehensive(
     }
     if node.try_get::<godot::classes::BoneAttachment3D>().is_some() {
         entity_commands.insert(BoneAttachment3DMarker);
+    }
+    if node.try_get::<godot::classes::BoneConstraint3D>().is_some() {
+        entity_commands.insert(BoneConstraint3DMarker);
     }
     if node.try_get::<godot::classes::CpuParticles3D>().is_some() {
         entity_commands.insert(CPUParticles3DMarker);
@@ -976,6 +1017,18 @@ fn check_3d_node_types_comprehensive(
     }
     if node.try_get::<godot::classes::ConeTwistJoint3D>().is_some() {
         entity_commands.insert(ConeTwistJoint3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::ConvertTransformModifier3D>()
+        .is_some()
+    {
+        entity_commands.insert(ConvertTransformModifier3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::CopyTransformModifier3D>()
+        .is_some()
+    {
+        entity_commands.insert(CopyTransformModifier3DMarker);
     }
     if node.try_get::<godot::classes::Decal>().is_some() {
         entity_commands.insert(DecalMarker);
@@ -1084,6 +1137,12 @@ fn check_3d_node_types_comprehensive(
         entity_commands.insert(MeshInstance3DMarker);
     }
     if node
+        .try_get::<godot::classes::ModifierBoneTarget3D>()
+        .is_some()
+    {
+        entity_commands.insert(ModifierBoneTarget3DMarker);
+    }
+    if node
         .try_get::<godot::classes::MultiMeshInstance3D>()
         .is_some()
     {
@@ -1097,6 +1156,18 @@ fn check_3d_node_types_comprehensive(
     }
     if node.try_get::<godot::classes::OmniLight3D>().is_some() {
         entity_commands.insert(OmniLight3DMarker);
+    }
+    if node
+        .try_get::<godot::classes::OpenXrRenderModel>()
+        .is_some()
+    {
+        entity_commands.insert(OpenXRRenderModelMarker);
+    }
+    if node
+        .try_get::<godot::classes::OpenXrRenderModelManager>()
+        .is_some()
+    {
+        entity_commands.insert(OpenXRRenderModelManagerMarker);
     }
     if node.try_get::<godot::classes::Path3D>().is_some() {
         entity_commands.insert(Path3DMarker);
@@ -1240,15 +1311,17 @@ fn check_3d_node_types_comprehensive(
 
 fn remove_3d_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
-    _node: &GodotNodeHandle,
+    _node: &mut GodotNodeHandle,
 ) {
     entity_commands
+        .remove::<AimModifier3DMarker>()
         .remove::<AnimatableBody3DMarker>()
         .remove::<AnimatedSprite3DMarker>()
         .remove::<Area3DMarker>()
         .remove::<AudioListener3DMarker>()
         .remove::<AudioStreamPlayer3DMarker>()
         .remove::<BoneAttachment3DMarker>()
+        .remove::<BoneConstraint3DMarker>()
         .remove::<CPUParticles3DMarker>()
         .remove::<Camera3DMarker>()
         .remove::<CharacterBody3DMarker>()
@@ -1256,6 +1329,8 @@ fn remove_3d_node_types_comprehensive(
         .remove::<CollisionPolygon3DMarker>()
         .remove::<CollisionShape3DMarker>()
         .remove::<ConeTwistJoint3DMarker>()
+        .remove::<ConvertTransformModifier3DMarker>()
+        .remove::<CopyTransformModifier3DMarker>()
         .remove::<DecalMarker>()
         .remove::<DirectionalLight3DMarker>()
         .remove::<GPUParticles3DMarker>()
@@ -1278,9 +1353,12 @@ fn remove_3d_node_types_comprehensive(
         .remove::<LightmapProbeMarker>()
         .remove::<Marker3DMarker>()
         .remove::<MeshInstance3DMarker>()
+        .remove::<ModifierBoneTarget3DMarker>()
         .remove::<MultiMeshInstance3DMarker>()
         .remove::<OccluderInstance3DMarker>()
         .remove::<OmniLight3DMarker>()
+        .remove::<OpenXRRenderModelMarker>()
+        .remove::<OpenXRRenderModelManagerMarker>()
         .remove::<Path3DMarker>()
         .remove::<PathFollow3DMarker>()
         .remove::<PhysicalBone3DMarker>()
@@ -1471,6 +1549,7 @@ fn check_2d_node_types_comprehensive(
     if node.try_get::<godot::classes::TileMap>().is_some() {
         entity_commands.insert(TileMapMarker);
     }
+    #[cfg(feature = "api-4-3")]
     if node.try_get::<godot::classes::TileMapLayer>().is_some() {
         entity_commands.insert(TileMapLayerMarker);
     }
@@ -1496,7 +1575,7 @@ fn check_2d_node_types_comprehensive(
 
 fn remove_2d_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
-    _node: &GodotNodeHandle,
+    _node: &mut GodotNodeHandle,
 ) {
     entity_commands
         .remove::<AnimatableBody2DMarker>()
@@ -1541,10 +1620,12 @@ fn remove_2d_node_types_comprehensive(
         .remove::<Sprite2DMarker>()
         .remove::<StaticBody2DMarker>()
         .remove::<TileMapMarker>()
-        .remove::<TileMapLayerMarker>()
         .remove::<TouchScreenButtonMarker>()
         .remove::<VisibleOnScreenEnabler2DMarker>()
         .remove::<VisibleOnScreenNotifier2DMarker>();
+
+    #[cfg(feature = "api-4-3")]
+    entity_commands.remove::<TileMapLayerMarker>();
 }
 
 fn check_control_node_types_comprehensive(
@@ -1595,6 +1676,12 @@ fn check_control_node_types_comprehensive(
     }
     if node.try_get::<godot::classes::FlowContainer>().is_some() {
         entity_commands.insert(FlowContainerMarker);
+    }
+    if node
+        .try_get::<godot::classes::FoldableContainer>()
+        .is_some()
+    {
+        entity_commands.insert(FoldableContainerMarker);
     }
     if node.try_get::<godot::classes::GridContainer>().is_some() {
         entity_commands.insert(GridContainerMarker);
@@ -1738,7 +1825,7 @@ fn check_control_node_types_comprehensive(
 
 fn remove_control_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
-    _node: &GodotNodeHandle,
+    _node: &mut GodotNodeHandle,
 ) {
     entity_commands
         .remove::<AspectRatioContainerMarker>()
@@ -1754,6 +1841,7 @@ fn remove_control_node_types_comprehensive(
         .remove::<ColorRectMarker>()
         .remove::<ContainerMarker>()
         .remove::<FlowContainerMarker>()
+        .remove::<FoldableContainerMarker>()
         .remove::<GridContainerMarker>()
         .remove::<HBoxContainerMarker>()
         .remove::<HFlowContainerMarker>()
@@ -1803,6 +1891,7 @@ fn check_universal_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
     node: &mut GodotNodeHandle,
 ) {
+    #[cfg(feature = "api-4-3")]
     if node.try_get::<godot::classes::AnimationMixer>().is_some() {
         entity_commands.insert(AnimationMixerMarker);
     }
@@ -1863,10 +1952,9 @@ fn check_universal_node_types_comprehensive(
 }
 fn remove_universal_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
-    _node: &GodotNodeHandle,
+    _node: &mut GodotNodeHandle,
 ) {
     entity_commands
-        .remove::<AnimationMixerMarker>()
         .remove::<AudioStreamPlayerMarker>()
         .remove::<CanvasItemMarker>()
         .remove::<CanvasLayerMarker>()
@@ -1879,4 +1967,7 @@ fn remove_universal_node_types_comprehensive(
         .remove::<ShaderGlobalsOverrideMarker>()
         .remove::<TimerMarker>()
         .remove::<ViewportMarker>();
+
+    #[cfg(feature = "api-4-3")]
+    entity_commands.remove::<AnimationMixerMarker>();
 }

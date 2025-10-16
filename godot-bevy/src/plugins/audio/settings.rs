@@ -1,9 +1,10 @@
 //! Audio settings and configuration
 
 use crate::plugins::audio::AudioTween;
+use bevy::reflect::Reflect;
 
 /// Settings for playing audio
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Reflect)]
 pub struct AudioSettings {
     pub volume: f32,
     pub pitch: f32,
