@@ -529,7 +529,7 @@ fn _strip_godot_components(commands: &mut Commands, ent: Entity, node: &GodotNod
     entity_commands.remove::<Name>();
     entity_commands.remove::<Groups>();
 
-    remove_comprehensive_node_type_markers(&mut entity_commands, node);
+    remove_comprehensive_node_type_markers(&mut entity_commands, &mut node.clone());
 }
 
 #[main_thread_system]

@@ -131,6 +131,8 @@ class GodotTypeGenerator:
         print("🏷️  Generating node markers...")
 
         content = '''use bevy::ecs::component::Component;
+use bevy::prelude::ReflectComponent;
+use bevy::reflect::Reflect;
 
 /// Marker components for Godot node types.
 /// These enable type-safe ECS queries like: Query<&GodotNodeHandle, With<Sprite2DMarker>>
@@ -139,7 +141,8 @@ class GodotTypeGenerator:
 /// To regenerate: python scripts/generate_godot_types.py
 
 // Base node type marker
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+#[reflect(Component)]
 pub struct NodeMarker;
 
 '''
@@ -149,7 +152,8 @@ pub struct NodeMarker;
             cfg_attr = self.get_type_cfg_attribute(node_type)
             if cfg_attr:
                 content += cfg_attr
-            content += f"#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]\n"
+            content += f"#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]\n"
+            content += f"#[reflect(Component)]\n"
             content += f"pub struct {node_type}Marker;\n\n"
 
         with open(self.node_markers_file, "w") as f:
@@ -458,16 +462,29 @@ var rust_watcher: Node = null
 
 func _ready():
 	name = "OptimizedSceneTreeWatcher"
-	
-	# Auto-detect the Rust SceneTreeWatcher
-	var bevy_app = get_node("/root/BevyAppSingleton")
+
+	# Auto-detect the Rust SceneTreeWatcher using multiple strategies:
+	# 1. Try production path: /root/BevyAppSingleton (autoload singleton)
+	# 2. Try as sibling: get_parent().get_node("SceneTreeWatcher") (test framework)
+	# 3. Use set_rust_watcher() if watcher is set externally
+
+	# Strategy 1: Production - BevyApp autoload singleton
+	var bevy_app = get_node_or_null("/root/BevyAppSingleton")
 	if bevy_app:
-		rust_watcher = bevy_app.get_node("SceneTreeWatcher")
-	
+		rust_watcher = bevy_app.get_node_or_null("SceneTreeWatcher")
+
+	# Strategy 2: Test environment - sibling node
+	if not rust_watcher and get_parent():
+		rust_watcher = get_parent().get_node_or_null("SceneTreeWatcher")
+
+	# If still not found, it may be set later via set_rust_watcher()
+	if not rust_watcher:
+		push_warning("[OptimizedSceneTreeWatcher] SceneTreeWatcher not found. Will wait for set_rust_watcher() call.")
+
 	# Connect to scene tree signals - these will forward to Rust with type info
 	# Use immediate connections for add/remove to get events as early as possible
 	get_tree().node_added.connect(_on_node_added)
-	get_tree().node_removed.connect(_on_node_removed) 
+	get_tree().node_removed.connect(_on_node_removed)
 	get_tree().node_renamed.connect(_on_node_renamed, CONNECT_DEFERRED)
 
 func set_rust_watcher(watcher: Node):
