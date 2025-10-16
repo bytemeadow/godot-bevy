@@ -108,21 +108,47 @@ jobs:
           echo "📊 Benchmark Results:"
           jq -r '.benchmarks | to_entries[] | "\(.key): \(.value.median_display)"' bench-results.json
 
-      - name: Check for regressions (PR only)
-        if: github.event_name == 'pull_request' && env.BASELINE_AVAILABLE == 'true'
+      - name: Generate comparison report (PR only)
+        if: github.event_name == 'pull_request'
         id: regression
         working-directory: itest
         continue-on-error: true
         run: |
-          echo "🔍 Checking for performance regressions..."
+          if [ "$BASELINE_AVAILABLE" == "true" ]; then
+            echo "🔍 Checking for performance regressions..."
 
-          if python3 parse-bench-results.py --json-input --baseline baseline.json --threshold 0.90 bench-results.json > regression-report.txt 2>&1; then
-            echo "status=pass" >> $GITHUB_OUTPUT
-            echo "✅ No regressions detected"
+            if python3 parse-bench-results.py --json-input --baseline baseline.json --threshold 0.90 bench-results.json > regression-report.txt 2>&1; then
+              echo "status=pass" >> $GITHUB_OUTPUT
+              echo "✅ No regressions detected"
+            else
+              echo "status=fail" >> $GITHUB_OUTPUT
+              echo "⚠️ Performance regressions detected!"
+              cat regression-report.txt
+            fi
           else
-            echo "status=fail" >> $GITHUB_OUTPUT
-            echo "⚠️ Performance regressions detected!"
-            cat regression-report.txt
+            echo "📋 No baseline available - creating comparison file with current results only"
+            echo "status=pass" >> $GITHUB_OUTPUT
+
+            # Create a comparison file even without baseline for consistent artifact structure
+            cat > create_comparison.py << 'EOF'
+          import json
+          with open('bench-results.json') as f:
+              results = json.load(f)
+          comparisons = []
+          for name, data in results['benchmarks'].items():
+              comparisons.append({
+                  'name': name,
+                  'status': 'new',
+                  'current': data,
+                  'baseline': None,
+                  'change_pct': None
+              })
+          with open('bench-results-comparison.json', 'w') as f:
+              json.dump({'comparisons': comparisons, 'passed': True}, f, indent=2)
+          EOF
+
+            python3 create_comparison.py
+            echo "✅ Created comparison file for new benchmarks"
           fi
 
       - name: Save PR metadata for comment workflow

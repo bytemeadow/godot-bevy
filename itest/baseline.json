@@ -1,11 +1,11 @@
 {
-  "timestamp": "2025-10-16T12:31:37.091675",
+  "timestamp": "2025-10-16T15:05:50.935881",
   "benchmarks": {
     "transform_update_individual_3d": {
       "min_ns": 1530000.0,
-      "median_ns": 1550000.0,
+      "median_ns": 1540000.0,
       "min_display": "1.53ms",
-      "median_display": "1.55ms"
+      "median_display": "1.54ms"
     },
     "transform_update_bulk_3d": {
       "min_ns": 1400000.0,
@@ -15,20 +15,20 @@
     },
     "transform_update_individual_2d": {
       "min_ns": 2700000.0,
-      "median_ns": 2730000.0,
+      "median_ns": 2720000.0,
       "min_display": "2.7ms",
-      "median_display": "2.73ms"
+      "median_display": "2.72ms"
     },
     "transform_update_bulk_2d": {
       "min_ns": 2480000.0,
-      "median_ns": 2510000.0,
+      "median_ns": 2490000.0,
       "min_display": "2.48ms",
-      "median_display": "2.51ms"
+      "median_display": "2.49ms"
     }
   },
   "ci_metadata": {
-    "commit": "1f76e2b58cb35b47adb4e9a1e1d56270b7435dd6",
-    "timestamp": "2025-10-16T12:31:37Z",
+    "commit": "6c66670a888aad7f1d12ae3a397f194c5a44e11c",
+    "timestamp": "2025-10-16T15:05:50Z",
     "runner": "GitHub Actions"
   }
 }
