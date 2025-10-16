@@ -2,7 +2,7 @@ name: benchmarks
 
 on:
   pull_request:
-    branches: [main, develop]
+    types: [opened, synchronize]
   push:
     branches: [main]
 
@@ -11,21 +11,18 @@ env:
   GODOT_VERSION: "4.5.1"
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: write  # Need write to push to gh-benchmarks branch
 
 jobs:
-  itest-benchmarks:
-    name: performance / itest benchmarks
+  run-benchmarks:
+    name: Run benchmarks
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GHA_PAT || secrets.GITHUB_TOKEN }}
 
-      - name: Install Rust toolchain
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Setup Rust cache
@@ -34,181 +31,185 @@ jobs:
           workspaces: . -> target
 
       - name: Install Linux dependencies
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libasound2-dev libudev-dev pkg-config
-          version: 1.0
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
-      - name: Download and cache Godot
-        id: godot-download
+      - name: Setup Godot
         uses: chickensoft-games/setup-godot@v2
         with:
           version: ${{ env.GODOT_VERSION }}
           use-dotnet: false
           include-templates: false
 
-      - name: Verify Godot installation
-        run: |
-          godot --version
-          echo "GODOT_EXECUTABLE=$(which godot)" >> $GITHUB_ENV
-
-      - name: Build itest benchmarks (release)
+      - name: Build itest in release mode
         working-directory: itest/rust
         run: cargo build --release
 
-      - name: Copy library to godot project (workaround for res:// paths)
+      - name: Copy library to Godot project
+        working-directory: itest
         run: |
-          # Create lib directory in godot project
-          mkdir -p itest/godot/lib
-          # Copy the built library
-          cp target/release/libgodot_bevy_itest.so itest/godot/lib/ || echo "Failed to copy .so"
-          cp target/release/libgodot_bevy_itest.dll itest/godot/lib/ 2>/dev/null || true
-          cp target/release/libgodot_bevy_itest.dylib itest/godot/lib/ 2>/dev/null || true
-          echo "Library copied to itest/godot/lib/"
-          ls -la itest/godot/lib/
+          mkdir -p godot/lib
+          cp rust/target/release/libgodot_bevy_itest.so godot/lib/ 2>/dev/null || \
+          cp rust/target/release/godot_bevy_itest.dll godot/lib/ 2>/dev/null || \
+          cp rust/target/release/libgodot_bevy_itest.dylib godot/lib/ 2>/dev/null || true
 
-      - name: Update .gdextension to use local lib path
-        working-directory: itest/godot
-        run: |
-          # Update .gdextension to point to lib/ directory instead of ../../target/
-          sed -i 's|res://../../target/debug/|res://lib/|g' itest.gdextension
-          sed -i 's|res://../../target/release/|res://lib/|g' itest.gdextension
-          echo "Updated .gdextension file:"
-          cat itest.gdextension
+          # Update .gdextension paths
+          sed -i 's|res://../../target/debug/|res://lib/|g' godot/itest.gdextension
+          sed -i 's|res://../../target/release/|res://lib/|g' godot/itest.gdextension
 
       - name: Import Godot project
         working-directory: itest
-        run: godot --editor --headless --path godot --quit || true
+        run: godot --headless --path godot --import --quit || true
 
-      - name: Download baseline from main (for PR comparison)
-        if: github.event_name == 'pull_request'
-        run: |
-          if curl -f -o itest/baseline.json https://raw.githubusercontent.com/${{ github.repository }}/main/itest/baseline.json; then
-            echo "✅ Found baseline from main branch"
-            echo "BASELINE_AVAILABLE=true" >> $GITHUB_ENV
-          else
-            echo "📋 No baseline found on main branch"
-            echo "BASELINE_AVAILABLE=false" >> $GITHUB_ENV
-          fi
-
-      - name: Run benchmarks
-        id: bench
+      - name: Run benchmarks and extract JSON
         working-directory: itest
         run: |
-          set -o pipefail
+          # Run benchmarks with JSON output enabled
+          export BENCHMARK_JSON=1
+          export BENCHMARK_JSON_PATH=bench-results.json
+
           godot --headless --path godot BenchRunner.tscn --quit-after 60000 2>&1 | tee bench-output.txt
 
-      - name: Parse benchmark results
-        working-directory: itest
-        run: |
-          python3 parse-bench-results.py bench-output.txt --output bench-results.json
-          echo "✅ Benchmark results saved"
-
-          # Pretty print for logs
-          echo "📊 Benchmark Results:"
-          jq -r '.benchmarks | to_entries[] | "\(.key): \(.value.median_display)"' bench-results.json
-
-      - name: Generate comparison report (PR only)
-        if: github.event_name == 'pull_request'
-        id: regression
-        working-directory: itest
-        continue-on-error: true
-        run: |
-          if [ "$BASELINE_AVAILABLE" == "true" ]; then
-            echo "🔍 Checking for performance regressions..."
-
-            if python3 parse-bench-results.py --json-input --baseline baseline.json --threshold 0.90 bench-results.json > regression-report.txt 2>&1; then
-              echo "status=pass" >> $GITHUB_OUTPUT
-              echo "✅ No regressions detected"
-            else
-              echo "status=fail" >> $GITHUB_OUTPUT
-              echo "⚠️ Performance regressions detected!"
-              cat regression-report.txt
-            fi
-          else
-            echo "📋 No baseline available - creating comparison file with current results only"
-            echo "status=pass" >> $GITHUB_OUTPUT
-
-            # Create a comparison file even without baseline for consistent artifact structure
-            cat > create_comparison.py << 'EOF'
-          import json
-          with open('bench-results.json') as f:
-              results = json.load(f)
-          comparisons = []
-          for name, data in results['benchmarks'].items():
-              comparisons.append({
-                  'name': name,
-                  'status': 'new',
-                  'current': data,
-                  'baseline': None,
-                  'change_pct': None
-              })
-          with open('bench-results-comparison.json', 'w') as f:
-              json.dump({'comparisons': comparisons, 'passed': True}, f, indent=2)
-          EOF
-
-            python3 create_comparison.py
-            echo "✅ Created comparison file for new benchmarks"
+          # Extract JSON from output as fallback if file write failed
+          if [ ! -f bench-results.json ]; then
+            sed -n '/===BENCHMARK_JSON_START===/,/===BENCHMARK_JSON_END===/p' bench-output.txt | \
+              sed '1d;$d' > bench-results.json
           fi
 
-      - name: Save PR metadata for comment workflow
-        if: github.event_name == 'pull_request'
-        run: |
-          mkdir -p itest/benchmark-artifacts
-          echo "${{ github.event.number }}" > itest/benchmark-artifacts/pr_number.txt
-          echo "${{ github.event.pull_request.head.sha }}" > itest/benchmark-artifacts/pr_sha.txt
+          # Verify we have valid JSON
+          if ! jq empty bench-results.json 2>/dev/null; then
+            echo "Error: Invalid JSON output"
+            exit 1
+          fi
 
-      - name: Upload benchmark results (for PR comments)
+          echo "✅ Benchmarks complete"
+
+      - name: Fetch baseline (PR only)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd itest
+          # Try to fetch baseline from gh-benchmarks branch
+          curl -sf https://raw.githubusercontent.com/${{ github.repository }}/gh-benchmarks/baseline.json \
+            > baseline.json 2>/dev/null || echo '{"benchmarks":{}}' > baseline.json
+
+      - name: Generate comparison report
+        if: github.event_name == 'pull_request'
+        working-directory: itest
+        run: |
+          # Create Python script for comparison
+          cat > compare.py << 'EOF'
+          import json
+          import sys
+
+          with open('bench-results.json') as f:
+              current = json.load(f)
+
+          try:
+              with open('baseline.json') as f:
+                  baseline = json.load(f)
+          except:
+              baseline = {"benchmarks": {}}
+
+          comparison = {
+              "benchmarks": [],
+              "summary": {"total": 0, "regressions": 0, "improvements": 0, "new": 0}
+          }
+
+          for name, curr_data in current.get("benchmarks", {}).items():
+              base_data = baseline.get("benchmarks", {}).get(name)
+
+              entry = {
+                  "name": name,
+                  "current": curr_data.get("median_display", "N/A"),
+                  "baseline": None,
+                  "change_pct": None,
+                  "status": "new"
+              }
+
+              if base_data:
+                  entry["baseline"] = base_data.get("median_display", "N/A")
+
+                  try:
+                      current_ns = float(curr_data.get("median_ns", 0))
+                      baseline_ns = float(base_data.get("median_ns", 0))
+
+                      if baseline_ns > 0:
+                          change_pct = ((current_ns - baseline_ns) / baseline_ns) * 100
+                          entry["change_pct"] = change_pct
+
+                          if change_pct > 10:
+                              entry["status"] = "regression"
+                              comparison["summary"]["regressions"] += 1
+                          elif change_pct > 5:
+                              entry["status"] = "slower"
+                          elif change_pct < -5:
+                              entry["status"] = "faster"
+                              comparison["summary"]["improvements"] += 1
+                          else:
+                              entry["status"] = "neutral"
+                  except:
+                      pass
+              else:
+                  comparison["summary"]["new"] += 1
+
+              comparison["benchmarks"].append(entry)
+
+          comparison["summary"]["total"] = len(comparison["benchmarks"])
+
+          with open('comparison.json', 'w') as f:
+              json.dump(comparison, f, indent=2)
+
+          # Exit with error if regressions detected
+          sys.exit(1 if comparison["summary"]["regressions"] > 0 else 0)
+          EOF
+
+          python3 compare.py || REGRESSION_DETECTED=$?
+
+          # Save PR context
+          echo "${{ github.event.pull_request.number }}" > pr_number.txt
+          echo "${{ github.event.pull_request.head.sha }}" > pr_sha.txt
+
+      - name: Upload benchmark artifacts
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
           path: |
             itest/bench-results.json
-            itest/bench-results-comparison.json
             itest/baseline.json
-            itest/regression-report.txt
-            itest/benchmark-artifacts/
+            itest/comparison.json
+            itest/pr_number.txt
+            itest/pr_sha.txt
 
-      - name: Save baseline (main branch only)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.repository == 'bytemeadow/godot-bevy'
+      - name: Update baseline (main branch)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp itest/bench-results.json itest/baseline.json
+          # Configure git
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Add CI metadata
-          jq '. + {"ci_metadata": {"commit": "${{ github.sha }}", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'", "runner": "GitHub Actions"}}' \
-            itest/baseline.json > baseline.tmp.json
-          mv baseline.tmp.json itest/baseline.json
+          # Fetch or create gh-benchmarks branch
+          git fetch origin gh-benchmarks 2>/dev/null || true
 
-      - name: Upload baseline artifact (main branch)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.repository == 'bytemeadow/godot-bevy'
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-baseline
-          path: itest/baseline.json
-
-      - name: Commit baseline (main branch)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.repository == 'bytemeadow/godot-bevy'
-        run: |
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-
-          git add -f itest/baseline.json
-
-          if git diff --cached --quiet; then
-            echo "📋 No changes to baseline"
+          if git show-ref --verify --quiet refs/remotes/origin/gh-benchmarks; then
+            git checkout gh-benchmarks
+            git pull origin gh-benchmarks
           else
-            git commit -m "chore: update benchmark baseline from CI [skip ci]
-
-            Updated from commit: ${{ github.sha }}
-            Runner: GitHub Actions"
-
-            git push origin main
-            echo "✅ Pushed updated baseline to main"
+            git checkout --orphan gh-benchmarks
+            git rm -rf . 2>/dev/null || true
+            echo "# Benchmark Baselines" > README.md
+            git add README.md
+            git commit -m "Initialize benchmarks branch"
           fi
 
-      - name: Fail if regressions detected
-        if: github.event_name == 'pull_request' && steps.regression.outputs.status == 'fail'
-        run: |
-          echo "::error::Performance regressions detected! Check the PR comment for details."
-          exit 1
+          # Copy and commit new baseline
+          cp itest/bench-results.json baseline.json
+          git add baseline.json
+          git commit -m "Update baseline from ${{ github.sha }}" || echo "No changes"
+          git push origin gh-benchmarks

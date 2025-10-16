@@ -197,11 +197,15 @@ impl IntegrationTests {
     }
 
     fn run_rust_benchmarks(&self, benchmarks: Vec<RustBenchmark>) {
+        // Check if we should output JSON (for CI)
+        let output_json = std::env::var("BENCHMARK_JSON").is_ok();
+
+        let mut results = Vec::new();
         let mut last_file = None;
 
         for bench in benchmarks {
-            // Print file header if different from last
-            if last_file.as_deref() != Some(bench.file) {
+            // Print file header if different from last (human-readable mode)
+            if !output_json && last_file.as_deref() != Some(bench.file) {
                 if last_file.is_some() {
                     println!();
                 }
@@ -209,19 +213,68 @@ impl IntegrationTests {
                 last_file = Some(bench.file.to_string());
             }
 
-            // Print benchmark name
-            print!("  {:58}", bench.name);
-            std::io::Write::flush(&mut std::io::stdout()).ok();
+            // Print benchmark name (human-readable mode)
+            if !output_json {
+                print!("  {:58}", bench.name);
+                std::io::Write::flush(&mut std::io::stdout()).ok();
+            }
 
             // Run the benchmark
             let result = bencher::run_benchmark(bench.function, bench.repetitions);
 
-            // Print results
-            for stat in result.stats {
-                print!(" {:>12.2?}", stat);
+            // Store result for JSON output
+            results.push((bench.name, result.stats[0], result.stats[1])); // min, median
+
+            // Print results (human-readable mode)
+            if !output_json {
+                for stat in result.stats {
+                    print!(" {:>12.2?}", stat);
+                }
+                println!();
             }
-            println!();
         }
+
+        // Output JSON if requested
+        if output_json {
+            self.output_json_results(results);
+        }
+    }
+
+    fn output_json_results(&self, results: Vec<(&str, std::time::Duration, std::time::Duration)>) {
+        use std::collections::HashMap;
+
+        let mut benchmarks = HashMap::new();
+
+        for (name, min, median) in results {
+            let mut entry = HashMap::new();
+            entry.insert("min_ns", min.as_nanos().to_string());
+            entry.insert("median_ns", median.as_nanos().to_string());
+            entry.insert("min_display", format!("{:.2?}", min));
+            entry.insert("median_display", format!("{:.2?}", median));
+
+            benchmarks.insert(name.to_string(), entry);
+        }
+
+        let output = serde_json::json!({
+            "benchmarks": benchmarks,
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+            "environment": {
+                "rust_debug": cfg!(debug_assertions),
+                "godot_debug": godot::classes::Os::singleton().is_debug_build(),
+            }
+        });
+
+        // Write to file
+        if let Ok(path) = std::env::var("BENCHMARK_JSON_PATH") {
+            if let Ok(file) = std::fs::File::create(path) {
+                let _ = serde_json::to_writer_pretty(file, &output);
+            }
+        }
+
+        // Also output to stdout with special markers for parsing
+        println!("===BENCHMARK_JSON_START===");
+        println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
+        println!("===BENCHMARK_JSON_END===");
     }
 }
 

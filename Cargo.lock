@@ -2381,11 +2381,13 @@ name = "godot-bevy-itest"
 version = "0.0.0"
 dependencies = [
  "bevy",
+ "chrono",
  "godot",
  "godot-bevy",
  "godot-bevy-itest-macros",
  "godot-bevy-macros",
  "parking_lot",
+ "serde_json",
 ]
 
 [[package]]
