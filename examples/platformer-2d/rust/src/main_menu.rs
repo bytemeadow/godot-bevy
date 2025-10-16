@@ -18,6 +18,7 @@ use bevy::{
     },
 };
 use godot::classes::{Button, DisplayServer, display_server::WindowMode};
+use godot::obj::Singleton;
 use godot_bevy::prelude::*;
 
 #[derive(Resource, Default)]

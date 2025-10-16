@@ -150,7 +150,7 @@ fn new_mob(
             .get_animation_names();
 
         let mob_type_index = fastrand::usize(0..mob_types.len());
-        let animation_name = mob_types[mob_type_index].clone();
+        let animation_name = &mob_types[mob_type_index].clone();
 
         // Use animation state instead of direct API calls
         anim_state.play(Some(animation_name.into()));

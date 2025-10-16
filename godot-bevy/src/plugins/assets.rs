@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use futures_lite::stream;
 use godot::classes::ResourceLoader;
 use godot::classes::resource_loader::ThreadLoadStatus;
-use godot::obj::Gd;
+use godot::obj::{Gd, Singleton};
 use godot::prelude::Resource as GodotBaseResource;
 use std::collections::HashMap;
 use std::path::Path;
@@ -214,7 +214,7 @@ impl AssetLoader for GodotResourceAssetLoader {
 
         {
             let mut resource_loader = ResourceLoader::singleton();
-            let path_gstring = godot::builtin::GString::from(godot_path.clone());
+            let path_gstring = godot::builtin::GString::from(&godot_path);
             resource_loader.load_threaded_request(&path_gstring);
         }
 
@@ -226,7 +226,7 @@ impl AssetLoader for GodotResourceAssetLoader {
         loop {
             let status = {
                 let mut resource_loader = ResourceLoader::singleton();
-                let path_gstring = godot::builtin::GString::from(godot_path.clone());
+                let path_gstring = godot::builtin::GString::from(&godot_path);
                 resource_loader.load_threaded_get_status(&path_gstring)
             };
 
@@ -234,7 +234,7 @@ impl AssetLoader for GodotResourceAssetLoader {
                 ThreadLoadStatus::LOADED => {
                     let resource = {
                         let mut resource_loader = ResourceLoader::singleton();
-                        let path_gstring = godot::builtin::GString::from(godot_path.clone());
+                        let path_gstring = godot::builtin::GString::from(&godot_path);
                         resource_loader.load_threaded_get(&path_gstring)
                     };
 

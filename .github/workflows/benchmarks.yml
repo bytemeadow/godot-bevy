@@ -8,7 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  GODOT_VERSION: "4.4.1"
+  GODOT_VERSION: "4.5.1"
 
 permissions:
   contents: write
@@ -143,7 +143,7 @@ jobs:
             benchmark-artifacts/
 
       - name: Save baseline (main branch only)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.repository == 'bytemeadow/godot-bevy'
         run: |
           cp itest/bench-results.json itest/baseline.json
 
@@ -153,14 +153,14 @@ jobs:
           mv baseline.tmp.json itest/baseline.json
 
       - name: Upload baseline artifact (main branch)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.repository == 'bytemeadow/godot-bevy'
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-baseline
           path: itest/baseline.json
 
       - name: Commit baseline (main branch)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.repository == 'bytemeadow/godot-bevy'
         run: |
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"

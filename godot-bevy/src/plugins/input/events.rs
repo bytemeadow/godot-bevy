@@ -14,7 +14,7 @@ use godot::{
         InputEventScreenTouch,
     },
     global::Key,
-    obj::{EngineEnum, Gd},
+    obj::{EngineEnum, Gd, Singleton},
 };
 use tracing::trace;
 

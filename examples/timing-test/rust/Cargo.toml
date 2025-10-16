@@ -13,6 +13,6 @@ name = "timing-test"
 [dependencies]
 bevy = { version = "0.16", default-features = false, features = ["bevy_log"] }
 fastrand = { version = "2.3.0" }
-godot = "0.3"
+godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }
 which = "8"

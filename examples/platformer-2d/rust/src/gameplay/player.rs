@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use godot::classes::CharacterBody2D;
 use godot::classes::{AnimatedSprite2D, Input, ProjectSettings};
 use godot::global::move_toward;
+use godot::obj::Singleton;
 use godot_bevy::plugins::core::PhysicsDelta;
 use godot_bevy::prelude::*;
 

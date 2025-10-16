@@ -27,7 +27,7 @@ use godot::{
     builtin::GString,
     classes::{Engine, Node, SceneTree},
     meta::ToGodot,
-    obj::{Gd, Inherits},
+    obj::{Gd, Inherits, Singleton},
     prelude::GodotConvert,
 };
 use std::collections::HashMap;

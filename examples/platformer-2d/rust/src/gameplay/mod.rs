@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use bevy::state::condition::in_state;
 use bevy::state::state::NextState;
 use gem::GemsCollected;
-use godot::classes::Input;
+use godot::{classes::Input, obj::Singleton};
 use hud::{HudHandles, HudUpdateEvent};
 
 pub mod audio;
