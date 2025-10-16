@@ -52,7 +52,9 @@ impl Plugin for GodotTransformSyncPlugin {
         // Register the transform configuration resource with the plugin's config
         app.insert_resource(GodotTransformConfig {
             sync_mode: self.sync_mode,
-        });
+        })
+        .register_type::<GodotTransformConfig>()
+        .register_type::<TransformSyncMode>();
 
         // Only add automatic sync systems if auto_sync is enabled
         if self.auto_sync {
