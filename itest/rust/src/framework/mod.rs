@@ -265,15 +265,18 @@ impl IntegrationTests {
         });
 
         // Write to file
-        if let Ok(path) = std::env::var("BENCHMARK_JSON_PATH") {
-            if let Ok(file) = std::fs::File::create(path) {
-                let _ = serde_json::to_writer_pretty(file, &output);
-            }
+        if let Ok(path) = std::env::var("BENCHMARK_JSON_PATH")
+            && let Ok(file) = std::fs::File::create(path)
+        {
+            let _ = serde_json::to_writer_pretty(file, &output);
         }
 
         // Also output to stdout with special markers for parsing
         println!("===BENCHMARK_JSON_START===");
-        println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&output).unwrap_or_default()
+        );
         println!("===BENCHMARK_JSON_END===");
     }
 }
