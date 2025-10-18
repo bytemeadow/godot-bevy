@@ -13,7 +13,7 @@ func bulk_update_transforms_3d(
   rotations: PackedVector4Array,
   scales: PackedVector3Array
 ) -> void:
-	var rotation = Quaternion()
+	var rotation: Quaternion = Quaternion()
 	for i: int in range(instance_ids.size()):
 		var node: Node3D = instance_from_id(instance_ids[i]) as Node3D
 		# Trust instance IDs are valid
