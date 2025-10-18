@@ -97,6 +97,7 @@ macro_rules! add_transform_sync_systems {
                 use godot::classes::{Engine, Node2D, Node3D, Object, SceneTree};
                 use godot::global::godot_print;
                 use godot::prelude::{Array, Dictionary, Gd, ToGodot};
+                use godot::obj::Singleton;
 
                 // Try to get the BevyAppSingleton autoload for bulk optimization
                 let engine = Engine::singleton();
