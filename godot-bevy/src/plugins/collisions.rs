@@ -3,11 +3,7 @@ use crate::plugins::core::PrePhysicsUpdate;
 use bevy::{
     app::{App, Plugin},
     ecs::{
-        component::Component,
-        entity::Entity,
-        event::{Event, EventReader, EventWriter, event_update_system},
-        schedule::IntoScheduleConfigs,
-        system::{NonSendMut, Query},
+        component::Component, entity::Entity, message::{message_update_system, Message, MessageReader, MessageWriter}, schedule::IntoScheduleConfigs, system::{NonSendMut, Query}
     },
     prelude::ReflectComponent,
     reflect::Reflect,
@@ -29,26 +25,26 @@ pub const AREA_EXITED: &str = "area_exited";
 pub const COLLISION_START_SIGNALS: &[&str] = &[BODY_ENTERED, AREA_ENTERED];
 
 #[doc(hidden)]
-pub struct CollisionEventReader(pub Receiver<CollisionEvent>);
+pub struct CollisionMessageReader(pub Receiver<CollisionMessage>);
 
-#[derive(Debug, Event)]
-pub struct CollisionEvent {
-    pub event_type: CollisionEventType,
+#[derive(Debug, Message)]
+pub struct CollisionMessage {
+    pub event_type: CollisionMessageType,
     pub origin: GodotNodeHandle,
     pub target: GodotNodeHandle,
 }
 
 impl Plugin for GodotCollisionsPlugin {
     fn build(&self, app: &mut App) {
-        app.register_type::<Collisions>()
-            .add_systems(
-                PrePhysicsUpdate,
-                (
-                    write_godot_collision_events.before(event_update_system),
-                    update_godot_collisions,
-                ),
-            )
-            .add_event::<CollisionEvent>();
+        // Note: register_type is no longer needed in Bevy 0.17 - types with #[derive(Reflect)] are auto-registered
+        app.add_systems(
+            PrePhysicsUpdate,
+            (
+                write_godot_collision_events.before(message_update_system),
+                update_godot_collisions,
+            ),
+        )
+        .add_message::<CollisionMessage>();
     }
 }
 
@@ -72,13 +68,13 @@ impl Collisions {
 #[doc(hidden)]
 #[derive(Debug, GodotConvert)]
 #[godot(via = GString)]
-pub enum CollisionEventType {
+pub enum CollisionMessageType {
     Started,
     Ended,
 }
 
 fn update_godot_collisions(
-    mut events: EventReader<CollisionEvent>,
+    mut messages: MessageReader<CollisionMessage>,
     mut entities: Query<(&GodotNodeHandle, &mut Collisions)>,
     all_entities: Query<(Entity, &GodotNodeHandle)>,
 ) {
@@ -86,7 +82,7 @@ fn update_godot_collisions(
         collisions.recent_collisions = vec![];
     }
 
-    for event in events.read() {
+    for event in messages.read() {
         trace!(target: "godot_collisions_update", event = ?event);
 
         let target = all_entities.iter().find_map(|(ent, reference)| {
@@ -111,18 +107,18 @@ fn update_godot_collisions(
         };
 
         match event.event_type {
-            CollisionEventType::Started => {
+            CollisionMessageType::Started => {
                 collisions.colliding_entities.push(target);
                 collisions.recent_collisions.push(target);
             }
-            CollisionEventType::Ended => collisions.colliding_entities.retain(|x| *x != target),
+            CollisionMessageType::Ended => collisions.colliding_entities.retain(|x| *x != target),
         };
     }
 }
 
 fn write_godot_collision_events(
-    events: NonSendMut<CollisionEventReader>,
-    mut event_writer: EventWriter<CollisionEvent>,
+    events: NonSendMut<CollisionMessageReader>,
+    mut message_writer: MessageWriter<CollisionMessage>,
 ) {
-    event_writer.write_batch(events.0.try_iter());
+    message_writer.write_batch(events.0.try_iter());
 }

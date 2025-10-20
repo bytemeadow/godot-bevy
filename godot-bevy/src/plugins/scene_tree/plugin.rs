@@ -8,7 +8,7 @@ use crate::{
     interop::GodotNodeHandle,
     plugins::collisions::{
         AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED, COLLISION_START_SIGNALS,
-        CollisionEventType, Collisions,
+        CollisionMessageType, Collisions,
     },
 };
 use bevy::{
@@ -16,8 +16,8 @@ use bevy::{
     ecs::{
         component::Component,
         entity::Entity,
-        event::{Event, EventReader, EventWriter, event_update_system},
         name::Name,
+        message::{Message, MessageReader, MessageWriter, message_update_system},
         schedule::IntoScheduleConfigs,
         system::{Commands, NonSendMut, Query, Res, SystemParam},
     },
@@ -37,7 +37,7 @@ use tracing::{debug, trace, warn};
 
 /// Unified scene tree plugin that provides:
 /// - SceneTreeRef for accessing the Godot scene tree
-/// - Scene tree events (NodeAdded, NodeRemoved, NodeRenamed)
+/// - Scene tree messsages (NodeAdded, NodeRemoved, NodeRenamed)
 /// - Automatic entity creation and mirroring for scene tree nodes
 ///
 /// This plugin is always included in the core plugins and provides
@@ -80,9 +80,7 @@ impl Plugin for GodotSceneTreePlugin {
             .insert_resource(SceneTreeConfig {
                 add_child_relationship: self.add_child_relationship,
             })
-            .register_type::<SceneTreeConfig>()
-            .register_type::<Groups>()
-            .add_event::<SceneTreeEvent>()
+            .add_message::<SceneTreeMessage>()
             .add_systems(
                 PreStartup,
                 (connect_scene_tree, initialize_scene_tree).chain(),
@@ -90,8 +88,8 @@ impl Plugin for GodotSceneTreePlugin {
             .add_systems(
                 First,
                 (
-                    write_scene_tree_events.before(event_update_system),
-                    read_scene_tree_events.before(event_update_system),
+                    write_scene_tree_messages.before(message_update_system),
+                    read_scene_tree_messages.before(message_update_system),
                 ),
             );
     }
@@ -143,7 +141,7 @@ fn initialize_scene_tree(
         .try_get_node_as::<Node>("/root/BevyAppSingleton/OptimizedSceneTreeWatcher")
         .or_else(|| root.try_get_node_as::<Node>("BevyAppSingleton/OptimizedSceneTreeWatcher"));
 
-    let events = if let Some(mut watcher) = optimized_watcher {
+    let messages = if let Some(mut watcher) = optimized_watcher {
         // Use optimized GDScript watcher to analyze the initial tree with type information
         tracing::info!("Using optimized initial tree analysis with type pre-analysis");
 
@@ -158,23 +156,23 @@ fn initialize_scene_tree(
             .unwrap()
             .to::<godot::builtin::PackedStringArray>();
 
-        let mut events = Vec::new();
+        let mut messages = Vec::new();
         let len = instance_ids.len().min(node_types.len());
         for i in 0..len {
             if let (Some(id), Some(type_gstring)) = (instance_ids.get(i), node_types.get(i)) {
                 let type_str = type_gstring.to_string();
 
-                events.push(SceneTreeEvent {
+                messages.push(SceneTreeMessage {
                     node: GodotNodeHandle::from_instance_id(godot::prelude::InstanceId::from_i64(
                         id,
                     )),
-                    event_type: SceneTreeEventType::NodeAdded,
+                    message_type: SceneTreeMessageType::NodeAdded,
                     node_type: Some(type_str),
                 });
             }
         }
 
-        events
+        messages
     } else {
         // Use fallback traversal without type optimization
         tracing::info!("Using fallback initial tree analysis (no type optimization)");
@@ -183,7 +181,7 @@ fn initialize_scene_tree(
 
     create_scene_tree_entity(
         &mut commands,
-        events,
+        messages,
         &mut scene_tree,
         &mut entities,
         &config,
@@ -191,34 +189,34 @@ fn initialize_scene_tree(
     );
 }
 
-fn traverse_fallback(node: Gd<Node>) -> Vec<SceneTreeEvent> {
-    fn traverse_recursive(node: Gd<Node>, events: &mut Vec<SceneTreeEvent>) {
-        events.push(SceneTreeEvent {
+fn traverse_fallback(node: Gd<Node>) -> Vec<SceneTreeMessage> {
+    fn traverse_recursive(node: Gd<Node>, messages: &mut Vec<SceneTreeMessage>) {
+        messages.push(SceneTreeMessage {
             node: GodotNodeHandle::from_instance_id(node.instance_id()),
-            event_type: SceneTreeEventType::NodeAdded,
+            message_type: SceneTreeMessageType::NodeAdded,
             node_type: None, // No type optimization available
         });
 
         for child in node.get_children().iter_shared() {
-            traverse_recursive(child, events);
+            traverse_recursive(child, messages);
         }
     }
 
-    let mut events = Vec::new();
-    traverse_recursive(node, &mut events);
-    events
+    let mut messages = Vec::new();
+    traverse_recursive(node, &mut messages);
+    messages
 }
 
-#[derive(Debug, Clone, Event)]
-pub struct SceneTreeEvent {
+#[derive(Debug, Clone, Message)]
+pub struct SceneTreeMessage {
     pub node: GodotNodeHandle,
-    pub event_type: SceneTreeEventType,
+    pub message_type: SceneTreeMessageType,
     pub node_type: Option<String>, // Pre-analyzed node type from GDScript watcher
 }
 
 #[derive(Copy, Clone, Debug, GodotConvert)]
 #[godot(via = GString)]
-pub enum SceneTreeEventType {
+pub enum SceneTreeMessageType {
     NodeAdded,
     NodeRemoved,
     NodeRenamed,
@@ -276,7 +274,7 @@ fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
 
     if optimized_watcher.is_some() {
         // The optimized GDScript watcher handles scene tree connections and forwards
-        // pre-analyzed events to the Rust watcher (which has the MPSC sender)
+        // pre-analyzed messages to the Rust watcher (which has the MPSC sender)
         // No need to connect here - it connects automatically in its _ready()
         tracing::info!("Using optimized GDScript scene tree watcher with type pre-analysis");
     } else {
@@ -287,21 +285,21 @@ fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
             "node_added",
             &watcher
                 .callable("scene_tree_event")
-                .bind(&[SceneTreeEventType::NodeAdded.to_variant()]),
+                .bind(&[SceneTreeMessageType::NodeAdded.to_variant()]),
         );
 
         scene_tree_gd.connect(
             "node_removed",
             &watcher
                 .callable("scene_tree_event")
-                .bind(&[SceneTreeEventType::NodeRemoved.to_variant()]),
+                .bind(&[SceneTreeMessageType::NodeRemoved.to_variant()]),
         );
 
         scene_tree_gd.connect(
             "node_renamed",
             &watcher
                 .callable("scene_tree_event")
-                .bind(&[SceneTreeEventType::NodeRenamed.to_variant()]),
+                .bind(&[SceneTreeMessageType::NodeRenamed.to_variant()]),
         );
     }
 }
@@ -333,13 +331,13 @@ impl<T: Inherits<Node>> From<&Gd<T>> for Groups {
 }
 
 #[doc(hidden)]
-pub struct SceneTreeEventReader(pub std::sync::mpsc::Receiver<SceneTreeEvent>);
+pub struct SceneTreeMessageReader(pub std::sync::mpsc::Receiver<SceneTreeMessage>);
 
-fn write_scene_tree_events(
-    event_reader: NonSendMut<SceneTreeEventReader>,
-    mut event_writer: EventWriter<SceneTreeEvent>,
+fn write_scene_tree_messages(
+    message_reader: NonSendMut<SceneTreeMessageReader>,
+    mut message_writer: MessageWriter<SceneTreeMessage>,
 ) {
-    event_writer.write_batch(event_reader.0.try_iter());
+    message_writer.write_batch(message_reader.0.try_iter());
 }
 
 /// Marks an entity so it is not despawned when its corresponding Godot Node is freed, breaking
@@ -351,7 +349,7 @@ pub struct ProtectedNodeEntity;
 
 fn create_scene_tree_entity(
     commands: &mut Commands,
-    events: impl IntoIterator<Item = SceneTreeEvent>,
+    messages: impl IntoIterator<Item = SceneTreeMessage>,
     scene_tree: &mut SceneTreeRef,
     entities: &mut Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
     config: &SceneTreeConfig,
@@ -376,14 +374,14 @@ fn create_scene_tree_entity(
             find_node_by_name(&scene_root.clone().upcast(), "CollisionWatcher")
         });
 
-    for event in events.into_iter() {
-        trace!(target: "godot_scene_tree_events", event = ?event);
+    for message in messages.into_iter() {
+        trace!(target: "godot_scene_tree_messages", message = ?message);
 
-        let mut node = event.node.clone();
+        let mut node = message.node.clone();
         let ent = ent_mapping.get(&node.instance_id()).cloned();
 
-        match event.event_type {
-            SceneTreeEventType::NodeAdded => {
+        match message.message_type {
+            SceneTreeMessageType::NodeAdded => {
                 // Skip nodes that have been freed before we process them (can happen in tests)
                 if !node.instance_id().lookup_validity() {
                     continue;
@@ -399,7 +397,7 @@ fn create_scene_tree_entity(
                     .insert(Name::from(node.get::<Node>().get_name().to_string()));
 
                 // Add node type marker components - use optimized version if available
-                if let Some(ref node_type_str) = event.node_type {
+                if let Some(ref node_type_str) = message.node_type {
                     // Use pre-analyzed type from GDScript watcher (much faster)
                     add_node_type_markers_from_string(&mut ent, node_type_str);
                 } else {
@@ -429,7 +427,7 @@ fn create_scene_tree_entity(
                                 BODY_ENTERED,
                                 &collision_watcher.callable("collision_event").bind(&[
                                     node_clone.to_variant(),
-                                    CollisionEventType::Started.to_variant(),
+                                    CollisionMessageType::Started.to_variant(),
                                 ]),
                             );
                         }
@@ -439,7 +437,7 @@ fn create_scene_tree_entity(
                                 BODY_EXITED,
                                 &collision_watcher.callable("collision_event").bind(&[
                                     node_clone.to_variant(),
-                                    CollisionEventType::Ended.to_variant(),
+                                    CollisionMessageType::Ended.to_variant(),
                                 ]),
                             );
                         }
@@ -449,7 +447,7 @@ fn create_scene_tree_entity(
                                 AREA_ENTERED,
                                 &collision_watcher.callable("collision_event").bind(&[
                                     node_clone.to_variant(),
-                                    CollisionEventType::Started.to_variant(),
+                                    CollisionMessageType::Started.to_variant(),
                                 ]),
                             );
                         }
@@ -459,7 +457,7 @@ fn create_scene_tree_entity(
                                 AREA_EXITED,
                                 &collision_watcher.callable("collision_event").bind(&[
                                     node_clone.to_variant(),
-                                    CollisionEventType::Ended.to_variant(),
+                                    CollisionMessageType::Ended.to_variant(),
                                 ]),
                             );
                         }
@@ -472,13 +470,13 @@ fn create_scene_tree_entity(
                 ent.insert(Groups::from(&node));
 
                 // Add all components registered by plugins
-                component_registry.add_to_entity(&mut ent, &event.node);
+                component_registry.add_to_entity(&mut ent, &message.node);
 
                 let ent = ent.id();
                 ent_mapping.insert(node.instance_id(), (ent, None));
 
                 // Try to add any registered bundles for this node type
-                super::autosync::try_add_bundles_for_node(commands, ent, &event.node);
+                super::autosync::try_add_bundles_for_node(commands, ent, &message.node);
 
                 if config.add_child_relationship
                     && node.instance_id() != scene_root.instance_id()
@@ -488,13 +486,13 @@ fn create_scene_tree_entity(
                     if let Some((parent_entity, _)) = ent_mapping.get(&parent_id) {
                         commands.entity(*parent_entity).add_children(&[ent]);
                     } else {
-                        warn!(target: "godot_scene_tree_events",
+                        warn!(target: "godot_scene_tree_messages",
                             "Parent entity with ID {} not found in ent_mapping. This might indicate a missing or incorrect mapping.",
                             parent_id);
                     }
                 }
             }
-            SceneTreeEventType::NodeRemoved => {
+            SceneTreeMessageType::NodeRemoved => {
                 if let Some((ent, prot_opt)) = ent {
                     let protected = prot_opt.is_some();
                     if !protected {
@@ -505,16 +503,16 @@ fn create_scene_tree_entity(
                     ent_mapping.remove(&node.instance_id());
                 } else {
                     // Entity was already despawned (common when using queue_free)
-                    trace!(target: "godot_scene_tree_events", "Entity for removed node was already despawned");
+                    trace!(target: "godot_scene_tree_messages", "Entity for removed node was already despawned");
                 }
             }
-            SceneTreeEventType::NodeRenamed => {
+            SceneTreeMessageType::NodeRenamed => {
                 if let Some((ent, _)) = ent {
                     commands
                         .entity(ent)
                         .insert(Name::from(node.get::<Node>().get_name().to_string()));
                 } else {
-                    trace!(target: "godot_scene_tree_events", "Entity for renamed node was already despawned");
+                    trace!(target: "godot_scene_tree_messages", "Entity for renamed node was already despawned");
                 }
             }
         }
@@ -533,17 +531,17 @@ fn _strip_godot_components(commands: &mut Commands, ent: Entity, node: &GodotNod
 }
 
 #[main_thread_system]
-fn read_scene_tree_events(
+fn read_scene_tree_messages(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
-    mut event_reader: EventReader<SceneTreeEvent>,
+    mut message_reader: MessageReader<SceneTreeMessage>,
     mut entities: Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
     config: Res<SceneTreeConfig>,
     component_registry: Res<SceneTreeComponentRegistry>,
 ) {
     create_scene_tree_entity(
         &mut commands,
-        event_reader.read().cloned(),
+        message_reader.read().cloned(),
         &mut scene_tree,
         &mut entities,
         &config,

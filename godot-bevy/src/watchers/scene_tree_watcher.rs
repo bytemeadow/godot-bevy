@@ -5,14 +5,14 @@ use std::sync::mpsc::Sender;
 
 use crate::{
     interop::GodotNodeHandle,
-    plugins::scene_tree::{SceneTreeEvent, SceneTreeEventType},
+    plugins::scene_tree::{SceneTreeMessage, SceneTreeMessageType},
 };
 
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct SceneTreeWatcher {
     base: Base<Node>,
-    pub notification_channel: Option<Sender<SceneTreeEvent>>,
+    pub notification_channel: Option<Sender<SceneTreeMessage>>,
 }
 
 #[godot_api]
@@ -28,11 +28,11 @@ impl INode for SceneTreeWatcher {
 #[godot_api]
 impl SceneTreeWatcher {
     #[func]
-    pub fn scene_tree_event(&self, node: Gd<Node>, event_type: SceneTreeEventType) {
+    pub fn scene_tree_event(&self, node: Gd<Node>, message_type: SceneTreeMessageType) {
         if let Some(channel) = self.notification_channel.as_ref() {
-            let _ = channel.send(SceneTreeEvent {
+            let _ = channel.send(SceneTreeMessage {
                 node: GodotNodeHandle::from_instance_id(node.instance_id()),
-                event_type,
+                message_type,
                 node_type: None, // No type optimization in basic method
             });
         }
@@ -42,13 +42,13 @@ impl SceneTreeWatcher {
     pub fn scene_tree_event_typed(
         &self,
         node: Gd<Node>,
-        event_type: SceneTreeEventType,
+        message_type: SceneTreeMessageType,
         node_type: String,
     ) {
         if let Some(channel) = self.notification_channel.as_ref() {
-            let _ = channel.send(SceneTreeEvent {
+            let _ = channel.send(SceneTreeMessage {
                 node: GodotNodeHandle::from_instance_id(node.instance_id()),
-                event_type,
+                message_type,
                 node_type: Some(node_type), // Pre-analyzed type from GDScript
             });
         }
