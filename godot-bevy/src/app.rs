@@ -1,9 +1,9 @@
 use crate::plugins::core::PrePhysicsUpdate;
 use crate::plugins::{
-    collisions::CollisionEventReader,
+    collisions::CollisionMessageReader,
     core::{PhysicsDelta, PhysicsUpdate},
     input::InputEventReader,
-    scene_tree::SceneTreeEventReader,
+    scene_tree::SceneTreeMessageReader,
     signals::{GodotSignalReader, GodotSignalSender},
 };
 use crate::watchers::collision_watcher::CollisionWatcher;
@@ -55,7 +55,7 @@ impl BevyApp {
         scene_tree_watcher.bind_mut().notification_channel = Some(sender);
         scene_tree_watcher.set_name("SceneTreeWatcher");
         self.base_mut().add_child(&scene_tree_watcher);
-        app.insert_non_send_resource(SceneTreeEventReader(receiver));
+        app.insert_non_send_resource(SceneTreeMessageReader(receiver));
     }
 
     fn register_signal_system(&mut self, app: &mut App) {
@@ -86,7 +86,7 @@ impl BevyApp {
         collision_watcher.bind_mut().notification_channel = Some(sender);
         collision_watcher.set_name("CollisionWatcher");
         self.base_mut().add_child(&collision_watcher);
-        app.insert_non_send_resource(CollisionEventReader(receiver));
+        app.insert_non_send_resource(CollisionMessageReader(receiver));
     }
 
     fn register_optimized_scene_tree_watcher(&mut self) {
@@ -147,21 +147,21 @@ impl INode for BevyApp {
         // Create watchers BEFORE app.finish() so PreStartup systems can find them
         // Check which plugins were added by looking for their resources/events
 
-        // Scene tree plugin check - look for Events<SceneTreeEvent>
-        use crate::plugins::scene_tree::SceneTreeEvent;
+        // Scene tree plugin check - look for Messages<SceneTreeMessage>
+        use crate::plugins::scene_tree::SceneTreeMessage;
         if app
             .world()
-            .contains_resource::<bevy::ecs::event::Events<SceneTreeEvent>>()
+            .contains_resource::<bevy::ecs::message::Messages<SceneTreeMessage>>()
         {
             self.register_scene_tree_watcher(&mut app);
             self.register_optimized_scene_tree_watcher();
         }
 
         // Collision plugin check - similar approach
-        use crate::plugins::collisions::CollisionEvent;
+        use crate::plugins::collisions::CollisionMessage;
         if app
             .world()
-            .contains_resource::<bevy::ecs::event::Events<CollisionEvent>>()
+            .contains_resource::<bevy::ecs::message::Messages<CollisionMessage>>()
         {
             self.register_collision_watcher(&mut app);
         }
@@ -170,7 +170,7 @@ impl INode for BevyApp {
         use crate::plugins::signals::GodotSignal;
         if app
             .world()
-            .contains_resource::<bevy::ecs::event::Events<GodotSignal>>()
+            .contains_resource::<bevy::ecs::message::Messages<GodotSignal>>()
         {
             self.register_signal_system(&mut app);
         }
@@ -179,7 +179,7 @@ impl INode for BevyApp {
         use crate::plugins::input::KeyboardInput;
         if app
             .world()
-            .contains_resource::<bevy::ecs::event::Events<KeyboardInput>>()
+            .contains_resource::<bevy::ecs::message::Messages<KeyboardInput>>()
         {
             self.register_input_event_watcher(&mut app);
         }
