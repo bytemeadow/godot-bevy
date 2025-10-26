@@ -12,11 +12,11 @@ members = [
   "godot-bevy",
   "godot-bevy-macros",
   "itest/rust",
-  "examples/avian-physics-demo/rust",
+  # NOTE: avian-physics-demo excluded - needs avian3d 0.5 and bevy_asset_loader stable 0.24
+  # "examples/avian-physics-demo/rust",
   "examples/dodge-the-creeps-2d/rust",
   "examples/timing-test/rust",
-  # NOTE: input-event-demo is excluded until bevy_enhanced_input and leafwing-input-manager
-  # have Bevy 0.17 compatible versions available
+  # NOTE: input-event-demo excluded - needs bevy_enhanced_input and leafwing-input-manager 0.17 support
   # "examples/input-event-demo/rust",
   "examples/platformer-2d/rust",
   "examples/simple-node2d-movement/rust",

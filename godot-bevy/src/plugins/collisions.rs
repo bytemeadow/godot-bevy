@@ -3,7 +3,11 @@ use crate::plugins::core::PrePhysicsUpdate;
 use bevy::{
     app::{App, Plugin},
     ecs::{
-        component::Component, entity::Entity, message::{message_update_system, Message, MessageReader, MessageWriter}, schedule::IntoScheduleConfigs, system::{NonSendMut, Query}
+        component::Component,
+        entity::Entity,
+        message::{Message, MessageReader, MessageWriter, message_update_system},
+        schedule::IntoScheduleConfigs,
+        system::{NonSendMut, Query},
     },
     prelude::ReflectComponent,
     reflect::Reflect,
@@ -36,7 +40,6 @@ pub struct CollisionMessage {
 
 impl Plugin for GodotCollisionsPlugin {
     fn build(&self, app: &mut App) {
-        // Note: register_type is no longer needed in Bevy 0.17 - types with #[derive(Reflect)] are auto-registered
         app.add_systems(
             PrePhysicsUpdate,
             (

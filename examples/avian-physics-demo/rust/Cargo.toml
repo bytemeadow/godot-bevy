@@ -12,7 +12,7 @@ name = "avian_physics_test"
 
 [dependencies]
 avian3d = "0.3"
-bevy = { version = "0.16", default-features = false, features = [
+bevy = { version = "0.17", default-features = false, features = [
   "bevy_asset",
   "bevy_state",
   "bevy_gilrs",
