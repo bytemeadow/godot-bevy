@@ -7,7 +7,7 @@ signal project_created(project_info: Dictionary)
 @onready var version_input: LineEdit = $VBox/Version/LineEdit
 @onready var release_build_check: CheckBox = $VBox/ReleaseBuild
 
-const DEFAULT_VERSION = "0.9.1"
+const DEFAULT_VERSION = "0.9.2"
 
 func _ready():
 	title = "Setup godot-bevy Project"
@@ -20,7 +20,7 @@ func _ready():
 
 	# Connect signals
 	get_ok_button().pressed.connect(_on_create_pressed)
-	
+
 	# Force proper sizing - known Godot issue workaround
 	call_deferred("_fix_dialog_size")
 

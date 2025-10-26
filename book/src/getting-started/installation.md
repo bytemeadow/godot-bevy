@@ -33,7 +33,7 @@ The easiest way to get started is using the godot-bevy editor plugin, which auto
 1. Go to **Project > Tools > Setup godot-bevy Project**
 2. Configure your project settings:
    - **Project name**: Used for the Rust crate name
-   - **godot-bevy version**: Library version (default: 0.9.1)  
+   - **godot-bevy version**: Library version (default: 0.9.2)
    - **Release build**: Whether to build in release mode initially
 3. Click **"Create Project"**
 
@@ -97,9 +97,9 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-godot-bevy = "0.9.1"
+godot-bevy = "0.9.2"
 bevy = { version = "0.16", default-features = false }
-godot = "0.3"
+godot = "0.4"
 
 [lints.rust.unexpected_cfgs]
 level = "warn"
@@ -221,7 +221,7 @@ cargo build
 
 ## Next Steps
 
-Congratulations! You've successfully set up godot-bevy using either the plugin or manual installation method. 
+Congratulations! You've successfully set up godot-bevy using either the plugin or manual installation method.
 
 The plugin installation automatically includes the new bulk transform API optimizations, while manual installations can add these by updating their BevyApp singleton scene.
 

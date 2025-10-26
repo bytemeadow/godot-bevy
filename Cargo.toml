@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.9.1"
+version = "0.9.2"
 edition = "2024"
 authors = ["David Chavez <david@dcvz.io>"]
 repository = "https://github.com/bytemeadow/godot-bevy"
@@ -25,4 +25,4 @@ resolver = "2"
 
 [workspace.dependencies]
 godot = { version = "0.4.1", features = ["experimental-threads"] }
-godot-bevy-macros = { version = "0.9.1", path = "godot-bevy-macros" }
+godot-bevy-macros = { version = "0.9.2", path = "godot-bevy-macros" }
