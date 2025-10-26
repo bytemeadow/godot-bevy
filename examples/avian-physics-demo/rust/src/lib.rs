@@ -12,8 +12,9 @@ use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::schedule::common_conditions::run_once;
 use bevy::ecs::system::ResMut;
 use bevy::prelude::{
-    Added, App, AppExtStates, Assets, Commands, Component, Entity, Event, EventReader, EventWriter,
-    Handle, Mesh, OnExit, Plugin, Query, Res, Resource, Result, States, Transform, Vec3, debug,
+    Added, App, AppExtStates, Assets, Commands, Component, Entity, Handle, Mesh, Message,
+    MessageReader, MessageWriter, OnExit, Plugin, Query, Res, Resource, Result, States, Transform,
+    Vec3, debug,
 };
 use bevy::{scene::ScenePlugin, state::app::StatesPlugin};
 use bevy_asset_loader::{
@@ -70,7 +71,7 @@ impl Plugin for AvianPhysicsDemo {
             .add_systems(Startup, update_scene_tree_config.run_if(run_once))
             .add_systems(OnExit(GameState::LoadAssets), spawn_entities)
             .add_systems(PhysicsUpdate, add_avian_collider)
-            .add_event::<ColliderRequired>();
+            .add_message::<ColliderRequired>();
     }
 }
 
@@ -86,7 +87,7 @@ pub struct GameAssets {
     floor_scene: Handle<GodotResource>,
 }
 
-#[derive(Event)]
+#[derive(Message)]
 struct ColliderRequired(Entity);
 
 // NOTE: Would really prefer initialize these values by adding the GodotSceneTreePlugin plugin
@@ -105,7 +106,7 @@ fn update_scene_tree_config(mut config: ResMut<SceneTreeConfig>) {
 fn spawn_entities(
     mut commands: Commands,
     assets: Res<GameAssets>,
-    mut events: EventWriter<ColliderRequired>,
+    mut events: MessageWriter<ColliderRequired>,
 ) {
     //
     // Spawn a static floor
@@ -138,7 +139,7 @@ fn spawn_entities(
 
 fn add_avian_collider(
     mut commands: Commands,
-    mut events: EventReader<ColliderRequired>,
+    mut events: MessageReader<ColliderRequired>,
     mut query: Query<&mut GodotNodeHandle, Added<RigidBody>>,
 ) -> Result {
     for collider_required in events.read() {

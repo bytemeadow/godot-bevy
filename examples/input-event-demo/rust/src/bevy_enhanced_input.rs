@@ -18,7 +18,7 @@ fn init_input(mut commands: Commands) {
     commands.spawn(Actions::<Player>::default());
 }
 
-fn bind(trigger: Trigger<Bind<Player>>, mut players: Query<&mut Actions<Player>>) {
+fn bind(trigger: On<Bind<Player>>, mut players: Query<&mut Actions<Player>>) {
     if let Ok(mut actions) = players.get_mut(trigger.target()) {
         actions
             .bind::<Move>()
@@ -30,11 +30,11 @@ fn bind(trigger: Trigger<Bind<Player>>, mut players: Query<&mut Actions<Player>>
     }
 }
 
-fn apply_move(trigger: Trigger<Fired<Move>>) {
+fn apply_move(trigger: On<Fire<Move>>) {
     godot_print!("[BEVY ENHANCED INPUT] move: {}", trigger.value);
 }
 
-fn interact(_trigger: Trigger<Fired<Interact>>) {
+fn interact(_trigger: On<Fire<Interact>>) {
     godot_print!("[BEVY ENHANCED INPUT] interact");
 }
 

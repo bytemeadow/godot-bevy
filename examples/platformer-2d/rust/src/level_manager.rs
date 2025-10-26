@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 use godot::classes::Node;
 use godot::prelude::*;
-use godot_bevy::plugins::scene_tree::{SceneTreeEvent, SceneTreeEventType};
+use godot_bevy::plugins::scene_tree::{SceneTreeMessage, SceneTreeMessageType};
 use godot_bevy::prelude::*;
 
-use crate::scene_management::SceneOperationEvent;
+use crate::scene_management::SceneOperationMessage;
 
 /// Simple level identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, GodotConvert, Var, Export)]
@@ -67,14 +67,14 @@ pub struct PendingLevel {
 }
 
 /// Event fired when a level load is requested
-#[derive(Event)]
-pub struct LoadLevelEvent {
+#[derive(Message)]
+pub struct LoadLevelMessage {
     pub level_id: LevelId,
 }
 
 /// Event fired when level loading is complete
-#[derive(Event)]
-pub struct LevelLoadedEvent {
+#[derive(Message)]
+pub struct LevelLoadedMessage {
     pub level_id: LevelId,
 }
 
@@ -85,8 +85,8 @@ impl Plugin for LevelManagerPlugin {
         app.init_resource::<CurrentLevel>()
             .init_resource::<PendingLevel>()
             .init_resource::<LevelLoadingState>()
-            .add_event::<LoadLevelEvent>()
-            .add_event::<LevelLoadedEvent>()
+            .add_message::<LoadLevelMessage>()
+            .add_message::<LevelLoadedMessage>()
             .add_systems(
                 Update,
                 (
@@ -102,7 +102,7 @@ impl Plugin for LevelManagerPlugin {
 fn handle_level_load_requests(
     mut loading_state: ResMut<LevelLoadingState>,
     mut current_level: ResMut<CurrentLevel>,
-    mut load_events: EventReader<LoadLevelEvent>,
+    mut load_events: MessageReader<LoadLevelMessage>,
     asset_server: Res<AssetServer>,
 ) {
     for event in load_events.read() {
@@ -126,7 +126,7 @@ fn handle_level_scene_change(
     current_level: Res<CurrentLevel>,
     mut loading_state: ResMut<LevelLoadingState>,
     mut pending_level: ResMut<PendingLevel>,
-    mut scene_events: EventWriter<SceneOperationEvent>,
+    mut scene_events: MessageWriter<SceneOperationMessage>,
     mut assets: ResMut<Assets<GodotResource>>,
 ) {
     if let (Some(level_id), Some(handle)) = (current_level.level_id, &loading_state.loading_handle)
@@ -136,9 +136,9 @@ fn handle_level_scene_change(
             info!("Requesting level scene change: {:?}", level_id);
 
             // Request scene change through centralized scene management
-            scene_events.write(SceneOperationEvent::change_to_packed(handle.clone()));
+            scene_events.write(SceneOperationMessage::change_to_packed(handle.clone()));
 
-            // Do NOT emit LevelLoadedEvent here!
+            // Do NOT emit LevelLoadedMessage here!
             pending_level.level_id = Some(level_id);
 
             info!("Level scene change requested for: {:?}", level_id);
@@ -152,8 +152,8 @@ fn handle_level_scene_change(
 
 fn emit_level_loaded_event_when_scene_ready(
     mut pending_level: ResMut<PendingLevel>,
-    mut scene_tree_events: EventReader<SceneTreeEvent>,
-    mut loaded_events: EventWriter<LevelLoadedEvent>,
+    mut scene_tree_events: MessageReader<SceneTreeMessage>,
+    mut loaded_events: MessageWriter<LevelLoadedMessage>,
 ) {
     if let Some(level_id) = pending_level.level_id {
         let expected_path = match level_id {
@@ -162,10 +162,10 @@ fn emit_level_loaded_event_when_scene_ready(
             LevelId::Level3 => "/root/Level3",
         };
         for event in scene_tree_events.read() {
-            if let SceneTreeEventType::NodeAdded = event.event_type {
+            if let SceneTreeMessageType::NodeAdded = event.message_type {
                 let node_path = event.node.clone().get::<Node>().get_path().to_string();
                 if node_path == expected_path {
-                    loaded_events.write(LevelLoadedEvent { level_id });
+                    loaded_events.write(LevelLoadedMessage { level_id });
                     pending_level.level_id = None;
                     break;
                 }

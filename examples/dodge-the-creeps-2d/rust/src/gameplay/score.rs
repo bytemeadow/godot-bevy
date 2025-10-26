@@ -2,8 +2,8 @@ use bevy::{
     app::{App, Plugin, Update},
     ecs::{
         change_detection::DetectChanges,
-        event::EventWriter,
         resource::Resource,
+        message::MessageWriter,
         schedule::IntoScheduleConfigs,
         system::{Res, ResMut},
     },
@@ -33,7 +33,7 @@ fn reset_score(mut score: ResMut<Score>) {
     score.0 = 0;
 }
 
-fn update_score_counter(score: Res<Score>, mut ui_commands: EventWriter<UICommand>) {
+fn update_score_counter(score: Res<Score>, mut ui_commands: MessageWriter<UICommand>) {
     if score.is_changed() {
         ui_commands.write(UICommand::SetText {
             target: UIElement::ScoreLabel,

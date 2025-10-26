@@ -1,6 +1,6 @@
 use crate::components::Gem;
 use crate::components::Player;
-use crate::gameplay::audio::PlaySfxEvent;
+use crate::gameplay::audio::PlaySfxMessage;
 use bevy::prelude::*;
 use godot::classes::Area2D;
 use godot_bevy::prelude::Collisions;
@@ -10,9 +10,9 @@ use godot_bevy::prelude::*;
 ///
 /// This event decouples gem collision detection from gem counting,
 /// allowing these systems to run in parallel and improving modularity.
-#[derive(Event, Debug)]
+#[derive(Message, Debug)]
 #[allow(dead_code)] // Fields provide useful API even if not currently used
-pub struct GemCollectedEvent {
+pub struct GemCollectedMessage {
     pub player_entity: Entity,
     pub gem_entity: Entity,
 }
@@ -25,7 +25,7 @@ pub struct GemPlugin;
 impl Plugin for GemPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<GemsCollected>()
-            .add_event::<GemCollectedEvent>()
+            .add_message::<GemCollectedMessage>()
             .add_systems(
                 Update,
                 (
@@ -47,7 +47,7 @@ impl Plugin for GemPlugin {
 fn detect_gem_player_collision(
     mut gems: Query<(Entity, &mut GodotNodeHandle, &Collisions), With<Gem>>,
     players: Query<Entity, With<Player>>,
-    mut gem_collected_events: EventWriter<GemCollectedEvent>,
+    mut gem_collected_events: MessageWriter<GemCollectedMessage>,
 ) {
     for (gem_entity, mut handle, collisions) in gems.iter_mut() {
         for &player_entity in collisions.recent_collisions() {
@@ -58,7 +58,7 @@ fn detect_gem_player_collision(
                 area.queue_free();
 
                 // Fire event for gem collection
-                gem_collected_events.write(GemCollectedEvent {
+                gem_collected_events.write(GemCollectedMessage {
                     player_entity,
                     gem_entity,
                 });
@@ -72,16 +72,16 @@ fn detect_gem_player_collision(
 /// This system runs after collision detection and can run in parallel
 /// with other event-handling systems that don't modify GemsCollected.
 fn handle_gem_collected_events(
-    mut gem_events: EventReader<GemCollectedEvent>,
+    mut gem_events: MessageReader<GemCollectedMessage>,
     mut gems_collected: ResMut<GemsCollected>,
-    mut sfx_events: EventWriter<PlaySfxEvent>,
+    mut sfx_events: MessageWriter<PlaySfxMessage>,
 ) {
     for _event in gem_events.read() {
         // Update gem count
         gems_collected.0 += 1;
 
         // Trigger sound effect
-        sfx_events.write(PlaySfxEvent::GemCollected);
+        sfx_events.write(PlaySfxMessage::GemCollected);
 
         debug!("Gem collected! Total: {}", gems_collected.0);
     }

@@ -7,8 +7,8 @@ use bevy::prelude::*;
 use godot_bevy::prelude::*;
 
 /// Simple events for requesting scene tree operations
-#[derive(Event, Debug)]
-pub enum SceneOperationEvent {
+#[derive(Message, Debug)]
+pub enum SceneOperationMessage {
     /// Reload the current scene
     ReloadCurrent,
 
@@ -24,7 +24,7 @@ pub struct SceneManagementPlugin;
 
 impl Plugin for SceneManagementPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<SceneOperationEvent>()
+        app.add_message::<SceneOperationMessage>()
             .add_systems(Update, process_scene_operations);
     }
 }
@@ -35,22 +35,22 @@ impl Plugin for SceneManagementPlugin {
 #[main_thread_system]
 fn process_scene_operations(
     mut scene_tree: SceneTreeRef,
-    mut operation_events: EventReader<SceneOperationEvent>,
+    mut operation_events: MessageReader<SceneOperationMessage>,
     mut assets: ResMut<Assets<GodotResource>>,
 ) {
     for event in operation_events.read() {
         match event {
-            SceneOperationEvent::ReloadCurrent => {
+            SceneOperationMessage::ReloadCurrent => {
                 info!("SceneManager: Reloading current scene");
                 scene_tree.get().reload_current_scene();
             }
 
-            SceneOperationEvent::ChangeToFile { path } => {
+            SceneOperationMessage::ChangeToFile { path } => {
                 info!("SceneManager: Changing to scene file: {}", path);
                 scene_tree.get().change_scene_to_file(path);
             }
 
-            SceneOperationEvent::ChangeToPacked { scene } => {
+            SceneOperationMessage::ChangeToPacked { scene } => {
                 if let Some(godot_resource) = assets.get_mut(scene) {
                     if let Some(packed_scene) =
                         godot_resource.try_cast::<godot::classes::PackedScene>()
@@ -69,7 +69,7 @@ fn process_scene_operations(
 }
 
 /// Convenience functions for common scene operations
-impl SceneOperationEvent {
+impl SceneOperationMessage {
     /// Create a reload current scene event
     pub fn reload() -> Self {
         Self::ReloadCurrent
