@@ -16,6 +16,8 @@ bevy = { version = "0.17", default-features = false, features = [
   "bevy_asset",
   "bevy_state",
   "bevy_gilrs",
+  "bevy_render",
+  "bevy_core_pipeline",
   "multi_threaded",
 ] }
 bevy_asset_loader = "0.24.0-rc.1"

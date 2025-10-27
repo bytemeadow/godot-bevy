@@ -12,9 +12,9 @@ use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::schedule::common_conditions::run_once;
 use bevy::ecs::system::ResMut;
 use bevy::prelude::{
-    Added, App, AppExtStates, Assets, Commands, Component, Entity, Handle, Mesh, Message,
-    MessageReader, MessageWriter, OnExit, Plugin, Query, Res, Resource, Result, States, Transform,
-    Vec3, debug,
+    Added, App, AppExtStates, AssetEvent, Assets, Commands, Component, Entity, Handle, Mesh,
+    Message, MessageReader, MessageWriter, OnExit, Plugin, Query, Res, Resource, Result, States,
+    Transform, Vec3, debug,
 };
 use bevy::{scene::ScenePlugin, state::app::StatesPlugin};
 use bevy_asset_loader::{
@@ -54,7 +54,8 @@ impl Plugin for AvianPhysicsDemo {
             .add_plugins((
                 // Plugins required by Avian
                 ScenePlugin,
-                PhysicsPlugins::default(),
+                // Configure Avian to use godot-bevy's PhysicsUpdate schedule instead of FixedPostUpdate
+                PhysicsPlugins::new(PhysicsUpdate),
             ))
             // The following 4 resource initializations are required by Avian
             .init_resource::<Assets<Mesh>>()
@@ -71,7 +72,9 @@ impl Plugin for AvianPhysicsDemo {
             .add_systems(Startup, update_scene_tree_config.run_if(run_once))
             .add_systems(OnExit(GameState::LoadAssets), spawn_entities)
             .add_systems(PhysicsUpdate, add_avian_collider)
-            .add_message::<ColliderRequired>();
+            .add_message::<ColliderRequired>()
+            // Register AssetEvent<Mesh> since we're manually initializing Assets<Mesh> without the full asset plugin
+            .add_message::<AssetEvent<Mesh>>();
     }
 }
 
