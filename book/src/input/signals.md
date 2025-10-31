@@ -32,7 +32,7 @@ fn connect_button(
     typed: TypedGodotSignals<StartGameRequested>,
 ) {
     for mut handle in &mut buttons {
-        typed.connect_map(&mut handle, "pressed", None, |_args, _node, _ent| StartGameRequested);
+        typed.connect_map(&mut handle, "pressed", None, |_args, _node, _ent| Some(StartGameRequested));
     }
 }
 ```
@@ -68,10 +68,10 @@ fn connect_menu(
     for (mut button, tag) in &mut menu {
         match tag {
             MenuTag::Fullscreen => {
-                toggle.connect_map(&mut button, "pressed", None, |_a, _n, _e| ToggleFullscreen);
+                toggle.connect_map(&mut button, "pressed", None, |_a, _n, _e| Some(ToggleFullscreen));
             }
             MenuTag::Quit => {
-                quit.connect_map(&mut button, "pressed", None, |_a, n, _e| QuitRequested { source: n.clone() });
+                quit.connect_map(&mut button, "pressed", None, |_a, n, _e| Some(QuitRequested { source: n.clone() }));
             }
         }
     }
@@ -97,7 +97,7 @@ fn connect_area(
     typed: TypedGodotSignals<AreaExited>,
 ) {
     for (entity, mut area) in &mut q {
-        typed.connect_map(&mut area, "body_exited", Some(entity), |_a, _n, e| AreaExited(e.unwrap()));
+        typed.connect_map(&mut area, "body_exited", Some(entity), |_a, _n, e| Some(AreaExited(e.unwrap())));
     }
 }
 ```
@@ -118,7 +118,7 @@ fn spawn_area(mut commands: Commands) {
     commands.spawn((
         MyArea,
         // Defer until GodotNodeHandle is available on this entity
-        TypedDeferredSignalConnections::<BodyEntered>::with_connection("body_entered", |_a, _n, e| BodyEntered(e.unwrap())),
+        TypedDeferredSignalConnections::<BodyEntered>::with_connection("body_entered", |_a, _n, e| Some(BodyEntered(e.unwrap()))),
     ));
 }
 ```

@@ -93,7 +93,7 @@ fn connect_start_button(
         menu_assets.start_button.as_mut().unwrap(),
         "pressed",
         None,
-        |_args, _node, _ent| StartGameRequested,
+        |_args, _node, _ent| Some(StartGameRequested),
     );
 }
 

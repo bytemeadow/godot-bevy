@@ -160,8 +160,10 @@ fn new_mob(
             &mut mob_nodes.visibility_notifier,
             "screen_exited",
             Some(entity),
-            |_args, _node, ent| MobScreenExited {
-                entity: ent.expect("entity was provided"),
+            |_args, _node, ent| {
+                Some(MobScreenExited {
+                    entity: ent.expect("entity was provided"),
+                })
             },
         );
 
