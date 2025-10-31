@@ -3,7 +3,7 @@ use bevy::{
     ecs::{
         component::Component,
         entity::Entity,
-        event::{Event, EventWriter, event_update_system},
+        message::{Message, MessageWriter, message_update_system},
         schedule::IntoScheduleConfigs,
         system::{Commands, NonSend, NonSendMut, Query, SystemParam},
     },
@@ -22,8 +22,11 @@ pub struct GodotSignalsPlugin;
 
 impl Plugin for GodotSignalsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(First, write_godot_signal_events.before(event_update_system))
-            .add_event::<GodotSignal>();
+        app.add_systems(
+            First,
+            write_godot_signal_messages.before(message_update_system),
+        )
+        .add_message::<GodotSignal>();
     }
 }
 
@@ -34,7 +37,7 @@ pub struct GodotSignalArgument {
     pub instance_id: Option<InstanceId>,
 }
 
-#[derive(Debug, Event)]
+#[derive(Debug, Message)]
 pub struct GodotSignal {
     pub name: String,
     pub origin: GodotNodeHandle,
@@ -48,17 +51,17 @@ pub struct GodotSignalReader(pub std::sync::mpsc::Receiver<GodotSignal>);
 #[doc(hidden)]
 pub struct GodotSignalSender(pub std::sync::mpsc::Sender<GodotSignal>);
 
-/// Global, type-erased dispatch for typed signal events
+/// Global, type-erased dispatch for typed signal messages
 pub(crate) trait TypedDispatch: Send {
     fn write_into_world(self: Box<Self>, world: &mut bevy::ecs::world::World);
 }
 
-struct TypedEnvelope<T: Event + Send + 'static>(T);
+struct TypedEnvelope<T: Message + Send + 'static>(T);
 
-impl<T: Event + Send + 'static> TypedDispatch for TypedEnvelope<T> {
+impl<T: Message + Send + 'static> TypedDispatch for TypedEnvelope<T> {
     fn write_into_world(self: Box<Self>, world: &mut bevy::ecs::world::World) {
-        if let Some(mut events) = world.get_resource_mut::<bevy::ecs::event::Events<T>>() {
-            events.send(self.0);
+        if let Some(mut messages) = world.get_resource_mut::<bevy::ecs::message::Messages<T>>() {
+            messages.write(self.0);
         }
     }
 }
@@ -69,7 +72,7 @@ pub(crate) struct GlobalTypedSignalReceiver(pub std::sync::mpsc::Receiver<Box<dy
 #[doc(hidden)]
 pub(crate) struct GlobalTypedSignalSender(pub std::sync::mpsc::Sender<Box<dyn TypedDispatch>>);
 
-/// System parameter for connecting Godot signals to Bevy's event system
+/// System parameter for connecting Godot signals to Bevy's message system
 /// Legacy SystemParam (deprecated) wrapped in a narrow module-level allow
 mod legacy_signals_param {
     #![allow(deprecated)]
@@ -85,7 +88,7 @@ mod legacy_signals_param {
     }
 
     impl<'w> GodotSignals<'w> {
-        /// Connect a Godot signal to be forwarded to Bevy's event system
+        /// Connect a Godot signal to be forwarded to Bevy's message system
         pub fn connect(&self, node: &mut GodotNodeHandle, signal_name: &str) {
             connect_godot_signal(node, signal_name, self.signal_sender.0.clone());
         }
@@ -95,11 +98,11 @@ mod legacy_signals_param {
 #[allow(deprecated)]
 pub use legacy_signals_param::GodotSignals;
 
-fn write_godot_signal_events(
+fn write_godot_signal_messages(
     events: NonSendMut<GodotSignalReader>,
-    mut event_writer: EventWriter<GodotSignal>,
+    mut message_writer: MessageWriter<GodotSignal>,
 ) {
-    event_writer.write_batch(events.0.try_iter());
+    message_writer.write_batch(events.0.try_iter());
 }
 
 pub fn connect_godot_signal(
@@ -171,12 +174,12 @@ pub fn variant_to_signal_argument(variant: &Variant) -> GodotSignalArgument {
     }
 }
 
-/// Generic plugin to enable typed Godot-signal-to-Bevy-event routing for `T`
-pub struct GodotTypedSignalsPlugin<T: Event + Send + 'static> {
+/// Generic plugin to enable typed Godot-signal-to-Bevy-message routing for `T`
+pub struct GodotTypedSignalsPlugin<T: Message + Send + 'static> {
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T: Event + Send + 'static> Default for GodotTypedSignalsPlugin<T> {
+impl<T: Message + Send + 'static> Default for GodotTypedSignalsPlugin<T> {
     fn default() -> Self {
         Self {
             _phantom: Default::default(),
@@ -184,10 +187,10 @@ impl<T: Event + Send + 'static> Default for GodotTypedSignalsPlugin<T> {
     }
 }
 
-impl<T: Event + Send + 'static> Plugin for GodotTypedSignalsPlugin<T> {
+impl<T: Message + Send + 'static> Plugin for GodotTypedSignalsPlugin<T> {
     fn build(&self, app: &mut App) {
-        // Ensure the Bevy event type exists
-        app.add_event::<T>();
+        // Ensure the Bevy message type exists
+        app.add_message::<T>();
 
         // Install global typed signal channel and consolidated drain once
         if !app.world().contains_non_send::<GlobalTypedSignalSender>() {
@@ -197,10 +200,10 @@ impl<T: Event + Send + 'static> Plugin for GodotTypedSignalsPlugin<T> {
             app.world_mut()
                 .insert_non_send_resource(GlobalTypedSignalReceiver(receiver));
 
-            // One consolidated drain for all typed events
+            // One consolidated drain for all typed messages
             app.add_systems(
                 First,
-                drain_global_typed_signals.before(event_update_system),
+                drain_global_typed_signals.before(message_update_system),
             );
         }
 
@@ -209,7 +212,7 @@ impl<T: Event + Send + 'static> Plugin for GodotTypedSignalsPlugin<T> {
     }
 }
 
-// Exclusive system to drain type-erased global queue into the correct Events<T> resources
+// Exclusive system to drain type-erased global queue into the correct Messages<T> resources
 fn drain_global_typed_signals(world: &mut bevy::ecs::world::World) {
     // Collect first to avoid overlapping mutable borrows of `world`
     let mut pending: Vec<Box<dyn TypedDispatch>> = Vec::new();
@@ -221,16 +224,16 @@ fn drain_global_typed_signals(world: &mut bevy::ecs::world::World) {
     }
 }
 
-/// SystemParam providing typed connect helpers for a specific Bevy `Event` T
+/// SystemParam providing typed connect helpers for a specific Bevy `Message` T
 #[derive(SystemParam)]
-pub struct TypedGodotSignals<'w, T: Event + Send + 'static> {
+pub struct TypedGodotSignals<'w, T: Message + Send + 'static> {
     /// Global type-erased sender. Provided by first `GodotTypedSignalsPlugin` added.
     typed_sender: NonSend<'w, GlobalTypedSignalSender>,
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<'w, T: Event + Send + 'static> TypedGodotSignals<'w, T> {
-    /// Connect a Godot signal and map it to a typed Bevy Event `T` via `mapper`.
+impl<'w, T: Message + Send + 'static> TypedGodotSignals<'w, T> {
+    /// Connect a Godot signal and map it to a typed Bevy Message `T` via `mapper`.
     /// Multiple connections are supported; each connection sends a `T` when fired.
     pub fn connect_map<F>(
         &self,
@@ -263,7 +266,7 @@ impl<'w, T: Event + Send + 'static> TypedGodotSignals<'w, T> {
 }
 
 /// Process typed deferred signal connections for entities that now have GodotNodeHandles
-fn process_typed_deferred_signal_connections<T: Event + Send + 'static>(
+fn process_typed_deferred_signal_connections<T: Message + Send + 'static>(
     mut commands: Commands,
     mut query: Query<(
         Entity,
@@ -294,8 +297,8 @@ fn process_typed_deferred_signal_connections<T: Event + Send + 'static>(
 // Typed Deferred Connections
 // ====================
 
-/// A single typed deferred connection item for `T` events
-pub struct TypedDeferredConnection<T: Event + Send + 'static> {
+/// A single typed deferred connection item for `T` messages
+pub struct TypedDeferredConnection<T: Message + Send + 'static> {
     pub signal_name: String,
     pub mapper: Box<
         dyn Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
@@ -304,17 +307,17 @@ pub struct TypedDeferredConnection<T: Event + Send + 'static> {
 
 /// Component to defer Godot signal connections until a `GodotNodeHandle` exists on the entity
 #[derive(Component)]
-pub struct TypedDeferredSignalConnections<T: Event + Send + 'static> {
+pub struct TypedDeferredSignalConnections<T: Message + Send + 'static> {
     pub connections: Vec<TypedDeferredConnection<T>>,
 }
 
-impl<T: Event + Send + 'static> Default for TypedDeferredSignalConnections<T> {
+impl<T: Message + Send + 'static> Default for TypedDeferredSignalConnections<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: Event + Send + 'static> TypedDeferredSignalConnections<T> {
+impl<T: Message + Send + 'static> TypedDeferredSignalConnections<T> {
     pub fn new() -> Self {
         Self {
             connections: Vec::new(),

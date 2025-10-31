@@ -1,7 +1,7 @@
 use bevy::{
     app::{App, First, Plugin},
     ecs::{
-        event::{Event, EventWriter, event_update_system},
+        message::{Message, MessageWriter, message_update_system},
         schedule::IntoScheduleConfigs,
         system::NonSendMut,
     },
@@ -19,12 +19,12 @@ use godot::{
 };
 use tracing::trace;
 
-/// Plugin that handles Godot input events and converts them to Bevy events.
-/// This is the base input plugin that provides raw input event types.
+/// Plugin that handles Godot input events and converts them to Bevy messages.
+/// This is the base input plugin that provides raw input message types.
 ///
 /// For higher-level input handling, consider using:
 /// - `BevyInputBridgePlugin` for Bevy's standard input resources
-/// - Custom input handling systems that read these events
+/// - Custom input handling systems that read these messages
 #[derive(Default)]
 pub struct GodotInputEventPlugin;
 
@@ -34,28 +34,20 @@ pub type GodotInputPlugin = GodotInputEventPlugin;
 
 impl Plugin for GodotInputEventPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(First, write_input_events.before(event_update_system))
-            .add_event::<KeyboardInput>()
-            .add_event::<MouseButtonInput>()
-            .add_event::<MouseMotion>()
-            .add_event::<TouchInput>()
-            .add_event::<ActionInput>()
-            .add_event::<GamepadButtonInput>()
-            .add_event::<GamepadAxisInput>()
-            .add_event::<PanGestureInput>()
-            .register_type::<MouseButtonInput>()
-            .register_type::<MouseButton>()
-            .register_type::<MouseMotion>()
-            .register_type::<TouchInput>()
-            .register_type::<ActionInput>()
-            .register_type::<GamepadButtonInput>()
-            .register_type::<GamepadAxisInput>()
-            .register_type::<PanGestureInput>();
+        app.add_systems(First, write_input_messages.before(message_update_system))
+            .add_message::<KeyboardInput>()
+            .add_message::<MouseButtonInput>()
+            .add_message::<MouseMotion>()
+            .add_message::<TouchInput>()
+            .add_message::<ActionInput>()
+            .add_message::<GamepadButtonInput>()
+            .add_message::<GamepadAxisInput>()
+            .add_message::<PanGestureInput>();
     }
 }
 
 /// Keyboard key press/release event
-#[derive(Debug, Event, Clone)]
+#[derive(Debug, Message, Clone)]
 pub struct KeyboardInput {
     pub keycode: Key,
     pub physical_keycode: Option<Key>,
@@ -64,7 +56,7 @@ pub struct KeyboardInput {
 }
 
 /// Mouse button press/release event
-#[derive(Debug, Event, Clone, Reflect)]
+#[derive(Debug, Message, Clone)]
 pub struct MouseButtonInput {
     pub button: MouseButton,
     pub pressed: bool,
@@ -75,14 +67,14 @@ pub struct MouseButtonInput {
 }
 
 /// Mouse motion event
-#[derive(Debug, Event, Clone, Reflect)]
+#[derive(Debug, Message, Clone)]
 pub struct MouseMotion {
     pub delta: Vec2,
     pub position: Vec2,
 }
 
 /// Touch input event (for mobile/touchscreen)
-#[derive(Debug, Event, Clone, Reflect)]
+#[derive(Debug, Message, Clone)]
 pub struct TouchInput {
     pub finger_id: i32,
     pub position: Vec2,
@@ -90,7 +82,7 @@ pub struct TouchInput {
 }
 
 /// Godot action input event (for input map actions)
-#[derive(Debug, Event, Clone, Reflect)]
+#[derive(Debug, Message, Clone)]
 pub struct ActionInput {
     pub action: String,
     pub pressed: bool,
@@ -98,7 +90,7 @@ pub struct ActionInput {
 }
 
 /// Gamepad button input event (from Godot InputEventJoypadButton)
-#[derive(Debug, Event, Clone, Reflect)]
+#[derive(Debug, Message, Clone)]
 pub struct GamepadButtonInput {
     pub device: i32,
     pub button_index: i32,
@@ -107,7 +99,7 @@ pub struct GamepadButtonInput {
 }
 
 /// Gamepad axis input event (from Godot InputEventJoypadMotion)
-#[derive(Debug, Event, Clone, Reflect)]
+#[derive(Debug, Message, Clone)]
 pub struct GamepadAxisInput {
     pub device: i32,
     pub axis: i32,
@@ -115,7 +107,7 @@ pub struct GamepadAxisInput {
 }
 
 /// Two-finger pan gesture input event (from Godot InputEventPanGesture)
-#[derive(Debug, Event, Clone, Reflect)]
+#[derive(Debug, Message, Clone)]
 pub struct PanGestureInput {
     pub delta: Vec2,
 }
@@ -152,16 +144,16 @@ impl From<godot::global::MouseButton> for MouseButton {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn write_input_events(
+fn write_input_messages(
     events: NonSendMut<InputEventReader>,
-    mut keyboard_events: EventWriter<KeyboardInput>,
-    mut mouse_button_events: EventWriter<MouseButtonInput>,
-    mut mouse_motion_events: EventWriter<MouseMotion>,
-    mut touch_events: EventWriter<TouchInput>,
-    mut action_events: EventWriter<ActionInput>,
-    mut gamepad_button_events: EventWriter<GamepadButtonInput>,
-    mut gamepad_axis_events: EventWriter<GamepadAxisInput>,
-    mut pan_gesture_events: EventWriter<PanGestureInput>,
+    mut keyboard_events: MessageWriter<KeyboardInput>,
+    mut mouse_button_events: MessageWriter<MouseButtonInput>,
+    mut mouse_motion_events: MessageWriter<MouseMotion>,
+    mut touch_events: MessageWriter<TouchInput>,
+    mut action_events: MessageWriter<ActionInput>,
+    mut gamepad_button_events: MessageWriter<GamepadButtonInput>,
+    mut gamepad_axis_events: MessageWriter<GamepadAxisInput>,
+    mut pan_gesture_events: MessageWriter<PanGestureInput>,
 ) {
     for (event_type, input_event) in events.0.try_iter() {
         trace!("Processing {:?} input event", event_type);
@@ -190,23 +182,23 @@ fn write_input_events(
 
 fn extract_action_events_only(
     input_event: Gd<GodotInputEvent>,
-    action_events: &mut EventWriter<ActionInput>,
+    action_messages: &mut MessageWriter<ActionInput>,
 ) {
     // Only process ActionInput events from normal input (mapped keys/actions)
     // Note: InputEventAction is not emitted by the engine, so we need to check manually
-    check_action_events(&input_event, action_events);
+    check_action_events(&input_event, action_messages);
 }
 
 #[allow(clippy::too_many_arguments)]
 fn extract_input_events_no_actions(
     input_event: Gd<GodotInputEvent>,
-    keyboard_events: &mut EventWriter<KeyboardInput>,
-    mouse_button_events: &mut EventWriter<MouseButtonInput>,
-    mouse_motion_events: &mut EventWriter<MouseMotion>,
-    touch_events: &mut EventWriter<TouchInput>,
-    gamepad_button_events: &mut EventWriter<GamepadButtonInput>,
-    gamepad_axis_events: &mut EventWriter<GamepadAxisInput>,
-    pan_gesture_events: &mut EventWriter<PanGestureInput>,
+    keyboard_events: &mut MessageWriter<KeyboardInput>,
+    mouse_button_events: &mut MessageWriter<MouseButtonInput>,
+    mouse_motion_events: &mut MessageWriter<MouseMotion>,
+    touch_events: &mut MessageWriter<TouchInput>,
+    gamepad_button_events: &mut MessageWriter<GamepadButtonInput>,
+    gamepad_axis_events: &mut MessageWriter<GamepadAxisInput>,
+    pan_gesture_events: &mut MessageWriter<PanGestureInput>,
 ) {
     extract_basic_input_events(
         input_event,
@@ -223,13 +215,13 @@ fn extract_input_events_no_actions(
 #[allow(clippy::too_many_arguments)]
 fn extract_basic_input_events(
     input_event: Gd<GodotInputEvent>,
-    keyboard_events: &mut EventWriter<KeyboardInput>,
-    mouse_button_events: &mut EventWriter<MouseButtonInput>,
-    mouse_motion_events: &mut EventWriter<MouseMotion>,
-    touch_events: &mut EventWriter<TouchInput>,
-    gamepad_button_events: &mut EventWriter<GamepadButtonInput>,
-    gamepad_axis_events: &mut EventWriter<GamepadAxisInput>,
-    pan_gesture_events: &mut EventWriter<PanGestureInput>,
+    keyboard_events: &mut MessageWriter<KeyboardInput>,
+    mouse_button_events: &mut MessageWriter<MouseButtonInput>,
+    mouse_motion_events: &mut MessageWriter<MouseMotion>,
+    touch_events: &mut MessageWriter<TouchInput>,
+    gamepad_button_events: &mut MessageWriter<GamepadButtonInput>,
+    gamepad_axis_events: &mut MessageWriter<GamepadAxisInput>,
+    pan_gesture_events: &mut MessageWriter<PanGestureInput>,
 ) {
     // Try to cast to specific input event types and extract data
 
@@ -304,7 +296,7 @@ fn extract_basic_input_events(
 
 fn check_action_events(
     input_event: &Gd<GodotInputEvent>,
-    action_events: &mut EventWriter<ActionInput>,
+    action_events: &mut MessageWriter<ActionInput>,
 ) {
     use godot::classes::InputMap;
 
