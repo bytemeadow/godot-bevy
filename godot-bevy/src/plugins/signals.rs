@@ -22,8 +22,11 @@ pub struct GodotSignalsPlugin;
 
 impl Plugin for GodotSignalsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(First, write_godot_signal_messages.before(message_update_system))
-            .add_message::<GodotSignal>();
+        app.add_systems(
+            First,
+            write_godot_signal_messages.before(message_update_system),
+        )
+        .add_message::<GodotSignal>();
     }
 }
 

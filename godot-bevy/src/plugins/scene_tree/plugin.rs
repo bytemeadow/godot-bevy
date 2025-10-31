@@ -16,8 +16,8 @@ use bevy::{
     ecs::{
         component::Component,
         entity::Entity,
-        name::Name,
         message::{Message, MessageReader, MessageWriter, message_update_system},
+        name::Name,
         schedule::IntoScheduleConfigs,
         system::{Commands, NonSendMut, Query, Res, SystemParam},
     },

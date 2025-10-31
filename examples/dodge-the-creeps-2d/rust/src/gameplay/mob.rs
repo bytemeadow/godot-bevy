@@ -9,8 +9,8 @@ use bevy::{
     ecs::{
         component::Component,
         entity::Entity,
-        name::Name,
         message::MessageReader,
+        name::Name,
         query::Added,
         resource::Resource,
         schedule::IntoScheduleConfigs,

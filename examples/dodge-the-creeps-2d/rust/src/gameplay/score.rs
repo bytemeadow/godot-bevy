@@ -2,8 +2,8 @@ use bevy::{
     app::{App, Plugin, Update},
     ecs::{
         change_detection::DetectChanges,
-        resource::Resource,
         message::MessageWriter,
+        resource::Resource,
         schedule::IntoScheduleConfigs,
         system::{Res, ResMut},
     },

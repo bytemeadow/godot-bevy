@@ -1,8 +1,8 @@
 use bevy::{
     app::{Plugin, Update},
     ecs::{
-        resource::Resource,
         message::MessageWriter,
+        resource::Resource,
         schedule::IntoScheduleConfigs,
         system::{Commands, Res, ResMut},
     },
