@@ -131,6 +131,8 @@ This library was inspired by and originally built upon the work of [bevy_godot](
 
 | `godot-bevy` | Bevy | Godot-Rust | Godot |
 |------------|------|------------|-------|
+| 0.9.2      | 0.16 | 0.4      | 4.5.x |
+| 0.9.x      | 0.16 | 0.3      | 4.4.x |
 | 0.8.x      | 0.16 | 0.3      | 4.4.x |
 | 0.7.x      | 0.16 | 0.3      | 4.4.x |
 
