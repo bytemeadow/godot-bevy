@@ -100,10 +100,6 @@ crate-type = ["cdylib"]
 godot-bevy = "0.9.2"
 bevy = { version = "0.16", default-features = false }
 godot = "0.4"
-
-[lints.rust.unexpected_cfgs]
-level = "warn"
-check-cfg = ['cfg(feature, values("trace_tracy"))']
 ```
 
 ## Configure Godot Integration

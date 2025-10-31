@@ -1,4 +1,3 @@
-#![allow(unexpected_cfgs)] // silence potential `tracy_trace` feature config warning brought in by `bevy_app` macro
 
 use avian3d::{
     collision::CollisionDiagnostics,
