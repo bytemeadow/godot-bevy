@@ -44,9 +44,9 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-godot-bevy = "0.8.4"  # Latest with opt-in plugin system
+godot-bevy = "0.9.2"  # Latest with opt-in plugin system
 bevy = { version = "0.16", default-features = false }
-godot = "0.3"
+godot = "0.4"
 ```
 
 Basic example:
