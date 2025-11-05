@@ -53,13 +53,14 @@ Basic example:
 
 ```rust
 use bevy::prelude::*;
+use godot::prelude::*;
 use godot_bevy::prelude::*;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
     // Add the features you need (v0.8+ opt-in plugin system)
-    app.add_plugins(GodotTransformsPlugin)  // Transform sync
-        .add_plugins(GodotAudioPlugin);     // Audio system
+    app.add_plugins(GodotTransformSyncPlugin::default())  // Transform sync
+        .add_plugins(GodotAudioPlugin);                   // Audio system
 
     // Print to the Godot console
     godot_print!("Hello from Godot-Bevy!");
@@ -102,9 +103,9 @@ fn build_app(app: &mut App) {
 // Add specific features as needed
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotTransformsPlugin)  // Transform sync
-        .add_plugins(GodotAudioPlugin)      // Audio system
-        .add_plugins(BevyInputBridgePlugin); // Input handling
+    app.add_plugins(GodotTransformSyncPlugin::default())  // Transform sync
+        .add_plugins(GodotAudioPlugin)                    // Audio system
+        .add_plugins(BevyInputBridgePlugin);              // Input handling
 }
 
 // Or everything at once (like v0.7.x)
