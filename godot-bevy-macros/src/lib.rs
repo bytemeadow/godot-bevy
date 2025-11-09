@@ -80,6 +80,22 @@ pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
     expanded.into()
 }
 
+/// Derive this macro on a struct for easy access to a scene's nodes.
+///
+/// Example:
+/// ```ignore
+/// #[derive(NodeTreeView)]
+/// pub struct MenuUi {
+///     #[node("/root/Main/HUD/Message")]
+///     pub message_label: GodotNodeHandle,
+/// }
+/// ```
+/// Node paths can be specified with patterns:
+/// - `/root/*/HUD/CurrentLevel` - matches any single node name where * appears
+/// - `/root/Level*/HUD/CurrentLevel` - matches node names starting with "Level"
+/// - `*/HUD/CurrentLevel` - matches relative to the base node
+///
+/// See `godot_bevy::node_tree_view::find_node_by_pattern` for details on how nodes are found.
 #[proc_macro_derive(NodeTreeView, attributes(node))]
 pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
     let view = parse_macro_input!(item as DeriveInput);
