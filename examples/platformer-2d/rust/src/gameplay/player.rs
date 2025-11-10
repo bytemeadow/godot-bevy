@@ -1,5 +1,5 @@
 use crate::components::{Gravity, JumpVelocity, Player, Speed};
-use crate::gameplay::audio::PlaySfxEvent;
+use crate::gameplay::audio::PlaySfxMessage;
 use bevy::app::{App, Plugin};
 use bevy::prelude::*;
 use godot::classes::CharacterBody2D;
@@ -21,16 +21,16 @@ pub enum PlayerSystemSet {
 }
 
 /// Event for player input state
-#[derive(Event, Debug, Clone)]
-pub struct PlayerInputEvent {
+#[derive(Message, Debug, Clone)]
+pub struct PlayerInputMessage {
     pub movement_direction: f32,
     pub jump_pressed: bool,
     pub is_on_floor: bool,
 }
 
 /// Event for player movement state changes
-#[derive(Event, Debug, Clone)]
-pub struct PlayerMovementEvent {
+#[derive(Message, Debug, Clone)]
+pub struct PlayerMovementMessage {
     pub is_moving: bool,
     pub is_on_floor: bool,
     pub facing_left: bool,
@@ -58,8 +58,8 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<PlayerInputEvent>()
-            .add_event::<PlayerMovementEvent>()
+        app.add_message::<PlayerInputMessage>()
+            .add_message::<PlayerMovementMessage>()
             .add_systems(
                 PhysicsUpdate,
                 (
@@ -82,7 +82,7 @@ impl Plugin for PlayerPlugin {
 #[main_thread_system]
 fn detect_player_input(
     mut player: Query<&mut GodotNodeHandle, With<Player>>,
-    mut input_events: EventWriter<PlayerInputEvent>,
+    mut input_events: MessageWriter<PlayerInputMessage>,
 ) {
     if let Ok(mut handle) = player.single_mut() {
         // Use try_get to handle case where Godot node might be invalid during scene transitions
@@ -97,7 +97,7 @@ fn detect_player_input(
 
         // Always send input events so movement system knows current input state,
         // including when player releases keys (movement_direction = 0.0)
-        input_events.write(PlayerInputEvent {
+        input_events.write(PlayerInputMessage {
             movement_direction,
             jump_pressed,
             is_on_floor,
@@ -111,11 +111,11 @@ fn detect_player_input(
 /// and movement execution separately from input detection.
 #[main_thread_system]
 fn apply_player_movement(
-    mut input_events: EventReader<PlayerInputEvent>,
+    mut input_events: MessageReader<PlayerInputMessage>,
     mut player: Query<(&mut GodotNodeHandle, &Speed, &JumpVelocity, &Gravity), With<Player>>,
     physics_delta: Res<PhysicsDelta>,
-    mut sfx_events: EventWriter<PlaySfxEvent>,
-    mut movement_events: EventWriter<PlayerMovementEvent>,
+    mut sfx_events: MessageWriter<PlaySfxMessage>,
+    mut movement_events: MessageWriter<PlayerMovementMessage>,
 ) {
     if let Ok((mut handle, speed, jump_velocity, gravity)) = player.single_mut() {
         let Some(mut character_body) = handle.try_get::<CharacterBody2D>() else {
@@ -140,7 +140,7 @@ fn apply_player_movement(
             // Handle jumping
             if input_event.jump_pressed && input_event.is_on_floor {
                 velocity.y = jump_velocity.0;
-                sfx_events.write(PlaySfxEvent::PlayerJump);
+                sfx_events.write(PlaySfxMessage::PlayerJump);
             }
 
             // Handle horizontal movement
@@ -163,7 +163,7 @@ fn apply_player_movement(
         character_body.move_and_slide();
 
         // Send movement event for animation system
-        movement_events.write(PlayerMovementEvent {
+        movement_events.write(PlayerMovementMessage {
             is_moving: movement_occurred,
             is_on_floor: character_body.is_on_floor(),
             facing_left: last_movement_direction < 0.0,
@@ -177,7 +177,7 @@ fn apply_player_movement(
 /// separately from physics and input.
 #[main_thread_system]
 fn update_player_animation(
-    mut movement_events: EventReader<PlayerMovementEvent>,
+    mut movement_events: MessageReader<PlayerMovementMessage>,
     mut player: Query<&mut GodotNodeHandle, With<Player>>,
 ) {
     if let Ok(mut handle) = player.single_mut() {

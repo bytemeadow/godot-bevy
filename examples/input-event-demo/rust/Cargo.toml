@@ -11,10 +11,10 @@ path = "../../run_godot.rs"
 name = "input-event-demo"
 
 [dependencies]
-bevy = { version = "0.16", default-features = false }
+bevy = { version = "0.17", default-features = false }
 fastrand = { version = "2.3.0" }
 godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }
-leafwing-input-manager = "0.17.0"
+leafwing-input-manager = "0.18.0"
 which = "8"
-bevy_enhanced_input = "0.13.0"
+bevy_enhanced_input = "0.19.1"

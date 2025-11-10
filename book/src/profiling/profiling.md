@@ -45,16 +45,4 @@ trace_tracy = ["dep:tracing-tracy", "godot-bevy/trace_tracy"]
 
 ## Notes
 
-If you see the following warning:
-
-```rust
-warning: unexpected `cfg` condition value: `trace_tracy`
-```
-
-after upgrading to Godot Bevy `0.9`, add the following to your Cargo.toml file
-
-```toml
-[lints.rust.unexpected_cfgs]
-level = "warn"
-check-cfg = ['cfg(feature, values("trace_tracy"))']
-```
+> **Note for version 0.9.3+**: The `check-cfg` workaround is no longer needed. Tracy integration has been refactored to prevent dependency leaks.

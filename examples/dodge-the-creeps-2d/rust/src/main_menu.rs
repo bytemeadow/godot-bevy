@@ -1,8 +1,8 @@
-use bevy::prelude::Event;
+use bevy::prelude::Message;
 use bevy::{
     app::{App, Plugin, Update},
     ecs::{
-        event::{EventReader, EventWriter},
+        message::{MessageReader, MessageWriter},
         resource::Resource,
         schedule::IntoScheduleConfigs,
         system::ResMut,
@@ -82,7 +82,7 @@ fn init_menu_assets(
     ui_handles.message_label = Some(menu_ui.message_label.clone());
 }
 
-#[derive(Event, Debug, Clone)]
+#[derive(Message, Debug, Clone)]
 struct StartGameRequested;
 
 fn connect_start_button(
@@ -98,7 +98,7 @@ fn connect_start_button(
 }
 
 fn listen_for_start_button(
-    mut events: EventReader<StartGameRequested>,
+    mut events: MessageReader<StartGameRequested>,
     mut app_state: ResMut<NextState<GameState>>,
 ) {
     for _ in events.read() {
@@ -106,14 +106,14 @@ fn listen_for_start_button(
     }
 }
 
-fn hide_play_button(mut ui_commands: EventWriter<UICommand>) {
+fn hide_play_button(mut ui_commands: MessageWriter<UICommand>) {
     ui_commands.write(UICommand::SetVisible {
         target: UIElement::StartButton,
         visible: false,
     });
 }
 
-fn show_play_button(mut ui_commands: EventWriter<UICommand>) {
+fn show_play_button(mut ui_commands: MessageWriter<UICommand>) {
     ui_commands.write(UICommand::SetVisible {
         target: UIElement::StartButton,
         visible: true,

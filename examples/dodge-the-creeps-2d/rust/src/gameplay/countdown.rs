@@ -2,7 +2,7 @@ use bevy::{
     app::{App, Plugin, Update},
     ecs::{
         entity::Entity,
-        event::EventWriter,
+        message::MessageWriter,
         resource::Resource,
         schedule::IntoScheduleConfigs,
         system::{Commands, Query, Res, ResMut},
@@ -37,7 +37,7 @@ impl Plugin for CountdownPlugin {
 #[derive(Resource)]
 pub struct CountdownTimer(Timer);
 
-fn setup_countdown(mut commands: Commands, mut ui_commands: EventWriter<UICommand>) {
+fn setup_countdown(mut commands: Commands, mut ui_commands: MessageWriter<UICommand>) {
     commands.insert_resource(CountdownTimer(Timer::from_seconds(1.0, TimerMode::Once)));
 
     ui_commands.write(UICommand::ShowMessage {
@@ -49,7 +49,7 @@ fn update_countdown(
     mut timer: ResMut<CountdownTimer>,
     time: Res<Time>,
     mut next_state: ResMut<NextState<GameState>>,
-    mut ui_commands: EventWriter<UICommand>,
+    mut ui_commands: MessageWriter<UICommand>,
 ) {
     timer.0.tick(time.delta());
     if timer.0.just_finished() {
@@ -61,7 +61,10 @@ fn update_countdown(
     }
 }
 
-fn kill_all_mobs(entities: Query<(Entity, &Groups)>, mut node_commands: EventWriter<NodeCommand>) {
+fn kill_all_mobs(
+    entities: Query<(Entity, &Groups)>,
+    mut node_commands: MessageWriter<NodeCommand>,
+) {
     for (entity, group) in entities.iter() {
         if group.is("mobs") {
             node_commands.write(NodeCommand::Destroy { entity });
