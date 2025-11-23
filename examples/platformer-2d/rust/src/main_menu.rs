@@ -76,7 +76,7 @@ fn init_menu_assets(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTr
     // Try to find menu nodes, but handle failure gracefully
     if let Some(root) = scene_tree.get().get_root() {
         // Try to create MenuUi - this might fail if nodes aren't ready yet
-        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| MenuUi::from_node(root))) {
+        match MenuUi::from_node(root) {
             Ok(menu_ui) => {
                 info!("MainMenu: Successfully found menu nodes");
                 menu_assets.start_button = Some(menu_ui.start_button.clone());

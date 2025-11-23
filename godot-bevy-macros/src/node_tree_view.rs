@@ -60,12 +60,14 @@ pub fn node_tree_view(input: DeriveInput) -> syn::Result<TokenStream2> {
     let gd = quote! { godot::obj::Gd };
 
     let expanded = quote! {
-       impl #node_tree_view for #item {
-           fn from_node<T: #inherits<#node>>(node: #gd<T>) -> Self {
-               let node = node.upcast::<#node>();
-               #self_expr
-           }
-       }
+        impl #node_tree_view for #item {
+            fn from_node<T: #inherits<#node>>(
+                node: #gd<T>
+            ) -> std::result::Result<Self, godot_bevy::node_tree_view::NodeTreeViewError> {
+                let node = node.upcast::<#node>();
+                Ok(#self_expr)
+            }
+        }
     };
 
     Ok(expanded)
@@ -153,7 +155,9 @@ fn create_pattern_matching_expr(
                 let base_node = &node;
                 let pattern = #path_pattern;
                 let node_ref = godot_bevy::node_tree_view::find_node_by_pattern(base_node, pattern)
-                    .unwrap_or_else(|| panic!("Could not find node matching pattern: {pattern}"));
+                    .ok_or_else(|| godot_bevy::node_tree_view::NodeTreeViewError::NodeNotFound(
+                        "{pattern}".to_string()
+                    ))?;
                 godot_bevy::interop::GodotNodeHandle::new(node_ref)
             }
         }

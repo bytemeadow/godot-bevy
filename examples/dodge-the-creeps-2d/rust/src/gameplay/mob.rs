@@ -140,7 +140,7 @@ fn new_mob(
         let velocity = Vector2::new(fastrand::f32() * 100.0 + 150.0, 0.0);
         mob.set_linear_velocity(velocity.rotated(mob_data.direction));
 
-        let mut mob_nodes = MobNodes::from_node(mob);
+        let mut mob_nodes = MobNodes::from_node(mob).unwrap();
 
         let animated_sprite = mob_nodes.animated_sprite.get::<AnimatedSprite2D>();
 
