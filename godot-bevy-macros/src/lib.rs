@@ -96,6 +96,10 @@ pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// - `*/HUD/CurrentLevel` - matches relative to the base node
 ///
 /// See `godot_bevy::node_tree_view::find_node_by_pattern` for details on how nodes are found.
+///
+/// Supported field types are:
+/// - `GodotNodeHandle`: `from_node()` returns `NodeTreeViewError` if the node is not found.
+/// - `Option<GodotNodeHandle>`: Filled with `None` if the node is not found.
 #[proc_macro_derive(NodeTreeView, attributes(node))]
 pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
     let view = parse_macro_input!(item as DeriveInput);

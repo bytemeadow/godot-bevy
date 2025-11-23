@@ -5,8 +5,9 @@
 
 ## Checklist
 
-- [ ] Create awesomeness!
+- [x] Create awesomeness!
 - [ ] Update book (if needed)
+- [ ] Update migration guide (if breaking change)
 - [ ] Add/update tests (if needed)
 - [ ] Update examples (if needed)
 - [ ] Run examples

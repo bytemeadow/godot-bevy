@@ -1,9 +1,22 @@
+use thiserror::Error;
+
+#[non_exhaustive]
+#[derive(Debug, Error)]
+pub enum NodeTreeViewError {
+    #[error("Could not find node matching pattern: {0}")]
+    NodeNotFound(String),
+}
+
 /// Trait for objects that can be created from a node reference.
 ///
 /// This is implemented by the `#[derive(NodeTreeView)]` macro.
 pub trait NodeTreeView {
     /// Create a new instance from a node reference.
-    fn from_node<T: godot::obj::Inherits<godot::classes::Node>>(node: godot::obj::Gd<T>) -> Self;
+    fn from_node<T: godot::obj::Inherits<godot::classes::Node>>(
+        node: godot::obj::Gd<T>,
+    ) -> Result<Self, NodeTreeViewError>
+    where
+        Self: Sized;
 }
 
 /// Find a node by matching a pattern with wildcards.
