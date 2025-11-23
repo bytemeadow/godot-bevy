@@ -156,7 +156,7 @@ fn create_pattern_matching_expr(
                 let pattern = #path_pattern;
                 let node_ref = godot_bevy::node_tree_view::find_node_by_pattern(base_node, pattern)
                     .ok_or_else(|| godot_bevy::node_tree_view::NodeTreeViewError::NodeNotFound(
-                        "{pattern}".to_string()
+                        pattern.to_string()
                     ))?;
                 godot_bevy::interop::GodotNodeHandle::new(node_ref)
             }
