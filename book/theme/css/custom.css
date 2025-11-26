@@ -1,0 +1,19 @@
+/*
+Customize headers so each level looks more unique
+
+Available CSS variables can be found here:
+https://github.com/rust-lang/mdBook/blob/master/crates/mdbook-html/front-end/css/variables.css
+*/
+
+h1:has(.header) {
+    border-bottom: 4px groove var(--sidebar-fg);
+}
+
+h2:has(.header) {
+    border-bottom: 2px dashed var(--theme-popup-border);
+}
+
+h3 .header {
+    font-style: italic;
+    border-bottom: 2px solid var(--theme-popup-border);
+}
