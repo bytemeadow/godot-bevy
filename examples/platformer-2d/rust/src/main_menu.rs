@@ -1,12 +1,12 @@
 use crate::{
     GameState,
-    level_manager::{LevelId, LoadLevelEvent},
+    level_manager::{LevelId, LoadLevelMessage},
 };
-use bevy::prelude::Event;
+use bevy::prelude::Message;
 use bevy::{
     app::prelude::*,
     ecs::{
-        event::{EventReader, EventWriter},
+        message::{MessageReader, MessageWriter},
         resource::Resource,
         schedule::IntoScheduleConfigs,
         system::{Res, ResMut},
@@ -106,13 +106,13 @@ fn menu_is_initialized(menu_assets: Res<MenuAssets>) -> bool {
 }
 
 // Typed events for menu actions
-#[derive(Event, Debug, Clone)]
+#[derive(Message, Debug, Clone)]
 struct StartGameRequested;
 
-#[derive(Event, Debug, Clone)]
+#[derive(Message, Debug, Clone)]
 struct ToggleFullscreenRequested;
 
-#[derive(Event, Debug, Clone)]
+#[derive(Message, Debug, Clone)]
 struct QuitRequested {
     source: GodotNodeHandle,
 }
@@ -157,16 +157,16 @@ fn connect_buttons(
 #[main_thread_system]
 fn listen_for_button_press(
     _menu_assets: Res<MenuAssets>,
-    mut start_ev: EventReader<StartGameRequested>,
-    mut toggle_ev: EventReader<ToggleFullscreenRequested>,
-    mut quit_ev: EventReader<QuitRequested>,
+    mut start_ev: MessageReader<StartGameRequested>,
+    mut toggle_ev: MessageReader<ToggleFullscreenRequested>,
+    mut quit_ev: MessageReader<QuitRequested>,
     mut app_state: ResMut<NextState<GameState>>,
-    mut level_load_events: EventWriter<LoadLevelEvent>,
+    mut level_load_events: MessageWriter<LoadLevelMessage>,
 ) {
     for _ in start_ev.read() {
         println!("Start button pressed (typed)");
         app_state.set(GameState::InGame);
-        level_load_events.write(LoadLevelEvent {
+        level_load_events.write(LoadLevelMessage {
             level_id: LevelId::Level1,
         });
     }

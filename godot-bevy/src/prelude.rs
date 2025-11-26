@@ -16,7 +16,7 @@ pub use crate::plugins::{
     },
     collisions::{
         AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED, COLLISION_START_SIGNALS,
-        CollisionEvent, CollisionEventType, Collisions, GodotCollisionsPlugin,
+        CollisionMessage, CollisionMessageType, Collisions, GodotCollisionsPlugin,
     },
     core::{FindEntityByNameExt, MainThreadMarker, PhysicsDelta, PhysicsUpdate},
     // Collisions

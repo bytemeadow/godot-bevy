@@ -5,14 +5,14 @@ use std::sync::mpsc::Sender;
 
 use crate::{
     interop::GodotNodeHandle,
-    plugins::collisions::{CollisionEvent, CollisionEventType},
+    plugins::collisions::{CollisionMessage, CollisionMessageType},
 };
 
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct CollisionWatcher {
     base: Base<Node>,
-    pub notification_channel: Option<Sender<CollisionEvent>>,
+    pub notification_channel: Option<Sender<CollisionMessage>>,
 }
 
 #[godot_api]
@@ -32,10 +32,10 @@ impl CollisionWatcher {
         &self,
         colliding_body: Gd<Node>,
         origin_node: Gd<Node>,
-        event_type: CollisionEventType,
+        event_type: CollisionMessageType,
     ) {
         if let Some(channel) = self.notification_channel.as_ref() {
-            let _ = channel.send(CollisionEvent {
+            let _ = channel.send(CollisionMessage {
                 event_type,
                 origin: GodotNodeHandle::from_instance_id(origin_node.instance_id()),
                 target: GodotNodeHandle::from_instance_id(colliding_body.instance_id()),

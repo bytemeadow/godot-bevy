@@ -2,8 +2,8 @@ use bevy::prelude::*;
 use godot::classes::Label;
 use godot_bevy::prelude::*;
 
-use crate::gameplay::gem::{GemCollectedEvent, GemsCollected};
-use crate::level_manager::LevelLoadedEvent;
+use crate::gameplay::gem::{GemCollectedMessage, GemsCollected};
+use crate::level_manager::LevelLoadedMessage;
 
 /// System sets for HUD operations that can run in parallel when possible
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -18,8 +18,8 @@ pub enum HudSystemSet {
 ///
 /// This decouples HUD updates from direct resource access,
 /// allowing better parallelization with other game systems.
-#[derive(Event, Debug)]
-pub enum HudUpdateEvent {
+#[derive(Message, Debug)]
+pub enum HudUpdateMessage {
     GemsChanged(i64),
 }
 
@@ -50,7 +50,7 @@ pub struct HudPlugin;
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HudHandles>()
-            .add_event::<HudUpdateEvent>()
+            .add_message::<HudUpdateMessage>()
             .add_systems(
                 Update,
                 (
@@ -70,9 +70,9 @@ impl Plugin for HudPlugin {
 #[main_thread_system]
 fn setup_hud_on_level_loaded(
     mut hud_handles: ResMut<HudHandles>,
-    mut events: EventReader<LevelLoadedEvent>,
+    mut events: MessageReader<LevelLoadedMessage>,
     mut scene_tree: SceneTreeRef,
-    mut hud_update_events: EventWriter<HudUpdateEvent>,
+    mut hud_update_events: MessageWriter<HudUpdateMessage>,
     gems_collected: Res<GemsCollected>,
 ) {
     for event in events.read() {
@@ -89,7 +89,7 @@ fn setup_hud_on_level_loaded(
             .set_text(event.level_id.display_name());
 
         // Request HUD gem update via events
-        hud_update_events.write(HudUpdateEvent::GemsChanged(gems_collected.0));
+        hud_update_events.write(HudUpdateMessage::GemsChanged(gems_collected.0));
     }
 }
 
@@ -99,12 +99,12 @@ fn setup_hud_on_level_loaded(
 /// and converts state changes to events for loose coupling.
 fn generate_hud_update_events(
     gems_collected: Res<GemsCollected>,
-    mut gem_events: EventReader<GemCollectedEvent>,
-    mut hud_update_events: EventWriter<HudUpdateEvent>,
+    mut gem_events: MessageReader<GemCollectedMessage>,
+    mut hud_update_events: MessageWriter<HudUpdateMessage>,
 ) {
     // Generate gem update events when gems are collected
     for _event in gem_events.read() {
-        hud_update_events.write(HudUpdateEvent::GemsChanged(gems_collected.0));
+        hud_update_events.write(HudUpdateMessage::GemsChanged(gems_collected.0));
     }
 }
 
@@ -114,12 +114,12 @@ fn generate_hud_update_events(
 /// since it only responds to events and updates UI elements.
 #[main_thread_system]
 fn handle_hud_update_events(
-    mut hud_events: EventReader<HudUpdateEvent>,
+    mut hud_events: MessageReader<HudUpdateMessage>,
     hud_handles: Res<HudHandles>,
 ) {
     for event in hud_events.read() {
         match event {
-            HudUpdateEvent::GemsChanged(gem_count) => {
+            HudUpdateMessage::GemsChanged(gem_count) => {
                 if let Some(gems_label) = &hud_handles.gems_label {
                     let mut label_handle = gems_label.clone();
                     label_handle

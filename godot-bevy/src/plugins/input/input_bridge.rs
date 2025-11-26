@@ -2,7 +2,7 @@ use bevy::{
     app::{App, First, Last, Plugin},
     ecs::{
         entity::Entity,
-        event::{EventReader, EventWriter},
+        message::{MessageReader, MessageWriter},
         system::ResMut,
     },
     input::{
@@ -22,8 +22,8 @@ use crate::plugins::input::events::{
     PanGestureInput as GodotPanGestureInput,
 };
 
-/// Plugin that bridges godot-bevy's input events to Bevy's standard input resources.
-/// This plugin automatically includes GodotInputEventPlugin as a dependency.
+/// Plugin that bridges godot-bevy's input messages to Bevy's standard input resources.
+// This plugin automatically includes GodotInputEventPlugin as a dependency.
 #[derive(Default)]
 pub struct BevyInputBridgePlugin;
 
@@ -47,13 +47,13 @@ impl Plugin for BevyInputBridgePlugin {
 }
 
 fn bridge_keyboard_input(
-    mut keyboard_events: EventReader<GodotKeyboardInput>,
+    mut keyboard_messages: MessageReader<GodotKeyboardInput>,
     mut key_code_input: ResMut<ButtonInput<KeyCode>>,
 ) {
-    for event in keyboard_events.read() {
+    for message in keyboard_messages.read() {
         // Convert Godot Key to Bevy KeyCode
-        if let Some(bevy_key_code) = godot_key_to_bevy_keycode(event.keycode) {
-            if event.pressed {
+        if let Some(bevy_key_code) = godot_key_to_bevy_keycode(message.keycode) {
+            if message.pressed {
                 key_code_input.press(bevy_key_code);
             } else {
                 key_code_input.release(bevy_key_code);
@@ -63,13 +63,13 @@ fn bridge_keyboard_input(
 }
 
 fn bridge_mouse_button_input(
-    mut mouse_events: EventReader<GodotMouseButtonInput>,
-    mut bevy_mouse_button_events: EventWriter<BevyMouseButtonInput>,
+    mut mouse_messages: MessageReader<GodotMouseButtonInput>,
+    mut bevy_mouse_button_messages: MessageWriter<BevyMouseButtonInput>,
 ) {
-    for event in mouse_events.read() {
+    for message in mouse_messages.read() {
         // Skip wheel events - they're handled separately in bridge_mouse_scroll
         if matches!(
-            event.button,
+            message.button,
             GodotMouseButton::WheelUp
                 | GodotMouseButton::WheelDown
                 | GodotMouseButton::WheelLeft
@@ -78,15 +78,15 @@ fn bridge_mouse_button_input(
             continue;
         }
 
-        let bevy_button = godot_mouse_to_bevy_mouse(event.button);
-        let state = if event.pressed {
+        let bevy_button = godot_mouse_to_bevy_mouse(message.button);
+        let state = if message.pressed {
             ButtonState::Pressed
         } else {
             ButtonState::Released
         };
 
         // Send MouseButtonInput event that Bevy's mouse_button_input_system will process
-        bevy_mouse_button_events.write(BevyMouseButtonInput {
+        bevy_mouse_button_messages.write(BevyMouseButtonInput {
             button: bevy_button,
             state,
             window: Entity::PLACEHOLDER,
@@ -95,49 +95,49 @@ fn bridge_mouse_button_input(
 }
 
 fn bridge_mouse_motion(
-    mut mouse_motion_events: EventReader<GodotMouseMotion>,
-    mut bevy_mouse_motion_events: EventWriter<BevyMouseMotion>,
+    mut mouse_motion_messages: MessageReader<GodotMouseMotion>,
+    mut bevy_mouse_motion_messages: MessageWriter<BevyMouseMotion>,
 ) {
     // Send individual Bevy MouseMotion events - bevy input will handle the accumulation
-    for event in mouse_motion_events.read() {
-        bevy_mouse_motion_events.write(BevyMouseMotion { delta: event.delta });
+    for event in mouse_motion_messages.read() {
+        bevy_mouse_motion_messages.write(BevyMouseMotion { delta: event.delta });
     }
 }
 
 fn bridge_mouse_scroll(
-    mut mouse_button_events: EventReader<GodotMouseButtonInput>,
-    mut bevy_mouse_scroll_events: EventWriter<BevyMouseWheel>,
+    mut mouse_button_messages: MessageReader<GodotMouseButtonInput>,
+    mut bevy_mouse_scroll_messages: MessageWriter<BevyMouseWheel>,
 ) {
     // Send individual Bevy MouseWheel events - bevy input will handle the accumulation
-    for event in mouse_button_events.read() {
-        match event.button {
+    for message in mouse_button_messages.read() {
+        match message.button {
             GodotMouseButton::WheelUp => {
-                bevy_mouse_scroll_events.write(BevyMouseWheel {
+                bevy_mouse_scroll_messages.write(BevyMouseWheel {
                     x: 0.0,
-                    y: event.factor,
+                    y: message.factor,
                     unit: MouseScrollUnit::Line,
                     window: Entity::PLACEHOLDER,
                 });
             }
             GodotMouseButton::WheelDown => {
-                bevy_mouse_scroll_events.write(BevyMouseWheel {
+                bevy_mouse_scroll_messages.write(BevyMouseWheel {
                     x: 0.0,
-                    y: -event.factor,
+                    y: -message.factor,
                     unit: MouseScrollUnit::Line,
                     window: Entity::PLACEHOLDER,
                 });
             }
             GodotMouseButton::WheelLeft => {
-                bevy_mouse_scroll_events.write(BevyMouseWheel {
-                    x: -event.factor,
+                bevy_mouse_scroll_messages.write(BevyMouseWheel {
+                    x: -message.factor,
                     y: 0.0,
                     unit: MouseScrollUnit::Line,
                     window: Entity::PLACEHOLDER,
                 });
             }
             GodotMouseButton::WheelRight => {
-                bevy_mouse_scroll_events.write(BevyMouseWheel {
-                    x: event.factor,
+                bevy_mouse_scroll_messages.write(BevyMouseWheel {
+                    x: message.factor,
                     y: 0.0,
                     unit: MouseScrollUnit::Line,
                     window: Entity::PLACEHOLDER,
@@ -149,11 +149,11 @@ fn bridge_mouse_scroll(
 }
 
 fn bridge_pan_gesture(
-    mut pan_events: EventReader<GodotPanGestureInput>,
-    mut bevy_pan_events: EventWriter<BevyPanGesture>,
+    mut pan_messages: MessageReader<GodotPanGestureInput>,
+    mut bevy_pan_messages: MessageWriter<BevyPanGesture>,
 ) {
-    for event in pan_events.read() {
-        bevy_pan_events.write(BevyPanGesture(event.delta));
+    for event in pan_messages.read() {
+        bevy_pan_messages.write(BevyPanGesture(event.delta));
     }
 }
 
