@@ -149,7 +149,10 @@ fn create_direct_path_expr(
                 let base_node = &node;
                 base_node.has_node(#node_path)
                     .then(|| {
-                        let node_ref = base_node.get_node_as::<godot::classes::Node>(#node_path);
+                        let node_ref = base_node.try_get_node_as::<godot::classes::Node>(#node_path)
+                            .ok_or_else(|| godot_bevy::node_tree_view::NodeTreeViewError::NodeNotFound(
+                                #node_path.to_string()
+                            ))?;
                         godot_bevy::interop::GodotNodeHandle::new(node_ref)
                     })
             }
@@ -158,7 +161,10 @@ fn create_direct_path_expr(
         quote_spanned! { span =>
             {
                 let base_node = &node;
-                let node_ref = base_node.get_node_as::<godot::classes::Node>(#node_path);
+                let node_ref = base_node.try_get_node_as::<godot::classes::Node>(#node_path)
+                    .ok_or_else(|| godot_bevy::node_tree_view::NodeTreeViewError::NodeNotFound(
+                        #node_path.to_string()
+                    ))?;
                 godot_bevy::interop::GodotNodeHandle::new(node_ref)
             }
         }
