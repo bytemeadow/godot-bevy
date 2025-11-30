@@ -76,7 +76,7 @@ fn init_menu_assets(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTr
     // Try to find menu nodes, but handle failure gracefully
     if let Some(root) = scene_tree.get().get_root() {
         // Try to create MenuUi - this might fail if nodes aren't ready yet
-        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| MenuUi::from_node(root))) {
+        match MenuUi::from_node(root) {
             Ok(menu_ui) => {
                 info!("MainMenu: Successfully found menu nodes");
                 menu_assets.start_button = Some(menu_ui.start_button.clone());
@@ -133,19 +133,19 @@ fn connect_buttons(
         // Get mutable references one at a time to avoid multiple borrows
         if let Some(start_btn) = menu_assets.start_button.as_mut() {
             typed_start.connect_map(start_btn, "pressed", None, |_args, _node, _ent| {
-                StartGameRequested
+                Some(StartGameRequested)
             });
         }
         if let Some(fullscreen_btn) = menu_assets.fullscreen_button.as_mut() {
             typed_fullscreen.connect_map(fullscreen_btn, "pressed", None, |_args, _node, _ent| {
-                ToggleFullscreenRequested
+                Some(ToggleFullscreenRequested)
             });
         }
         if let Some(quit_btn) = menu_assets.quit_button.as_mut() {
             typed_quit.connect_map(quit_btn, "pressed", None, |_args, node, _ent| {
-                QuitRequested {
+                Some(QuitRequested {
                     source: node.clone(),
-                }
+                })
             });
         }
 

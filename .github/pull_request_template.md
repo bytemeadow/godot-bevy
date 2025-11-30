@@ -5,8 +5,10 @@
 
 ## Checklist
 
-- [ ] Create awesomeness!
+- [x] Create awesomeness!
 - [ ] Update book (if needed)
+  - [ ] Update migration guide (if breaking change)
+  - [ ] Run `mdbook test` (if book was updated)
 - [ ] Add/update tests (if needed)
 - [ ] Update examples (if needed)
 - [ ] Run examples

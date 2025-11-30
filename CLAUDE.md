@@ -60,7 +60,7 @@ cargo build --release --manifest-path examples/{example}/rust/Cargo.toml
 - **`GodotCorePlugins`**: Minimal required functionality 
 - **`GodotDefaultPlugins`**: All functionality enabled (use for easy migration)
 - **Individual plugins**: 
-  - `GodotTransformsPlugin` (move/position nodes from Bevy)
+  - `GodotTransformSyncPlugin` (move/position nodes from Bevy)
   - `GodotAudioPlugin` (play sounds/music from Bevy) 
   - `GodotSignalsPlugin` (respond to Godot signals in Bevy)
   - `GodotCollisionsPlugin` (detect collisions in Bevy)
@@ -80,7 +80,7 @@ fn build_app(app: &mut App) {
 // Add specific features as needed
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotTransformsPlugin)      // Transform sync
+    app.add_plugins(GodotTransformSyncPlugin::default()) // Transform sync
         .add_plugins(GodotAudioPlugin)          // Audio system
         .add_plugins(BevyInputBridgePlugin);    // Input (auto-includes GodotInputEventPlugin)
 }

@@ -202,7 +202,7 @@ fn spawn_enemy(
 ## Next Steps
 
 Now that you understand the basic concepts:
-- Try the [examples](https://github.com/godot-rust/godot-bevy/tree/main/examples)
+- Try the [examples](https://github.com/bytemeadow/godot-bevy/tree/main/examples)
 - Read about specific systems in detail
 - Start building your game!
 

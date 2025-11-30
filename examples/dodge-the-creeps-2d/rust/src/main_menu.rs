@@ -70,7 +70,7 @@ fn init_menu_assets(
     mut ui_handles: ResMut<UIHandles>,
     mut scene_tree: SceneTreeRef,
 ) {
-    let menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap());
+    let menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap()).unwrap();
 
     menu_assets.message_label = Some(menu_ui.message_label.clone());
     menu_assets.start_button = Some(menu_ui.start_button.clone());
@@ -93,7 +93,7 @@ fn connect_start_button(
         menu_assets.start_button.as_mut().unwrap(),
         "pressed",
         None,
-        |_args, _node, _ent| StartGameRequested,
+        |_args, _node, _ent| Some(StartGameRequested),
     );
 }
 

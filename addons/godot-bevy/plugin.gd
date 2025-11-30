@@ -91,7 +91,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 bevy = { version = "0.16", default-features = false, features = ["bevy_state"] }
-godot = "0.3"
+godot = "0.4"
 godot-bevy = { version = "%s", features = ["default"] }
 
 [workspace]

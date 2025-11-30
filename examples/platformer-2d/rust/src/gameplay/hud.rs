@@ -78,7 +78,7 @@ fn setup_hud_on_level_loaded(
     for event in events.read() {
         // Try to get HUD node handles - this is the only SceneTreeRef access in HUD
         let root = scene_tree.get().get_root().unwrap();
-        let mut hud_ui = HudUi::from_node(root);
+        let mut hud_ui = HudUi::from_node(root).unwrap();
         hud_handles.current_level_label = Some(hud_ui.current_level_label.clone());
         hud_handles.gems_label = Some(hud_ui.gems_label.clone());
 

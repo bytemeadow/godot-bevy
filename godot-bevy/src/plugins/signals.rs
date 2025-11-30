@@ -242,7 +242,7 @@ impl<'w, T: Message + Send + 'static> TypedGodotSignals<'w, T> {
         source_entity: Option<Entity>,
         mut mapper: F,
     ) where
-        F: FnMut(&[Variant], &GodotNodeHandle, Option<Entity>) -> T + Send + 'static,
+        F: FnMut(&[Variant], &GodotNodeHandle, Option<Entity>) -> Option<T> + Send + 'static,
     {
         let mut node_ref = node.get::<Node>();
         let signal_name_copy = signal_name.to_string();
@@ -253,7 +253,9 @@ impl<'w, T: Message + Send + 'static> TypedGodotSignals<'w, T> {
             // Clone variants to owned values we can inspect
             let owned: Vec<Variant> = args.iter().map(|&v| v.clone()).collect();
             let event = mapper(&owned, &source_node, source_entity);
-            let _ = sender_t.send(Box::new(TypedEnvelope::<T>(event)));
+            if let Some(event) = event {
+                let _ = sender_t.send(Box::new(TypedEnvelope::<T>(event)));
+            }
             Variant::nil()
         };
 
@@ -298,8 +300,9 @@ fn process_typed_deferred_signal_connections<T: Message + Send + 'static>(
 /// A single typed deferred connection item for `T` messages
 pub struct TypedDeferredConnection<T: Message + Send + 'static> {
     pub signal_name: String,
-    pub mapper:
-        Box<dyn Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> T + Send + Sync + 'static>,
+    pub mapper: Box<
+        dyn Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
+    >,
 }
 
 /// Component to defer Godot signal connections until a `GodotNodeHandle` exists on the entity
@@ -323,7 +326,7 @@ impl<T: Message + Send + 'static> TypedDeferredSignalConnections<T> {
 
     pub fn with_connection<F>(signal_name: impl Into<String>, mapper: F) -> Self
     where
-        F: Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> T + Send + Sync + 'static,
+        F: Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
     {
         Self {
             connections: vec![TypedDeferredConnection {
@@ -335,7 +338,7 @@ impl<T: Message + Send + 'static> TypedDeferredSignalConnections<T> {
 
     pub fn push<F>(&mut self, signal_name: impl Into<String>, mapper: F)
     where
-        F: Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> T + Send + Sync + 'static,
+        F: Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
     {
         self.connections.push(TypedDeferredConnection {
             signal_name: signal_name.into(),
