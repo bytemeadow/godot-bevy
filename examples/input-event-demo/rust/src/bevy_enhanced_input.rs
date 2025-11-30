@@ -7,6 +7,7 @@ pub struct BevyEnhancedInputPlugin;
 impl Plugin for BevyEnhancedInputPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(EnhancedInputPlugin)
+            .add_input_context::<Player>()
             .add_observer(apply_move)
             .add_observer(interact)
             .add_systems(Startup, init_input);
