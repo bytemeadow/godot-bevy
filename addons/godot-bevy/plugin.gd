@@ -90,7 +90,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-bevy = { version = "0.16", default-features = false, features = ["bevy_state"] }
+bevy = { version = "0.17", default-features = false, features = ["bevy_state"] }
 godot = "0.4"
 godot-bevy = { version = "%s", features = ["default"] }
 
