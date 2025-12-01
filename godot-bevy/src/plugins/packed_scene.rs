@@ -1,10 +1,16 @@
 use super::scene_tree::SceneTreeRef;
 use crate::plugins::assets::GodotResource;
+use crate::plugins::signals::{
+    DeferredSignalConnection, GlobalTypedSignalSender, SignalConnectionSpec,
+    TypedDeferredSignalConnections,
+};
 use crate::plugins::transforms::IntoGodotTransform2D;
 use crate::prelude::main_thread_system;
 use crate::{interop::GodotNodeHandle, plugins::transforms::IntoGodotTransform};
 use bevy_app::{App, Plugin, PostUpdate};
 use bevy_asset::{Assets, Handle};
+use bevy_ecs::message::Message;
+use bevy_ecs::system::NonSend;
 use bevy_ecs::{
     component::Component,
     entity::Entity,
@@ -12,6 +18,7 @@ use bevy_ecs::{
     system::{Commands, Query, ResMut},
 };
 use bevy_transform::components::Transform;
+use godot::prelude::Variant;
 use godot::{
     builtin::GString,
     classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader},
@@ -39,6 +46,7 @@ impl Plugin for GodotPackedScenePlugin {
 pub struct GodotScene {
     resource: GodotSceneResource,
     parent: Option<GodotNodeHandle>,
+    deferred_signal_connections: Vec<Box<dyn DeferredSignalConnection>>,
 }
 
 #[derive(Debug)]
@@ -54,6 +62,7 @@ impl GodotScene {
         Self {
             resource: GodotSceneResource::Handle(handle),
             parent: None,
+            deferred_signal_connections: Vec::new(),
         }
     }
 
@@ -66,12 +75,57 @@ impl GodotScene {
         Self {
             resource: GodotSceneResource::Path(path.to_string()),
             parent: None,
+            deferred_signal_connections: Vec::new(),
         }
     }
 
     /// Set the parent node for this scene when spawned.
     pub fn with_parent(mut self, parent: GodotNodeHandle) -> Self {
         self.parent = Some(parent);
+        self
+    }
+
+    /// Connect a typed Godot signal from a child node to a Bevy `Message`.
+    /// The signal will be connected when the scene is spawned.
+    ///
+    /// # Arguments
+    /// * `node_path` - Path to the node relative to the scene root (e.g., "VBox/MyButton").
+    /// * `signal_name` - Name of the Godot signal to connect (e.g., "pressed").
+    /// * `mapper` - Closure that maps signal arguments to your typed message.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let scene: Handle<GodotResource> = ...;
+    /// let entity = world.spawn_empty();
+    /// entity.insert(
+    ///     GodotScene::from_handle(scene).with_signal_connection::<MyMessage>(
+    ///         "VBox/MyButton",
+    ///         "pressed",
+    ///         |args, _node, _entity| {
+    ///             Some(MyMessage::from_args(args))
+    ///         }
+    ///     )
+    /// );
+    /// ```
+    pub fn with_signal_connection<T, F>(
+        mut self,
+        node_path: &str,
+        signal_name: &str,
+        mapper: F,
+    ) -> Self
+    where
+        T: Message + Send + std::fmt::Debug + 'static,
+        F: Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
+    {
+        self.deferred_signal_connections
+            .push(Box::new(SignalConnectionSpec {
+                node_path: node_path.to_string(),
+                signal_name: signal_name.to_string(),
+                connections: TypedDeferredSignalConnections::<T>::with_connection(
+                    signal_name,
+                    mapper,
+                ),
+            }));
         self
     }
 }
@@ -82,6 +136,7 @@ fn spawn_scene(
     mut new_scenes: Query<(&mut GodotScene, Entity, Option<&Transform>), Without<GodotNodeHandle>>,
     mut scene_tree: SceneTreeRef,
     mut assets: ResMut<Assets<GodotResource>>,
+    typed_message_sender: NonSend<GlobalTypedSignalSender>,
 ) {
     for (mut scene, ent, transform) in new_scenes.iter_mut() {
         let packed_scene = match &scene.resource {
@@ -121,6 +176,11 @@ fn spawn_scene(
                     "attempted to spawn a scene with a transform on Node that did not inherit from Node, the transform was not set"
                 )
             }
+        }
+
+        // Connect signals
+        for deferred_connection in scene.deferred_signal_connections.drain(..) {
+            deferred_connection.connect(&instance, ent, &typed_message_sender);
         }
 
         match &mut scene.parent {
