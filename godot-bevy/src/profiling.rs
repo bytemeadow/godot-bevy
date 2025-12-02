@@ -9,9 +9,8 @@ use once_cell::sync::Lazy;
 
 /// Tracy client instance (only exists when tracy feature is enabled)
 #[cfg(feature = "trace_tracy")]
-static TRACY_CLIENT: Lazy<tracing_tracy::client::Client> = Lazy::new(|| {
-    tracing_tracy::client::Client::start()
-});
+static TRACY_CLIENT: Lazy<tracing_tracy::client::Client> =
+    Lazy::new(|| tracing_tracy::client::Client::start());
 
 /// Initialize the profiling system
 /// Called by the #[bevy_app] macro during library initialization

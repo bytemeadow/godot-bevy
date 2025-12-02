@@ -1,4 +1,3 @@
-
 use avian3d::{
     collision::CollisionDiagnostics,
     dynamics::solver::SolverDiagnostics,
