@@ -26,7 +26,7 @@ impl Plugin for GodotInputPlugin {
     }
 }
 
-fn handle_keyboard_input(mut keyboard_events: EventReader<KeyboardInput>) {
+fn handle_keyboard_input(mut keyboard_events: MessageReader<KeyboardInput>) {
     for event in keyboard_events.read() {
         let key_name = format!("{:?}", event.keycode);
         let state = if event.pressed { "pressed" } else { "released" };
@@ -56,7 +56,7 @@ fn handle_keyboard_input(mut keyboard_events: EventReader<KeyboardInput>) {
     }
 }
 
-fn handle_mouse_button_input(mut mouse_button_events: EventReader<MouseButtonInput>) {
+fn handle_mouse_button_input(mut mouse_button_events: MessageReader<MouseButtonInput>) {
     for event in mouse_button_events.read() {
         let button_name = format!("{:?}", event.button);
         let state = if event.pressed { "pressed" } else { "released" };
@@ -88,7 +88,7 @@ fn handle_mouse_button_input(mut mouse_button_events: EventReader<MouseButtonInp
     }
 }
 
-fn handle_mouse_motion(mut mouse_motion_events: EventReader<MouseMotion>) {
+fn handle_mouse_motion(mut mouse_motion_events: MessageReader<MouseMotion>) {
     for event in mouse_motion_events.read() {
         // Only log significant mouse movements to avoid spam
         if event.delta.length() > 5.0 {
@@ -103,7 +103,7 @@ fn handle_mouse_motion(mut mouse_motion_events: EventReader<MouseMotion>) {
     }
 }
 
-fn handle_touch_input(mut touch_events: EventReader<TouchInput>) {
+fn handle_touch_input(mut touch_events: MessageReader<TouchInput>) {
     for event in touch_events.read() {
         let state = if event.pressed { "touched" } else { "released" };
 
@@ -123,7 +123,7 @@ fn handle_touch_input(mut touch_events: EventReader<TouchInput>) {
     }
 }
 
-fn handle_action_input(mut action_events: EventReader<ActionInput>) {
+fn handle_action_input(mut action_events: MessageReader<ActionInput>) {
     for event in action_events.read() {
         let state = if event.pressed { "pressed" } else { "released" };
 
@@ -155,7 +155,7 @@ fn handle_action_input(mut action_events: EventReader<ActionInput>) {
     }
 }
 
-fn handle_gamepad_button_input(mut gamepad_button_events: EventReader<GamepadButtonInput>) {
+fn handle_gamepad_button_input(mut gamepad_button_events: MessageReader<GamepadButtonInput>) {
     for event in gamepad_button_events.read() {
         let state = if event.pressed { "pressed" } else { "released" };
 
@@ -198,7 +198,7 @@ fn handle_gamepad_button_input(mut gamepad_button_events: EventReader<GamepadBut
     }
 }
 
-fn handle_gamepad_axis_input(mut gamepad_axis_events: EventReader<GamepadAxisInput>) {
+fn handle_gamepad_axis_input(mut gamepad_axis_events: MessageReader<GamepadAxisInput>) {
     for event in gamepad_axis_events.read() {
         // Only log significant axis movements to avoid spam
         if event.value.abs() > 0.1 {

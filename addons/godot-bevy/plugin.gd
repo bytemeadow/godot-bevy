@@ -90,16 +90,12 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-bevy = { version = "0.16", default-features = false, features = ["bevy_state"] }
+bevy = { version = "0.17", default-features = false, features = ["bevy_state"] }
 godot = "0.4"
 godot-bevy = { version = "%s", features = ["default"] }
 
 [workspace]
 # Empty workspace table to make this a standalone project
-
-[lints.rust.unexpected_cfgs]
-level = "warn"
-check-cfg = ['cfg(feature, values("trace_tracy"))']
 """ % [project_name.to_snake_case(), info.godot_bevy_version]
 
 	_save_file(rust_path.path_join("Cargo.toml"), cargo_content)

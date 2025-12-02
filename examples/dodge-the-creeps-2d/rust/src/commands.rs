@@ -10,7 +10,7 @@ use godot::obj::Gd;
 use godot_bevy::prelude::*;
 
 /// Commands for UI operations
-#[derive(Event, Debug, Clone)]
+#[derive(Message, Debug, Clone)]
 pub enum UICommand {
     /// Set text on a UI element
     SetText { target: UIElement, text: String },
@@ -21,7 +21,7 @@ pub enum UICommand {
 }
 
 /// Commands for node operations
-#[derive(Event, Debug, Clone)]
+#[derive(Message, Debug, Clone)]
 pub enum NodeCommand {
     /// Set visibility of any node
     #[allow(dead_code)]
@@ -34,7 +34,7 @@ pub enum NodeCommand {
 }
 
 /// Commands for animation operations
-#[derive(Event, Debug, Clone)]
+#[derive(Message, Debug, Clone)]
 pub enum AnimationCommand {
     /// Play an animation on a sprite
     #[allow(dead_code)]
@@ -148,9 +148,9 @@ pub struct CommandSystemPlugin;
 impl Plugin for CommandSystemPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<UIHandles>()
-            .add_event::<UICommand>()
-            .add_event::<NodeCommand>()
-            .add_event::<AnimationCommand>()
+            .add_message::<UICommand>()
+            .add_message::<NodeCommand>()
+            .add_message::<AnimationCommand>()
             .add_systems(
                 Update,
                 (
@@ -167,7 +167,7 @@ impl Plugin for CommandSystemPlugin {
 
 /// Main thread system that processes UI commands
 #[main_thread_system]
-fn process_ui_commands(mut ui_commands: EventReader<UICommand>, ui_handles: Res<UIHandles>) {
+fn process_ui_commands(mut ui_commands: MessageReader<UICommand>, ui_handles: Res<UIHandles>) {
     use godot::classes::{Button, Label};
 
     for command in ui_commands.read() {
@@ -200,7 +200,7 @@ fn process_ui_commands(mut ui_commands: EventReader<UICommand>, ui_handles: Res<
 /// Main thread system that processes node commands
 #[main_thread_system]
 fn process_node_commands(
-    mut node_commands: EventReader<NodeCommand>,
+    mut node_commands: MessageReader<NodeCommand>,
     mut nodes: Query<&mut GodotNodeHandle>,
     mut commands: Commands,
 ) {
@@ -237,7 +237,7 @@ fn process_node_commands(
 /// Main thread system that processes animation commands
 #[main_thread_system]
 fn process_animation_commands(
-    mut animation_commands: EventReader<AnimationCommand>,
+    mut animation_commands: MessageReader<AnimationCommand>,
     mut nodes: Query<&mut GodotNodeHandle>,
 ) {
     use godot::classes::AnimatedSprite2D;

@@ -1,7 +1,7 @@
 use crate::gameplay::audio::GameSfxChannel;
 use crate::{GameState, commands::AnimationState};
 use bevy::math::{Vec3Swizzles, vec3};
-use bevy::prelude::Event;
+use bevy::prelude::Message;
 use bevy::transform::components::Transform;
 use bevy::{
     app::{App, Plugin, Update},
@@ -9,7 +9,7 @@ use bevy::{
     ecs::{
         component::Component,
         entity::Entity,
-        event::EventReader,
+        message::MessageReader,
         name::Name,
         query::Added,
         resource::Resource,
@@ -182,12 +182,12 @@ fn new_mob(
     }
 }
 
-#[derive(Event, Debug, Clone, Copy)]
+#[derive(Message, Debug, Clone, Copy)]
 struct MobScreenExited {
     entity: Entity,
 }
 
-fn kill_mob(mut commands: Commands, mut events: EventReader<MobScreenExited>) {
+fn kill_mob(mut commands: Commands, mut events: MessageReader<MobScreenExited>) {
     for ev in events.read() {
         commands.entity(ev.entity).despawn();
     }

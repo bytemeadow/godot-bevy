@@ -8,7 +8,7 @@
 //! and have no shared mutable state, improving audio responsiveness.
 
 use crate::GameState;
-use crate::level_manager::{LevelId, LevelLoadedEvent};
+use crate::level_manager::{LevelId, LevelLoadedMessage};
 use bevy::prelude::*;
 use bevy::state::condition::in_state;
 use bevy::state::state::OnExit;
@@ -31,7 +31,7 @@ impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
         app.add_audio_channel::<GameMusicChannel>()
             .add_audio_channel::<GameSfxChannel>()
-            .add_event::<PlaySfxEvent>()
+            .add_message::<PlaySfxMessage>()
             .add_systems(
                 Update,
                 (
@@ -87,8 +87,8 @@ pub struct GameAudio {
 }
 
 /// Event to trigger sound effects
-#[derive(Event, Debug, Clone)]
-pub enum PlaySfxEvent {
+#[derive(Message, Debug, Clone)]
+pub enum PlaySfxMessage {
     PlayerJump,
     GemCollected,
 }
@@ -98,7 +98,7 @@ pub enum PlaySfxEvent {
 /// Runs in `BackgroundMusic` set and can execute in parallel with SFX systems
 /// since it uses a separate audio channel (`GameMusicChannel`).
 fn handle_level_music_change(
-    mut level_loaded_events: EventReader<LevelLoadedEvent>,
+    mut level_loaded_events: MessageReader<LevelLoadedMessage>,
     music_channel: Res<AudioChannel<GameMusicChannel>>,
     game_audio: Res<GameAudio>,
 ) {
@@ -127,17 +127,17 @@ fn handle_level_music_change(
 /// Runs in `SoundEffects` set and can execute in parallel with music systems
 /// since it uses a separate audio channel (`GameSfxChannel`).
 fn handle_sfx_events(
-    mut sfx_events: EventReader<PlaySfxEvent>,
+    mut sfx_events: MessageReader<PlaySfxMessage>,
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
     game_audio: Res<GameAudio>,
 ) {
     for event in sfx_events.read() {
         match event {
-            PlaySfxEvent::PlayerJump => {
+            PlaySfxMessage::PlayerJump => {
                 sfx_channel.play(game_audio.jump_sound.clone()).volume(0.8);
                 debug!("Played jump sound effect");
             }
-            PlaySfxEvent::GemCollected => {
+            PlaySfxMessage::GemCollected => {
                 sfx_channel.play(game_audio.gem_sound.clone()).volume(0.9);
                 debug!("Played gem collection sound effect");
             }
