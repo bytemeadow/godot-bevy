@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -20,14 +21,22 @@ def main(args: list[str]) -> None:
     baseline_path = Path(parsed_args.baseline)
     output_file_path = Path(parsed_args.output_file)
 
-    with open(bench_results_path) as f:
-        current_results = json.load(f)
+    try:
+        with open(bench_results_path) as f:
+            current_results = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: benchmark results file {bench_results_path} not found, can't continue.")
+        exit(1)
 
     try:
         with open(baseline_path) as f:
             baseline = json.load(f)
-    except:
-        print(f"Warning: baseline file {baseline_path} not found, skipping comparison")
+    except FileNotFoundError:
+        print(f"Warning: baseline file {baseline_path} not found, showing only current results.")
+        print(f"Directory contents of {baseline_path.parent}:")
+        for file in os.listdir(baseline_path.parent):
+            print(f"  {file}")
+
         baseline = {"benchmarks": {}}
 
     comparison = {
