@@ -34,7 +34,7 @@ When you run this example and interact with it, you'll see console output like:
 
 ### Event Processing
 ```rust
-fn handle_keyboard_input(mut keyboard_events: EventReader<KeyboardInput>) {
+fn handle_keyboard_input(mut keyboard_events: MessageReader<KeyboardInput>) {
     for event in keyboard_events.read() {
         if event.pressed && event.keycode == Key::SPACE {
             println!("Space key pressed!");
@@ -42,7 +42,7 @@ fn handle_keyboard_input(mut keyboard_events: EventReader<KeyboardInput>) {
     }
 }
 
-fn handle_actions(mut action_events: EventReader<ActionInput>) {
+fn handle_actions(mut action_events: MessageReader<ActionInput>) {
     for event in action_events.read() {
         if event.action == "jump" && event.pressed {
             println!("Jump action triggered!"); // User can remap this!

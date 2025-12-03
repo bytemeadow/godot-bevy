@@ -142,7 +142,7 @@ fn setup(
 ### Reacting to Signals
 ```rust
 fn handle_button_press(
-    mut events: EventReader<GodotSignal>,
+    mut events: MessageReader<GodotSignal>,
 ) {
     for signal in events.read() {
         if signal.name == "pressed" {

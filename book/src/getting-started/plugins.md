@@ -75,7 +75,7 @@ All other features must be explicitly added as plugins.
 - **`GodotSignalsPlugin`**: Signal event bridge
 
   - Converts Godot signals to Bevy events
-  - Use `EventReader<GodotSignal>` to handle signals
+  - Use `MessageReader<GodotSignal>` to handle signals
   - Essential for UI interactions (button clicks, etc.)
 
 - **`GodotInputEventPlugin`**: Raw input events

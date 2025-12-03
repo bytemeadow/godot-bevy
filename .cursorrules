@@ -177,7 +177,7 @@ commands.spawn(GodotSceneWithComponent::<Player>::from_resource(asset));
 
 ### Signal Handling
 ```rust
-fn handle_signals(mut events: EventReader<GodotSignal>) {
+fn handle_signals(mut events: MessageReader<GodotSignal>) {
     for signal in events.read() {
         match signal.name.as_str() {
             "pressed" => { /* handle button press */ },

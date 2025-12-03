@@ -6,17 +6,17 @@ This page focuses on the typed signals API (recommended). A legacy API remains a
 
 ## Quick Start (Typed)
 
-1) Define a Bevy event for your case:
+1) Define a Bevy message for your case:
 
 ```rust
 use bevy::prelude::*;
 use godot_bevy::prelude::*;
 
-#[derive(Event, Debug, Clone)]
+#[derive(Message, Debug, Clone)]
 struct StartGameRequested;
 ```
 
-2) Register the typed plugin for your event type:
+2) Register the typed plugin for your message type:
 
 ```rust
 fn build_app(app: &mut App) {
@@ -24,7 +24,7 @@ fn build_app(app: &mut App) {
 }
 ```
 
-3) Connect a Godot signal and map it to your event:
+3) Connect a Godot signal and map it to your message:
 
 ```rust
 fn connect_button(
@@ -37,10 +37,10 @@ fn connect_button(
 }
 ```
 
-4) Listen for the event anywhere:
+4) Listen for the message anywhere:
 
 ```rust
-fn on_start(mut ev: EventReader<StartGameRequested>) {
+fn on_start(mut ev: MessageReader<StartGameRequested>) {
     for _ in ev.read() {
         // Start the game!
     }
@@ -52,8 +52,8 @@ fn on_start(mut ev: EventReader<StartGameRequested>) {
 Use one plugin per event type. You can map the same Godot signal to multiple typed events if you like:
 
 ```rust
-#[derive(Event, Debug, Clone)] struct ToggleFullscreen;
-#[derive(Event, Debug, Clone)] struct QuitRequested { source: GodotNodeHandle }
+#[derive(Message, Debug, Clone)] struct ToggleFullscreen;
+#[derive(Message, Debug, Clone)] struct QuitRequested { source: GodotNodeHandle }
 
 fn setup(app: &mut App) {
     app.add_plugins(GodotTypedSignalsPlugin::<ToggleFullscreen>::default())
@@ -89,7 +89,7 @@ The mapper closure receives:
 Example adding the entity:
 
 ```rust
-#[derive(Event, Debug, Clone, Copy)]
+#[derive(Message, Debug, Clone, Copy)]
 struct AreaExited(Entity);
 
 fn connect_area(
@@ -108,7 +108,7 @@ When spawning entities before their `GodotNodeHandle` is ready, you can defer co
 
 ```rust
 #[derive(Component)] struct MyArea;
-#[derive(Event, Debug, Clone, Copy)] struct BodyEntered(Entity);
+#[derive(Message, Debug, Clone, Copy)] struct BodyEntered(Entity);
 
 fn setup(app: &mut App) {
     app.add_plugins(GodotTypedSignalsPlugin::<BodyEntered>::default());
@@ -132,7 +132,7 @@ fn connect_legacy(mut q: Query<&mut GodotNodeHandle, With<Button>>, legacy: Godo
     for mut handle in &mut q { legacy.connect(&mut handle, "pressed"); }
 }
 
-fn read_legacy(mut ev: EventReader<GodotSignal>) {
+fn read_legacy(mut ev: MessageReader<GodotSignal>) {
     for s in ev.read() {
         if s.name == "pressed" { /* ... */ }
     }
