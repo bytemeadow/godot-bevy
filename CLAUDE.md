@@ -121,7 +121,8 @@ Examples are structured as workspace members with separate Rust crates. Each exa
 
 **Transform Synchronization**: Automatic synchronization between Bevy `Transform` components and Godot node transforms. You can select for this synchronization to be disabled, just sync Bevy Transforms to Godot Transforms, or sync bi-directionally.
 
-**Signal Integration**: Godot signals become Bevy events via `EventReader<GodotSignal>`, enabling ECS systems to respond to UI interactions and game events.
+**Signal Integration**: Godot signals become Bevy events via `MessageReader<GodotSignal>`, enabling ECS systems to
+respond to UI interactions and game events.
 
 **Node Queries**: Query Godot nodes directly from Bevy systems using `Query<&mut GodotNodeHandle>` and cast to specific Godot types.
 

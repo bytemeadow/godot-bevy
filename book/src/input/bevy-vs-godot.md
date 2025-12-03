@@ -30,7 +30,7 @@ Use godot-bevy's event-based system for more advanced input handling:
 
 ```rust
 fn movement_system(
-    mut events: EventReader<ActionInput>,
+    mut events: MessageReader<ActionInput>,
     mut query: Query<&mut Transform, With<Player>>,
 ) {
     for event in events.read() {
@@ -125,7 +125,7 @@ godot-bevy provides several input event types:
 The most important event type - maps to Godot's input actions:
 
 ```rust
-fn handle_actions(mut events: EventReader<ActionInput>) {
+fn handle_actions(mut events: MessageReader<ActionInput>) {
     for event in events.read() {
         println!("Action: {}, Pressed: {}, Strength: {}", 
                  event.action, event.pressed, event.strength);
@@ -137,7 +137,7 @@ fn handle_actions(mut events: EventReader<ActionInput>) {
 Direct keyboard events:
 
 ```rust
-fn handle_keyboard(mut events: EventReader<KeyboardInput>) {
+fn handle_keyboard(mut events: MessageReader<KeyboardInput>) {
     for event in events.read() {
         if event.pressed && event.keycode == Key::SPACE {
             println!("Space pressed!");
@@ -150,7 +150,7 @@ fn handle_keyboard(mut events: EventReader<KeyboardInput>) {
 Mouse button events:
 
 ```rust
-fn handle_mouse(mut events: EventReader<MouseButtonInput>) {
+fn handle_mouse(mut events: MessageReader<MouseButtonInput>) {
     for event in events.read() {
         println!("Mouse button: {:?} at {:?}", 
                  event.button_index, event.position);
@@ -162,7 +162,7 @@ fn handle_mouse(mut events: EventReader<MouseButtonInput>) {
 Mouse movement events:
 
 ```rust
-fn handle_mouse_motion(mut events: EventReader<MouseMotion>) {
+fn handle_mouse_motion(mut events: MessageReader<MouseMotion>) {
     for event in events.read() {
         println!("Mouse moved by: {:?}", event.relative);
     }
@@ -217,7 +217,7 @@ fn debug_controls(keys: Res<ButtonInput<KeyCode>>) {
     }
 }
 
-fn game_controls(mut events: EventReader<ActionInput>) {
+fn game_controls(mut events: MessageReader<ActionInput>) {
     for event in events.read() {
         // Handle game actions
     }
