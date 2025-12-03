@@ -119,74 +119,11 @@ jobs:
         if: github.event_name == 'pull_request'
         working-directory: itest
         run: |
-          # Create Python script for comparison
-          cat > compare.py << 'EOF'
-          import json
-          import sys
-
-          with open('bench-results.json') as f:
-              current = json.load(f)
-
-          try:
-              with open('baseline.json') as f:
-                  baseline = json.load(f)
-          except:
-              baseline = {"benchmarks": {}}
-
-          comparison = {
-              "benchmarks": [],
-              "summary": {"total": 0, "regressions": 0, "improvements": 0, "new": 0}
-          }
-
-          for name, curr_data in current.get("benchmarks", {}).items():
-              base_data = baseline.get("benchmarks", {}).get(name)
-
-              entry = {
-                  "name": name,
-                  "current": curr_data.get("median_display", "N/A"),
-                  "baseline": None,
-                  "change_pct": None,
-                  "status": "new"
-              }
-
-              if base_data:
-                  entry["baseline"] = base_data.get("median_display", "N/A")
-
-                  try:
-                      current_ns = float(curr_data.get("median_ns", 0))
-                      baseline_ns = float(base_data.get("median_ns", 0))
-
-                      if baseline_ns > 0:
-                          change_pct = ((current_ns - baseline_ns) / baseline_ns) * 100
-                          entry["change_pct"] = change_pct
-
-                          if change_pct > 10:
-                              entry["status"] = "regression"
-                              comparison["summary"]["regressions"] += 1
-                          elif change_pct > 5:
-                              entry["status"] = "slower"
-                          elif change_pct < -5:
-                              entry["status"] = "faster"
-                              comparison["summary"]["improvements"] += 1
-                          else:
-                              entry["status"] = "neutral"
-                  except:
-                      pass
-              else:
-                  comparison["summary"]["new"] += 1
-
-              comparison["benchmarks"].append(entry)
-
-          comparison["summary"]["total"] = len(comparison["benchmarks"])
-
-          with open('comparison.json', 'w') as f:
-              json.dump(comparison, f, indent=2)
-
-          # Exit with error if regressions detected
-          sys.exit(1 if comparison["summary"]["regressions"] > 0 else 0)
-          EOF
-
-          python3 compare.py || REGRESSION_DETECTED=$?
+          python3 "$GITHUB_WORKSPACE/.github/scripts/benchmarks-compare.py" \
+            "$GITHUB_WORKSPACE/itest/baseline.json" \
+            "$GITHUB_WORKSPACE/itest/bench-results.json" \
+            "$GITHUB_WORKSPACE/itest/comparison.json" \
+            || REGRESSION_DETECTED=$?
 
           # Save PR context
           echo "${{ github.event.pull_request.number }}" > pr_number.txt
