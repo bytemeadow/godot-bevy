@@ -49,18 +49,37 @@ jobs:
       - name: Copy library to Godot project
         working-directory: itest
         run: |
+          TARGET_DIR="$(cargo metadata --format-version 1 --no-deps | jq --raw-output '.target_directory')"
+          if [ ! -e "$TARGET_DIR" ]; then
+            echo "Cargo target directory not found: $TARGET_DIR"
+            exit 1
+          fi
+          echo "Cargo target directory contents: $TARGET_DIR/release"
+          ls -lah "$TARGET_DIR/release"
+
           mkdir -p godot/lib
-          cp rust/target/release/libgodot_bevy_itest.so godot/lib/ 2>/dev/null || \
-          cp rust/target/release/godot_bevy_itest.dll godot/lib/ 2>/dev/null || \
-          cp rust/target/release/libgodot_bevy_itest.dylib godot/lib/ 2>/dev/null || true
+          cp "$TARGET_DIR/release/libgodot_bevy_itest.so" godot/lib/ 2>/dev/null || \
+          cp "$TARGET_DIR/release/godot_bevy_itest.dll" godot/lib/ 2>/dev/null || \
+          cp "$TARGET_DIR/release/libgodot_bevy_itest.dylib" godot/lib/ 2>/dev/null || true
+          echo "Godot library directory contents: itest/godot/lib/"
+          ls -lah godot/lib/
 
           # Update .gdextension paths
           sed -i 's|res://../../target/debug/|res://lib/|g' godot/itest.gdextension
           sed -i 's|res://../../target/release/|res://lib/|g' godot/itest.gdextension
+          
+          # Print updated .gdextension file
+          sed 's/^/| /' godot/itest.gdextension
 
       - name: Import Godot project
         working-directory: itest
-        run: godot --headless --path godot --import --quit || true
+        run: |
+          # Known bug in Godot 4.5.1: Headless import of project with GDExtensions crashes
+          # https://github.com/godotengine/godot/issues/111645
+          # Workaround: Import twice to workaround first editor crash.
+          godot --headless --path godot --import --quit || true
+          echo "First import expected to crash due to bug. Importing again to workaround crash."
+          godot --headless --path godot --import --quit
 
       - name: Run benchmarks and extract JSON
         working-directory: itest
@@ -172,6 +191,9 @@ jobs:
           # Save PR context
           echo "${{ github.event.pull_request.number }}" > pr_number.txt
           echo "${{ github.event.pull_request.head.sha }}" > pr_sha.txt
+          
+          # Fail step if regressions or error detected
+          exit $REGRESSION_DETECTED
 
       - name: Upload benchmark artifacts
         if: github.event_name == 'pull_request'
