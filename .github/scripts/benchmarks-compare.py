@@ -28,6 +28,7 @@ def main(args: list[str]) -> None:
         print(f"Error: benchmark results file {bench_results_path} not found, can't continue.")
         exit(1)
 
+    baseline = {"benchmarks": {}}
     try:
         with open(baseline_path) as f:
             baseline = json.load(f)
@@ -36,8 +37,9 @@ def main(args: list[str]) -> None:
         print(f"Directory contents of {baseline_path.parent}:")
         for file in os.listdir(baseline_path.parent):
             print(f"  {file}")
-
-        baseline = {"benchmarks": {}}
+    except json.decoder.JSONDecodeError as json_error:
+        print(f"Warning: baseline file json parse error {baseline_path}, showing only current results.")
+        print(json_error)
 
     comparison = {
         "benchmarks": [],
