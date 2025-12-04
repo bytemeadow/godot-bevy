@@ -30,8 +30,7 @@ permissions:
     contents: write # Need write to push to gh-benchmarks branch
 
 jobs:
-    run-benchmarks:
-        name: Run benchmarks
+    benchmarks:
         runs-on: ubuntu-latest
 
         steps:
