@@ -62,7 +62,50 @@ jobs:
             - name: Run clippy
               run: cargo clippy --all-targets -- -D warnings
 
-    # Build and test job - runs on all platforms after lint passes
+    # Test job - runs on all platforms after lint passes (parallel with build)
+    test:
+        name: test (${{ matrix.platform }})
+        runs-on: ${{ matrix.os }}
+        needs: lint
+        strategy:
+            matrix:
+                os:
+                    [
+                        blaze/compute/ubuntu-latest-amd64,
+                        blaze/macos-latest,
+                        windows-latest,
+                    ]
+                include:
+                    - os: blaze/compute/ubuntu-latest-amd64
+                      platform: linux
+                    - os: blaze/macos-latest
+                      platform: macos
+                    - os: windows-latest
+                      platform: windows
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Setup Rust cache
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: . -> target
+
+            - name: Cache and install Linux dependencies
+              if: runner.os == 'linux'
+              uses: awalsh128/cache-apt-pkgs-action@latest
+              with:
+                  packages: libasound2-dev libudev-dev pkg-config
+                  version: 1.0
+
+            - name: Run unit tests
+              run: cargo test --lib --bins --examples
+
+    # Build job - runs on all platforms after lint passes (parallel with test)
     build:
         name: build (${{ matrix.platform }})
         runs-on: ${{ matrix.os }}
@@ -114,9 +157,6 @@ jobs:
               with:
                   packages: libasound2-dev libudev-dev pkg-config
                   version: 1.0
-
-            - name: Run unit tests (no runtime)
-              run: cargo test --lib --bins --examples
 
             - name: Build release
               run: cargo build --release
