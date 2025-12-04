@@ -179,10 +179,12 @@ jobs:
                       library:
                         - 'godot-bevy/**'
                         - 'godot-bevy-macros/**'
+                        - '.github/workflows/ci.yml'
                         - 'Cargo.toml'
                         - 'Cargo.lock'
                       itest:
                         - 'itest/**'
+                        - '.github/workflows/ci.yml'
                       dodge-the-creeps-2d:
                         - 'godot-bevy/**'
                         - 'godot-bevy-macros/**'
