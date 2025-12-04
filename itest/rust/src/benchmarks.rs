@@ -11,6 +11,16 @@ use godot_bevy_itest_macros::bench;
 const BENCH_ENTITY_COUNT: usize = 5000;
 const BENCH_ACTION_EVENT_COUNT: usize = 100;
 
+fn get_bevy_app_singleton() -> Gd<Node> {
+    let scene_tree = Engine::singleton()
+        .get_main_loop()
+        .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
+        .expect("Failed to get SceneTree");
+    let root = scene_tree.get_root().expect("Failed to get root node");
+    root.get_node_or_null("BevyAppSingleton")
+        .expect("BevyAppSingleton not found - ensure it is configured as an autoload")
+}
+
 /// Benchmark: Individual transform updates (3D)
 /// Measures the cost of updating transforms one-by-one via individual FFI calls
 #[bench(repeat = 3)]
@@ -64,23 +74,16 @@ fn transform_update_bulk_3d() -> i32 {
     let rot_packed = PackedVector4Array::from(rotations.as_slice());
     let scale_packed = PackedVector3Array::from(scales.as_slice());
 
-    // Call bulk update if BevyAppSingleton exists
-    if let Some(scene_tree) = Engine::singleton()
-        .get_main_loop()
-        .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
-        && let Some(root) = scene_tree.get_root()
-        && let Some(mut bevy_app) = root.get_node_or_null("BevyAppSingleton")
-    {
-        bevy_app.call(
-            "bulk_update_transforms_3d",
-            &[
-                ids_packed.to_variant(),
-                pos_packed.to_variant(),
-                rot_packed.to_variant(),
-                scale_packed.to_variant(),
-            ],
-        );
-    }
+    let mut bevy_app = get_bevy_app_singleton();
+    bevy_app.call(
+        "bulk_update_transforms_3d",
+        &[
+            ids_packed.to_variant(),
+            pos_packed.to_variant(),
+            rot_packed.to_variant(),
+            scale_packed.to_variant(),
+        ],
+    );
 
     // Cleanup
     let count = nodes.len() as i32;
@@ -144,23 +147,16 @@ fn transform_update_bulk_2d() -> i32 {
     let rot_packed = PackedFloat32Array::from(rotations.as_slice());
     let scale_packed = PackedVector2Array::from(scales.as_slice());
 
-    // Call bulk update if BevyAppSingleton exists
-    if let Some(scene_tree) = Engine::singleton()
-        .get_main_loop()
-        .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
-        && let Some(root) = scene_tree.get_root()
-        && let Some(mut bevy_app) = root.get_node_or_null("BevyAppSingleton")
-    {
-        bevy_app.call(
-            "bulk_update_transforms_2d",
-            &[
-                ids_packed.to_variant(),
-                pos_packed.to_variant(),
-                rot_packed.to_variant(),
-                scale_packed.to_variant(),
-            ],
-        );
-    }
+    let mut bevy_app = get_bevy_app_singleton();
+    bevy_app.call(
+        "bulk_update_transforms_2d",
+        &[
+            ids_packed.to_variant(),
+            pos_packed.to_variant(),
+            rot_packed.to_variant(),
+            scale_packed.to_variant(),
+        ],
+    );
 
     // Cleanup
     let count = nodes.len() as i32;
@@ -217,26 +213,19 @@ fn transform_read_bulk_3d() -> i32 {
 
     let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
 
-    // Call bulk read if BevyAppSingleton exists
-    let mut sum = Vector3::ZERO;
-    if let Some(scene_tree) = Engine::singleton()
-        .get_main_loop()
-        .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
-        && let Some(root) = scene_tree.get_root()
-        && let Some(mut bevy_app) = root.get_node_or_null("BevyAppSingleton")
-    {
-        let result = bevy_app
-            .call("bulk_get_transforms_3d", &[ids_packed.to_variant()])
-            .to::<godot::builtin::Dictionary>();
+    let mut bevy_app = get_bevy_app_singleton();
+    let result = bevy_app
+        .call("bulk_get_transforms_3d", &[ids_packed.to_variant()])
+        .to::<godot::builtin::Dictionary>();
 
-        if let Some(positions) = result
-            .get("positions")
-            .map(|v| v.to::<PackedVector3Array>())
-        {
-            for i in 0..positions.len() {
-                if let Some(pos) = positions.get(i) {
-                    sum += pos;
-                }
+    let mut sum = Vector3::ZERO;
+    if let Some(positions) = result
+        .get("positions")
+        .map(|v| v.to::<PackedVector3Array>())
+    {
+        for i in 0..positions.len() {
+            if let Some(pos) = positions.get(i) {
+                sum += pos;
             }
         }
     }
@@ -297,26 +286,19 @@ fn transform_read_bulk_2d() -> i32 {
 
     let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
 
-    // Call bulk read if BevyAppSingleton exists
-    let mut sum = Vector2::ZERO;
-    if let Some(scene_tree) = Engine::singleton()
-        .get_main_loop()
-        .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
-        && let Some(root) = scene_tree.get_root()
-        && let Some(mut bevy_app) = root.get_node_or_null("BevyAppSingleton")
-    {
-        let result = bevy_app
-            .call("bulk_get_transforms_2d", &[ids_packed.to_variant()])
-            .to::<godot::builtin::Dictionary>();
+    let mut bevy_app = get_bevy_app_singleton();
+    let result = bevy_app
+        .call("bulk_get_transforms_2d", &[ids_packed.to_variant()])
+        .to::<godot::builtin::Dictionary>();
 
-        if let Some(positions) = result
-            .get("positions")
-            .map(|v| v.to::<PackedVector2Array>())
-        {
-            for i in 0..positions.len() {
-                if let Some(pos) = positions.get(i) {
-                    sum += pos;
-                }
+    let mut sum = Vector2::ZERO;
+    if let Some(positions) = result
+        .get("positions")
+        .map(|v| v.to::<PackedVector2Array>())
+    {
+        for i in 0..positions.len() {
+            if let Some(pos) = positions.get(i) {
+                sum += pos;
             }
         }
     }
@@ -358,13 +340,6 @@ fn action_check_individual() -> i32 {
         }
     }
 
-    godot_print!(
-        "[action_check_individual] action_count={}, match_count={}, iterations={}",
-        action_count,
-        match_count,
-        BENCH_ACTION_EVENT_COUNT
-    );
-
     // Return action count to prevent optimization
     (action_count + match_count) as i32
 }
@@ -378,44 +353,22 @@ fn action_check_bulk() -> i32 {
     key_event.set_keycode(Key::SPACE);
     key_event.set_pressed(true);
 
+    let mut bevy_app = get_bevy_app_singleton();
     let mut match_count = 0;
-    let mut found_bevy_app = false;
-    let mut actions_checked_per_call = 0usize;
 
-    // Call bulk check if BevyAppSingleton exists
-    if let Some(scene_tree) = Engine::singleton()
-        .get_main_loop()
-        .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
-        && let Some(root) = scene_tree.get_root()
-        && let Some(mut bevy_app) = root.get_node_or_null("BevyAppSingleton")
-    {
-        found_bevy_app = true;
+    // Simulate checking multiple input events
+    for _ in 0..BENCH_ACTION_EVENT_COUNT {
+        let result = bevy_app
+            .call("bulk_check_actions", &[key_event.to_variant()])
+            .to::<godot::builtin::Dictionary>();
 
-        // Simulate checking multiple input events
-        for i in 0..BENCH_ACTION_EVENT_COUNT {
-            let result = bevy_app
-                .call("bulk_check_actions", &[key_event.to_variant()])
-                .to::<godot::builtin::Dictionary>();
-
-            if let Some(actions) = result
-                .get("actions")
-                .map(|v| v.to::<godot::builtin::PackedStringArray>())
-            {
-                match_count += actions.len();
-                if i == 0 {
-                    actions_checked_per_call = actions.len();
-                }
-            }
+        if let Some(actions) = result
+            .get("actions")
+            .map(|v| v.to::<godot::builtin::PackedStringArray>())
+        {
+            match_count += actions.len();
         }
     }
-
-    godot_print!(
-        "[action_check_bulk] found_bevy_app={}, match_count={}, actions_per_call={}, iterations={}",
-        found_bevy_app,
-        match_count,
-        actions_checked_per_call,
-        BENCH_ACTION_EVENT_COUNT
-    );
 
     match_count as i32
 }
