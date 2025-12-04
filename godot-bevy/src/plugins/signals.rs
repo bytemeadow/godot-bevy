@@ -1,12 +1,10 @@
-use bevy::{
-    app::{App, First, Plugin},
-    ecs::{
-        component::Component,
-        entity::Entity,
-        message::{Message, MessageWriter, message_update_system},
-        schedule::IntoScheduleConfigs,
-        system::{Commands, NonSend, NonSendMut, Query, SystemParam},
-    },
+use bevy_app::{App, First, Plugin};
+use bevy_ecs::{
+    component::Component,
+    entity::Entity,
+    message::{Message, MessageWriter, message_update_system},
+    schedule::IntoScheduleConfigs,
+    system::{Commands, NonSend, NonSendMut, Query, SystemParam},
 };
 use godot::{
     classes::{Node, Object},
@@ -53,14 +51,14 @@ pub struct GodotSignalSender(pub std::sync::mpsc::Sender<GodotSignal>);
 
 /// Global, type-erased dispatch for typed signal messages
 pub(crate) trait TypedDispatch: Send {
-    fn write_into_world(self: Box<Self>, world: &mut bevy::ecs::world::World);
+    fn write_into_world(self: Box<Self>, world: &mut bevy_ecs::world::World);
 }
 
 struct TypedEnvelope<T: Message + Send + 'static>(T);
 
 impl<T: Message + Send + 'static> TypedDispatch for TypedEnvelope<T> {
-    fn write_into_world(self: Box<Self>, world: &mut bevy::ecs::world::World) {
-        if let Some(mut messages) = world.get_resource_mut::<bevy::ecs::message::Messages<T>>() {
+    fn write_into_world(self: Box<Self>, world: &mut bevy_ecs::world::World) {
+        if let Some(mut messages) = world.get_resource_mut::<bevy_ecs::message::Messages<T>>() {
             messages.write(self.0);
         }
     }
@@ -213,7 +211,7 @@ impl<T: Message + Send + 'static> Plugin for GodotTypedSignalsPlugin<T> {
 }
 
 // Exclusive system to drain type-erased global queue into the correct Messages<T> resources
-fn drain_global_typed_signals(world: &mut bevy::ecs::world::World) {
+fn drain_global_typed_signals(world: &mut bevy_ecs::world::World) {
     // Collect first to avoid overlapping mutable borrows of `world`
     let mut pending: Vec<Box<dyn TypedDispatch>> = Vec::new();
     if let Some(receiver) = world.get_non_send_resource_mut::<GlobalTypedSignalReceiver>() {

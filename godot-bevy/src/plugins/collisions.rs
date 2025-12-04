@@ -1,17 +1,15 @@
 use crate::interop::GodotNodeHandle;
 use crate::plugins::core::PrePhysicsUpdate;
-use bevy::{
-    app::{App, Plugin},
-    ecs::{
-        component::Component,
-        entity::Entity,
-        message::{Message, MessageReader, MessageWriter, message_update_system},
-        schedule::IntoScheduleConfigs,
-        system::{NonSendMut, Query},
-    },
-    prelude::ReflectComponent,
-    reflect::Reflect,
+use bevy_app::{App, Plugin};
+use bevy_ecs::prelude::ReflectComponent;
+use bevy_ecs::{
+    component::Component,
+    entity::Entity,
+    message::{Message, MessageReader, MessageWriter, message_update_system},
+    schedule::IntoScheduleConfigs,
+    system::{NonSendMut, Query},
 };
+use bevy_reflect::Reflect;
 use godot::prelude::*;
 use std::sync::mpsc::Receiver;
 use tracing::trace;

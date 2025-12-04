@@ -364,8 +364,8 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
 
     let bundle_impl = quote! {
         fn #create_bundle_fn_name(
-            commands: &mut bevy::ecs::system::Commands,
-            entity: bevy::ecs::entity::Entity,
+            commands: &mut godot_bevy::bevy_ecs::system::Commands,
+            entity: godot_bevy::bevy_ecs::entity::Entity,
             handle: &godot_bevy::interop::GodotNodeHandle,
         ) -> bool {
             if let Some(godot_node) = handle.clone().try_get::<#godot_node_name>() {
@@ -407,7 +407,7 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
     let expanded = quote! {
         // Ensure this type implements Bevy's Bundle trait
         const _: fn() = || {
-            fn assert_impl_bundle<T: bevy::prelude::Bundle>() {}
+            fn assert_impl_bundle<T: godot_bevy::bevy_ecs::bundle::Bundle>() {}
             assert_impl_bundle::<#struct_name>();
         };
 

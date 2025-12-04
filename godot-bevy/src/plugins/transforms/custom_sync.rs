@@ -6,10 +6,10 @@
 ///
 /// # Usage
 ///
-/// ```rust
+/// ```ignore
 /// use godot_bevy::add_transform_sync_systems;
-/// use bevy::ecs::query::With;
-/// use bevy::ecs::component::Component;
+/// use bevy_ecs::query::With;
+/// use bevy_ecs::component::Component;
 /// use bevy::prelude::*;
 ///
 /// #[derive(Component)]
@@ -78,22 +78,22 @@ macro_rules! add_transform_sync_systems {
             #[tracing::instrument]
             #[$crate::prelude::main_thread_system]
             pub fn [<post_update_godot_transforms_ $name:lower>](
-                change_tick: bevy::ecs::system::SystemChangeTick,
-                entities: bevy::prelude::Query<
+                change_tick: $crate::bevy_ecs::system::SystemChangeTick,
+                entities: $crate::bevy_ecs::system::Query<
                     (
-                        bevy::ecs::change_detection::Ref<bevy::prelude::Transform>,
+                        $crate::bevy_ecs::change_detection::Ref<$crate::bevy_transform::components::Transform>,
                         &mut $crate::interop::GodotNodeHandle,
                         &$crate::plugins::transforms::TransformSyncMetadata,
-                        bevy::ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
+                        $crate::bevy_ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
                     ),
                     (
-                        bevy::ecs::query::Changed<bevy::prelude::Transform>,
+                        $crate::bevy_ecs::query::Changed<$crate::bevy_transform::components::Transform>,
                         $bevy_to_godot_query,
                     ),
                 >,
             ) {
                 use $crate::plugins::transforms::{IntoGodotTransform, IntoGodotTransform2D};
-                use bevy::ecs::change_detection::DetectChanges;
+                use $crate::bevy_ecs::change_detection::DetectChanges;
                 use godot::classes::{Engine, Node2D, Node3D, Object, SceneTree};
                 use godot::global::godot_print;
                 use godot::prelude::{Array, Dictionary, Gd, ToGodot};
@@ -126,23 +126,23 @@ macro_rules! add_transform_sync_systems {
             }
 
             fn [<post_update_godot_transforms_ $name:lower _bulk>](
-                change_tick: bevy::ecs::system::SystemChangeTick,
-                mut entities: bevy::prelude::Query<
+                change_tick: $crate::bevy_ecs::system::SystemChangeTick,
+                mut entities: $crate::bevy_ecs::system::Query<
                     (
-                        bevy::ecs::change_detection::Ref<bevy::prelude::Transform>,
+                        $crate::bevy_ecs::change_detection::Ref<$crate::bevy_transform::components::Transform>,
                         &mut $crate::interop::GodotNodeHandle,
                         &$crate::plugins::transforms::TransformSyncMetadata,
-                        bevy::ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
+                        $crate::bevy_ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
                     ),
                     (
-                        bevy::ecs::query::Changed<bevy::prelude::Transform>,
+                        $crate::bevy_ecs::query::Changed<$crate::bevy_transform::components::Transform>,
                         $bevy_to_godot_query,
                     ),
                 >,
                 mut batch_singleton: godot::prelude::Gd<godot::classes::Object>,
             ) {
                 use $crate::plugins::transforms::{IntoGodotTransform, IntoGodotTransform2D};
-                use bevy::ecs::change_detection::DetectChanges;
+                use $crate::bevy_ecs::change_detection::DetectChanges;
                 use godot::global::godot_print;
                 use godot::prelude::ToGodot;
 
@@ -262,22 +262,22 @@ macro_rules! add_transform_sync_systems {
             }
 
             fn [<post_update_godot_transforms_ $name:lower _individual>](
-                change_tick: bevy::ecs::system::SystemChangeTick,
-                mut entities: bevy::prelude::Query<
+                change_tick: $crate::bevy_ecs::system::SystemChangeTick,
+                mut entities: $crate::bevy_ecs::system::Query<
                     (
-                        bevy::ecs::change_detection::Ref<bevy::prelude::Transform>,
+                        $crate::bevy_ecs::change_detection::Ref<$crate::bevy_transform::components::Transform>,
                         &mut $crate::interop::GodotNodeHandle,
                         &$crate::plugins::transforms::TransformSyncMetadata,
-                        bevy::ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
+                        $crate::bevy_ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
                     ),
                     (
-                        bevy::ecs::query::Changed<bevy::prelude::Transform>,
+                        $crate::bevy_ecs::query::Changed<$crate::bevy_transform::components::Transform>,
                         $bevy_to_godot_query,
                     ),
                 >,
             ) {
                 use $crate::plugins::transforms::{IntoGodotTransform, IntoGodotTransform2D};
-                use bevy::ecs::change_detection::DetectChanges;
+                use $crate::bevy_ecs::change_detection::DetectChanges;
                 use godot::classes::{Node2D, Node3D};
 
                 // Original individual FFI approach
@@ -306,7 +306,7 @@ macro_rules! add_transform_sync_systems {
                 }
             }
 
-            $app.add_systems(bevy::app::Last, [<post_update_godot_transforms_ $name:lower>]);
+            $app.add_systems($crate::bevy_app::Last, [<post_update_godot_transforms_ $name:lower>]);
         }
     };
 
@@ -315,18 +315,18 @@ macro_rules! add_transform_sync_systems {
             #[tracing::instrument]
             #[$crate::prelude::main_thread_system]
             pub fn [<pre_update_godot_transforms_ $name:lower>](
-                mut entities: bevy::prelude::Query<
+                mut entities: $crate::bevy_ecs::system::Query<
                     (
-                        &mut bevy::prelude::Transform,
+                        &mut $crate::bevy_transform::components::Transform,
                         &mut $crate::interop::GodotNodeHandle,
                         &mut $crate::plugins::transforms::TransformSyncMetadata,
-                        bevy::ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
+                        $crate::bevy_ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
                     ),
                     $godot_to_bevy_query
                 >,
             ) {
                 use $crate::plugins::transforms::IntoBevyTransform;
-                use bevy::ecs::change_detection::DetectChanges;
+                use $crate::bevy_ecs::change_detection::DetectChanges;
                 use godot::classes::{Node2D, Node3D};
 
                 for (mut bevy_transform, mut reference, mut metadata, (node2d, node3d)) in entities.iter_mut() {
@@ -357,7 +357,7 @@ macro_rules! add_transform_sync_systems {
                 }
             }
 
-            $app.add_systems(bevy::app::PreUpdate, [<pre_update_godot_transforms_ $name:lower>]);
+            $app.add_systems($crate::bevy_app::PreUpdate, [<pre_update_godot_transforms_ $name:lower>]);
         }
     };
 

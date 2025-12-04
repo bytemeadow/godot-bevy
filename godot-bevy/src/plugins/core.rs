@@ -1,9 +1,11 @@
 #![allow(deprecated)] // TODO: remove this once we've removed SystemDeltaTimer
 
-use bevy::app::{App, Plugin, ScheduleRunnerPlugin};
-use bevy::ecs::schedule::{Schedule, ScheduleLabel};
-use bevy::ecs::system::SystemParam;
-use bevy::prelude::*;
+use bevy_app::{App, Plugin};
+use bevy_ecs::component::Component;
+use bevy_ecs::observer::Trigger;
+use bevy_ecs::prelude::{Name, OnRemove, Resource};
+use bevy_ecs::schedule::{Schedule, ScheduleLabel};
+use bevy_ecs::system::{Local, Query, SystemParam};
 use std::any::TypeId;
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
@@ -42,7 +44,7 @@ pub struct MainThreadMarker;
 
 use crate::interop::GodotNodeHandle;
 use crate::prelude::main_thread_system;
-use bevy::ecs::system::EntityCommands;
+use bevy_ecs::system::EntityCommands;
 use godot::{classes::Node, obj::Gd};
 use tracing::debug;
 
@@ -165,8 +167,10 @@ pub struct GodotBaseCorePlugin;
 
 impl Plugin for GodotBaseCorePlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(MinimalPlugins.build().disable::<ScheduleRunnerPlugin>())
-            .add_plugins(bevy::diagnostic::DiagnosticsPlugin)
+        app.add_plugins(bevy_time::TimePlugin)
+            .add_plugins(bevy_app::TaskPoolPlugin::default())
+            .add_plugins(bevy_diagnostic::FrameCountPlugin)
+            .add_plugins(bevy_diagnostic::DiagnosticsPlugin)
             .init_resource::<PhysicsDelta>()
             .init_non_send_resource::<MainThreadMarker>()
             .init_resource::<SceneTreeComponentRegistry>()

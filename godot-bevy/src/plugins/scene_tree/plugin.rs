@@ -11,19 +11,16 @@ use crate::{
         CollisionMessageType, Collisions,
     },
 };
-use bevy::{
-    app::{App, First, Plugin, PreStartup},
-    ecs::{
-        component::Component,
-        entity::Entity,
-        message::{Message, MessageReader, MessageWriter, message_update_system},
-        name::Name,
-        schedule::IntoScheduleConfigs,
-        system::{Commands, NonSendMut, Query, Res, SystemParam},
-    },
-    prelude::{ReflectComponent, ReflectResource, Resource},
-    reflect::Reflect,
+use bevy_app::{App, First, Plugin, PreStartup};
+use bevy_ecs::{
+    component::Component,
+    entity::Entity,
+    message::{Message, MessageReader, MessageWriter, message_update_system},
+    prelude::{Name, ReflectComponent, ReflectResource, Resource},
+    schedule::IntoScheduleConfigs,
+    system::{Commands, NonSendMut, Query, Res, SystemParam},
 };
+use bevy_reflect::Reflect;
 use godot::{
     builtin::GString,
     classes::{Engine, Node, SceneTree},

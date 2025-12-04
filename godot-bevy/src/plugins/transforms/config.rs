@@ -1,5 +1,5 @@
-use bevy::prelude::*;
-use bevy::reflect::Reflect;
+use bevy_ecs::prelude::{ReflectResource, Resource};
+use bevy_reflect::Reflect;
 
 /// Transform synchronization modes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]

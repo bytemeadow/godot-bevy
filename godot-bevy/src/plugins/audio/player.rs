@@ -1,6 +1,6 @@
 //! Audio player types and Godot integration
 
-use bevy::prelude::*;
+use bevy_math::{Vec2, Vec3};
 
 /// Type of Godot AudioStreamPlayer to use
 #[derive(Debug, Clone)]

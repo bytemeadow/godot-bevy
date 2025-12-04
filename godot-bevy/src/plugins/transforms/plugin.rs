@@ -1,8 +1,6 @@
-use bevy::{
-    app::{App, Last, Plugin, PreUpdate},
-    ecs::{schedule::IntoScheduleConfigs, system::Res},
-    prelude::Transform,
-};
+use bevy_app::{App, Last, Plugin, PreUpdate};
+use bevy_ecs::{schedule::IntoScheduleConfigs, system::Res};
+use bevy_transform::components::Transform;
 use godot::classes::{Node2D, Node3D};
 
 use crate::plugins::core::AppSceneTreeExt;

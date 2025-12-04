@@ -2,7 +2,7 @@
 
 use crate::plugins::assets::GodotResource;
 use crate::plugins::audio::{AudioPlayerType, AudioSettings, AudioTween, ChannelId, SoundId};
-use bevy::asset::Handle;
+use bevy_asset::Handle;
 
 /// Internal command for the audio system (channel-wide operations only)
 #[derive(Debug)]

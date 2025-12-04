@@ -1,5 +1,5 @@
-use bevy::math::{Quat, Vec3, vec3};
-use bevy::prelude::Transform as BevyTransform;
+use bevy_math::{Quat, Vec3, vec3};
+use bevy_transform::components::Transform as BevyTransform;
 use godot::builtin::{Basis, Quaternion, Transform2D as GodotTransform2D, Vector3};
 use godot::builtin::{Transform3D as GodotTransform3D, Vector2};
 
@@ -94,7 +94,7 @@ impl IntoGodotTransform2D for BevyTransform {
             2.0 * self.rotation.z.atan2(self.rotation.w)
         } else {
             // Complex rotation - fall back to full Euler conversion
-            let (_, _, z) = self.rotation.to_euler(bevy::math::EulerRot::XYZ);
+            let (_, _, z) = self.rotation.to_euler(bevy_math::EulerRot::XYZ);
             z
         };
 
@@ -263,7 +263,7 @@ mod tests {
         assert!((bevy_quat.w - godot_quat.w).abs() < EPSILON);
 
         // Round trip
-        let original = Quat::from_euler(bevy::math::EulerRot::XYZ, 0.1, 0.2, 0.3);
+        let original = Quat::from_euler(bevy_math::EulerRot::XYZ, 0.1, 0.2, 0.3);
         let round_trip = original.to_quaternion().to_quat();
         assert_quat_near(original, round_trip, EPSILON);
     }
@@ -322,7 +322,7 @@ mod tests {
     fn test_transform_3d_complex() {
         let bevy_transform = BevyTransform {
             translation: Vec3::new(5.0, -10.0, 15.0),
-            rotation: Quat::from_euler(bevy::math::EulerRot::XYZ, 0.1, 0.2, 0.3),
+            rotation: Quat::from_euler(bevy_math::EulerRot::XYZ, 0.1, 0.2, 0.3),
             scale: Vec3::new(1.5, 2.0, 0.75),
         };
         let godot_transform = bevy_transform.to_godot_transform();
@@ -371,7 +371,7 @@ mod tests {
         assert_vec3_near(back_to_bevy.translation, Vec3::ZERO, EPSILON);
 
         // Check that the Z rotation is preserved
-        let (_, _, z_rot) = back_to_bevy.rotation.to_euler(bevy::math::EulerRot::XYZ);
+        let (_, _, z_rot) = back_to_bevy.rotation.to_euler(bevy_math::EulerRot::XYZ);
         assert!(
             (z_rot - angle).abs() < EPSILON,
             "Z rotation mismatch: {} vs {}",
@@ -408,8 +408,8 @@ mod tests {
         assert!((back_to_bevy.translation.y - bevy_transform.translation.y).abs() < EPSILON);
 
         // Check Z rotation is preserved
-        let (_, _, original_z) = bevy_transform.rotation.to_euler(bevy::math::EulerRot::XYZ);
-        let (_, _, back_z) = back_to_bevy.rotation.to_euler(bevy::math::EulerRot::XYZ);
+        let (_, _, original_z) = bevy_transform.rotation.to_euler(bevy_math::EulerRot::XYZ);
+        let (_, _, back_z) = back_to_bevy.rotation.to_euler(bevy_math::EulerRot::XYZ);
         assert!(
             (back_z - original_z).abs() < EPSILON,
             "Z rotation mismatch: {} vs {}",

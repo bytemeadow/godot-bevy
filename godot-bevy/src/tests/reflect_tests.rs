@@ -5,7 +5,7 @@ mod tests {
     use crate::plugins::transforms::{
         GodotTransformConfig, TransformSyncMetadata, TransformSyncMode,
     };
-    use bevy::reflect::{Reflect, ReflectRef, TypeRegistry};
+    use bevy_reflect::{Reflect, ReflectRef, TypeRegistry};
 
     #[test]
     fn test_collisions_reflection() {

@@ -2,7 +2,7 @@
 // To regenerate: python scripts/generate_godot_types.py
 
 use crate::interop::{GodotNodeHandle, node_markers::*};
-use bevy::ecs::system::EntityCommands;
+use bevy_ecs::system::EntityCommands;
 
 /// Adds appropriate marker components to an entity based on the Godot node type.
 /// This function is automatically generated and handles all 208 Godot node types.

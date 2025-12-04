@@ -1,13 +1,11 @@
-use bevy::{
-    app::{App, First, Plugin},
-    ecs::{
-        message::{Message, MessageWriter, message_update_system},
-        schedule::IntoScheduleConfigs,
-        system::NonSendMut,
-    },
-    math::Vec2,
-    reflect::Reflect,
+use bevy_app::{App, First, Plugin};
+use bevy_ecs::{
+    message::{Message, MessageWriter, message_update_system},
+    schedule::IntoScheduleConfigs,
+    system::NonSendMut,
 };
+use bevy_math::Vec2;
+use bevy_reflect::Reflect;
 use godot::{
     classes::{
         InputEvent as GodotInputEvent, InputEventJoypadButton, InputEventJoypadMotion,

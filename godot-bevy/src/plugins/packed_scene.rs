@@ -3,18 +3,15 @@ use crate::plugins::assets::GodotResource;
 use crate::plugins::transforms::IntoGodotTransform2D;
 use crate::prelude::main_thread_system;
 use crate::{interop::GodotNodeHandle, plugins::transforms::IntoGodotTransform};
-use bevy::{
-    app::{App, Plugin, PostUpdate},
-    asset::{Assets, Handle},
-    ecs::{
-        component::Component,
-        entity::Entity,
-        query::Without,
-        system::{Commands, Query, ResMut},
-    },
-    log::tracing,
-    transform::components::Transform,
+use bevy_app::{App, Plugin, PostUpdate};
+use bevy_asset::{Assets, Handle};
+use bevy_ecs::{
+    component::Component,
+    entity::Entity,
+    query::Without,
+    system::{Commands, Query, ResMut},
 };
+use bevy_transform::components::Transform;
 use godot::{
     builtin::GString,
     classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader},

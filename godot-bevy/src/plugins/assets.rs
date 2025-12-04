@@ -1,11 +1,11 @@
-use bevy::app::{App, Plugin};
-use bevy::asset::{
-    AssetApp, AssetLoader, AssetMetaCheck, AssetPlugin, LoadContext,
+use bevy_app::{App, Plugin};
+use bevy_asset::{
+    Asset, AssetApp, AssetLoader, AssetMetaCheck, AssetPlugin, LoadContext,
     io::{
         AssetReader, AssetReaderError, AssetSource, AssetSourceId, PathStream, Reader, VecReader,
     },
 };
-use bevy::prelude::*;
+use bevy_reflect::TypePath;
 use futures_lite::stream;
 use godot::classes::ResourceLoader;
 use godot::classes::resource_loader::ThreadLoadStatus;
@@ -28,9 +28,9 @@ use crate::interop::GodotResourceHandle;
 /// and uses Godot's `ResourceLoader` directly for maximum compatibility.
 ///
 /// ## Unified Asset Loading
-/// ```rust
+/// ```ignore
 /// use bevy::prelude::*;
-/// use bevy::asset::{AssetServer, Assets, Handle};
+/// use bevy_asset::{AssetServer, Assets, Handle};
 /// use godot::classes::PackedScene;
 /// use godot_bevy::prelude::*;
 ///
@@ -92,7 +92,7 @@ impl Plugin for GodotAssetsPlugin {
         // Configure AssetPlugin to bypass path verification for Godot resources
         app.add_plugins(AssetPlugin {
             meta_check: AssetMetaCheck::Never,
-            ..default()
+            ..Default::default()
         });
 
         app.init_asset::<GodotResource>()

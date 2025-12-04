@@ -1,6 +1,6 @@
-use bevy::app::plugin_group;
+use bevy_app::plugin_group;
 #[cfg(feature = "bevy_gamepad")]
-use bevy::gilrs::GilrsPlugin;
+use bevy_gilrs::GilrsPlugin;
 
 pub mod assets;
 pub mod audio;

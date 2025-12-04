@@ -2,11 +2,12 @@
 
 use crate::interop::GodotNodeHandle;
 use crate::plugins::audio::{AudioTween, ChannelId};
-use bevy::prelude::*;
+use bevy_ecs::prelude::Resource;
 use godot::classes::{AudioStreamPlayer, AudioStreamPlayer2D, AudioStreamPlayer3D};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
+use tracing::trace;
 
 /// Unique identifier for a sound instance
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

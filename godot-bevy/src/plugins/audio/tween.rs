@@ -1,6 +1,6 @@
 //! Audio tweening and easing for smooth transitions
 
-use bevy::reflect::Reflect;
+use bevy_reflect::Reflect;
 use std::time::Duration;
 
 /// Tweening/easing configuration for smooth audio transitions

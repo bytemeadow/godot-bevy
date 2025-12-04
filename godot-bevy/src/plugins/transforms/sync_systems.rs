@@ -2,10 +2,10 @@ use crate::interop::GodotNodeHandle;
 use crate::interop::node_markers::{Node2DMarker, Node3DMarker};
 use crate::plugins::transforms::{IntoBevyTransform, IntoGodotTransform, IntoGodotTransform2D};
 use crate::prelude::main_thread_system;
-use bevy::ecs::change_detection::{DetectChanges, Ref};
-use bevy::ecs::query::{AnyOf, Changed};
-use bevy::ecs::system::{Query, SystemChangeTick};
-use bevy::prelude::Transform as BevyTransform;
+use bevy_ecs::change_detection::{DetectChanges, Ref};
+use bevy_ecs::query::{AnyOf, Changed};
+use bevy_ecs::system::{Query, SystemChangeTick};
+use bevy_transform::components::Transform as BevyTransform;
 use godot::classes::{Engine, Node2D, Node3D, Object, SceneTree};
 use godot::obj::Singleton;
 use godot::prelude::{Gd, ToGodot};
@@ -135,7 +135,7 @@ fn post_update_godot_transforms_bulk(
                 transform_ref.translation.y,
             ));
             // For 2D, rotation is just Z component
-            let (_, _, z) = transform_ref.rotation.to_euler(bevy::math::EulerRot::XYZ);
+            let (_, _, z) = transform_ref.rotation.to_euler(bevy_math::EulerRot::XYZ);
             rotations_2d.push(z);
             scales_2d.push(godot::prelude::Vector2::new(
                 transform_ref.scale.x,
