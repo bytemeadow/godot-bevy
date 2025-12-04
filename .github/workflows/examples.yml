@@ -110,17 +110,12 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                os:
-                    [
-                        blaze/compute/ubuntu-latest-amd64,
-                        blaze/macos-latest,
-                        windows-latest,
-                    ]
+                os: [ubuntu-latest, macos-latest, windows-latest]
                 example: ${{ fromJson(needs.changes.outputs.examples) }}
                 include:
-                    - os: blaze/compute/ubuntu-latest-amd64
+                    - os: ubuntu-latest
                       platform: linux
-                    - os: blaze/macos-latest
+                    - os: macos-latest
                       platform: macos
                     - os: windows-latest
                       platform: windows
