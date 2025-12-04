@@ -159,7 +159,7 @@ jobs:
                   version: 1.0
 
             - name: Build release
-              run: cargo build --release
+              run: cargo build --release -p godot-bevy -p godot-bevy-macros
 
             - name: Upload Rust libraries
               uses: actions/upload-artifact@v4
