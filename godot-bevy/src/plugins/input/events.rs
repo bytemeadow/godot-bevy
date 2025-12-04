@@ -7,13 +7,15 @@ use bevy_ecs::{
 use bevy_math::Vec2;
 use bevy_reflect::Reflect;
 use godot::{
+    builtin::Dictionary,
     classes::{
-        InputEvent as GodotInputEvent, InputEventJoypadButton, InputEventJoypadMotion,
+        Engine, InputEvent as GodotInputEvent, InputEventJoypadButton, InputEventJoypadMotion,
         InputEventKey, InputEventMouseButton, InputEventMouseMotion, InputEventPanGesture,
-        InputEventScreenTouch,
+        InputEventScreenTouch, Object, SceneTree,
     },
     global::Key,
     obj::{EngineEnum, Gd, Singleton},
+    prelude::ToGodot,
 };
 use tracing::trace;
 
@@ -293,6 +295,70 @@ fn extract_basic_input_events(
 }
 
 fn check_action_events(
+    input_event: &Gd<GodotInputEvent>,
+    action_events: &mut MessageWriter<ActionInput>,
+) {
+    // Try to get the BevyAppSingleton autoload for bulk optimization
+    let engine = Engine::singleton();
+    if let Some(scene_tree) = engine
+        .get_main_loop()
+        .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())
+        && let Some(root) = scene_tree.get_root()
+        && let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton")
+        && bevy_app.has_method("bulk_check_actions")
+    {
+        check_action_events_bulk(input_event, action_events, bevy_app.upcast::<Object>());
+        return;
+    }
+
+    // Fallback to individual FFI calls
+    check_action_events_individual(input_event, action_events);
+}
+
+fn check_action_events_bulk(
+    input_event: &Gd<GodotInputEvent>,
+    action_events: &mut MessageWriter<ActionInput>,
+    mut batch_singleton: Gd<Object>,
+) {
+    let result = batch_singleton
+        .call("bulk_check_actions", &[input_event.to_variant()])
+        .to::<Dictionary>();
+
+    if let (Some(actions), Some(pressed_arr), Some(strengths)) = (
+        result
+            .get("actions")
+            .map(|v| v.to::<godot::builtin::PackedStringArray>()),
+        result
+            .get("pressed")
+            .map(|v| v.to::<godot::builtin::Array<bool>>()),
+        result
+            .get("strengths")
+            .map(|v| v.to::<godot::builtin::PackedFloat32Array>()),
+    ) {
+        for i in 0..actions.len() {
+            if let (Some(action), Some(pressed), Some(strength)) =
+                (actions.get(i), pressed_arr.get(i), strengths.get(i))
+            {
+                let action_str = action.to_string();
+
+                trace!(
+                    "Generated ActionInput: '{}' {} (strength: {:.2})",
+                    action_str,
+                    if pressed { "pressed" } else { "released" },
+                    strength
+                );
+
+                action_events.write(ActionInput {
+                    action: action_str,
+                    pressed,
+                    strength,
+                });
+            }
+        }
+    }
+}
+
+fn check_action_events_individual(
     input_event: &Gd<GodotInputEvent>,
     action_events: &mut MessageWriter<ActionInput>,
 ) {

@@ -1,11 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://bjsfwt816j4tp"]
+extends Node
 
-[sub_resource type="GDScript" id="GDScript_1"]
-script/source = "extends BevyApp
-
-
-# Bulk Transform Optimization Methods
-# Automatically detected by godot-bevy library for performance optimization
+# Benchmark helper that provides bulk optimization methods
+# This is a standalone GDScript node (not extending BevyApp) for benchmark testing
 
 func bulk_update_transforms_3d(
   instance_ids: PackedInt64Array,
@@ -16,9 +12,7 @@ func bulk_update_transforms_3d(
 	var rotation: Quaternion = Quaternion()
 	for i: int in range(instance_ids.size()):
 		var node: Node3D = instance_from_id(instance_ids[i]) as Node3D
-		# Trust instance IDs are valid
 		node.position = positions[i]
-		# Copy quaternion, avoiding heap allocation
 		rotation.x = rotations[i].x
 		rotation.y = rotations[i].y
 		rotation.z = rotations[i].z
@@ -34,14 +28,9 @@ func bulk_update_transforms_2d(
 ) -> void:
 	for i: int in range(instance_ids.size()):
 		var node: Node2D = instance_from_id(instance_ids[i]) as Node2D
-		# Trust instance IDs are valid
 		node.position = positions[i]
 		node.rotation = rotations[i]
 		node.scale = scales[i]
-
-
-# Bulk Transform Read Methods
-# Returns transform data for multiple nodes in a single FFI call
 
 func bulk_get_transforms_3d(instance_ids: PackedInt64Array) -> Dictionary:
 	var positions: PackedVector3Array = PackedVector3Array()
@@ -59,7 +48,11 @@ func bulk_get_transforms_3d(instance_ids: PackedInt64Array) -> Dictionary:
 		rotations[i] = Vector4(q.x, q.y, q.z, q.w)
 		scales[i] = node.scale
 
-	return {"positions": positions, "rotations": rotations, "scales": scales}
+	var result: Dictionary = {}
+	result["positions"] = positions
+	result["rotations"] = rotations
+	result["scales"] = scales
+	return result
 
 func bulk_get_transforms_2d(instance_ids: PackedInt64Array) -> Dictionary:
 	var positions: PackedVector2Array = PackedVector2Array()
@@ -76,12 +69,11 @@ func bulk_get_transforms_2d(instance_ids: PackedInt64Array) -> Dictionary:
 		rotations[i] = node.rotation
 		scales[i] = node.scale
 
-	return {"positions": positions, "rotations": rotations, "scales": scales}
-
-
-# Bulk Input Action Checking
-# Checks an input event against all actions in a single FFI call
-# Returns arrays of matching action data for efficient transfer
+	var result: Dictionary = {}
+	result["positions"] = positions
+	result["rotations"] = rotations
+	result["scales"] = scales
+	return result
 
 func bulk_check_actions(event: InputEvent) -> Dictionary:
 	var actions: PackedStringArray = PackedStringArray()
@@ -95,7 +87,3 @@ func bulk_check_actions(event: InputEvent) -> Dictionary:
 			strengths.append(event.get_action_strength(action))
 
 	return {"actions": actions, "pressed": pressed, "strengths": strengths}
-"
-
-[node name="BevyApp" type="BevyApp"]
-script = SubResource("GDScript_1")

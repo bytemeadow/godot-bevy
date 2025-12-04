@@ -2,12 +2,14 @@ use godot::builtin::{
     PackedFloat32Array, PackedInt64Array, PackedVector2Array, PackedVector3Array,
     PackedVector4Array,
 };
-use godot::classes::Engine;
-use godot::obj::NewAlloc;
+use godot::classes::{Engine, InputEventKey, InputMap};
+use godot::global::Key;
+use godot::obj::{NewAlloc, NewGd};
 use godot::prelude::*;
 use godot_bevy_itest_macros::bench;
 
 const BENCH_ENTITY_COUNT: usize = 5000;
+const BENCH_ACTION_EVENT_COUNT: usize = 100;
 
 /// Benchmark: Individual transform updates (3D)
 /// Measures the cost of updating transforms one-by-one via individual FFI calls
@@ -327,4 +329,93 @@ fn transform_read_bulk_2d() -> i32 {
 
     // Use sum to prevent optimization
     (count as f32 + sum.x) as i32
+}
+
+/// Benchmark: Individual action checking
+/// Measures the cost of checking input events against all actions one-by-one
+#[bench(repeat = 3)]
+fn action_check_individual() -> i32 {
+    // Create a key event that we'll check against actions
+    let mut key_event = InputEventKey::new_gd();
+    key_event.set_keycode(Key::SPACE);
+    key_event.set_pressed(true);
+
+    let mut input_map = InputMap::singleton();
+    let actions = input_map.get_actions();
+    let action_count = actions.len();
+
+    let mut match_count = 0;
+
+    // Simulate checking multiple input events
+    for _ in 0..BENCH_ACTION_EVENT_COUNT {
+        // Check each action individually (N FFI calls per event)
+        for action_name in actions.iter_shared() {
+            if key_event.is_action(&action_name) {
+                let _pressed = key_event.is_action_pressed(&action_name);
+                let _strength = key_event.get_action_strength(&action_name);
+                match_count += 1;
+            }
+        }
+    }
+
+    godot_print!(
+        "[action_check_individual] action_count={}, match_count={}, iterations={}",
+        action_count,
+        match_count,
+        BENCH_ACTION_EVENT_COUNT
+    );
+
+    // Return action count to prevent optimization
+    (action_count + match_count) as i32
+}
+
+/// Benchmark: Bulk action checking
+/// Measures the cost of checking input events against all actions via single FFI call
+#[bench(repeat = 3)]
+fn action_check_bulk() -> i32 {
+    // Create a key event that we'll check against actions
+    let mut key_event = InputEventKey::new_gd();
+    key_event.set_keycode(Key::SPACE);
+    key_event.set_pressed(true);
+
+    let mut match_count = 0;
+    let mut found_bevy_app = false;
+    let mut actions_checked_per_call = 0usize;
+
+    // Call bulk check if BevyAppSingleton exists
+    if let Some(scene_tree) = Engine::singleton()
+        .get_main_loop()
+        .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
+        && let Some(root) = scene_tree.get_root()
+        && let Some(mut bevy_app) = root.get_node_or_null("BevyAppSingleton")
+    {
+        found_bevy_app = true;
+
+        // Simulate checking multiple input events
+        for i in 0..BENCH_ACTION_EVENT_COUNT {
+            let result = bevy_app
+                .call("bulk_check_actions", &[key_event.to_variant()])
+                .to::<godot::builtin::Dictionary>();
+
+            if let Some(actions) = result
+                .get("actions")
+                .map(|v| v.to::<godot::builtin::PackedStringArray>())
+            {
+                match_count += actions.len();
+                if i == 0 {
+                    actions_checked_per_call = actions.len();
+                }
+            }
+        }
+    }
+
+    godot_print!(
+        "[action_check_bulk] found_bevy_app={}, match_count={}, actions_per_call={}, iterations={}",
+        found_bevy_app,
+        match_count,
+        actions_checked_per_call,
+        BENCH_ACTION_EVENT_COUNT
+    );
+
+    match_count as i32
 }
