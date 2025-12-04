@@ -13,11 +13,8 @@ name = "avian_physics_test"
 [dependencies]
 avian3d = "0.4"
 bevy = { version = "0.17", default-features = false, features = [
-  "bevy_asset",
   "bevy_state",
-  "bevy_gilrs",
-  "bevy_render",
-  "bevy_core_pipeline",
+  "bevy_log",
   "multi_threaded",
 ] }
 bevy_asset_loader = "0.24.0-rc.1"
