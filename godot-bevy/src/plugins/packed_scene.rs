@@ -89,9 +89,15 @@ impl GodotScene {
     /// The signal will be connected when the scene is spawned.
     ///
     /// # Arguments
-    /// * `node_path` - Path to the node relative to the scene root (e.g., "VBox/MyButton").
+    /// * `node_path` - Path relative to the scene root (e.g., "VBox/MyButton" or "." for root node).
+    ///   Argument supports the same syntax as [Node.get_node](https://docs.godotengine.org/en/stable/classes/class_node.html#class-node-method-get-node).
     /// * `signal_name` - Name of the Godot signal to connect (e.g., "pressed").
     /// * `mapper` - Closure that maps signal arguments to your typed message.
+    ///   * The closure receives three arguments: `args`, `node_handle`, and `entity`:
+    ///     - `args: &[Variant]`: raw Godot arguments (clone if you need detailed parsing).
+    ///     - `node_handle: &GodotNodeHandle`: emitting node; clone into your event if useful.
+    ///     - `entity: Option<Entity>`: Bevy entity the GodotScene component is attached to (Always Some).
+    ///   * The closure returns an optional Bevy Message, or None to not send the message.
     ///
     /// # Example
     /// ```ignore
