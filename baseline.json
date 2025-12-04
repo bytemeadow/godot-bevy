@@ -1,33 +1,33 @@
 {
   "benchmarks": {
     "transform_update_bulk_2d": {
-      "median_display": "2.44ms",
-      "median_ns": "2443526",
-      "min_display": "2.41ms",
-      "min_ns": "2411654"
+      "median_display": "2.39ms",
+      "median_ns": "2390364",
+      "min_display": "2.37ms",
+      "min_ns": "2365417"
     },
     "transform_update_bulk_3d": {
-      "median_display": "1.37ms",
-      "median_ns": "1371056",
-      "min_display": "1.35ms",
-      "min_ns": "1353764"
+      "median_display": "1.34ms",
+      "median_ns": "1344500",
+      "min_display": "1.34ms",
+      "min_ns": "1335229"
     },
     "transform_update_individual_2d": {
-      "median_display": "2.65ms",
-      "median_ns": "2650749",
-      "min_display": "2.60ms",
-      "min_ns": "2602429"
+      "median_display": "2.57ms",
+      "median_ns": "2571966",
+      "min_display": "2.55ms",
+      "min_ns": "2549083"
     },
     "transform_update_individual_3d": {
-      "median_display": "1.48ms",
-      "median_ns": "1478903",
-      "min_display": "1.46ms",
-      "min_ns": "1463691"
+      "median_display": "1.45ms",
+      "median_ns": "1451575",
+      "min_display": "1.44ms",
+      "min_ns": "1435237"
     }
   },
   "environment": {
     "godot_debug": true,
     "rust_debug": false
   },
-  "timestamp": "2025-12-04T06:40:48.753688495+00:00"
+  "timestamp": "2025-12-04T16:07:12.910020439+00:00"
 }
