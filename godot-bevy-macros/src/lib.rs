@@ -21,8 +21,9 @@ pub fn main_thread_system(_attr: TokenStream, item: TokenStream) -> TokenStream 
     );
 
     // Add a NonSend resource parameter that forces main thread execution
+    // Use godot_bevy::bevy_ecs:: so the path resolves for users who only depend on godot-bevy
     let main_thread_param: syn::FnArg = syn::parse_quote! {
-        _main_thread: bevy::ecs::system::NonSend<#type_alias_name>
+        _main_thread: godot_bevy::bevy_ecs::system::NonSend<#type_alias_name>
     };
     input_fn.sig.inputs.push(main_thread_param);
 

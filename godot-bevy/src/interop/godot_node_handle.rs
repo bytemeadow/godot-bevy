@@ -1,4 +1,4 @@
-use bevy::ecs::component::Component;
+use bevy_ecs::component::Component;
 use godot::{
     classes::Node,
     obj::{Gd, Inherits, InstanceId},

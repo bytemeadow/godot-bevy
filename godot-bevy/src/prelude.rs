@@ -43,6 +43,6 @@ pub use crate::plugins::{
 pub use crate::plugins::signals::{
     GodotSignal, GodotSignals, GodotSignalsPlugin, connect_godot_signal,
 };
-pub use bevy::prelude as bevy_prelude;
+pub use bevy_ecs::prelude as bevy_ecs_prelude;
 pub use godot::prelude as godot_prelude;
 pub use godot_bevy_macros::*;

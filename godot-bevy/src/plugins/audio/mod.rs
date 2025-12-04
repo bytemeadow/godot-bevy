@@ -4,7 +4,7 @@
 //! with Bevy's ECS, offering channels, spatial audio, and smooth transitions.
 //!
 //! # Example
-//! ```rust,no_run
+//! ```ignore
 //! use bevy::prelude::*;
 //! use godot_bevy::prelude::*;
 //!

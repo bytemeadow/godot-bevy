@@ -1,18 +1,16 @@
-use bevy::{
-    app::{App, First, Last, Plugin},
-    ecs::{
-        entity::Entity,
-        message::{MessageReader, MessageWriter},
-        system::ResMut,
-    },
-    input::{
-        ButtonInput, ButtonState, InputPlugin,
-        gestures::PanGesture as BevyPanGesture,
-        keyboard::KeyCode,
-        mouse::{
-            MouseButton as BevyMouseButton, MouseButtonInput as BevyMouseButtonInput,
-            MouseMotion as BevyMouseMotion, MouseScrollUnit, MouseWheel as BevyMouseWheel,
-        },
+use bevy_app::{App, First, Last, Plugin};
+use bevy_ecs::{
+    entity::Entity,
+    message::{MessageReader, MessageWriter},
+    system::ResMut,
+};
+use bevy_input::{
+    ButtonInput, ButtonState, InputPlugin,
+    gestures::PanGesture as BevyPanGesture,
+    keyboard::KeyCode,
+    mouse::{
+        MouseButton as BevyMouseButton, MouseButtonInput as BevyMouseButtonInput,
+        MouseMotion as BevyMouseMotion, MouseScrollUnit, MouseWheel as BevyMouseWheel,
     },
 };
 

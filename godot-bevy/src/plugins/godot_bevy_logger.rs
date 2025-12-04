@@ -1,9 +1,7 @@
-use bevy::{
-    app::{App, Plugin},
-    log::{
-        Level, tracing,
-        tracing_subscriber::{self, EnvFilter},
-    },
+use bevy_app::{App, Plugin};
+use bevy_log::{
+    Level, tracing,
+    tracing_subscriber::{self, EnvFilter},
 };
 use chrono::Local;
 use godot::global::{godot_error, godot_print, godot_print_rich, godot_warn};
@@ -40,7 +38,7 @@ pub struct GodotBevyLogPlugin {
 impl Default for GodotBevyLogPlugin {
     fn default() -> Self {
         Self {
-            filter: bevy::log::DEFAULT_FILTER.to_string(),
+            filter: bevy_log::DEFAULT_FILTER.to_string(),
             level: Level::INFO,
             color: true,
             // Timestamp formatting reference https://docs.rs/chrono/0.4.41/chrono/format/strftime/index.html

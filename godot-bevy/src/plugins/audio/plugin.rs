@@ -7,14 +7,17 @@ use crate::plugins::audio::{
 };
 use crate::plugins::scene_tree::SceneTreeRef;
 use crate::prelude::main_thread_system;
-use bevy::app::{App, Plugin, Update};
-use bevy::asset::Assets;
-use bevy::ecs::system::ResMut;
-use bevy::prelude::*;
+use bevy_app::{App, Plugin, Update};
+use bevy_asset::Assets;
+use bevy_ecs::prelude::Resource;
+use bevy_ecs::system::{Res, ResMut};
+use bevy_math::{Vec2, Vec3};
+use bevy_time::Time;
 use godot::classes::{AudioStream, AudioStreamPlayer, AudioStreamPlayer2D, AudioStreamPlayer3D};
 use godot::obj::NewAlloc;
 use std::collections::HashMap;
 use thiserror::Error;
+use tracing::{trace, warn};
 
 /// Plugin that provides a comprehensive audio API using Godot's audio system.
 /// Supports 2D, 3D, and non-positional audio with channels, tweening, and spatial features.

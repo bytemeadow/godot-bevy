@@ -9,10 +9,8 @@
 //! Bevy app. When you use `#[derive(BevyBundle)]`, the macro automatically
 //! generates the necessary bundle creation function and registers it with the global registry.
 
-use bevy::{
-    app::App,
-    ecs::{entity::Entity, system::Commands},
-};
+use bevy_app::App;
+use bevy_ecs::{entity::Entity, system::Commands};
 use std::sync::RwLock;
 use tracing::trace;
 
@@ -47,7 +45,7 @@ pub fn register_all_autosync_bundles(_app: &mut App) {
                 .into_iter()
                 .collect();
 
-        bevy::log::debug!("Registered {} AutoSyncBundle entries", entries.len());
+        tracing::debug!("Registered {} AutoSyncBundle entries", entries.len());
         *registry = Some(entries);
     }
 }

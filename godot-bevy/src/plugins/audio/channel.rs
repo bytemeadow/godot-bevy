@@ -4,8 +4,9 @@ use crate::plugins::assets::GodotResource;
 use crate::plugins::audio::{
     AudioCommand, AudioPlayerType, AudioSettings, AudioTween, PlayCommand, SoundId,
 };
-use bevy::asset::Handle;
-use bevy::prelude::*;
+use bevy_asset::Handle;
+use bevy_ecs::prelude::Resource;
+use bevy_math::{Vec2, Vec3};
 use parking_lot::RwLock;
 use std::collections::VecDeque;
 use std::marker::PhantomData;
@@ -251,7 +252,7 @@ impl<T: AudioChannelMarker> Drop for PlayAudioCommand<'_, T> {
     }
 }
 
-/// Default main audio track  
+/// Default main audio track
 #[derive(Resource)]
 pub struct MainAudioTrack;
 

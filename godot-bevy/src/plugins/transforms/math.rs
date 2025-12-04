@@ -2,7 +2,8 @@
 ///
 /// These functions provide testable implementations of core mathematical
 /// operations used in transform conversion traits.
-use bevy::prelude::{Quat, Transform};
+use bevy_math::Quat;
+use bevy_transform::components::Transform;
 
 /// Extract rotation angle from 2D transform matrix components
 pub fn extract_rotation_from_2d_matrix(a_x: f32, a_y: f32) -> f32 {
@@ -53,14 +54,14 @@ pub fn validate_transform_for_conversion(transform: &Transform) -> bool {
 
 /// Extract Z-axis rotation from quaternion (for 2D conversion)
 pub fn extract_z_rotation_from_quat(quat: Quat) -> f32 {
-    let (_, _, rotation_z) = quat.to_euler(bevy::math::EulerRot::XYZ);
+    let (_, _, rotation_z) = quat.to_euler(bevy_math::EulerRot::XYZ);
     rotation_z
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy::prelude::Vec3;
+    use bevy_math::Vec3;
     use std::f32::consts::PI;
 
     #[test]

@@ -138,7 +138,7 @@ pub fn bevy_bundle(input: DeriveInput) -> syn::Result<TokenStream2> {
         .collect();
 
     let bundle_struct = quote! {
-        #[derive(bevy::prelude::Bundle)]
+        #[derive(godot_bevy::bevy_ecs::bundle::Bundle)]
         pub struct #bundle_name {
             #(#bundle_fields),*
         }
@@ -233,8 +233,8 @@ pub fn bevy_bundle(input: DeriveInput) -> syn::Result<TokenStream2> {
     // Generate the bundle registration (always enabled now)
     let bundle_impl = quote! {
         fn #create_bundle_fn_name(
-            commands: &mut bevy::ecs::system::Commands,
-            entity: bevy::ecs::entity::Entity,
+            commands: &mut godot_bevy::bevy_ecs::system::Commands,
+            entity: godot_bevy::bevy_ecs::entity::Entity,
             handle: &godot_bevy::interop::GodotNodeHandle,
         ) -> bool {
             // Try to get the node as the correct type

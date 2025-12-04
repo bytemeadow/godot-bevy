@@ -44,10 +44,24 @@ jobs:
               id: filter
               with:
                   filters: |
+                      avian-physics-demo:
+                        - 'godot-bevy/**'
+                        - 'godot-bevy-macros/**'
+                        - 'examples/avian-physics-demo/**'
+                        - '.github/workflows/examples.yml'
+                        - 'Cargo.toml'
+                        - 'Cargo.lock'
                       dodge-the-creeps-2d:
                         - 'godot-bevy/**'
                         - 'godot-bevy-macros/**'
                         - 'examples/dodge-the-creeps-2d/**'
+                        - '.github/workflows/examples.yml'
+                        - 'Cargo.toml'
+                        - 'Cargo.lock'
+                      perf-test:
+                        - 'godot-bevy/**'
+                        - 'godot-bevy-macros/**'
+                        - 'examples/perf-test/**'
                         - '.github/workflows/examples.yml'
                         - 'Cargo.toml'
                         - 'Cargo.lock'
@@ -61,22 +75,19 @@ jobs:
 
     # Build example libraries on all platforms (needed for cross-platform Godot export)
     build:
-        name: build (${{ matrix.platform }})
+        name: build ${{ matrix.example }} (${{ matrix.platform }})
         runs-on: ${{ matrix.os }}
         needs: changes
-        if: contains(needs.changes.outputs.examples, 'dodge-the-creeps-2d') || contains(needs.changes.outputs.examples, 'platformer-2d')
+        if: needs.changes.outputs.examples != '[]'
         strategy:
+            fail-fast: false
             matrix:
-                os:
-                    [
-                        blaze/compute/ubuntu-latest-amd64,
-                        blaze/macos-latest,
-                        windows-latest,
-                    ]
+                os: [ubuntu-latest, macos-latest, windows-latest]
+                example: ${{ fromJson(needs.changes.outputs.examples) }}
                 include:
-                    - os: blaze/compute/ubuntu-latest-amd64
+                    - os: ubuntu-latest
                       platform: linux
-                    - os: blaze/macos-latest
+                    - os: macos-latest
                       platform: macos
                     - os: windows-latest
                       platform: windows
@@ -100,15 +111,13 @@ jobs:
                   packages: libasound2-dev libudev-dev pkg-config
                   version: 1.0
 
-            - name: Build example libraries
-              run: |
-                  cargo build --release --manifest-path examples/dodge-the-creeps-2d/rust/Cargo.toml
-                  cargo build --release --manifest-path examples/platformer-2d/rust/Cargo.toml
+            - name: Build example library
+              run: cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
 
             - name: Upload example libraries
               uses: actions/upload-artifact@v4
               with:
-                  name: example-libs-${{ matrix.platform }}
+                  name: example-libs-${{ matrix.example }}-${{ runner.os }}
                   path: |
                       target/release/*.so
                       target/release/*.dylib
@@ -118,7 +127,7 @@ jobs:
     # Export examples for all platforms (requires libraries from build)
     export:
         name: export (${{ matrix.example }})
-        runs-on: blaze/macos-latest
+        runs-on: macos-latest
         needs: [build, changes]
         if: contains(needs.changes.outputs.examples, 'dodge-the-creeps-2d') || contains(needs.changes.outputs.examples, 'platformer-2d')
         strategy:
@@ -143,7 +152,7 @@ jobs:
             - name: Download all platform libraries
               uses: actions/download-artifact@v4
               with:
-                  pattern: example-libs-*
+                  pattern: example-libs-${{ matrix.example }}-*
                   path: artifacts/
 
             - name: Setup cross-platform libraries

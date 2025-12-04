@@ -4,7 +4,7 @@
 // Allow the macro to reference the crate externally even from within itself
 extern crate self as godot_bevy;
 
-use bevy::app::{App, Plugin};
+use bevy_app::{App, Plugin};
 
 pub mod app;
 pub mod interop;
@@ -26,6 +26,13 @@ pub use inventory;
 
 // Re-export paste to avoid requiring users to add it as a dependency for transform sync macros
 pub use paste;
+
+// Re-export bevy sub-crates for macro-generated code
+// This allows macros to use $crate::bevy_ecs:: paths that work for both
+// users who depend on individual sub-crates and users who depend on the main bevy crate
+pub use bevy_app;
+pub use bevy_ecs;
+pub use bevy_transform;
 
 pub struct GodotPlugin;
 

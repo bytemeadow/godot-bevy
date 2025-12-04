@@ -9,7 +9,8 @@ use crate::plugins::{
 use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
 use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
-use bevy::app::App;
+use bevy_app::{App, PluginsState};
+use bevy_ecs::message::Messages;
 use godot::prelude::*;
 use std::sync::OnceLock;
 use std::sync::mpsc::channel;
@@ -151,7 +152,7 @@ impl INode for BevyApp {
         use crate::plugins::scene_tree::SceneTreeMessage;
         if app
             .world()
-            .contains_resource::<bevy::ecs::message::Messages<SceneTreeMessage>>()
+            .contains_resource::<Messages<SceneTreeMessage>>()
         {
             self.register_scene_tree_watcher(&mut app);
             self.register_optimized_scene_tree_watcher();
@@ -161,34 +162,28 @@ impl INode for BevyApp {
         use crate::plugins::collisions::CollisionMessage;
         if app
             .world()
-            .contains_resource::<bevy::ecs::message::Messages<CollisionMessage>>()
+            .contains_resource::<Messages<CollisionMessage>>()
         {
             self.register_collision_watcher(&mut app);
         }
 
         // Signal plugin check
         use crate::plugins::signals::GodotSignal;
-        if app
-            .world()
-            .contains_resource::<bevy::ecs::message::Messages<GodotSignal>>()
-        {
+        if app.world().contains_resource::<Messages<GodotSignal>>() {
             self.register_signal_system(&mut app);
         }
 
         // Input event plugin check - check for KeyboardInput as a marker
         use crate::plugins::input::KeyboardInput;
-        if app
-            .world()
-            .contains_resource::<bevy::ecs::message::Messages<KeyboardInput>>()
-        {
+        if app.world().contains_resource::<Messages<KeyboardInput>>() {
             self.register_input_event_watcher(&mut app);
         }
 
         // Finalize plugins - PreStartup systems will now find the watchers
-        if app.plugins_state() != bevy::app::PluginsState::Cleaned {
-            while app.plugins_state() == bevy::app::PluginsState::Adding {
+        if app.plugins_state() != PluginsState::Cleaned {
+            while app.plugins_state() == PluginsState::Adding {
                 #[cfg(not(target_arch = "wasm32"))]
-                bevy::tasks::tick_global_task_pools_on_main_thread();
+                bevy_tasks::tick_global_task_pools_on_main_thread();
             }
 
             app.finish();

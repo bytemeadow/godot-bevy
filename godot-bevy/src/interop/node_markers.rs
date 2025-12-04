@@ -1,6 +1,6 @@
-use bevy::ecs::component::Component;
-use bevy::prelude::ReflectComponent;
-use bevy::reflect::Reflect;
+use bevy_ecs::component::Component;
+use bevy_ecs::prelude::ReflectComponent;
+use bevy_reflect::Reflect;
 
 /// Marker components for Godot node types.
 /// These enable type-safe ECS queries like: Query<&GodotNodeHandle, With<Sprite2DMarker>>
