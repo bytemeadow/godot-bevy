@@ -168,3 +168,163 @@ fn transform_update_bulk_2d() -> i32 {
 
     count
 }
+
+/// Benchmark: Individual transform reads (3D)
+/// Measures the cost of reading transforms one-by-one via individual FFI calls
+#[bench(repeat = 3)]
+fn transform_read_individual_3d() -> i32 {
+    let mut nodes = Vec::new();
+
+    // Create nodes with initial transforms
+    for i in 0..BENCH_ENTITY_COUNT {
+        let mut node = Node3D::new_alloc();
+        node.set_position(Vector3::new(i as f32, i as f32 * 2.0, i as f32 * 3.0));
+        nodes.push(node);
+    }
+
+    // Read each transform individually (N FFI calls)
+    let mut sum = Vector3::ZERO;
+    for node in &nodes {
+        sum += node.get_position();
+    }
+
+    // Cleanup
+    let count = nodes.len() as i32;
+    for node in nodes {
+        node.free();
+    }
+
+    // Use sum to prevent optimization
+    (count as f32 + sum.x) as i32
+}
+
+/// Benchmark: Bulk transform reads (3D)
+/// Measures the cost of reading transforms via bulk PackedArray FFI call
+#[bench(repeat = 3)]
+fn transform_read_bulk_3d() -> i32 {
+    let mut nodes = Vec::new();
+    let mut instance_ids = Vec::new();
+
+    // Create nodes with initial transforms
+    for i in 0..BENCH_ENTITY_COUNT {
+        let mut node = Node3D::new_alloc();
+        node.set_position(Vector3::new(i as f32, i as f32 * 2.0, i as f32 * 3.0));
+        instance_ids.push(node.instance_id().to_i64());
+        nodes.push(node);
+    }
+
+    let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
+
+    // Call bulk read if BevyAppSingleton exists
+    let mut sum = Vector3::ZERO;
+    if let Some(scene_tree) = Engine::singleton()
+        .get_main_loop()
+        .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
+        && let Some(root) = scene_tree.get_root()
+        && let Some(mut bevy_app) = root.get_node_or_null("BevyAppSingleton")
+    {
+        let result = bevy_app
+            .call("bulk_get_transforms_3d", &[ids_packed.to_variant()])
+            .to::<godot::builtin::Dictionary>();
+
+        if let Some(positions) = result
+            .get("positions")
+            .map(|v| v.to::<PackedVector3Array>())
+        {
+            for i in 0..positions.len() {
+                if let Some(pos) = positions.get(i) {
+                    sum += pos;
+                }
+            }
+        }
+    }
+
+    // Cleanup
+    let count = nodes.len() as i32;
+    for node in nodes {
+        node.free();
+    }
+
+    // Use sum to prevent optimization
+    (count as f32 + sum.x) as i32
+}
+
+/// Benchmark: Individual transform reads (2D)
+/// Measures the cost of reading 2D transforms one-by-one
+#[bench(repeat = 3)]
+fn transform_read_individual_2d() -> i32 {
+    let mut nodes = Vec::new();
+
+    // Create nodes with initial transforms
+    for i in 0..BENCH_ENTITY_COUNT {
+        let mut node = Node2D::new_alloc();
+        node.set_position(Vector2::new(i as f32, i as f32 * 2.0));
+        nodes.push(node);
+    }
+
+    // Read each transform individually (N FFI calls)
+    let mut sum = Vector2::ZERO;
+    for node in &nodes {
+        sum += node.get_position();
+    }
+
+    // Cleanup
+    let count = nodes.len() as i32;
+    for node in nodes {
+        node.free();
+    }
+
+    // Use sum to prevent optimization
+    (count as f32 + sum.x) as i32
+}
+
+/// Benchmark: Bulk transform reads (2D)
+/// Measures the cost of reading 2D transforms via bulk PackedArray FFI call
+#[bench(repeat = 3)]
+fn transform_read_bulk_2d() -> i32 {
+    let mut nodes = Vec::new();
+    let mut instance_ids = Vec::new();
+
+    // Create nodes with initial transforms
+    for i in 0..BENCH_ENTITY_COUNT {
+        let mut node = Node2D::new_alloc();
+        node.set_position(Vector2::new(i as f32, i as f32 * 2.0));
+        instance_ids.push(node.instance_id().to_i64());
+        nodes.push(node);
+    }
+
+    let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
+
+    // Call bulk read if BevyAppSingleton exists
+    let mut sum = Vector2::ZERO;
+    if let Some(scene_tree) = Engine::singleton()
+        .get_main_loop()
+        .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
+        && let Some(root) = scene_tree.get_root()
+        && let Some(mut bevy_app) = root.get_node_or_null("BevyAppSingleton")
+    {
+        let result = bevy_app
+            .call("bulk_get_transforms_2d", &[ids_packed.to_variant()])
+            .to::<godot::builtin::Dictionary>();
+
+        if let Some(positions) = result
+            .get("positions")
+            .map(|v| v.to::<PackedVector2Array>())
+        {
+            for i in 0..positions.len() {
+                if let Some(pos) = positions.get(i) {
+                    sum += pos;
+                }
+            }
+        }
+    }
+
+    // Cleanup
+    let count = nodes.len() as i32;
+    for node in nodes {
+        node.free();
+    }
+
+    // Use sum to prevent optimization
+    (count as f32 + sum.x) as i32
+}

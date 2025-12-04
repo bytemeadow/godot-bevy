@@ -38,6 +38,45 @@ func bulk_update_transforms_2d(
 		node.position = positions[i]
 		node.rotation = rotations[i]
 		node.scale = scales[i]
+
+
+# Bulk Transform Read Methods
+# Returns transform data for multiple nodes in a single FFI call
+
+func bulk_get_transforms_3d(instance_ids: PackedInt64Array) -> Dictionary:
+	var positions: PackedVector3Array = PackedVector3Array()
+	var rotations: PackedVector4Array = PackedVector4Array()
+	var scales: PackedVector3Array = PackedVector3Array()
+
+	positions.resize(instance_ids.size())
+	rotations.resize(instance_ids.size())
+	scales.resize(instance_ids.size())
+
+	for i: int in range(instance_ids.size()):
+		var node: Node3D = instance_from_id(instance_ids[i]) as Node3D
+		positions[i] = node.position
+		var q: Quaternion = node.quaternion
+		rotations[i] = Vector4(q.x, q.y, q.z, q.w)
+		scales[i] = node.scale
+
+	return {"positions": positions, "rotations": rotations, "scales": scales}
+
+func bulk_get_transforms_2d(instance_ids: PackedInt64Array) -> Dictionary:
+	var positions: PackedVector2Array = PackedVector2Array()
+	var rotations: PackedFloat32Array = PackedFloat32Array()
+	var scales: PackedVector2Array = PackedVector2Array()
+
+	positions.resize(instance_ids.size())
+	rotations.resize(instance_ids.size())
+	scales.resize(instance_ids.size())
+
+	for i: int in range(instance_ids.size()):
+		var node: Node2D = instance_from_id(instance_ids[i]) as Node2D
+		positions[i] = node.position
+		rotations[i] = node.rotation
+		scales[i] = node.scale
+
+	return {"positions": positions, "rotations": rotations, "scales": scales}
 "
 
 [node name="BevyApp" type="BevyApp"]
