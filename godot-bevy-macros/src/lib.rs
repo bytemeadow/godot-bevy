@@ -97,6 +97,27 @@ pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Supported field types are:
 /// - `GodotNodeHandle`: `from_node()` returns `NodeTreeViewError` if the node is not found.
 /// - `Option<GodotNodeHandle>`: Filled with `None` if the node is not found.
+///
+/// For each field annotated with `#[node(<path>)]`, a companion string constant is generated
+/// containing that path. The constant name is `<UPPERCASE_FIELD_NAME>_PATH`, and it is defined
+/// in the struct that derives `NodeTreeView`.
+///
+/// Example:
+/// ```ignore
+/// #[derive(NodeTreeView)]
+/// pub struct MobNodes {
+///     #[node("AnimatedSprite2D")]
+///     animated_sprite: GodotNodeHandle,
+///
+///     #[node("Node2D/*/VisibleOnScreenNotifier2D")]
+///     visibility_notifier: GodotNodeHandle,
+/// }
+/// /// Generated companion string constants:
+/// impl MobNodes {
+///     pub const ANIMATED_SPRITE_PATH: &'static str = "AnimatedSprite2D";
+///     pub const VISIBILITY_NOTIFIER_PATH: &'static str = "Node2D/*/VisibleOnScreenNotifier2D";
+/// }
+/// ```
 #[proc_macro_derive(NodeTreeView, attributes(node))]
 pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
     let view = parse_macro_input!(item as DeriveInput);

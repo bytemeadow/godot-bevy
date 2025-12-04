@@ -48,6 +48,30 @@ pub fn node_tree_view(input: DeriveInput) -> syn::Result<TokenStream2> {
         return Err(error);
     }
 
+    // Generate associated constants for node paths
+    let path_constants = data_struct
+        .fields
+        .iter()
+        .filter_map(|field| {
+            let field_name = field.ident.as_ref()?;
+            let node_path: syn::LitStr = field.attrs.iter().find_map(|attr| {
+                if attr.path().is_ident("node") {
+                    attr.parse_args().ok()
+                } else {
+                    None
+                }
+            })?;
+
+            // Convert field name to SCREAMING_SNAKE_CASE and append _PATH
+            let const_name_str = format!("{}_PATH", field_name.to_string().to_uppercase());
+            let const_name = syn::Ident::new(&const_name_str, field_name.span());
+
+            Some(quote! {
+                pub const #const_name: &'static str = #node_path;
+            })
+        })
+        .collect::<TokenStream2>();
+
     let self_expr = if matches!(data_struct.fields, Fields::Named(_)) {
         quote! { Self { #field_exprs } }
     } else {
@@ -60,6 +84,10 @@ pub fn node_tree_view(input: DeriveInput) -> syn::Result<TokenStream2> {
     let gd = quote! { godot::obj::Gd };
 
     let expanded = quote! {
+        impl #item {
+            #path_constants
+        }
+
         impl #node_tree_view for #item {
             fn from_node<T: #inherits<#node>>(
                 node: #gd<T>
