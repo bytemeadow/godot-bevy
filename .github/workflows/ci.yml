@@ -62,7 +62,7 @@ jobs:
             - name: Run clippy
               run: cargo clippy --all-targets -- -D warnings
 
-    # Test job - runs on all platforms after lint passes (parallel with build)
+    # Test job - runs on all platforms after lint passes
     test:
         name: test (${{ matrix.platform }})
         runs-on: ${{ matrix.os }}
@@ -105,14 +105,12 @@ jobs:
             - name: Run unit tests
               run: cargo test --lib --bins --examples
 
-    # Build job - runs on all platforms after lint passes (parallel with test)
-    build:
-        name: build (${{ matrix.platform }})
+    # Build example libraries on all platforms (needed for cross-platform Godot export)
+    build-examples:
+        name: build examples (${{ matrix.platform }})
         runs-on: ${{ matrix.os }}
-        needs: lint
-        env:
-            # Disable debug symbols in release builds to save disk space
-            CARGO_PROFILE_RELEASE_DEBUG: false
+        needs: [lint, changes]
+        if: contains(needs.changes.outputs.examples, 'dodge-the-creeps-2d') || contains(needs.changes.outputs.examples, 'platformer-2d')
         strategy:
             matrix:
                 os:
@@ -124,16 +122,10 @@ jobs:
                 include:
                     - os: blaze/compute/ubuntu-latest-amd64
                       platform: linux
-                      target: x86_64-unknown-linux-gnu
-                      extension: .so
                     - os: blaze/macos-latest
                       platform: macos
-                      target: x86_64-apple-darwin
-                      extension: .dylib
                     - os: windows-latest
                       platform: windows
-                      target: x86_64-pc-windows-msvc
-                      extension: .dll
 
         steps:
             - name: Checkout code
@@ -141,8 +133,6 @@ jobs:
 
             - name: Install Rust toolchain
               uses: dtolnay/rust-toolchain@stable
-              with:
-                  targets: ${{ matrix.target }}
 
             - name: Setup Rust cache
               uses: Swatinem/rust-cache@v2
@@ -158,18 +148,22 @@ jobs:
                   packages: libasound2-dev libudev-dev pkg-config
                   version: 1.0
 
-            - name: Build release
-              run: cargo build --release -p godot-bevy -p godot-bevy-macros
+            - name: Build example libraries
+              run: |
+                  cargo build --release --manifest-path examples/dodge-the-creeps-2d/rust/Cargo.toml
+                  cargo build --release --manifest-path examples/platformer-2d/rust/Cargo.toml
 
-            - name: Upload Rust libraries
+            - name: Upload example libraries
               uses: actions/upload-artifact@v4
               with:
-                  name: rust-libs-${{ runner.os }}
+                  name: example-libs-${{ matrix.platform }}
                   path: |
-                      target/release/*rust${{ matrix.extension }}
-                      target/release/deps/*rust*${{ matrix.extension }}
-                  if-no-files-found: error
+                      target/release/*.so
+                      target/release/*.dylib
+                      target/release/*.dll
+                  if-no-files-found: warn
 
+    # Detect which paths changed to conditionally run downstream jobs
     changes:
         name: detect changes
         runs-on: ubuntu-latest
@@ -182,7 +176,6 @@ jobs:
             - uses: dorny/paths-filter@v3
               id: filter
               with:
-                  # Output JSON array of changed filter names
                   filters: |
                       library:
                         - 'godot-bevy/**'
@@ -206,36 +199,23 @@ jobs:
                         - 'Cargo.toml'
                         - 'Cargo.lock'
 
-    # Build examples matrix from changed examples
+    # Export examples for all platforms (requires libraries from build-examples)
     examples:
-        name: build / ${{ matrix.example }}
+        name: export / ${{ matrix.example }}
         runs-on: blaze/macos-latest
-        needs: [build, changes]
-        # Only run if at least one example filter matched (exclude library/itest from check)
+        needs: [build-examples, changes]
         if: contains(needs.changes.outputs.examples, 'dodge-the-creeps-2d') || contains(needs.changes.outputs.examples, 'platformer-2d')
         strategy:
             fail-fast: false
             matrix:
-                # List all exportable examples here
                 example: [dodge-the-creeps-2d, platformer-2d]
                 exclude:
-                    # Exclude examples that didn't change
                     - example: ${{ !contains(needs.changes.outputs.examples, 'dodge-the-creeps-2d') && 'dodge-the-creeps-2d' || 'none' }}
                     - example: ${{ !contains(needs.changes.outputs.examples, 'platformer-2d') && 'platformer-2d' || 'none' }}
 
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
-
-            - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@stable
-
-            - name: Setup Rust cache
-              uses: Swatinem/rust-cache@v2
-              with:
-                  workspaces: |
-                      . -> target
-                      examples/*/rust -> target
 
             - name: Install Godot
               uses: chickensoft-games/setup-godot@v2
@@ -244,6 +224,24 @@ jobs:
                   use-dotnet: false
                   include-templates: true
 
+            - name: Download all platform libraries
+              uses: actions/download-artifact@v4
+              with:
+                  pattern: example-libs-*
+                  path: artifacts/
+
+            - name: Setup cross-platform libraries
+              run: |
+                  mkdir -p target/release
+
+                  # Copy all platform libraries to target directory
+                  find artifacts/ -type f \( -name "*.so" -o -name "*.dylib" -o -name "*.dll" \) | while read file; do
+                    cp "$file" target/release/
+                  done
+
+                  echo "Available libraries:"
+                  ls -la target/release/
+
             - name: Cache Godot imports
               uses: actions/cache@v4
               with:
@@ -251,27 +249,6 @@ jobs:
                   key: ${{ runner.os }}-godot-imports-${{ matrix.example }}-${{ hashFiles(format('examples/{0}/godot/**/*.import', matrix.example)) }}
                   restore-keys: |
                       ${{ runner.os }}-godot-imports-${{ matrix.example }}-
-
-            - name: Download Rust libraries
-              uses: actions/download-artifact@v4
-              with:
-                  path: artifacts/
-
-            - name: Setup cross-platform libraries
-              run: |
-                  mkdir -p target/{release,debug}
-
-                  # Copy all platform libraries to target directories
-                  find artifacts/ -name "*rust*" -type f | while read file; do
-                    cp "$file" target/release/ 2>/dev/null || true
-                    cp "$file" target/debug/ 2>/dev/null || true
-                  done
-
-                  echo "Available libraries:"
-                  ls -la target/release/ || echo "No release libraries found"
-
-            - name: Build example Rust library
-              run: cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
 
             - name: Import Godot project
               working-directory: examples/${{ matrix.example }}/godot
@@ -292,10 +269,11 @@ jobs:
                   path: examples/${{ matrix.example }}/godot/exports/
                   if-no-files-found: error
 
+    # Integration tests with Godot runtime
     integration-tests:
         name: integration tests
         runs-on: blaze/macos-latest
-        needs: [build, changes]
+        needs: [lint, changes]
         if: |
             needs.changes.outputs.library == 'true' ||
             needs.changes.outputs.itest == 'true'
@@ -320,21 +298,6 @@ jobs:
                   version: ${{ env.GODOT_VERSION }}
                   use-dotnet: false
                   include-templates: false
-
-            - name: Download Rust libraries
-              uses: actions/download-artifact@v4
-              with:
-                  path: artifacts/
-
-            - name: Setup cross-platform libraries
-              run: |
-                  mkdir -p target/{release,debug}
-
-                  # Copy all platform libraries to target directories
-                  find artifacts/ -name "*rust*" -type f | while read file; do
-                    cp "$file" target/release/ 2>/dev/null || true
-                    cp "$file" target/debug/ 2>/dev/null || true
-                  done
 
             - name: Cache Godot imports
               uses: actions/cache@v4
