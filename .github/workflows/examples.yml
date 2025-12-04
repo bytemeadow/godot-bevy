@@ -115,11 +115,11 @@ jobs:
                       target/release/*.dll
                   if-no-files-found: warn
 
-    # Export examples for all platforms (requires libraries from build-examples)
+    # Export examples for all platforms (requires libraries from build)
     export:
         name: export (${{ matrix.example }})
         runs-on: blaze/macos-latest
-        needs: [build-examples, changes]
+        needs: [build, changes]
         if: contains(needs.changes.outputs.examples, 'dodge-the-creeps-2d') || contains(needs.changes.outputs.examples, 'platformer-2d')
         strategy:
             fail-fast: false
