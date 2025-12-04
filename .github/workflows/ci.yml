@@ -66,7 +66,8 @@ jobs:
     test:
         name: test (${{ matrix.platform }})
         runs-on: ${{ matrix.os }}
-        needs: lint
+        needs: [lint, changes]
+        if: needs.changes.outputs.library == 'true' || needs.changes.outputs.itest == 'true'
         strategy:
             matrix:
                 os:
