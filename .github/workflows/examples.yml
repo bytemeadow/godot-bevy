@@ -103,11 +103,12 @@ jobs:
 
     # Build example libraries on all platforms (needed for cross-platform Godot export)
     build:
-        name: build (${{ matrix.platform }})
+        name: build ${{ matrix.example }} (${{ matrix.platform }})
         runs-on: ${{ matrix.os }}
         needs: changes
         if: needs.changes.outputs.examples != '[]'
         strategy:
+            fail-fast: false
             matrix:
                 os:
                     [
@@ -115,6 +116,7 @@ jobs:
                         blaze/macos-latest,
                         windows-latest,
                     ]
+                example: ${{ fromJson(needs.changes.outputs.examples) }}
                 include:
                     - os: blaze/compute/ubuntu-latest-amd64
                       platform: linux
@@ -142,16 +144,8 @@ jobs:
                   packages: libasound2-dev libudev-dev pkg-config
                   version: 1.0
 
-            - name: Build example libraries
-              run: |
-                  cargo build --release --manifest-path examples/avian-physics-demo/rust/Cargo.toml
-                  cargo build --release --manifest-path examples/dodge-the-creeps-2d/rust/Cargo.toml
-                  cargo build --release --manifest-path examples/input-event-demo/rust/Cargo.toml
-                  cargo build --release --manifest-path examples/perf-test/rust/Cargo.toml
-                  cargo build --release --manifest-path examples/platformer-2d/rust/Cargo.toml
-                  cargo build --release --manifest-path examples/simple-node2d-movement/rust/Cargo.toml
-                  cargo build --release --manifest-path examples/timing-test/rust/Cargo.toml
-                  cargo build --release --manifest-path examples/two-way-sync-demo/rust/Cargo.toml
+            - name: Build example library
+              run: cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
 
             - name: Upload example libraries
               uses: actions/upload-artifact@v4
