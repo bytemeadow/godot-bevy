@@ -60,7 +60,7 @@ jobs:
                         - 'Cargo.lock'
 
     # Build example libraries on all platforms (needed for cross-platform Godot export)
-    build-examples:
+    build:
         name: build (${{ matrix.platform }})
         runs-on: ${{ matrix.os }}
         needs: changes
@@ -116,7 +116,7 @@ jobs:
                   if-no-files-found: warn
 
     # Export examples for all platforms (requires libraries from build-examples)
-    export-examples:
+    export:
         name: export (${{ matrix.example }})
         runs-on: blaze/macos-latest
         needs: [build-examples, changes]
