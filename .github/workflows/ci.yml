@@ -199,7 +199,7 @@ jobs:
                         - 'Cargo.lock'
 
     # Export examples for all platforms (requires libraries from build-examples)
-    examples:
+    export-examples:
         name: export / ${{ matrix.example }}
         runs-on: blaze/macos-latest
         needs: [build-examples, changes]
