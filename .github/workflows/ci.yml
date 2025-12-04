@@ -3,8 +3,20 @@ name: ci
 on:
     push:
         branches: [main, develop]
+        paths-ignore:
+            - "book/**"
+            - "**.md"
+            - "!**/Cargo.toml"
+            - ".github/workflows/book.yml"
+            - ".github/workflows/benchmark*.yml"
     pull_request:
         branches: [main, develop]
+        paths-ignore:
+            - "book/**"
+            - "**.md"
+            - "!**/Cargo.toml"
+            - ".github/workflows/book.yml"
+            - ".github/workflows/benchmark*.yml"
 
 env:
     CARGO_TERM_COLOR: always
@@ -20,9 +32,41 @@ concurrency:
     cancel-in-progress: true
 
 jobs:
-    rust:
-        name: build / rust (${{ matrix.platform }})
+    # Fast-fail lint job - runs once on Linux, catches formatting/clippy errors quickly
+    lint:
+        name: lint
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: rustfmt, clippy
+
+            - name: Setup Rust cache
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: . -> target
+
+            - name: Cache and install Linux dependencies
+              uses: awalsh128/cache-apt-pkgs-action@latest
+              with:
+                  packages: libasound2-dev libudev-dev pkg-config
+                  version: 1.0
+
+            - name: Check formatting
+              run: cargo fmt --all -- --check
+
+            - name: Run clippy
+              run: cargo clippy --all-targets -- -D warnings
+
+    # Build and test job - runs on all platforms after lint passes
+    build:
+        name: build (${{ matrix.platform }})
         runs-on: ${{ matrix.os }}
+        needs: lint
         env:
             # Disable debug symbols in release builds to save disk space
             CARGO_PROFILE_RELEASE_DEBUG: false
@@ -56,7 +100,6 @@ jobs:
               uses: dtolnay/rust-toolchain@stable
               with:
                   targets: ${{ matrix.target }}
-                  components: rustfmt, clippy
 
             - name: Setup Rust cache
               uses: Swatinem/rust-cache@v2
@@ -71,12 +114,6 @@ jobs:
               with:
                   packages: libasound2-dev libudev-dev pkg-config
                   version: 1.0
-
-            - name: Check formatting
-              run: cargo fmt --all -- --check
-
-            - name: Run clippy
-              run: cargo clippy --all-targets -- -D warnings
 
             - name: Run unit tests (no runtime)
               run: cargo test --lib --bins --examples
@@ -97,14 +134,23 @@ jobs:
         name: detect changes
         runs-on: ubuntu-latest
         outputs:
-            dodge-the-creeps-2d: ${{ steps.filter.outputs.dodge-the-creeps-2d }}
-            platformer-2d: ${{ steps.filter.outputs.platformer-2d }}
+            library: ${{ steps.filter.outputs.library }}
+            itest: ${{ steps.filter.outputs.itest }}
+            examples: ${{ steps.filter.outputs.changes }}
         steps:
             - uses: actions/checkout@v4
             - uses: dorny/paths-filter@v3
               id: filter
               with:
+                  # Output JSON array of changed filter names
                   filters: |
+                      library:
+                        - 'godot-bevy/**'
+                        - 'godot-bevy-macros/**'
+                        - 'Cargo.toml'
+                        - 'Cargo.lock'
+                      itest:
+                        - 'itest/**'
                       dodge-the-creeps-2d:
                         - 'godot-bevy/**'
                         - 'godot-bevy-macros/**'
@@ -120,16 +166,22 @@ jobs:
                         - 'Cargo.toml'
                         - 'Cargo.lock'
 
+    # Build examples matrix from changed examples
     examples:
         name: build / ${{ matrix.example }}
         runs-on: blaze/macos-latest
-        needs: [rust, changes]
-        if: |
-            needs.changes.outputs.dodge-the-creeps-2d == 'true' ||
-            needs.changes.outputs.platformer-2d == 'true'
+        needs: [build, changes]
+        # Only run if at least one example filter matched (exclude library/itest from check)
+        if: contains(needs.changes.outputs.examples, 'dodge-the-creeps-2d') || contains(needs.changes.outputs.examples, 'platformer-2d')
         strategy:
+            fail-fast: false
             matrix:
-                example: ${{ fromJson(needs.changes.outputs.dodge-the-creeps-2d == 'true' && needs.changes.outputs.platformer-2d == 'true' && '["dodge-the-creeps-2d", "platformer-2d"]' || needs.changes.outputs.dodge-the-creeps-2d == 'true' && '["dodge-the-creeps-2d"]' || '["platformer-2d"]') }}
+                # List all exportable examples here
+                example: [dodge-the-creeps-2d, platformer-2d]
+                exclude:
+                    # Exclude examples that didn't change
+                    - example: ${{ !contains(needs.changes.outputs.examples, 'dodge-the-creeps-2d') && 'dodge-the-creeps-2d' || 'none' }}
+                    - example: ${{ !contains(needs.changes.outputs.examples, 'platformer-2d') && 'platformer-2d' || 'none' }}
 
         steps:
             - name: Checkout code
@@ -146,11 +198,11 @@ jobs:
                       examples/*/rust -> target
 
             - name: Install Godot
-              uses: CapsCollective/godot-actions/install-godot@v1.2
+              uses: chickensoft-games/setup-godot@v2
               with:
-                  godot-version: ${{ env.GODOT_VERSION }}
-                  install-templates: true
-              id: install-godot
+                  version: ${{ env.GODOT_VERSION }}
+                  use-dotnet: false
+                  include-templates: true
 
             - name: Cache Godot imports
               uses: actions/cache@v4
@@ -183,15 +235,15 @@ jobs:
 
             - name: Import Godot project
               working-directory: examples/${{ matrix.example }}/godot
-              run: ${{ steps.install-godot.outputs.godot-executable }} --editor --headless --quit || true
+              run: godot --editor --headless --quit || true
 
             - name: Export for all platforms
               working-directory: examples/${{ matrix.example }}/godot
               run: |
                   mkdir -p exports
-                  ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Linux/X11" exports/${{ matrix.example }}-linux
-                  ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
-                  ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
+                  godot --headless --export-release "Linux/X11" exports/${{ matrix.example }}-linux
+                  godot --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
+                  godot --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
 
             - name: Upload game exports
               uses: actions/upload-artifact@v4
@@ -203,7 +255,10 @@ jobs:
     integration-tests:
         name: integration tests
         runs-on: blaze/macos-latest
-        needs: [rust]
+        needs: [build, changes]
+        if: |
+            needs.changes.outputs.library == 'true' ||
+            needs.changes.outputs.itest == 'true'
 
         steps:
             - name: Checkout code
@@ -220,10 +275,11 @@ jobs:
                       itest/rust -> target
 
             - name: Install Godot
-              uses: CapsCollective/godot-actions/install-godot@v1.2
+              uses: chickensoft-games/setup-godot@v2
               with:
-                  godot-version: ${{ env.GODOT_VERSION }}
-              id: install-godot
+                  version: ${{ env.GODOT_VERSION }}
+                  use-dotnet: false
+                  include-templates: false
 
             - name: Download Rust libraries
               uses: actions/download-artifact@v4
@@ -253,10 +309,10 @@ jobs:
 
             - name: Import Godot project
               working-directory: itest/godot
-              run: ${{ steps.install-godot.outputs.godot-executable }} --editor --headless --quit || true
+              run: godot --editor --headless --quit || true
 
             - name: Run integration tests
               working-directory: itest
               env:
-                  GODOT4_BIN: ${{ steps.install-godot.outputs.godot-executable }}
+                  GODOT4_BIN: godot
               run: ./run-tests.sh
