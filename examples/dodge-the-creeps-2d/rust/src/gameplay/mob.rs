@@ -105,7 +105,17 @@ fn spawn_mob(
         .spawn_empty()
         .insert(Mob { direction })
         .insert(transform)
-        .insert(GodotScene::from_handle(assets.mob_scn.clone()))
+        .insert(
+            GodotScene::from_handle(assets.mob_scn.clone()).with_signal_connection(
+                "VisibleOnScreenNotifier2D",
+                "screen_exited",
+                |_args, _handle, entity| {
+                    Some(MobScreenExited {
+                        entity: entity.expect("entity was provided"),
+                    })
+                },
+            ),
+        )
         .insert(AnimationState::default());
 }
 
@@ -154,18 +164,6 @@ fn new_mob(
 
         // Use animation state instead of direct API calls
         anim_state.play(Some(animation_name.into()));
-
-        // Connect typed event with entity attachment so we can destroy the entity when it goes off-screen
-        typed.connect_map(
-            &mut mob_nodes.visibility_notifier,
-            "screen_exited",
-            Some(entity),
-            |_args, _node, ent| {
-                Some(MobScreenExited {
-                    entity: ent.expect("entity was provided"),
-                })
-            },
-        );
 
         // Play 2D positional spawn sound at mob's position with fade-in
         let position = transform.translation.xy();
