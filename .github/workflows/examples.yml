@@ -148,11 +148,13 @@ jobs:
 
             - name: Setup cross-platform libraries
               run: |
-                  mkdir -p target/release
+                  mkdir -p target/release target/debug
 
-                  # Copy all platform libraries to target directory
+                  # Copy all platform libraries to both release and debug directories
+                  # (Godot import runs in debug mode, export uses release)
                   find artifacts/ -type f \( -name "*.so" -o -name "*.dylib" -o -name "*.dll" \) | while read file; do
                     cp "$file" target/release/
+                    cp "$file" target/debug/
                   done
 
                   echo "Available libraries:"
