@@ -6,7 +6,6 @@ on:
         paths-ignore:
             - "book/**"
             - "**.md"
-            - "!**/Cargo.toml"
             - ".github/workflows/book.yml"
             - ".github/workflows/benchmark*.yml"
     pull_request:
@@ -14,7 +13,6 @@ on:
         paths-ignore:
             - "book/**"
             - "**.md"
-            - "!**/Cargo.toml"
             - ".github/workflows/book.yml"
             - ".github/workflows/benchmark*.yml"
 
