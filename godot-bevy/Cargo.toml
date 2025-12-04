@@ -17,7 +17,6 @@ bevy_diagnostic = { version = "0.17", default-features = false }
 bevy_ecs = { version = "0.17", default-features = false, features = ["multi_threaded"] }
 bevy_input = { version = "0.17", default-features = false }
 bevy_math = { version = "0.17", default-features = false }
-bevy_platform = { version = "0.17", default-features = false }
 bevy_reflect = { version = "0.17", default-features = false }
 bevy_tasks = { version = "0.17", default-features = false, features = ["multi_threaded"] }
 bevy_time = { version = "0.17", default-features = false }

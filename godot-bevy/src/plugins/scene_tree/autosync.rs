@@ -45,7 +45,7 @@ pub fn register_all_autosync_bundles(_app: &mut App) {
                 .into_iter()
                 .collect();
 
-        bevy_log::debug!("Registered {} AutoSyncBundle entries", entries.len());
+        tracing::debug!("Registered {} AutoSyncBundle entries", entries.len());
         *registry = Some(entries);
     }
 }
