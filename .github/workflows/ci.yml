@@ -1,452 +1,181 @@
 name: ci
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
+    push:
+        branches: [main, develop]
+        paths-ignore:
+            - "book/**"
+            - "**.md"
+            - ".github/workflows/book.yml"
+            - ".github/workflows/benchmark*.yml"
+            - ".github/workflows/examples.yml"
+    pull_request:
+        branches: [main, develop]
+        paths-ignore:
+            - "book/**"
+            - "**.md"
+            - ".github/workflows/book.yml"
+            - ".github/workflows/benchmark*.yml"
+            - ".github/workflows/examples.yml"
 
 env:
-  CARGO_TERM_COLOR: always
-  GODOT_VERSION: "4.5.1"
+    CARGO_TERM_COLOR: always
+    GODOT_VERSION: "4.5.1"
 
 permissions:
-  contents: read
-  issues: write
-  pull-requests: write
+    contents: read
+    issues: write
+    pull-requests: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
-  rust:
-    name: build / rust (${{ matrix.platform }})
-    runs-on: ${{ matrix.os }}
-    env:
-      # Disable debug symbols in release builds to save disk space
-      CARGO_PROFILE_RELEASE_DEBUG: false
-    strategy:
-      matrix:
-        os:
-          [
-            blaze/compute/ubuntu-latest-amd64,
-            blaze/macos-latest,
-            windows-latest,
-          ]
-        include:
-          - os: blaze/compute/ubuntu-latest-amd64
-            platform: linux
-            target: x86_64-unknown-linux-gnu
-            extension: .so
-          - os: blaze/macos-latest
-            platform: macos
-            target: x86_64-apple-darwin
-            extension: .dylib
-          - os: windows-latest
-            platform: windows
-            target: x86_64-pc-windows-msvc
-            extension: .dll
+    # Fast-fail lint job - runs once on Linux, catches formatting/clippy errors quickly
+    lint:
+        name: lint
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: rustfmt, clippy
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-          components: rustfmt, clippy
+            - name: Setup Rust cache
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: . -> target
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            . -> target
-            examples/*/rust -> target
+            - name: Cache and install Linux dependencies
+              uses: awalsh128/cache-apt-pkgs-action@latest
+              with:
+                  packages: libasound2-dev libudev-dev pkg-config
+                  version: 1.0
 
-      - name: Cache and install Linux dependencies
-        if: runner.os == 'linux'
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libasound2-dev libudev-dev pkg-config
-          version: 1.0
+            - name: Check formatting
+              run: cargo fmt --all -- --check
 
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+            - name: Run clippy
+              run: cargo clippy --all-targets -- -D warnings
 
-      - name: Run clippy
-        run: cargo clippy --all-targets -- -D warnings
+    # Test job - runs on all platforms after lint passes
+    test:
+        name: test (${{ matrix.platform }})
+        runs-on: ${{ matrix.os }}
+        needs: [lint, changes]
+        if: needs.changes.outputs.library == 'true' || needs.changes.outputs.itest == 'true'
+        strategy:
+            matrix:
+                os:
+                    [
+                        blaze/compute/ubuntu-latest-amd64,
+                        blaze/macos-latest,
+                        windows-latest,
+                    ]
+                include:
+                    - os: blaze/compute/ubuntu-latest-amd64
+                      platform: linux
+                    - os: blaze/macos-latest
+                      platform: macos
+                    - os: windows-latest
+                      platform: windows
 
-      - name: Run unit tests (no runtime)
-        run: cargo test --lib --bins --examples
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-      - name: Build release
-        run: cargo build --release
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
 
-      - name: Upload Rust libraries
-        uses: actions/upload-artifact@v4
-        with:
-          name: rust-libs-${{ runner.os }}
-          path: |
-            target/release/*rust${{ matrix.extension }}
-            target/release/deps/*rust*${{ matrix.extension }}
-          if-no-files-found: error
+            - name: Setup Rust cache
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: . -> target
 
-  changes:
-    name: detect changes
-    runs-on: ubuntu-latest
-    outputs:
-      benchmark: ${{ steps.filter.outputs.benchmark }}
-      dodge-the-creeps-2d: ${{ steps.filter.outputs.dodge-the-creeps-2d }}
-      platformer-2d: ${{ steps.filter.outputs.platformer-2d }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            benchmark:
-              - 'godot-bevy/**'
-              - 'godot-bevy-macros/**'
-              - 'examples/perf-test/**'
-              - '.github/workflows/ci.yml'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-            dodge-the-creeps-2d:
-              - 'godot-bevy/**'
-              - 'godot-bevy-macros/**'
-              - 'examples/dodge-the-creeps-2d/**'
-              - '.github/workflows/ci.yml'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-            platformer-2d:
-              - 'godot-bevy/**'
-              - 'godot-bevy-macros/**'
-              - 'examples/platformer-2d/**'
-              - '.github/workflows/ci.yml'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
+            - name: Cache and install Linux dependencies
+              if: runner.os == 'linux'
+              uses: awalsh128/cache-apt-pkgs-action@latest
+              with:
+                  packages: libasound2-dev libudev-dev pkg-config
+                  version: 1.0
 
-  examples:
-    name: build / ${{ matrix.example }}
-    runs-on: blaze/macos-latest
-    needs: [rust, changes]
-    if: |
-      needs.changes.outputs.dodge-the-creeps-2d == 'true' ||
-      needs.changes.outputs.platformer-2d == 'true'
-    strategy:
-      matrix:
-        example: ${{ fromJson(needs.changes.outputs.dodge-the-creeps-2d == 'true' && needs.changes.outputs.platformer-2d == 'true' && '["dodge-the-creeps-2d", "platformer-2d"]' || needs.changes.outputs.dodge-the-creeps-2d == 'true' && '["dodge-the-creeps-2d"]' || '["platformer-2d"]') }}
+            - name: Run unit tests
+              run: cargo test --lib --bins --examples
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    # Detect which paths changed to conditionally run downstream jobs
+    changes:
+        name: detect changes
+        runs-on: ubuntu-latest
+        outputs:
+            library: ${{ steps.filter.outputs.library }}
+            itest: ${{ steps.filter.outputs.itest }}
+        steps:
+            - uses: actions/checkout@v4
+            - uses: dorny/paths-filter@v3
+              id: filter
+              with:
+                  filters: |
+                      library:
+                        - 'godot-bevy/**'
+                        - 'godot-bevy-macros/**'
+                        - '.github/workflows/ci.yml'
+                        - 'Cargo.toml'
+                        - 'Cargo.lock'
+                      itest:
+                        - 'itest/**'
+                        - '.github/workflows/ci.yml'
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+    # Integration tests with Godot runtime
+    integration-tests:
+        name: integration tests
+        runs-on: blaze/macos-latest
+        needs: [lint, changes]
+        if: |
+            needs.changes.outputs.library == 'true' ||
+            needs.changes.outputs.itest == 'true'
 
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            . -> target
-            examples/*/rust -> target
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-      - name: Install Godot
-        uses: CapsCollective/godot-actions/install-godot@v1.2
-        with:
-          godot-version: ${{ env.GODOT_VERSION }}
-          install-templates: true
-        id: install-godot
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Godot imports
-        uses: actions/cache@v4
-        with:
-          path: examples/${{ matrix.example }}/godot/.godot
-          key: ${{ runner.os }}-godot-imports-${{ matrix.example }}-${{ hashFiles(format('examples/{0}/godot/**/*.import', matrix.example)) }}
-          restore-keys: |
-            ${{ runner.os }}-godot-imports-${{ matrix.example }}-
+            - name: Setup Rust cache
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: |
+                      . -> target
+                      itest/rust -> target
 
-      - name: Download Rust libraries
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
+            - name: Install Godot
+              uses: chickensoft-games/setup-godot@v2
+              with:
+                  version: ${{ env.GODOT_VERSION }}
+                  use-dotnet: false
+                  include-templates: false
 
-      - name: Setup cross-platform libraries
-        run: |
-          mkdir -p target/{release,debug}
+            - name: Cache Godot imports
+              uses: actions/cache@v4
+              with:
+                  path: itest/godot/.godot
+                  key: ${{ runner.os }}-godot-imports-itest-${{ hashFiles('itest/godot/**/*.import') }}
+                  restore-keys: |
+                      ${{ runner.os }}-godot-imports-itest-
 
-          # Copy all platform libraries to target directories
-          find artifacts/ -name "*rust*" -type f | while read file; do
-            cp "$file" target/release/ 2>/dev/null || true
-            cp "$file" target/debug/ 2>/dev/null || true
-          done
+            - name: Build integration test library
+              run: cargo build --manifest-path itest/rust/Cargo.toml
 
-          echo "Available libraries:"
-          ls -la target/release/ || echo "No release libraries found"
+            - name: Import Godot project
+              working-directory: itest/godot
+              run: godot --editor --headless --quit || true
 
-      - name: Build example Rust library
-        run: cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
-
-      - name: Import Godot project
-        working-directory: examples/${{ matrix.example }}/godot
-        run: ${{ steps.install-godot.outputs.godot-executable }} --editor --headless --quit || true
-
-      - name: Export for all platforms
-        working-directory: examples/${{ matrix.example }}/godot
-        run: |
-          mkdir -p exports
-          ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Linux/X11" exports/${{ matrix.example }}-linux
-          ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
-          ${{ steps.install-godot.outputs.godot-executable }} --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
-
-      - name: Upload game exports
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.example }}-exports
-          path: examples/${{ matrix.example }}/godot/exports/
-          if-no-files-found: error
-
-  integration-tests:
-    name: integration tests
-    runs-on: blaze/macos-latest
-    needs: [rust]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            . -> target
-            itest/rust -> target
-
-      - name: Install Godot
-        uses: CapsCollective/godot-actions/install-godot@v1.2
-        with:
-          godot-version: ${{ env.GODOT_VERSION }}
-        id: install-godot
-
-      - name: Download Rust libraries
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-
-      - name: Setup cross-platform libraries
-        run: |
-          mkdir -p target/{release,debug}
-
-          # Copy all platform libraries to target directories
-          find artifacts/ -name "*rust*" -type f | while read file; do
-            cp "$file" target/release/ 2>/dev/null || true
-            cp "$file" target/debug/ 2>/dev/null || true
-          done
-
-      - name: Cache Godot imports
-        uses: actions/cache@v4
-        with:
-          path: itest/godot/.godot
-          key: ${{ runner.os }}-godot-imports-itest-${{ hashFiles('itest/godot/**/*.import') }}
-          restore-keys: |
-            ${{ runner.os }}-godot-imports-itest-
-
-      - name: Build integration test library
-        run: cargo build --manifest-path itest/rust/Cargo.toml
-
-      - name: Import Godot project
-        working-directory: itest/godot
-        run: ${{ steps.install-godot.outputs.godot-executable }} --editor --headless --quit || true
-
-      - name: Run integration tests
-        working-directory: itest
-        env:
-          GODOT4_BIN: ${{ steps.install-godot.outputs.godot-executable }}
-        run: ./run-tests.sh
-
-  # NOTE: perf-test benchmark job has been replaced by itest benchmarks
-  # See .github/workflows/benchmarks.yml for the new benchmark workflow
-  # perf-test example is still available for manual testing and demonstration
-  benchmark:
-    name: performance / particle benchmark (deprecated)
-    runs-on: blaze/compute/ubuntu-latest-amd64
-    needs: [rust, changes]
-    if: false  # Disabled - use itest benchmarks instead
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            . -> target
-            examples/*/rust -> target
-
-      - name: Cache and install Linux dependencies
-        if: runner.os == 'linux'
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libasound2-dev libudev-dev pkg-config
-          version: 1.0
-
-      - name: Download Rust libraries
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-
-      - name: Setup cross-platform libraries
-        run: |
-          mkdir -p target/{release,debug}
-
-          # Copy all platform libraries to target directories
-          find artifacts/ -name "*rust*" -type f | while read file; do
-            cp "$file" target/release/ 2>/dev/null || true
-            cp "$file" target/debug/ 2>/dev/null || true
-          done
-
-          echo "Available libraries:"
-          ls -la target/release/ || echo "No release libraries found"
-
-      - name: Cache gdenv
-        uses: actions/cache@v4
-        id: cache-gdenv
-        with:
-          path: ~/.local/share/gdenv
-          key: ${{ runner.os }}-gdenv-4.4.1
-
-      - name: Install gdenv
-        if: steps.cache-gdenv.outputs.cache-hit != 'true'
-        run: |
-          # Install gdenv using official installer
-          curl -fsSL https://gdenv.bytemeadow.com | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Install Godot via gdenv
-        if: steps.cache-gdenv.outputs.cache-hit != 'true'
-        run: |
-          # Install Godot 4.4.1 using gdenv
-          gdenv install 4.4.1
-          gdenv use 4.4.1
-
-      - name: Setup Godot environment
-        run: |
-          # Add gdenv bin directory to PATH
-          echo "$HOME/.local/share/gdenv/bin" >> $GITHUB_PATH
-
-          # Set the executable path
-          echo "GODOT_EXECUTABLE=$HOME/.local/share/gdenv/bin/godot" >> $GITHUB_ENV
-
-          # Verify installation
-          $HOME/.local/share/gdenv/bin/godot --version
-
-      - name: Cache Godot imports
-        uses: actions/cache@v4
-        with:
-          path: examples/perf-test/godot/.godot
-          key: ${{ runner.os }}-godot-imports-perf-test-${{ hashFiles('examples/perf-test/godot/**/*.import') }}
-          restore-keys: |
-            ${{ runner.os }}-godot-imports-perf-test-
-
-      - name: Build perf-test benchmark
-        run: cargo build --release --manifest-path examples/perf-test/rust/Cargo.toml
-
-      - name: Import Godot project
-        working-directory: examples/perf-test/godot
-        run: $GODOT_EXECUTABLE --editor --headless --quit || true
-
-      - name: Download baseline for regression check
-        if: github.event_name == 'pull_request'
-        working-directory: examples/perf-test
-        run: |
-          # Download baseline from main branch for regression testing
-          if curl -f -o main-baseline.json https://raw.githubusercontent.com/${{ github.repository }}/main/examples/perf-test/baseline.json; then
-            # Check if this is a CI-generated baseline
-            if jq -e '.ci_metadata' main-baseline.json > /dev/null; then
-              echo "Found CI-generated baseline from commit $(jq -r '.ci_metadata.commit' main-baseline.json)"
-              echo "BASELINE_AVAILABLE=true" >> $GITHUB_ENV
-            else
-              echo "Baseline exists but was not generated by CI - skipping regression check"
-              echo "BASELINE_AVAILABLE=false" >> $GITHUB_ENV
-            fi
-          else
-            echo "No baseline found on main branch - regression check skipped"
-            echo "BASELINE_AVAILABLE=false" >> $GITHUB_ENV
-          fi
-
-      - name: Run performance benchmark with regression check
-        id: benchmark
-        working-directory: examples/perf-test
-        run: |
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            # On main branch: always save baseline
-            if python3 regression_test.py --entity-counts 500 1000 2000 5000 10000 20000 --save-baseline baseline.json --godot "$GODOT_EXECUTABLE"; then
-              echo "benchmark_success=true" >> $GITHUB_OUTPUT
-              echo "baseline_created=true" >> $GITHUB_OUTPUT
-            else
-              echo "benchmark_success=false" >> $GITHUB_OUTPUT
-              exit 1
-            fi
-          elif [ "$BASELINE_AVAILABLE" = "true" ]; then
-            # On PR with baseline: run regression check
-            echo "Running benchmark with regression check against main baseline..."
-            if python3 regression_test.py --entity-counts 500 1000 2000 5000 10000 20000 --baseline main-baseline.json --threshold 0.85 --godot "$GODOT_EXECUTABLE"; then
-              echo "benchmark_success=true" >> $GITHUB_OUTPUT
-            else
-              echo "::warning::Performance regression detected! Bevy implementation performance dropped more than 15%"
-              echo "benchmark_success=false" >> $GITHUB_OUTPUT
-              exit 1
-            fi
-          else
-            # On PR without baseline: just run benchmark
-            echo "Running benchmark without regression check (no baseline available)..."
-            if python3 regression_test.py --entity-counts 500 1000 2000 5000 10000 20000 --godot "$GODOT_EXECUTABLE"; then
-              echo "benchmark_success=true" >> $GITHUB_OUTPUT
-            else
-              echo "benchmark_success=false" >> $GITHUB_OUTPUT
-              exit 1
-            fi
-          fi
-
-      - name: Generate benchmark summary
-        if: always() && steps.benchmark.outputs.benchmark_success == 'true'
-        working-directory: examples/perf-test
-        run: |
-          echo "## 🚀 Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "✅ Benchmark completed and baseline saved for future regression tests." >> $GITHUB_STEP_SUMMARY
-          elif [ "$BASELINE_AVAILABLE" = "true" ]; then
-            echo "✅ Benchmark completed with regression check passed." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "ℹ️  Benchmark completed (no regression check - baseline not available)." >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Check the benchmark job logs for detailed results." >> $GITHUB_STEP_SUMMARY
-
-      - name: Save PR metadata for comment workflow
-        if: github.event_name == 'pull_request' && steps.benchmark.outputs.benchmark_success == 'true'
-        run: |
-          mkdir -p benchmark-artifacts
-          echo "${{ github.event.number }}" > benchmark-artifacts/pr_number.txt
-          echo "${{ github.event.pull_request.head.sha }}" > benchmark-artifacts/pr_sha.txt
-
-      - name: Upload benchmark results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-results
-          path: |
-            examples/perf-test/benchmark_results/
-            examples/perf-test/benchmark_output.txt
-            examples/perf-test/baseline.json
-            benchmark-artifacts/
+            - name: Run integration tests
+              working-directory: itest
+              env:
+                  GODOT4_BIN: godot
+              run: ./run-tests.sh
