@@ -137,9 +137,7 @@ jobs:
             - name: Setup Rust cache
               uses: Swatinem/rust-cache@v2
               with:
-                  workspaces: |
-                      . -> target
-                      examples/*/rust -> target
+                  workspaces: . -> target
 
             - name: Cache and install Linux dependencies
               if: runner.os == 'linux'
