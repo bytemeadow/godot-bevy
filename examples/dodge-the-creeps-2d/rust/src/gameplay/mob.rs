@@ -107,7 +107,7 @@ fn spawn_mob(
         .insert(transform)
         .insert(
             GodotScene::from_handle(assets.mob_scn.clone()).with_signal_connection(
-                "VisibleOnScreenNotifier2D",
+                MobNodes::VISIBILITY_NOTIFIER_PATH,
                 "screen_exited",
                 |_args, _handle, entity| {
                     Some(MobScreenExited {
