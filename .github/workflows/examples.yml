@@ -9,7 +9,6 @@ on:
             - "examples/**"
             - ".github/workflows/examples.yml"
             - "Cargo.toml"
-            - "Cargo.lock"
     pull_request:
         branches: [main, develop]
         paths:
@@ -18,7 +17,6 @@ on:
             - "examples/**"
             - ".github/workflows/examples.yml"
             - "Cargo.toml"
-            - "Cargo.lock"
 
 env:
     CARGO_TERM_COLOR: always
@@ -50,28 +48,24 @@ jobs:
                         - 'examples/avian-physics-demo/**'
                         - '.github/workflows/examples.yml'
                         - 'Cargo.toml'
-                        - 'Cargo.lock'
                       dodge-the-creeps-2d:
                         - 'godot-bevy/**'
                         - 'godot-bevy-macros/**'
                         - 'examples/dodge-the-creeps-2d/**'
                         - '.github/workflows/examples.yml'
                         - 'Cargo.toml'
-                        - 'Cargo.lock'
                       perf-test:
                         - 'godot-bevy/**'
                         - 'godot-bevy-macros/**'
                         - 'examples/perf-test/**'
                         - '.github/workflows/examples.yml'
                         - 'Cargo.toml'
-                        - 'Cargo.lock'
                       platformer-2d:
                         - 'godot-bevy/**'
                         - 'godot-bevy-macros/**'
                         - 'examples/platformer-2d/**'
                         - '.github/workflows/examples.yml'
                         - 'Cargo.toml'
-                        - 'Cargo.lock'
 
     # Build example libraries on all platforms (needed for cross-platform Godot export)
     build:
