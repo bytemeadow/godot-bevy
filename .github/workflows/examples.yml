@@ -150,7 +150,7 @@ jobs:
             - name: Upload example libraries
               uses: actions/upload-artifact@v4
               with:
-                  name: example-libs-${{ matrix.platform }}
+                  name: example-libs-${{ matrix.example }}-${{ runner.os }}
                   path: |
                       target/release/*.so
                       target/release/*.dylib
@@ -185,7 +185,7 @@ jobs:
             - name: Download all platform libraries
               uses: actions/download-artifact@v4
               with:
-                  pattern: example-libs-*
+                  pattern: example-libs-${{ matrix.example }}-*
                   path: artifacts/
 
             - name: Setup cross-platform libraries
