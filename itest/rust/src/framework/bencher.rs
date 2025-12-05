@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
-const WARMUP_RUNS: usize = 200;
-const TEST_RUNS: usize = 501;
+const WARMUP_RUNS: usize = 5;
+const TEST_RUNS: usize = 21;
 const METRIC_COUNT: usize = 2;
 
 pub struct BenchResult {

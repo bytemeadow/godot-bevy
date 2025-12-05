@@ -9,7 +9,7 @@ use godot::prelude::*;
 use godot_bevy_itest_macros::bench;
 
 const BENCH_ENTITY_COUNT: usize = 20000;
-const UPDATE_ITERATIONS: usize = 100;
+const UPDATE_ITERATIONS: usize = 50;
 const BENCH_ACTION_EVENT_COUNT: usize = 100;
 
 fn get_bevy_app_singleton() -> Gd<Node> {
