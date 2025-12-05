@@ -27,3 +27,5 @@ devenv.local.nix
 
 .cargo/
 /inspo
+
+extension_api.json

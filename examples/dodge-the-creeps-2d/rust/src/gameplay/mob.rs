@@ -25,11 +25,12 @@ use godot::{
     builtin::Vector2,
     classes::{AnimatedSprite2D, PathFollow2D, RigidBody2D},
 };
+use godot_bevy::interop::VisibleOnScreenNotifier2DSignals;
 use godot_bevy::{
     interop::GodotNodeHandle,
     prelude::{
         AudioChannel, FindEntityByNameExt, GodotResource, GodotScene, GodotTypedSignalsPlugin,
-        NodeTreeView, TypedGodotSignals, main_thread_system,
+        NodeTreeView, main_thread_system,
     },
 };
 use std::f32::consts::PI;
@@ -105,7 +106,17 @@ fn spawn_mob(
         .spawn_empty()
         .insert(Mob { direction })
         .insert(transform)
-        .insert(GodotScene::from_handle(assets.mob_scn.clone()))
+        .insert(
+            GodotScene::from_handle(assets.mob_scn.clone()).with_signal_connection(
+                MobNodes::VISIBILITY_NOTIFIER_PATH,
+                VisibleOnScreenNotifier2DSignals::SCREEN_EXITED,
+                |_args, _handle, entity| {
+                    Some(MobScreenExited {
+                        entity: entity.expect("entity was provided"),
+                    })
+                },
+            ),
+        )
         .insert(AnimationState::default());
 }
 
@@ -115,26 +126,16 @@ pub struct MobNodes {
     animated_sprite: GodotNodeHandle,
 
     #[node("VisibleOnScreenNotifier2D")]
-    visibility_notifier: GodotNodeHandle,
+    _visibility_notifier: GodotNodeHandle,
 }
 
 #[main_thread_system]
 fn new_mob(
-    mut entities: Query<
-        (
-            Entity,
-            &Mob,
-            &Transform,
-            &mut GodotNodeHandle,
-            &mut AnimationState,
-        ),
-        Added<Mob>,
-    >,
+    mut entities: Query<(&Mob, &Transform, &mut GodotNodeHandle, &mut AnimationState), Added<Mob>>,
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
     assets: Res<MobAssets>,
-    typed: TypedGodotSignals<MobScreenExited>,
 ) {
-    for (entity, mob_data, transform, mut mob, mut anim_state) in entities.iter_mut() {
+    for (mob_data, transform, mut mob, mut anim_state) in entities.iter_mut() {
         let mut mob = mob.get::<RigidBody2D>();
 
         let velocity = Vector2::new(fastrand::f32() * 100.0 + 150.0, 0.0);
@@ -154,18 +155,6 @@ fn new_mob(
 
         // Use animation state instead of direct API calls
         anim_state.play(Some(animation_name.into()));
-
-        // Connect typed event with entity attachment so we can destroy the entity when it goes off-screen
-        typed.connect_map(
-            &mut mob_nodes.visibility_notifier,
-            "screen_exited",
-            Some(entity),
-            |_args, _node, ent| {
-                Some(MobScreenExited {
-                    entity: ent.expect("entity was provided"),
-                })
-            },
-        );
 
         // Play 2D positional spawn sound at mob's position with fade-in
         let position = transform.translation.xy();

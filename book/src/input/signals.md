@@ -4,7 +4,16 @@ Godot signals are a core communication mechanism in the Godot engine. godot-bevy
 
 This page focuses on the typed signals API (recommended). A legacy API remains available but is deprecated; see the Legacy section below.
 
-## Quick Start (Typed)
+## Outline
+
+- [Quick Start](#quick-start)
+- [Multiple Typed Events](#multiple-typed-events)
+- [Passing Context (Node, Entity, Arguments)](#passing-context-node-entity-arguments)
+- [Deferred Connections](#deferred-connections)
+- [Attaching signals to Godot scenes](#attaching-signals-to-godot-scenes)
+- [Untyped Legacy API (Deprecated)](#untyped-legacy-api-deprecated)
+
+## Quick Start
 
 1) Define a Bevy message for your case:
 
@@ -102,7 +111,7 @@ fn connect_area(
 }
 ```
 
-## Deferred Connections (Typed)
+## Deferred Connections
 
 When spawning entities before their `GodotNodeHandle` is ready, you can defer connections. Add `TypedDeferredSignalConnections<T>` with a signal-to-event mapper; the `GodotTypedSignalsPlugin<T>` wires it once the handle appears.
 
@@ -123,7 +132,55 @@ fn spawn_area(mut commands: Commands) {
 }
 ```
 
-## Legacy API (Deprecated)
+## Attaching signals to Godot scenes
+
+When spawning an entity associated with a Godot scene, you can schedule
+signals to be connected to children of the scene once the scene is spawned.
+When inserting a `GodotScene` resource, use the `with_signal_connection` builder method to schedule connections.
+
+The method arguments are similar to other typed signal constructors such as `connect_map`:
+* `node_path` - Path relative to the scene root (e.g., "VBox/MyButton" or "." for root node).
+  Argument supports the same syntax as [Node.get_node](https://docs.godotengine.org/en/stable/classes/class_node.html#class-node-method-get-node).
+* `signal_name` - Name of the Godot signal to connect (e.g., "pressed").
+* `mapper` - Closure that maps signal arguments to your typed message.
+  * The closure receives three arguments: `args`, `node_handle`, and `entity`:
+    - `args: &[Variant]`: raw Godot arguments (clone if you need detailed parsing).
+    - `node_handle: &GodotNodeHandle`: emitting node; clone into your event if useful.
+    - `entity: Option<Entity>`: Bevy entity the GodotScene component is attached to (Always Some).
+  * The closure returns an optional Bevy Message, or None to not send the message.
+
+```rust,ignore
+impl Command for SpawnPickup {
+    fn apply(self, world: &mut World) -> () {
+        let assets = world.get_resource::<PickupAssets>().cloned();
+
+        let mut pickup = world.spawn_empty();
+        pickup
+            .insert(Name::new("Pickup"))
+            .insert(Transform::from_xyz(200.0, 200.0, 0.0));
+
+        // Only insert GodotScene if Godot engine is running; useful when running tests without Godot.
+        if let Some(assets) = assets {
+            pickup.insert(
+                GodotScene::from_handle(assets.scene.clone())
+                
+                    // Schedule the "area_entered" signal on the Area2D child
+                    // to be connected to PickupAreaEntered message
+                    .with_signal_connection(
+                        "Area2D",
+                        "area_entered",
+                        |_args, _handle, _entity| {
+                            // Pickup "area_entered" signal mapped
+                            Some(PickupAreaEntered)
+                        },
+                ),
+            );
+        }
+    }
+}
+```
+
+## Untyped Legacy API (Deprecated)
 
 The legacy API (`GodotSignals`, `GodotSignal`, `connect_godot_signal`) remains available but is deprecated. Prefer the typed API above. Minimal usage for migration:
 
