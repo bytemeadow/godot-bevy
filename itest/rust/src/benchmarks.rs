@@ -1,12 +1,33 @@
 use godot::builtin::{
-    PackedFloat32Array, PackedInt64Array, PackedVector2Array, PackedVector3Array,
-    PackedVector4Array,
+    Basis, PackedFloat32Array, PackedInt64Array, PackedVector2Array, PackedVector3Array,
+    PackedVector4Array, Quaternion, Transform2D, Transform3D,
 };
 use godot::classes::{Engine, InputEventKey, InputMap};
 use godot::global::Key;
 use godot::obj::{NewAlloc, NewGd};
 use godot::prelude::*;
 use godot_bevy_itest_macros::bench;
+
+/// Helper to create a Transform3D from position, rotation (quaternion xyzw), and scale
+fn make_transform_3d(pos: Vector3, rot: Vector4, scale: Vector3) -> Transform3D {
+    let quat = Quaternion::new(rot.x, rot.y, rot.z, rot.w);
+    let rotation_basis = Basis::from_quaternion(quat);
+    let basis = Basis::from_cols(
+        rotation_basis.col_a() * scale.x,
+        rotation_basis.col_b() * scale.y,
+        rotation_basis.col_c() * scale.z,
+    );
+    Transform3D { basis, origin: pos }
+}
+
+/// Helper to create a Transform2D from position, rotation (radians), and scale
+fn make_transform_2d(pos: Vector2, rotation: f32, scale: Vector2) -> Transform2D {
+    let cos_rot = rotation.cos();
+    let sin_rot = rotation.sin();
+    let a = Vector2::new(cos_rot * scale.x, sin_rot * scale.x);
+    let b = Vector2::new(-sin_rot * scale.y, cos_rot * scale.y);
+    Transform2D { a, b, origin: pos }
+}
 
 const BENCH_ENTITY_COUNT: usize = 20000;
 const UPDATE_ITERATIONS: usize = 50;
@@ -28,14 +49,22 @@ fn transform_update_individual_3d() -> i32 {
     let mut nodes = Vec::with_capacity(BENCH_ENTITY_COUNT);
     for _ in 0..BENCH_ENTITY_COUNT {
         let mut node = Node3D::new_alloc();
-        node.set_position(Vector3::new(1.0, 2.0, 3.0));
+        node.set_transform(make_transform_3d(
+            Vector3::new(1.0, 2.0, 3.0),
+            Vector4::new(0.0, 0.0, 0.0, 1.0),
+            Vector3::new(1.0, 1.0, 1.0),
+        ));
         nodes.push(node);
     }
 
     for iteration in 0..UPDATE_ITERATIONS {
         let offset = iteration as f32;
         for node in &mut nodes {
-            node.set_position(Vector3::new(5.0 + offset, 6.0, 7.0));
+            node.set_transform(make_transform_3d(
+                Vector3::new(5.0 + offset, 6.0, 7.0),
+                Vector4::new(0.0, 0.0, 0.0, 1.0),
+                Vector3::new(1.0, 1.0, 1.0),
+            ));
         }
     }
 
@@ -97,14 +126,22 @@ fn transform_update_individual_2d() -> i32 {
     let mut nodes = Vec::with_capacity(BENCH_ENTITY_COUNT);
     for _ in 0..BENCH_ENTITY_COUNT {
         let mut node = Node2D::new_alloc();
-        node.set_position(Vector2::new(1.0, 2.0));
+        node.set_transform(make_transform_2d(
+            Vector2::new(1.0, 2.0),
+            0.0,
+            Vector2::new(1.0, 1.0),
+        ));
         nodes.push(node);
     }
 
     for iteration in 0..UPDATE_ITERATIONS {
         let offset = iteration as f32;
         for node in &mut nodes {
-            node.set_position(Vector2::new(5.0 + offset, 6.0));
+            node.set_transform(make_transform_2d(
+                Vector2::new(5.0 + offset, 6.0),
+                0.0,
+                Vector2::new(1.0, 1.0),
+            ));
         }
     }
 
