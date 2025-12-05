@@ -26,24 +26,30 @@ pub fn pre_update_godot_transforms(
         AnyOf<(&Node2DMarker, &Node3DMarker)>,
     )>,
 ) {
-    // Try to get the BevyAppSingleton autoload for bulk optimization
-    let engine = Engine::singleton();
-    if let Some(scene_tree) = engine
-        .get_main_loop()
-        .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())
-        && let Some(root) = scene_tree.get_root()
-        && let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton")
+    // In debug builds, use bulk optimization (GDScript path) which is faster when Rust FFI
+    // overhead is high. In release builds, use individual FFI calls which are faster due to
+    // optimized Rust FFI and avoiding GDScript interpreter overhead.
+    #[cfg(debug_assertions)]
     {
-        // Check if this BevyApp has the bulk read methods
-        if bevy_app.has_method("bulk_get_transforms_3d") {
+        let engine = Engine::singleton();
+        if let Some(scene_tree) = engine
+            .get_main_loop()
+            .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())
+            && let Some(root) = scene_tree.get_root()
+            && let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton")
+            && bevy_app.has_method("bulk_get_transforms_3d")
+        {
             let _bulk_span = tracing::info_span!("using_bulk_read_optimization").entered();
             pre_update_godot_transforms_bulk(entities, bevy_app.upcast::<Object>());
             return;
         }
+        pre_update_godot_transforms_individual(entities);
     }
 
-    // Fallback to individual FFI calls
-    pre_update_godot_transforms_individual(entities);
+    #[cfg(not(debug_assertions))]
+    {
+        pre_update_godot_transforms_individual(entities);
+    }
 }
 
 fn pre_update_godot_transforms_bulk(
@@ -211,25 +217,30 @@ pub fn post_update_godot_transforms(
         Changed<BevyTransform>,
     >,
 ) {
-    // Try to get the BevyAppSingleton autoload for bulk optimization
-    let engine = Engine::singleton();
-    if let Some(scene_tree) = engine
-        .get_main_loop()
-        .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())
-        && let Some(root) = scene_tree.get_root()
-        && let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton")
+    // In debug builds, use bulk optimization (GDScript path) which is faster when Rust FFI
+    // overhead is high. In release builds, use individual FFI calls which are faster due to
+    // optimized Rust FFI and avoiding GDScript interpreter overhead.
+    #[cfg(debug_assertions)]
     {
-        // Check if this BevyApp has the raw array methods (prefer these over bulk Dictionary methods)
-        if bevy_app.has_method("bulk_update_transforms_3d") {
-            // Use bulk optimization path
+        let engine = Engine::singleton();
+        if let Some(scene_tree) = engine
+            .get_main_loop()
+            .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())
+            && let Some(root) = scene_tree.get_root()
+            && let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton")
+            && bevy_app.has_method("bulk_update_transforms_3d")
+        {
             let _bulk_span = tracing::info_span!("using_bulk_optimization").entered();
             post_update_godot_transforms_bulk(change_tick, entities, bevy_app.upcast::<Object>());
             return;
         }
+        post_update_godot_transforms_individual(change_tick, entities);
     }
 
-    // Fallback to individual FFI calls
-    post_update_godot_transforms_individual(change_tick, entities);
+    #[cfg(not(debug_assertions))]
+    {
+        post_update_godot_transforms_individual(change_tick, entities);
+    }
 }
 
 fn post_update_godot_transforms_bulk(
