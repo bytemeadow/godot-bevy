@@ -18,15 +18,39 @@ import sys
 from pathlib import Path
 from collections import defaultdict
 
+
 class GodotTypeGenerator:
     def __init__(self):
         self.project_root = Path(__file__).parent.parent
         self.api_file = self.project_root / "extension_api.json"
-        self.node_markers_file = self.project_root / "godot-bevy" / "src" / "interop" / "node_markers.rs"
-        self.type_checking_file = self.project_root / "godot-bevy" / "src" / "plugins" / "scene_tree" / "node_type_checking_generated.rs"
-        self.plugin_file = self.project_root / "godot-bevy" / "src" / "plugins" / "scene_tree" / "plugin.rs"
-        self.gdscript_watcher_file = self.project_root / "addons" / "godot-bevy" / "optimized_scene_tree_watcher.gd"
-        self.signal_names_file = self.project_root / "godot-bevy" / "src" / "interop" / "signal_names.rs"
+        self.node_markers_file = (
+            self.project_root / "godot-bevy" / "src" / "interop" / "node_markers.rs"
+        )
+        self.type_checking_file = (
+            self.project_root
+            / "godot-bevy"
+            / "src"
+            / "plugins"
+            / "scene_tree"
+            / "node_type_checking_generated.rs"
+        )
+        self.plugin_file = (
+            self.project_root
+            / "godot-bevy"
+            / "src"
+            / "plugins"
+            / "scene_tree"
+            / "plugin.rs"
+        )
+        self.gdscript_watcher_file = (
+            self.project_root
+            / "addons"
+            / "godot-bevy"
+            / "optimized_scene_tree_watcher.gd"
+        )
+        self.signal_names_file = (
+            self.project_root / "godot-bevy" / "src" / "interop" / "signal_names.rs"
+        )
 
         # Store all classes by name for signal generation
         self.classes_by_name = {}
@@ -35,31 +59,61 @@ class GodotTypeGenerator:
         # Used for filtering both node types and signal generation
         self.excluded_classes = {
             # CSG classes (require special module)
-            'CSGBox3D', 'CSGCombiner3D', 'CSGCylinder3D', 'CSGMesh3D', 'CSGPolygon3D',
-            'CSGPrimitive3D', 'CSGShape3D', 'CSGSphere3D', 'CSGTorus3D',
+            "CSGBox3D",
+            "CSGCombiner3D",
+            "CSGCylinder3D",
+            "CSGMesh3D",
+            "CSGPolygon3D",
+            "CSGPrimitive3D",
+            "CSGShape3D",
+            "CSGSphere3D",
+            "CSGTorus3D",
             # Editor classes
-            'GridMapEditorPlugin', 'ScriptCreateDialog', 'FileSystemDock',
-            'OpenXRBindingModifierEditor', 'OpenXRInteractionProfileEditor',
-            'OpenXRInteractionProfileEditorBase',
+            "GridMapEditorPlugin",
+            "ScriptCreateDialog",
+            "FileSystemDock",
+            "OpenXRBindingModifierEditor",
+            "OpenXRInteractionProfileEditor",
+            "OpenXRInteractionProfileEditorBase",
             # XR classes that might not be available
-            'XRAnchor3D', 'XRBodyModifier3D', 'XRCamera3D', 'XRController3D',
-            'XRFaceModifier3D', 'XRHandModifier3D', 'XRNode3D', 'XROrigin3D',
+            "XRAnchor3D",
+            "XRBodyModifier3D",
+            "XRCamera3D",
+            "XRController3D",
+            "XRFaceModifier3D",
+            "XRHandModifier3D",
+            "XRNode3D",
+            "XROrigin3D",
             # OpenXR classes
-            'OpenXRCompositionLayer', 'OpenXRCompositionLayerCylinder',
-            'OpenXRCompositionLayerEquirect', 'OpenXRCompositionLayerQuad',
-            'OpenXRHand', 'OpenXRVisibilityMask',
+            "OpenXRCompositionLayer",
+            "OpenXRCompositionLayerCylinder",
+            "OpenXRCompositionLayerEquirect",
+            "OpenXRCompositionLayerQuad",
+            "OpenXRHand",
+            "OpenXRVisibilityMask",
             # Classes that might not be available in all builds
-            'VoxelGI', 'LightmapGI', 'FogVolume', 'WorldEnvironment',
+            "VoxelGI",
+            "LightmapGI",
+            "FogVolume",
+            "WorldEnvironment",
             # Navigation classes (might be module-specific)
-            'NavigationAgent2D', 'NavigationAgent3D', 'NavigationLink2D',
-            'NavigationLink3D', 'NavigationObstacle2D', 'NavigationObstacle3D',
-            'NavigationRegion2D', 'NavigationRegion3D',
+            "NavigationAgent2D",
+            "NavigationAgent3D",
+            "NavigationLink2D",
+            "NavigationLink3D",
+            "NavigationObstacle2D",
+            "NavigationObstacle3D",
+            "NavigationRegion2D",
+            "NavigationRegion3D",
             # Other problematic classes
-            'StatusIndicator',
+            "StatusIndicator",
             # Graph classes (not available in all Godot builds)
-            'GraphEdit', 'GraphElement', 'GraphFrame', 'GraphNode',
+            "GraphEdit",
+            "GraphElement",
+            "GraphFrame",
+            "GraphNode",
             # Parallax2D is in extension API but not in current Rust bindings
-            'Parallax2D',
+            "Parallax2D",
         }
 
         # Types that require specific Godot API versions
@@ -93,7 +147,7 @@ class GodotTypeGenerator:
                 cwd=self.project_root,
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
             )
 
             if result.returncode == 0:
@@ -118,12 +172,22 @@ class GodotTypeGenerator:
 
             for cmd in godot_commands:
                 try:
-                    result = subprocess.run([
-                        cmd, "--headless", "--dump-extension-api-with-docs", str(self.api_file)
-                    ], capture_output=True, text=True, timeout=30)
+                    result = subprocess.run(
+                        [
+                            cmd,
+                            "--headless",
+                            "--dump-extension-api-with-docs",
+                            str(self.api_file),
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                    )
 
                     if result.returncode == 0 and self.api_file.exists():
-                        print(f"✅ Successfully generated extension_api.json using '{cmd}'")
+                        print(
+                            f"✅ Successfully generated extension_api.json using '{cmd}'"
+                        )
                         return
 
                 except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -152,8 +216,7 @@ class GodotTypeGenerator:
 
         # Store all classes by name for signal generation
         self.classes_by_name = {
-            class_info["name"]: class_info
-            for class_info in api["classes"]
+            class_info["name"]: class_info for class_info in api["classes"]
         }
 
         # Build inheritance relationships
@@ -181,11 +244,14 @@ class GodotTypeGenerator:
         excluded_prefixes = ["Editor", "ScriptEditor", "VisualShader"]
         excluded_types = {"Node", "MissingNode", "ImporterMeshInstance3D"}
 
-        filtered_types = sorted([
-            t for t in node_types
-            if not any(t.startswith(prefix) for prefix in excluded_prefixes)
-            and t not in excluded_types
-        ])
+        filtered_types = sorted(
+            [
+                t
+                for t in node_types
+                if not any(t.startswith(prefix) for prefix in excluded_prefixes)
+                and t not in excluded_types
+            ]
+        )
 
         print(f"✅ Found {len(filtered_types)} node types")
         return filtered_types, parent_map
@@ -201,7 +267,7 @@ class GodotTypeGenerator:
         """Generate the node_markers.rs file"""
         print("🏷️  Generating node markers...")
 
-        content = '''use bevy::ecs::component::Component;
+        content = """use bevy::ecs::component::Component;
 use bevy::prelude::ReflectComponent;
 use bevy::reflect::Reflect;
 
@@ -216,7 +282,7 @@ use bevy::reflect::Reflect;
 #[reflect(Component)]
 pub struct NodeMarker;
 
-'''
+"""
 
         # Generate all markers
         for node_type in node_types:
@@ -245,12 +311,7 @@ pub struct NodeMarker;
                     return True
             return False
 
-        categories = {
-            "3d": [],
-            "2d": [],
-            "control": [],
-            "universal": []
-        }
+        categories = {"3d": [], "2d": [], "control": [], "universal": []}
 
         for node_type in node_types:
             if is_descendant_of(node_type, "Node3D"):
@@ -274,7 +335,7 @@ pub struct NodeMarker;
         # Categorize only the valid types
         categories = self.categorize_types_by_hierarchy(valid_types, parent_map)
 
-        content = f'''// 🤖 This file is automatically generated by scripts/generate_godot_types.py
+        content = f"""// 🤖 This file is automatically generated by scripts/generate_godot_types.py
 // To regenerate: python scripts/generate_godot_types.py
 
 use bevy::ecs::system::EntityCommands;
@@ -350,13 +411,21 @@ pub fn remove_comprehensive_node_type_markers(
     remove_universal_node_types_comprehensive(entity_commands, node);
 }}
 
-'''
+"""
 
         # Generate specific checking functions
-        content += self._generate_hierarchy_function_comprehensive("3d", categories["3d"])
-        content += self._generate_hierarchy_function_comprehensive("2d", categories["2d"])
-        content += self._generate_hierarchy_function_comprehensive("control", categories["control"])
-        content += self._generate_universal_function_comprehensive(categories["universal"])
+        content += self._generate_hierarchy_function_comprehensive(
+            "3d", categories["3d"]
+        )
+        content += self._generate_hierarchy_function_comprehensive(
+            "2d", categories["2d"]
+        )
+        content += self._generate_hierarchy_function_comprehensive(
+            "control", categories["control"]
+        )
+        content += self._generate_universal_function_comprehensive(
+            categories["universal"]
+        )
 
         with open(self.type_checking_file, "w") as f:
             f.write(content)
@@ -374,24 +443,24 @@ pub fn remove_comprehensive_node_type_markers(
         """Fix Godot class names to match the actual Rust bindings"""
         # Map class names from extension API to actual Rust struct names
         name_fixes = {
-            'CPUParticles2D': 'CpuParticles2D',
-            'CPUParticles3D': 'CpuParticles3D',
-            'GPUParticles2D': 'GpuParticles2D',
-            'GPUParticles3D': 'GpuParticles3D',
-            'GPUParticlesAttractor3D': 'GpuParticlesAttractor3D',
-            'GPUParticlesAttractorBox3D': 'GpuParticlesAttractorBox3D',
-            'GPUParticlesAttractorSphere3D': 'GpuParticlesAttractorSphere3D',
-            'GPUParticlesAttractorVectorField3D': 'GpuParticlesAttractorVectorField3D',
-            'GPUParticlesCollision3D': 'GpuParticlesCollision3D',
-            'GPUParticlesCollisionBox3D': 'GpuParticlesCollisionBox3D',
-            'GPUParticlesCollisionHeightField3D': 'GpuParticlesCollisionHeightField3D',
-            'GPUParticlesCollisionSDF3D': 'GpuParticlesCollisionSdf3d',
-            'GPUParticlesCollisionSphere3D': 'GpuParticlesCollisionSphere3D',
-            'HTTPRequest': 'HttpRequest',
-            'SkeletonIK3D': 'SkeletonIk3d',
-            'Generic6DOFJoint3D': 'Generic6DofJoint3D',
-            'OpenXRRenderModel': 'OpenXrRenderModel',
-            'OpenXRRenderModelManager': 'OpenXrRenderModelManager',
+            "CPUParticles2D": "CpuParticles2D",
+            "CPUParticles3D": "CpuParticles3D",
+            "GPUParticles2D": "GpuParticles2D",
+            "GPUParticles3D": "GpuParticles3D",
+            "GPUParticlesAttractor3D": "GpuParticlesAttractor3D",
+            "GPUParticlesAttractorBox3D": "GpuParticlesAttractorBox3D",
+            "GPUParticlesAttractorSphere3D": "GpuParticlesAttractorSphere3D",
+            "GPUParticlesAttractorVectorField3D": "GpuParticlesAttractorVectorField3D",
+            "GPUParticlesCollision3D": "GpuParticlesCollision3D",
+            "GPUParticlesCollisionBox3D": "GpuParticlesCollisionBox3D",
+            "GPUParticlesCollisionHeightField3D": "GpuParticlesCollisionHeightField3D",
+            "GPUParticlesCollisionSDF3D": "GpuParticlesCollisionSdf3d",
+            "GPUParticlesCollisionSphere3D": "GpuParticlesCollisionSphere3D",
+            "HTTPRequest": "HttpRequest",
+            "SkeletonIK3D": "SkeletonIk3d",
+            "Generic6DOFJoint3D": "Generic6DofJoint3D",
+            "OpenXRRenderModel": "OpenXrRenderModel",
+            "OpenXRRenderModelManager": "OpenXrRenderModelManager",
         }
 
         return name_fixes.get(class_name, class_name)
@@ -406,23 +475,23 @@ pub fn remove_comprehensive_node_type_markers(
             return "SIGNAL"
 
         # Insert underscores before uppercase letters (for camelCase/PascalCase)
-        result = re.sub('([a-z0-9])([A-Z])', r'\1_\2', signal_name)
+        result = re.sub("([a-z0-9])([A-Z])", r"\1_\2", signal_name)
 
         # Replace non-alphanumeric characters with underscores
-        result = re.sub(r'[^a-zA-Z0-9_]', '_', result)
+        result = re.sub(r"[^a-zA-Z0-9_]", "_", result)
 
         # Convert to uppercase
         result = result.upper()
 
         # Collapse multiple underscores
-        result = re.sub(r'_+', '_', result)
+        result = re.sub(r"_+", "_", result)
 
         # Strip leading/trailing underscores
-        result = result.strip('_')
+        result = result.strip("_")
 
         # Ensure it doesn't start with a digit (prepend underscore if needed)
         if result and result[0].isdigit():
-            result = '_' + result
+            result = "_" + result
 
         # Fallback if empty after processing
         if not result:
@@ -433,7 +502,7 @@ pub fn remove_comprehensive_node_type_markers(
     def _generate_string_match_arms(self, categories):
         """Generate match arms for the string-based marker function"""
         match_arms = []
-        
+
         # Add base types first
         base_types = [
             '        "Node3D" => {\n            entity_commands.insert(Node3DMarker);\n        }',
@@ -443,7 +512,7 @@ pub fn remove_comprehensive_node_type_markers(
             '        "Node" => {\n            // NodeMarker already added above\n        }',
         ]
         match_arms.extend(base_types)
-        
+
         # Generate Node3D types (skip base Node3D since it's already handled)
         for node_type in categories["3d"]:
             if node_type == "Node3D":
@@ -451,17 +520,21 @@ pub fn remove_comprehensive_node_type_markers(
             marker_name = f"{node_type}Marker"
             cfg_attr = self.get_type_cfg_attribute(node_type)
             if cfg_attr:
-                match_arms.append(f'''        {cfg_attr.strip()}
+                match_arms.append(
+                    f"""        {cfg_attr.strip()}
         "{node_type}" => {{
             entity_commands.insert(Node3DMarker);
             entity_commands.insert({marker_name});
-        }}''')
+        }}"""
+                )
             else:
-                match_arms.append(f'''        "{node_type}" => {{
+                match_arms.append(
+                    f"""        "{node_type}" => {{
             entity_commands.insert(Node3DMarker);
             entity_commands.insert({marker_name});
-        }}''')
-        
+        }}"""
+                )
+
         # Generate Node2D types (skip base Node2D since it's already handled)
         for node_type in categories["2d"]:
             if node_type == "Node2D":
@@ -469,18 +542,22 @@ pub fn remove_comprehensive_node_type_markers(
             marker_name = f"{node_type}Marker"
             cfg_attr = self.get_type_cfg_attribute(node_type)
             if cfg_attr:
-                match_arms.append(f'''        {cfg_attr.strip()}
+                match_arms.append(
+                    f"""        {cfg_attr.strip()}
         "{node_type}" => {{
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert({marker_name});
-        }}''')
+        }}"""
+                )
             else:
-                match_arms.append(f'''        "{node_type}" => {{
+                match_arms.append(
+                    f"""        "{node_type}" => {{
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert({marker_name});
-        }}''')
+        }}"""
+                )
 
         # Generate Control types (skip base Control since it's already handled)
         for node_type in categories["control"]:
@@ -489,18 +566,22 @@ pub fn remove_comprehensive_node_type_markers(
             marker_name = f"{node_type}Marker"
             cfg_attr = self.get_type_cfg_attribute(node_type)
             if cfg_attr:
-                match_arms.append(f'''        {cfg_attr.strip()}
+                match_arms.append(
+                    f"""        {cfg_attr.strip()}
         "{node_type}" => {{
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert({marker_name});
-        }}''')
+        }}"""
+                )
             else:
-                match_arms.append(f'''        "{node_type}" => {{
+                match_arms.append(
+                    f"""        "{node_type}" => {{
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert({marker_name});
-        }}''')
+        }}"""
+                )
 
         # Generate universal (direct Node) types (skip base Node, Node3D, and CanvasItem since already handled)
         for node_type in categories["universal"]:
@@ -509,25 +590,29 @@ pub fn remove_comprehensive_node_type_markers(
             marker_name = f"{node_type}Marker"
             cfg_attr = self.get_type_cfg_attribute(node_type)
             if cfg_attr:
-                match_arms.append(f'''        {cfg_attr.strip()}
+                match_arms.append(
+                    f"""        {cfg_attr.strip()}
         "{node_type}" => {{
             entity_commands.insert({marker_name});
-        }}''')
+        }}"""
+                )
             else:
-                match_arms.append(f'''        "{node_type}" => {{
+                match_arms.append(
+                    f"""        "{node_type}" => {{
             entity_commands.insert({marker_name});
-        }}''')
-        
-        return '\n'.join(match_arms)
+        }}"""
+                )
+
+        return "\n".join(match_arms)
 
     def generate_gdscript_watcher(self, node_types, parent_map):
         """Generate the optimized GDScript scene tree watcher with all node types"""
         print("📜 Generating GDScript optimized scene tree watcher...")
-        
+
         # Filter and categorize types
         valid_types = self.filter_valid_godot_classes(node_types)
         categories = self.categorize_types_by_hierarchy(valid_types, parent_map)
-        
+
         content = f'''extends Node
 class_name OptimizedSceneTreeWatcher
 
@@ -627,89 +712,128 @@ func _analyze_node_type(node: Node) -> String:
 
 {self._generate_initial_tree_analysis()}
 '''
-        
+
         with open(self.gdscript_watcher_file, "w") as f:
             f.write(content)
-        
+
         print(f"✅ Generated GDScript watcher with {len(valid_types)} node types")
 
     @staticmethod
     def _generate_gdscript_type_analysis(categories):
         """Generate the GDScript node type analysis function"""
-        lines = ["\t# Check Node3D hierarchy first (most common in 3D games)", "\tif node is Node3D:"]
-        
+        lines = [
+            "\t# Check Node3D hierarchy first (most common in 3D games)",
+            "\tif node is Node3D:",
+        ]
+
         # Node3D hierarchy (most common in 3D games)
 
         # Add common 3D types first for better performance
-        common_3d = ["MeshInstance3D", "StaticBody3D", "RigidBody3D", "CharacterBody3D", "Area3D", 
-                     "Camera3D", "DirectionalLight3D", "OmniLight3D", "SpotLight3D", "CollisionShape3D"]
-        
+        common_3d = [
+            "MeshInstance3D",
+            "StaticBody3D",
+            "RigidBody3D",
+            "CharacterBody3D",
+            "Area3D",
+            "Camera3D",
+            "DirectionalLight3D",
+            "OmniLight3D",
+            "SpotLight3D",
+            "CollisionShape3D",
+        ]
+
         for node_type in common_3d:
             if node_type in categories["3d"]:
-                lines.append(f"\t\tif node is {node_type}: return \"{node_type}\"")
-        
+                lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+
         # Add remaining 3D types
         for node_type in sorted(categories["3d"]):
             if node_type not in common_3d:
-                lines.append(f"\t\tif node is {node_type}: return \"{node_type}\"")
-        
-        lines.append("\t\treturn \"Node3D\"")
+                lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+
+        lines.append('\t\treturn "Node3D"')
         lines.append("")
-        
+
         # Node2D hierarchy (common in 2D games)
         lines.append("\t# Check Node2D hierarchy (common in 2D games)")
         lines.append("\telif node is Node2D:")
-        
+
         # Add common 2D types first
-        common_2d = ["Sprite2D", "StaticBody2D", "RigidBody2D", "CharacterBody2D", "Area2D", 
-                     "Camera2D", "CollisionShape2D", "AnimatedSprite2D"]
-        
+        common_2d = [
+            "Sprite2D",
+            "StaticBody2D",
+            "RigidBody2D",
+            "CharacterBody2D",
+            "Area2D",
+            "Camera2D",
+            "CollisionShape2D",
+            "AnimatedSprite2D",
+        ]
+
         for node_type in common_2d:
             if node_type in categories["2d"]:
-                lines.append(f"\t\tif node is {node_type}: return \"{node_type}\"")
-        
+                lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+
         # Add remaining 2D types
         for node_type in sorted(categories["2d"]):
             if node_type not in common_2d:
-                lines.append(f"\t\tif node is {node_type}: return \"{node_type}\"")
-        
-        lines.append("\t\treturn \"Node2D\"")
+                lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+
+        lines.append('\t\treturn "Node2D"')
         lines.append("")
-        
+
         # Control hierarchy (UI elements)
         lines.append("\t# Check Control hierarchy (UI elements)")
         lines.append("\telif node is Control:")
-        
+
         # Add common UI types first
-        common_control = ["Button", "Label", "Panel", "VBoxContainer", "HBoxContainer", 
-                         "MarginContainer", "ColorRect", "LineEdit", "TextEdit", "CheckBox"]
-        
+        common_control = [
+            "Button",
+            "Label",
+            "Panel",
+            "VBoxContainer",
+            "HBoxContainer",
+            "MarginContainer",
+            "ColorRect",
+            "LineEdit",
+            "TextEdit",
+            "CheckBox",
+        ]
+
         for node_type in common_control:
             if node_type in categories["control"]:
-                lines.append(f"\t\tif node is {node_type}: return \"{node_type}\"")
-        
+                lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+
         # Add remaining Control types
         for node_type in sorted(categories["control"]):
             if node_type not in common_control:
-                lines.append(f"\t\tif node is {node_type}: return \"{node_type}\"")
-        
-        lines.append("\t\treturn \"Control\"")
+                lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+
+        lines.append('\t\treturn "Control"')
         lines.append("")
-        
+
         # Universal types (direct Node children)
-        lines.append("\t# Check other common node types that inherit directly from Node")
-        common_universal = ["AnimationPlayer", "Timer", "AudioStreamPlayer", "HTTPRequest", "CanvasLayer"]
-        
+        lines.append(
+            "\t# Check other common node types that inherit directly from Node"
+        )
+        common_universal = [
+            "AnimationPlayer",
+            "Timer",
+            "AudioStreamPlayer",
+            "HTTPRequest",
+            "CanvasLayer",
+        ]
+
         for node_type in common_universal:
             if node_type in categories["universal"]:
-                lines.append(f"\telif node is {node_type}: return \"{node_type}\"")
-        
-        # Add remaining universal types  
+                lines.append(f'\telif node is {node_type}: return "{node_type}"')
+
+        # Add remaining universal types
         for node_type in sorted(categories["universal"]):
             if node_type not in common_universal:
-                lines.append(f"\telif node is {node_type}: return \"{node_type}\"")
-        
-        return '\n'.join(lines)
+                lines.append(f'\telif node is {node_type}: return "{node_type}"')
+
+        return "\n".join(lines)
 
     @staticmethod
     def _generate_initial_tree_analysis():
@@ -756,35 +880,35 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 
     def _generate_hierarchy_function_comprehensive(self, name, types):
         """Generate a hierarchy-specific type checking function"""
-        content = f'''fn check_{name}_node_types_comprehensive(
+        content = f"""fn check_{name}_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
     node: &mut GodotNodeHandle,
 ) {{
-'''
+"""
 
         for node_type in sorted(types):
             rust_class_name = self.fix_godot_class_name_for_rust(node_type)
             cfg_attr = self.get_type_cfg_attribute(node_type)
             if cfg_attr:
-                content += f'''    {cfg_attr.strip()}
+                content += f"""    {cfg_attr.strip()}
     if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
         entity_commands.insert({node_type}Marker);
     }}
-'''
+"""
             else:
-                content += f'''    if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
+                content += f"""    if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
         entity_commands.insert({node_type}Marker);
     }}
-'''
+"""
 
         content += "}\n\n"
 
-        content += f'''fn remove_{name}_node_types_comprehensive(
+        content += f"""fn remove_{name}_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
     _node: &mut GodotNodeHandle,
 ) {{
     entity_commands
-'''
+"""
 
         # Separate regular and version-gated types
         regular_types = []
@@ -802,8 +926,8 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 
         # Generate regular removes in a chain
         for node_type in regular_types:
-            content += f'''        .remove::<{node_type}Marker>()
-'''
+            content += f"""        .remove::<{node_type}Marker>()
+"""
 
         # Close the chain with semicolon
         content += ";\n"
@@ -813,8 +937,8 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
             content += f"\n    {version}\n"
             content += "    entity_commands\n"
             for node_type in types_list:
-                content += f'''        .remove::<{node_type}Marker>()
-'''
+                content += f"""        .remove::<{node_type}Marker>()
+"""
             content += ";\n"
 
         content += "}\n\n"
@@ -822,35 +946,35 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 
     def _generate_universal_function_comprehensive(self, types):
         """Generate the universal types checking function"""
-        content = '''fn check_universal_node_types_comprehensive(
+        content = """fn check_universal_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
     node: &mut GodotNodeHandle,
 ) {
-'''
+"""
 
         for node_type in sorted(types):
             rust_class_name = self.fix_godot_class_name_for_rust(node_type)
             cfg_attr = self.get_type_cfg_attribute(node_type)
             if cfg_attr:
-                content += f'''    {cfg_attr.strip()}
+                content += f"""    {cfg_attr.strip()}
     if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
         entity_commands.insert({node_type}Marker);
     }}
-'''
+"""
             else:
-                content += f'''    if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
+                content += f"""    if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
         entity_commands.insert({node_type}Marker);
     }}
-'''
+"""
 
         content += "}\n"
 
-        content += '''fn remove_universal_node_types_comprehensive(
+        content += """fn remove_universal_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
     _node: &mut GodotNodeHandle,
 ) {
     entity_commands
-'''
+"""
 
         # Separate regular and version-gated types
         regular_types = []
@@ -868,8 +992,8 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 
         # Generate regular removes in a chain
         for node_type in regular_types:
-            content += f'''        .remove::<{node_type}Marker>()
-'''
+            content += f"""        .remove::<{node_type}Marker>()
+"""
 
         # Close the chain with semicolon
         content += ";\n"
@@ -879,8 +1003,8 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
             content += f"\n    {version}\n"
             content += "    entity_commands\n"
             for node_type in types_list:
-                content += f'''        .remove::<{node_type}Marker>()
-'''
+                content += f"""        .remove::<{node_type}Marker>()
+"""
             content += ";\n"
 
         content += "}\n"
@@ -897,15 +1021,19 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
             print("✅ Plugin is correctly integrated with generated code")
         else:
             print("⚠️  Plugin integration needed:")
-            print("   1. Add: use super::node_type_checking_generated::add_comprehensive_node_type_markers;")
-            print("   2. Replace add_node_type_markers calls with add_comprehensive_node_type_markers")
+            print(
+                "   1. Add: use super::node_type_checking_generated::add_comprehensive_node_type_markers;"
+            )
+            print(
+                "   2. Replace add_node_type_markers calls with add_comprehensive_node_type_markers"
+            )
             print("   3. This is a one-time setup - future script runs won't need this")
 
     def generate_signal_names(self):
         """Generate the signal_names.rs file with signal constants"""
         print("📡 Generating signal names...")
 
-        content = '''#![allow(dead_code)]
+        content = """#![allow(dead_code)]
 //! 🤖 This file is automatically generated by scripts/generate_godot_types.py
 //! To regenerate: python scripts/generate_godot_types.py
 //!
@@ -919,7 +1047,7 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 //! button.connect(ButtonSignals::PRESSED.into(), callable);
 //! ```
 
-'''
+"""
 
         # Collect all classes with signals, sorted by name, skipping excluded classes
         classes_with_signals = []
@@ -968,7 +1096,7 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
                     description = self.sanitize_doc_comment(description)
 
                     # Format description for Rust doc comments
-                    description_lines = description.replace('\r\n', '\n').split('\n')
+                    description_lines = description.replace("\r\n", "\n").split("\n")
                     for line in description_lines:
                         # Strip trailing whitespace but preserve empty lines
                         line = line.rstrip()
@@ -978,7 +1106,9 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
                     content += f"    /// Signal `{signal_name}`\n"
 
                 # Constant definition
-                content += f'    pub const {const_name}: &\'static str = "{signal_name}";\n\n'
+                content += (
+                    f'    pub const {const_name}: &\'static str = "{signal_name}";\n\n'
+                )
                 signal_count += 1
 
             # Close impl block
@@ -988,7 +1118,9 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
         with open(self.signal_names_file, "w") as f:
             f.write(content)
 
-        print(f"✅ Generated {signal_count} signal constants across {len(classes_with_signals)} classes")
+        print(
+            f"✅ Generated {signal_count} signal constants across {len(classes_with_signals)} classes"
+        )
         self.run_cargo_fmt(self.signal_names_file)
 
     @staticmethod
@@ -998,30 +1130,30 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
         from textwrap import dedent
 
         # Basic inline formatting
-        text = text.replace('[b]', '**').replace('[/b]', '**')
-        text = text.replace('[i]', '*').replace('[/i]', '*')
-        text = text.replace('[code]', '`').replace('[/code]', '`')
+        text = text.replace("[b]", "**").replace("[/b]", "**")
+        text = text.replace("[i]", "*").replace("[/i]", "*")
+        text = text.replace("[code]", "`").replace("[/code]", "`")
 
         # [member something] -> `something`
-        text = re.sub(r'\[member\s+([^]]+)]', r'`\1`', text)
+        text = re.sub(r"\[member\s+([^]]+)]", r"`\1`", text)
 
         # [param something] -> `something`
-        text = re.sub(r'\[param\s+([^]]+)]', r'`\1`', text)
+        text = re.sub(r"\[param\s+([^]]+)]", r"`\1`", text)
 
         # [constant something] -> `something`
-        text = re.sub(r'\[constant\s+([^]]+)]', r'`\1`', text)
+        text = re.sub(r"\[constant\s+([^]]+)]", r"`\1`", text)
 
         # [method something] -> `something()`
-        text = re.sub(r'\[method\s+([^]]+)]', r'`\1()`', text)
+        text = re.sub(r"\[method\s+([^]]+)]", r"`\1()`", text)
 
         # [signal something] -> `something`
-        text = re.sub(r'\[signal\s+([^]]+)]', r'`\1`', text)
+        text = re.sub(r"\[signal\s+([^]]+)]", r"`\1`", text)
 
         # [enum something] -> `something`
-        text = re.sub(r'\[enum\s+([^]]+)]', r'`\1`', text)
+        text = re.sub(r"\[enum\s+([^]]+)]", r"`\1`", text)
 
         # [url=...]...[/url] -> [link text](url)
-        text = re.sub(r'\[url=([^]]+)]([^\[]+)\[/url]', r'[\2](\1)', text)
+        text = re.sub(r"\[url=([^]]+)]([^\[]+)\[/url]", r"[\2](\1)", text)
 
         # [codeblock]...[/codeblock] -> ```text\n...\n```
         def codeblock_repl(m):
@@ -1030,7 +1162,9 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
             code = dedent(code)
             return f"\n```text\n{code}\n```\n"
 
-        text = re.sub(r'\[codeblock](.*?)\[/codeblock]', codeblock_repl, text, flags=re.S)
+        text = re.sub(
+            r"\[codeblock](.*?)\[/codeblock]", codeblock_repl, text, flags=re.S
+        )
 
         # [codeblocks] (with language specified)
         def codeblocks_repl(m):
@@ -1038,10 +1172,12 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
             code = dedent(code)
             return f"\n```gdscript\n{code}\n```\n"
 
-        text = re.sub(r'\[codeblocks](.*?)\[/codeblocks]', codeblocks_repl, text, flags=re.S)
+        text = re.sub(
+            r"\[codeblocks](.*?)\[/codeblocks]", codeblocks_repl, text, flags=re.S
+        )
 
         # Remove any remaining BBCode-style tags that we didn't handle
-        text = re.sub(r'\[/?[a-zA-Z0-9_]+]', '', text)
+        text = re.sub(r"\[/?[a-zA-Z0-9_]+]", "", text)
 
         return text
 
@@ -1052,22 +1188,21 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
         # Also handle other problematic sequences
 
         # Replace tabs with 4 spaces for consistent formatting
-        text = text.replace('\t', '    ')
+        text = text.replace("\t", "    ")
 
         # Replace */ with *\/ to prevent closing block comments
-        text = text.replace('*/', r'*\/')
+        text = text.replace("*/", r"*\/")
 
         # Replace leading /// with \/\/\/ to prevent nested doc comments
-        text = text.replace('///', r'\/\/\/')
+        text = text.replace("///", r"\/\/\/")
 
         # Ensure we don't have unclosed backticks that would break markdown
         # Count backticks and add one if odd
-        backtick_count = text.count('`')
+        backtick_count = text.count("`")
         if backtick_count % 2 != 0:
-            text += '`'
+            text += "`"
 
         return text
-
 
     def run(self):
         """Run the complete generation pipeline"""
@@ -1095,7 +1230,8 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
             # Step 7: Verify plugin integration
             self.verify_plugin_integration()
 
-            print(f"""
+            print(
+                f"""
 🎉 Generation complete!
 
 Generated:
@@ -1113,15 +1249,18 @@ Files generated:
 Next steps:
   • Run 'cargo check' to verify the build
   • Commit the generated files
-""")
+"""
+            )
 
         except Exception as e:
             print(f"❌ Generation failed: {e}")
             sys.exit(1)
 
+
 def main():
     generator = GodotTypeGenerator()
     generator.run()
+
 
 if __name__ == "__main__":
     main()

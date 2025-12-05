@@ -13,13 +13,16 @@ import argparse
 from datetime import datetime
 from typing import Dict, List, Tuple
 
+
 class BenchmarkRunner:
     def __init__(self, godot_path: str = "godot"):
         self.godot_path = godot_path
         self.results_dir = "benchmark_results"
         os.makedirs(self.results_dir, exist_ok=True)
 
-    def run_benchmark(self, implementation: str, entity_count: int, duration: float = 10.0) -> Dict:
+    def run_benchmark(
+        self, implementation: str, entity_count: int, duration: float = 10.0
+    ) -> Dict:
         """Run a single benchmark and return results"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_file = f"{self.results_dir}/benchmark_{implementation}_{entity_count}entities_{timestamp}.json"
@@ -31,7 +34,7 @@ class BenchmarkRunner:
             f"--implementation={implementation}",
             f"--entity-count={entity_count}",
             f"--duration={duration}",
-            f"--output={output_file}"
+            f"--output={output_file}",
         ]
 
         print(f"🚀 Running {implementation} benchmark with {entity_count} entities...")
@@ -45,33 +48,32 @@ class BenchmarkRunner:
             # Run benchmark with timeout and without capturing output
             # This prevents hanging on output buffer issues
             # Calculate timeout based on entity count - higher counts need more warmup time
-            warmup_time = min(60, max(30, entity_count // 200))  # 30-60s warmup based on entity count
+            warmup_time = min(
+                60, max(30, entity_count // 200)
+            )  # 30-60s warmup based on entity count
             total_timeout = duration + warmup_time + 30  # warmup + benchmark + shutdown
-            
-            result = subprocess.run(
-                cmd,
-                timeout=total_timeout,
-                check=True
-            )
+
+            result = subprocess.run(cmd, timeout=total_timeout, check=True)
 
             # Change back to original directory
             os.chdir(original_dir)
 
             # Wait a moment for file to be written
             import time
+
             time.sleep(0.5)
 
             # Check both possible locations for the output file
             possible_paths = [
                 output_file,
                 os.path.join("godot", output_file),
-                output_file.replace("../", "")  # In case it was saved with ../
+                output_file.replace("../", ""),  # In case it was saved with ../
             ]
 
             for path in possible_paths:
                 if os.path.exists(path):
                     print(f"✅ Found results at: {path}")
-                    with open(path, 'r') as f:
+                    with open(path, "r") as f:
                         return json.load(f)
 
             # If not found, list what files exist to debug
@@ -108,8 +110,8 @@ class BenchmarkRunner:
             "metadata": {
                 "timestamp": datetime.now().isoformat(),
                 "duration": duration,
-                "entity_counts": entity_counts
-            }
+                "entity_counts": entity_counts,
+            },
         }
 
         for count in entity_counts:
@@ -129,10 +131,7 @@ class BenchmarkRunner:
 
     def analyze_results(self, results: Dict) -> Dict:
         """Analyze benchmark results and calculate performance metrics"""
-        analysis = {
-            "performance_ratios": {},
-            "summary": {}
-        }
+        analysis = {"performance_ratios": {}, "summary": {}}
 
         for count in results["metadata"]["entity_counts"]:
             if count in results["godot"] and count in results["bevy"]:
@@ -145,7 +144,7 @@ class BenchmarkRunner:
                     "godot_fps": godot_fps,
                     "bevy_fps": bevy_fps,
                     "speedup": ratio,
-                    "percent_faster": (ratio - 1) * 100
+                    "percent_faster": (ratio - 1) * 100,
                 }
 
         # Calculate average speedup
@@ -157,10 +156,12 @@ class BenchmarkRunner:
 
         return analysis
 
-    def check_regression(self, current_results: Dict, baseline_file: str, threshold: float = 0.9) -> Tuple[bool, str]:
+    def check_regression(
+        self, current_results: Dict, baseline_file: str, threshold: float = 0.9
+    ) -> Tuple[bool, str]:
         """Check if current results show regression compared to baseline"""
         try:
-            with open(baseline_file, 'r') as f:
+            with open(baseline_file, "r") as f:
                 baseline = json.load(f)
         except FileNotFoundError:
             return True, "No baseline file found"
@@ -175,7 +176,9 @@ class BenchmarkRunner:
                     baseline_fps = baseline[impl][str(count)]["avg_fps"]
 
                     if current_fps < baseline_fps * threshold:
-                        percent_drop = ((baseline_fps - current_fps) / baseline_fps) * 100
+                        percent_drop = (
+                            (baseline_fps - current_fps) / baseline_fps
+                        ) * 100
                         regressions.append(
                             f"{impl} @ {count} entities: {current_fps:.1f} FPS "
                             f"(was {baseline_fps:.1f} FPS, -{percent_drop:.1f}%)"
@@ -186,23 +189,42 @@ class BenchmarkRunner:
         else:
             return True, "No regressions detected"
 
+
 def main():
     parser = argparse.ArgumentParser(description="Boids Performance Regression Test")
     parser.add_argument("--godot", default="godot", help="Path to Godot executable")
-    parser.add_argument("--entity-counts", nargs="+", type=int, default=[1000, 2000, 5000, 10000],
-                      help="List of entity counts to test")
-    parser.add_argument("--duration", type=float, default=10.0,
-                      help="Duration of each benchmark in seconds")
-    parser.add_argument("--baseline", help="Baseline results file for regression testing")
+    parser.add_argument(
+        "--entity-counts",
+        nargs="+",
+        type=int,
+        default=[1000, 2000, 5000, 10000],
+        help="List of entity counts to test",
+    )
+    parser.add_argument(
+        "--duration",
+        type=float,
+        default=10.0,
+        help="Duration of each benchmark in seconds",
+    )
+    parser.add_argument(
+        "--baseline", help="Baseline results file for regression testing"
+    )
     parser.add_argument("--save-baseline", help="Save results as new baseline")
-    parser.add_argument("--threshold", type=float, default=0.9,
-                      help="Performance threshold for regression detection (default: 0.9)")
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.9,
+        help="Performance threshold for regression detection (default: 0.9)",
+    )
 
     args = parser.parse_args()
 
     # Build Rust library first
     print("🔨 Building Rust library...")
-    subprocess.run(["cargo", "build", "--release", "--manifest-path", "rust/Cargo.toml"], check=True)
+    subprocess.run(
+        ["cargo", "build", "--release", "--manifest-path", "rust/Cargo.toml"],
+        check=True,
+    )
 
     # Run benchmarks
     runner = BenchmarkRunner(args.godot)
@@ -212,15 +234,17 @@ def main():
     analysis = runner.analyze_results(results)
 
     # Print results
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("📊 BENCHMARK RESULTS")
-    print("="*50)
+    print("=" * 50)
 
     for count, data in analysis["performance_ratios"].items():
         print(f"\n{count} boids:")
         print(f"  Godot: {data['godot_fps']:.1f} FPS")
         print(f"  Bevy:  {data['bevy_fps']:.1f} FPS")
-        print(f"  Speedup: {data['speedup']:.2f}x ({data['percent_faster']:.1f}% faster)")
+        print(
+            f"  Speedup: {data['speedup']:.2f}x ({data['percent_faster']:.1f}% faster)"
+        )
 
     if analysis["summary"]:
         print(f"\nAverage speedup: {analysis['summary']['avg_speedup']:.2f}x")
@@ -229,13 +253,15 @@ def main():
 
     # Save baseline if requested
     if args.save_baseline:
-        with open(args.save_baseline, 'w') as f:
+        with open(args.save_baseline, "w") as f:
             json.dump(results, f, indent=2)
         print(f"\n✅ Baseline saved to: {args.save_baseline}")
 
     # Check for regression
     if args.baseline:
-        passed, message = runner.check_regression(results, args.baseline, args.threshold)
+        passed, message = runner.check_regression(
+            results, args.baseline, args.threshold
+        )
         print(f"\n{'✅' if passed else '❌'} Regression Test: {message}")
 
         if not passed:
@@ -245,13 +271,11 @@ def main():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     os.makedirs(runner.results_dir, exist_ok=True)
     full_results_file = f"{runner.results_dir}/full_comparison_{timestamp}.json"
-    with open(full_results_file, 'w') as f:
-        json.dump({
-            "results": results,
-            "analysis": analysis
-        }, f, indent=2)
+    with open(full_results_file, "w") as f:
+        json.dump({"results": results, "analysis": analysis}, f, indent=2)
 
     print(f"\n💾 Full results saved to: {full_results_file}")
+
 
 if __name__ == "__main__":
     main()
