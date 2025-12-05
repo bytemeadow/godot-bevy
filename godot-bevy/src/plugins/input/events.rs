@@ -298,16 +298,20 @@ fn check_action_events(
     input_event: &Gd<GodotInputEvent>,
     action_events: &mut MessageWriter<ActionInput>,
 ) {
-    // Try to get the BevyAppSingleton autoload for bulk optimization
-    let engine = Engine::singleton();
-    if let Some(scene_tree) = engine
-        .get_main_loop()
-        .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())
-        && let Some(root) = scene_tree.get_root()
-        && let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton")
-        && bevy_app.has_method("bulk_check_actions")
-    {
-        check_action_events_bulk(input_event, action_events, bevy_app.upcast::<Object>());
+    // Try to get the OptimizedBulkOperations node for bulk optimization
+    let bulk_ops = (|| {
+        let engine = Engine::singleton();
+        let scene_tree = engine
+            .get_main_loop()
+            .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())?;
+        let root = scene_tree.get_root()?;
+        root.get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
+            .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
+            .map(|n: godot::prelude::Gd<godot::classes::Node>| n.upcast::<Object>())
+    })();
+
+    if let Some(bulk_ops_node) = bulk_ops {
+        check_action_events_bulk(input_event, action_events, bulk_ops_node);
         return;
     }
 

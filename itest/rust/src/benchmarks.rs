@@ -32,14 +32,15 @@ fn make_transform_2d(pos: Vector2, rotation: f32, scale: Vector2) -> Transform2D
 const BENCH_ENTITY_COUNT: usize = 20000;
 const BENCH_ACTION_EVENT_COUNT: usize = 100;
 
-fn get_bevy_app_singleton() -> Gd<Node> {
+fn get_bulk_operations_node() -> Gd<Node> {
     let scene_tree = Engine::singleton()
         .get_main_loop()
         .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
         .expect("Failed to get SceneTree");
     let root = scene_tree.get_root().expect("Failed to get root node");
-    root.get_node_or_null("BevyAppSingleton")
-        .expect("BevyAppSingleton not found - ensure it is configured as an autoload")
+    root.get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
+        .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
+        .expect("OptimizedBulkOperations not found - ensure BevyAppSingleton is configured as an autoload")
 }
 
 /// Measures the cost of updating 3D transforms one-by-one via individual FFI calls
@@ -85,7 +86,7 @@ fn transform_update_bulk_3d() -> i32 {
     }
 
     let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
-    let mut bevy_app = get_bevy_app_singleton();
+    let mut bulk_ops = get_bulk_operations_node();
 
     let positions = vec![Vector3::new(5.0, 6.0, 7.0); BENCH_ENTITY_COUNT];
     let rotations = vec![Vector4::new(0.0, 0.0, 0.0, 1.0); BENCH_ENTITY_COUNT];
@@ -95,7 +96,7 @@ fn transform_update_bulk_3d() -> i32 {
     let rot_packed = PackedVector4Array::from(rotations.as_slice());
     let scale_packed = PackedVector3Array::from(scales.as_slice());
 
-    bevy_app.call(
+    bulk_ops.call(
         "bulk_update_transforms_3d",
         &[
             ids_packed.to_variant(),
@@ -156,7 +157,7 @@ fn transform_update_bulk_2d() -> i32 {
     }
 
     let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
-    let mut bevy_app = get_bevy_app_singleton();
+    let mut bulk_ops = get_bulk_operations_node();
 
     let positions = vec![Vector2::new(5.0, 6.0); BENCH_ENTITY_COUNT];
     let rotations = vec![0.0f32; BENCH_ENTITY_COUNT];
@@ -166,7 +167,7 @@ fn transform_update_bulk_2d() -> i32 {
     let rot_packed = PackedFloat32Array::from(rotations.as_slice());
     let scale_packed = PackedVector2Array::from(scales.as_slice());
 
-    bevy_app.call(
+    bulk_ops.call(
         "bulk_update_transforms_2d",
         &[
             ids_packed.to_variant(),
@@ -226,10 +227,10 @@ fn transform_read_bulk_3d() -> i32 {
     }
 
     let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
-    let mut bevy_app = get_bevy_app_singleton();
+    let mut bulk_ops = get_bulk_operations_node();
 
     let mut sum = Vector3::ZERO;
-    let result = bevy_app
+    let result = bulk_ops
         .call("bulk_get_transforms_3d", &[ids_packed.to_variant()])
         .to::<godot::builtin::Dictionary>();
 
@@ -294,10 +295,10 @@ fn transform_read_bulk_2d() -> i32 {
     }
 
     let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
-    let mut bevy_app = get_bevy_app_singleton();
+    let mut bulk_ops = get_bulk_operations_node();
 
     let mut sum = Vector2::ZERO;
-    let result = bevy_app
+    let result = bulk_ops
         .call("bulk_get_transforms_2d", &[ids_packed.to_variant()])
         .to::<godot::builtin::Dictionary>();
 
@@ -352,11 +353,11 @@ fn action_check_bulk() -> i32 {
     key_event.set_keycode(Key::SPACE);
     key_event.set_pressed(true);
 
-    let mut bevy_app = get_bevy_app_singleton();
+    let mut bulk_ops = get_bulk_operations_node();
     let mut match_count = 0;
 
     for _ in 0..BENCH_ACTION_EVENT_COUNT {
-        let result = bevy_app
+        let result = bulk_ops
             .call("bulk_check_actions", &[key_event.to_variant()])
             .to::<godot::builtin::Dictionary>();
 

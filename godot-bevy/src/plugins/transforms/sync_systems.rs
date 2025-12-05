@@ -9,11 +9,25 @@ use bevy_ecs::system::{Query, SystemChangeTick};
 use bevy_math::Quat;
 use bevy_transform::components::Transform as BevyTransform;
 use godot::builtin::{Dictionary, PackedInt64Array};
-use godot::classes::{Engine, Node2D, Node3D, Object, SceneTree};
+use godot::classes::{Engine, Node, Node2D, Node3D, Object, SceneTree};
 use godot::obj::Singleton;
 use godot::prelude::{Gd, ToGodot};
 
 use super::change_filter::TransformSyncMetadata;
+
+/// Helper to find the OptimizedBulkOperations node
+fn get_bulk_operations_node() -> Option<Gd<Object>> {
+    let engine = Engine::singleton();
+    let scene_tree = engine
+        .get_main_loop()
+        .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())?;
+    let root = scene_tree.get_root()?;
+
+    // Try to find OptimizedBulkOperations as a child of BevyAppSingleton
+    root.get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
+        .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
+        .map(|n: Gd<Node>| n.upcast::<Object>())
+}
 
 #[main_thread_system]
 #[tracing::instrument]
@@ -31,16 +45,9 @@ pub fn pre_update_godot_transforms(
     // optimized Rust FFI and avoiding GDScript interpreter overhead.
     #[cfg(debug_assertions)]
     {
-        let engine = Engine::singleton();
-        if let Some(scene_tree) = engine
-            .get_main_loop()
-            .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())
-            && let Some(root) = scene_tree.get_root()
-            && let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton")
-            && bevy_app.has_method("bulk_get_transforms_3d")
-        {
+        if let Some(bulk_ops) = get_bulk_operations_node() {
             let _bulk_span = tracing::info_span!("using_bulk_read_optimization").entered();
-            pre_update_godot_transforms_bulk(entities, bevy_app.upcast::<Object>());
+            pre_update_godot_transforms_bulk(entities, bulk_ops);
             return;
         }
         pre_update_godot_transforms_individual(entities);
@@ -222,16 +229,9 @@ pub fn post_update_godot_transforms(
     // optimized Rust FFI and avoiding GDScript interpreter overhead.
     #[cfg(debug_assertions)]
     {
-        let engine = Engine::singleton();
-        if let Some(scene_tree) = engine
-            .get_main_loop()
-            .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())
-            && let Some(root) = scene_tree.get_root()
-            && let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton")
-            && bevy_app.has_method("bulk_update_transforms_3d")
-        {
+        if let Some(bulk_ops) = get_bulk_operations_node() {
             let _bulk_span = tracing::info_span!("using_bulk_optimization").entered();
-            post_update_godot_transforms_bulk(change_tick, entities, bevy_app.upcast::<Object>());
+            post_update_godot_transforms_bulk(change_tick, entities, bulk_ops);
             return;
         }
         post_update_godot_transforms_individual(change_tick, entities);

@@ -97,26 +97,27 @@ macro_rules! add_transform_sync_systems {
                 // optimized Rust FFI and avoiding GDScript interpreter overhead.
                 #[cfg(debug_assertions)]
                 {
-                    use godot::classes::{Engine, Object, SceneTree};
+                    use godot::classes::{Engine, Node, Object, SceneTree};
                     use godot::obj::Singleton;
 
-                    let engine = Engine::singleton();
-                    if let Some(scene_tree) = engine
-                        .get_main_loop()
-                        .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())
-                    {
-                        if let Some(root) = scene_tree.get_root() {
-                            if let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton") {
-                                if bevy_app.has_method("bulk_update_transforms_3d") {
-                                    [<post_update_godot_transforms_ $name:lower _bulk>](
-                                        change_tick,
-                                        entities,
-                                        bevy_app.upcast::<Object>(),
-                                    );
-                                    return;
-                                }
-                            }
-                        }
+                    let bulk_ops = (|| {
+                        let engine = Engine::singleton();
+                        let scene_tree = engine
+                            .get_main_loop()
+                            .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())?;
+                        let root = scene_tree.get_root()?;
+                        root.get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
+                            .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
+                            .map(|n: godot::prelude::Gd<Node>| n.upcast::<Object>())
+                    })();
+
+                    if let Some(bulk_ops_node) = bulk_ops {
+                        [<post_update_godot_transforms_ $name:lower _bulk>](
+                            change_tick,
+                            entities,
+                            bulk_ops_node,
+                        );
+                        return;
                     }
                     [<post_update_godot_transforms_ $name:lower _individual>](change_tick, entities);
                 }
@@ -333,25 +334,26 @@ macro_rules! add_transform_sync_systems {
                 // optimized Rust FFI and avoiding GDScript interpreter overhead.
                 #[cfg(debug_assertions)]
                 {
-                    use godot::classes::{Engine, Object, SceneTree};
+                    use godot::classes::{Engine, Node, Object, SceneTree};
                     use godot::obj::Singleton;
 
-                    let engine = Engine::singleton();
-                    if let Some(scene_tree) = engine
-                        .get_main_loop()
-                        .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())
-                    {
-                        if let Some(root) = scene_tree.get_root() {
-                            if let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton") {
-                                if bevy_app.has_method("bulk_get_transforms_3d") {
-                                    [<pre_update_godot_transforms_ $name:lower _bulk>](
-                                        entities,
-                                        bevy_app.upcast::<Object>(),
-                                    );
-                                    return;
-                                }
-                            }
-                        }
+                    let bulk_ops = (|| {
+                        let engine = Engine::singleton();
+                        let scene_tree = engine
+                            .get_main_loop()
+                            .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())?;
+                        let root = scene_tree.get_root()?;
+                        root.get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
+                            .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
+                            .map(|n: godot::prelude::Gd<Node>| n.upcast::<Object>())
+                    })();
+
+                    if let Some(bulk_ops_node) = bulk_ops {
+                        [<pre_update_godot_transforms_ $name:lower _bulk>](
+                            entities,
+                            bulk_ops_node,
+                        );
+                        return;
                     }
                     [<pre_update_godot_transforms_ $name:lower _individual>](entities);
                 }

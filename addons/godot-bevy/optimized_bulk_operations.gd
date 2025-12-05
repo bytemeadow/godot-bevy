@@ -1,14 +1,29 @@
-extends BevyApp
+extends Node
+class_name OptimizedBulkOperations
+
+# Optimized Bulk Operations
+# This GDScript class provides bulk FFI optimization methods for godot-bevy.
+# These methods reduce FFI overhead by batching operations that would otherwise
+# require many individual Rust-to-Godot calls.
+#
+# In debug builds, these bulk methods are faster due to high Rust FFI overhead.
+# In release builds, direct FFI calls are faster, so these are primarily used
+# for debug build performance.
 
 
-# Bulk Transform Optimization Methods
-# Automatically detected by godot-bevy library for performance optimization
+func _ready():
+	name = "OptimizedBulkOperations"
+
+
+# =============================================================================
+# Bulk Transform Write Methods
+# =============================================================================
 
 func bulk_update_transforms_3d(
-  instance_ids: PackedInt64Array,
-  positions: PackedVector3Array,
-  rotations: PackedVector4Array,
-  scales: PackedVector3Array
+	instance_ids: PackedInt64Array,
+	positions: PackedVector3Array,
+	rotations: PackedVector4Array,
+	scales: PackedVector3Array
 ) -> void:
 	var rotation: Quaternion = Quaternion()
 	for i: int in range(instance_ids.size()):
@@ -21,11 +36,12 @@ func bulk_update_transforms_3d(
 		node.quaternion = rotation
 		node.scale = scales[i]
 
+
 func bulk_update_transforms_2d(
-  instance_ids: PackedInt64Array,
-  positions: PackedVector2Array,
-  rotations: PackedFloat32Array,
-  scales: PackedVector2Array
+	instance_ids: PackedInt64Array,
+	positions: PackedVector2Array,
+	rotations: PackedFloat32Array,
+	scales: PackedVector2Array
 ) -> void:
 	for i: int in range(instance_ids.size()):
 		var node: Node2D = instance_from_id(instance_ids[i]) as Node2D
@@ -34,8 +50,9 @@ func bulk_update_transforms_2d(
 		node.scale = scales[i]
 
 
+# =============================================================================
 # Bulk Transform Read Methods
-# Returns transform data for multiple nodes in a single FFI call
+# =============================================================================
 
 func bulk_get_transforms_3d(instance_ids: PackedInt64Array) -> Dictionary:
 	var positions: PackedVector3Array = PackedVector3Array()
@@ -55,6 +72,7 @@ func bulk_get_transforms_3d(instance_ids: PackedInt64Array) -> Dictionary:
 
 	return {"positions": positions, "rotations": rotations, "scales": scales}
 
+
 func bulk_get_transforms_2d(instance_ids: PackedInt64Array) -> Dictionary:
 	var positions: PackedVector2Array = PackedVector2Array()
 	var rotations: PackedFloat32Array = PackedFloat32Array()
@@ -73,9 +91,9 @@ func bulk_get_transforms_2d(instance_ids: PackedInt64Array) -> Dictionary:
 	return {"positions": positions, "rotations": rotations, "scales": scales}
 
 
+# =============================================================================
 # Bulk Input Action Checking
-# Checks an input event against all actions in a single FFI call
-# Returns arrays of matching action data for efficient transfer
+# =============================================================================
 
 func bulk_check_actions(event: InputEvent) -> Dictionary:
 	var actions: PackedStringArray = PackedStringArray()
