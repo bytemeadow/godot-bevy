@@ -39,9 +39,6 @@ impl Plugin for GodotTransformSyncPlugin {
                 entity.insert(node3d.get_transform().to_bevy_transform());
             } else if let Some(node2d) = node_handle.try_get::<Node2D>() {
                 entity.insert(node2d.get_transform().to_bevy_transform());
-            } else {
-                // Fallback to default for non-spatial nodes
-                entity.insert(Transform::default());
             }
         })
         // Register metadata component with default - this avoids the 1-frame delay
