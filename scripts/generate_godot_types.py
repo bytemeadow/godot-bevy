@@ -51,6 +51,9 @@ class GodotTypeGenerator:
             / "godot-bevy"
             / "optimized_scene_tree_watcher.gd"
         )
+        self.signal_names_file = (
+            self.project_root / "godot-bevy" / "src" / "interop" / "signal_names.rs"
+        )
 
         # Store all classes by name for signal generation
         self.classes_by_name = {}
@@ -59,31 +62,61 @@ class GodotTypeGenerator:
         # Used for filtering both node types and signal generation
         self.excluded_classes = {
             # CSG classes (require special module)
-            'CSGBox3D', 'CSGCombiner3D', 'CSGCylinder3D', 'CSGMesh3D', 'CSGPolygon3D',
-            'CSGPrimitive3D', 'CSGShape3D', 'CSGSphere3D', 'CSGTorus3D',
+            "CSGBox3D",
+            "CSGCombiner3D",
+            "CSGCylinder3D",
+            "CSGMesh3D",
+            "CSGPolygon3D",
+            "CSGPrimitive3D",
+            "CSGShape3D",
+            "CSGSphere3D",
+            "CSGTorus3D",
             # Editor classes
-            'GridMapEditorPlugin', 'ScriptCreateDialog', 'FileSystemDock',
-            'OpenXRBindingModifierEditor', 'OpenXRInteractionProfileEditor',
-            'OpenXRInteractionProfileEditorBase',
+            "GridMapEditorPlugin",
+            "ScriptCreateDialog",
+            "FileSystemDock",
+            "OpenXRBindingModifierEditor",
+            "OpenXRInteractionProfileEditor",
+            "OpenXRInteractionProfileEditorBase",
             # XR classes that might not be available
-            'XRAnchor3D', 'XRBodyModifier3D', 'XRCamera3D', 'XRController3D',
-            'XRFaceModifier3D', 'XRHandModifier3D', 'XRNode3D', 'XROrigin3D',
+            "XRAnchor3D",
+            "XRBodyModifier3D",
+            "XRCamera3D",
+            "XRController3D",
+            "XRFaceModifier3D",
+            "XRHandModifier3D",
+            "XRNode3D",
+            "XROrigin3D",
             # OpenXR classes
-            'OpenXRCompositionLayer', 'OpenXRCompositionLayerCylinder',
-            'OpenXRCompositionLayerEquirect', 'OpenXRCompositionLayerQuad',
-            'OpenXRHand', 'OpenXRVisibilityMask',
+            "OpenXRCompositionLayer",
+            "OpenXRCompositionLayerCylinder",
+            "OpenXRCompositionLayerEquirect",
+            "OpenXRCompositionLayerQuad",
+            "OpenXRHand",
+            "OpenXRVisibilityMask",
             # Classes that might not be available in all builds
-            'VoxelGI', 'LightmapGI', 'FogVolume', 'WorldEnvironment',
+            "VoxelGI",
+            "LightmapGI",
+            "FogVolume",
+            "WorldEnvironment",
             # Navigation classes (might be module-specific)
-            'NavigationAgent2D', 'NavigationAgent3D', 'NavigationLink2D',
-            'NavigationLink3D', 'NavigationObstacle2D', 'NavigationObstacle3D',
-            'NavigationRegion2D', 'NavigationRegion3D',
+            "NavigationAgent2D",
+            "NavigationAgent3D",
+            "NavigationLink2D",
+            "NavigationLink3D",
+            "NavigationObstacle2D",
+            "NavigationObstacle3D",
+            "NavigationRegion2D",
+            "NavigationRegion3D",
             # Other problematic classes
-            'StatusIndicator',
+            "StatusIndicator",
             # Graph classes (not available in all Godot builds)
-            'GraphEdit', 'GraphElement', 'GraphFrame', 'GraphNode',
+            "GraphEdit",
+            "GraphElement",
+            "GraphFrame",
+            "GraphNode",
             # Parallax2D is in extension API but not in current Rust bindings
-            'Parallax2D',
+            "Parallax2D",
         }
 
         # Types that require specific Godot API versions
@@ -117,7 +150,7 @@ class GodotTypeGenerator:
                 cwd=self.project_root,
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
             )
 
             if result.returncode == 0:
@@ -143,7 +176,12 @@ class GodotTypeGenerator:
             for cmd in godot_commands:
                 try:
                     result = subprocess.run(
-                        [cmd, "--headless", "--dump-extension-api-with-docs", str(self.api_file)],
+                        [
+                            cmd,
+                            "--headless",
+                            "--dump-extension-api-with-docs",
+                            str(self.api_file),
+                        ],
                         capture_output=True,
                         text=True,
                         timeout=30,
@@ -181,8 +219,7 @@ class GodotTypeGenerator:
 
         # Store all classes by name for signal generation
         self.classes_by_name = {
-            class_info["name"]: class_info
-            for class_info in api["classes"]
+            class_info["name"]: class_info for class_info in api["classes"]
         }
 
         # Build inheritance relationships
@@ -441,23 +478,23 @@ pub fn remove_comprehensive_node_type_markers(
             return "SIGNAL"
 
         # Insert underscores before uppercase letters (for camelCase/PascalCase)
-        result = re.sub('([a-z0-9])([A-Z])', r'\1_\2', signal_name)
+        result = re.sub("([a-z0-9])([A-Z])", r"\1_\2", signal_name)
 
         # Replace non-alphanumeric characters with underscores
-        result = re.sub(r'[^a-zA-Z0-9_]', '_', result)
+        result = re.sub(r"[^a-zA-Z0-9_]", "_", result)
 
         # Convert to uppercase
         result = result.upper()
 
         # Collapse multiple underscores
-        result = re.sub(r'_+', '_', result)
+        result = re.sub(r"_+", "_", result)
 
         # Strip leading/trailing underscores
-        result = result.strip('_')
+        result = result.strip("_")
 
         # Ensure it doesn't start with a digit (prepend underscore if needed)
         if result and result[0].isdigit():
-            result = '_' + result
+            result = "_" + result
 
         # Fallback if empty after processing
         if not result:
@@ -688,7 +725,10 @@ func _analyze_node_type(node: Node) -> String:
     def _generate_gdscript_type_analysis(categories):
         """Generate the GDScript node type analysis function"""
         # Node3D hierarchy (most common in 3D games)
-        lines = ["\t# Check Node3D hierarchy first (most common in 3D games)", "\tif node is Node3D:"]
+        lines = [
+            "\t# Check Node3D hierarchy first (most common in 3D games)",
+            "\tif node is Node3D:",
+        ]
 
         # Add common 3D types first for better performance
         common_3d = [
@@ -995,7 +1035,7 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
         """Generate the signal_names.rs file with signal constants"""
         print("📡 Generating signal names...")
 
-        content = '''#![allow(dead_code)]
+        content = """#![allow(dead_code)]
 //! 🤖 This file is automatically generated by scripts/generate_godot_types.py
 //! To regenerate: python scripts/generate_godot_types.py
 //!
@@ -1009,7 +1049,7 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 //! button.connect(ButtonSignals::PRESSED.into(), callable);
 //! ```
 
-'''
+"""
 
         # Collect all classes with signals, sorted by name, skipping excluded classes
         classes_with_signals = []
@@ -1058,7 +1098,7 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
                     description = self.sanitize_doc_comment(description)
 
                     # Format description for Rust doc comments
-                    description_lines = description.replace('\r\n', '\n').split('\n')
+                    description_lines = description.replace("\r\n", "\n").split("\n")
                     for line in description_lines:
                         # Strip trailing whitespace but preserve empty lines
                         line = line.rstrip()
@@ -1068,7 +1108,9 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
                     content += f"    /// Signal `{signal_name}`\n"
 
                 # Constant definition
-                content += f'    pub const {const_name}: &\'static str = "{signal_name}";\n\n'
+                content += (
+                    f'    pub const {const_name}: &\'static str = "{signal_name}";\n\n'
+                )
                 signal_count += 1
 
             # Close impl block
@@ -1078,7 +1120,9 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
         with open(self.signal_names_file, "w") as f:
             f.write(content)
 
-        print(f"✅ Generated {signal_count} signal constants across {len(classes_with_signals)} classes")
+        print(
+            f"✅ Generated {signal_count} signal constants across {len(classes_with_signals)} classes"
+        )
         self.run_cargo_fmt(self.signal_names_file)
 
     @staticmethod
@@ -1088,30 +1132,30 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
         from textwrap import dedent
 
         # Basic inline formatting
-        text = text.replace('[b]', '**').replace('[/b]', '**')
-        text = text.replace('[i]', '*').replace('[/i]', '*')
-        text = text.replace('[code]', '`').replace('[/code]', '`')
+        text = text.replace("[b]", "**").replace("[/b]", "**")
+        text = text.replace("[i]", "*").replace("[/i]", "*")
+        text = text.replace("[code]", "`").replace("[/code]", "`")
 
         # [member something] -> `something`
-        text = re.sub(r'\[member\s+([^]]+)]', r'`\1`', text)
+        text = re.sub(r"\[member\s+([^]]+)]", r"`\1`", text)
 
         # [param something] -> `something`
-        text = re.sub(r'\[param\s+([^]]+)]', r'`\1`', text)
+        text = re.sub(r"\[param\s+([^]]+)]", r"`\1`", text)
 
         # [constant something] -> `something`
-        text = re.sub(r'\[constant\s+([^]]+)]', r'`\1`', text)
+        text = re.sub(r"\[constant\s+([^]]+)]", r"`\1`", text)
 
         # [method something] -> `something()`
-        text = re.sub(r'\[method\s+([^]]+)]', r'`\1()`', text)
+        text = re.sub(r"\[method\s+([^]]+)]", r"`\1()`", text)
 
         # [signal something] -> `something`
-        text = re.sub(r'\[signal\s+([^]]+)]', r'`\1`', text)
+        text = re.sub(r"\[signal\s+([^]]+)]", r"`\1`", text)
 
         # [enum something] -> `something`
-        text = re.sub(r'\[enum\s+([^]]+)]', r'`\1`', text)
+        text = re.sub(r"\[enum\s+([^]]+)]", r"`\1`", text)
 
         # [url=...]...[/url] -> [link text](url)
-        text = re.sub(r'\[url=([^]]+)]([^\[]+)\[/url]', r'[\2](\1)', text)
+        text = re.sub(r"\[url=([^]]+)]([^\[]+)\[/url]", r"[\2](\1)", text)
 
         # [codeblock]...[/codeblock] -> ```text\n...\n```
         def codeblock_repl(m):
@@ -1120,7 +1164,9 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
             code = dedent(code)
             return f"\n```text\n{code}\n```\n"
 
-        text = re.sub(r'\[codeblock](.*?)\[/codeblock]', codeblock_repl, text, flags=re.S)
+        text = re.sub(
+            r"\[codeblock](.*?)\[/codeblock]", codeblock_repl, text, flags=re.S
+        )
 
         # [codeblocks] (with language specified)
         def codeblocks_repl(m):
@@ -1128,10 +1174,12 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
             code = dedent(code)
             return f"\n```gdscript\n{code}\n```\n"
 
-        text = re.sub(r'\[codeblocks](.*?)\[/codeblocks]', codeblocks_repl, text, flags=re.S)
+        text = re.sub(
+            r"\[codeblocks](.*?)\[/codeblocks]", codeblocks_repl, text, flags=re.S
+        )
 
         # Remove any remaining BBCode-style tags that we didn't handle
-        text = re.sub(r'\[/?[a-zA-Z0-9_]+]', '', text)
+        text = re.sub(r"\[/?[a-zA-Z0-9_]+]", "", text)
 
         return text
 
@@ -1142,22 +1190,21 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
         # Also handle other problematic sequences
 
         # Replace tabs with 4 spaces for consistent formatting
-        text = text.replace('\t', '    ')
+        text = text.replace("\t", "    ")
 
         # Replace */ with *\/ to prevent closing block comments
-        text = text.replace('*/', r'*\/')
+        text = text.replace("*/", r"*\/")
 
         # Replace leading /// with \/\/\/ to prevent nested doc comments
-        text = text.replace('///', r'\/\/\/')
+        text = text.replace("///", r"\/\/\/")
 
         # Ensure we don't have unclosed backticks that would break markdown
         # Count backticks and add one if odd
-        backtick_count = text.count('`')
+        backtick_count = text.count("`")
         if backtick_count % 2 != 0:
-            text += '`'
+            text += "`"
 
         return text
-
 
     def run(self):
         """Run the complete generation pipeline"""
