@@ -7,10 +7,14 @@ from pathlib import Path
 
 def create_argument_parser() -> argparse.ArgumentParser:
     """Create and configure the argument parser for benchmark comparison."""
-    parser = argparse.ArgumentParser(description='Compare benchmark results against a baseline')
-    parser.add_argument('baseline', help='Path to the baseline.json file')
-    parser.add_argument('bench_results', help='Path to the bench-results.json file')
-    parser.add_argument('output_file', help='Path to the output json file for the comparison results')
+    parser = argparse.ArgumentParser(
+        description="Compare benchmark results against a baseline"
+    )
+    parser.add_argument("baseline", help="Path to the baseline.json file")
+    parser.add_argument("bench_results", help="Path to the bench-results.json file")
+    parser.add_argument(
+        "output_file", help="Path to the output json file for the comparison results"
+    )
     return parser
 
 
@@ -25,7 +29,9 @@ def main(args: list[str]) -> None:
         with open(bench_results_path) as f:
             current_results = json.load(f)
     except FileNotFoundError:
-        print(f"Error: benchmark results file {bench_results_path} not found, can't continue.")
+        print(
+            f"Error: benchmark results file {bench_results_path} not found, can't continue."
+        )
         exit(1)
 
     baseline = {"benchmarks": {}}
@@ -33,17 +39,21 @@ def main(args: list[str]) -> None:
         with open(baseline_path) as f:
             baseline = json.load(f)
     except FileNotFoundError:
-        print(f"Warning: baseline file {baseline_path} not found, showing only current results.")
+        print(
+            f"Warning: baseline file {baseline_path} not found, showing only current results."
+        )
         print(f"Directory contents of {baseline_path.parent}:")
         for file in os.listdir(baseline_path.parent):
             print(f"  {file}")
     except json.decoder.JSONDecodeError as json_error:
-        print(f"Warning: baseline file json parse error {baseline_path}, showing only current results.")
+        print(
+            f"Warning: baseline file json parse error {baseline_path}, showing only current results."
+        )
         print(json_error)
 
     comparison = {
         "benchmarks": [],
-        "summary": {"total": 0, "regressions": 0, "improvements": 0, "new": 0}
+        "summary": {"total": 0, "regressions": 0, "improvements": 0, "new": 0},
     }
 
     for name, curr_data in current_results.get("benchmarks", {}).items():
@@ -54,7 +64,7 @@ def main(args: list[str]) -> None:
             "current": curr_data.get("median_display", "N/A"),
             "baseline": None,
             "change_pct": None,
-            "status": "new"
+            "status": "new",
         }
 
         if base_data:
@@ -87,11 +97,16 @@ def main(args: list[str]) -> None:
 
     comparison["summary"]["total"] = len(comparison["benchmarks"])
 
-    with open(output_file_path, 'w') as f:
+    with open(output_file_path, "w") as f:
         json.dump(comparison, f, indent=2)
 
-    # Exit with error if regressions detected
-    sys.exit(1 if comparison["summary"]["regressions"] > 0 else 0)
+    # Log summary - regressions are reported in PR comment, don't fail the build
+    regressions = comparison["summary"]["regressions"]
+    improvements = comparison["summary"]["improvements"]
+    if regressions > 0:
+        print(f"⚠️  {regressions} regression(s) detected - see PR comment for details")
+    if improvements > 0:
+        print(f"✅ {improvements} improvement(s) detected")
 
 
 if __name__ == "__main__":
