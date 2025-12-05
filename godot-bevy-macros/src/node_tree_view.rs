@@ -63,7 +63,9 @@ pub fn node_tree_view(input: DeriveInput) -> syn::Result<TokenStream2> {
             })?;
 
             // Convert field name to SCREAMING_SNAKE_CASE and append _PATH
-            let const_name_str = format!("{}_PATH", field_name.to_string().to_uppercase());
+            // Trim leading underscores to allow unused fields.
+            let field_str = field_name.to_string().trim_start_matches('_').to_string();
+            let const_name_str = format!("{}_PATH", field_str.to_uppercase());
             let const_name = syn::Ident::new(&const_name_str, field_name.span());
 
             Some(quote! {

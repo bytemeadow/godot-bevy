@@ -25,11 +25,12 @@ use godot::{
     builtin::Vector2,
     classes::{AnimatedSprite2D, PathFollow2D, RigidBody2D},
 };
+use godot_bevy::interop::VisibleOnScreenNotifier2DSignals;
 use godot_bevy::{
     interop::GodotNodeHandle,
     prelude::{
         AudioChannel, FindEntityByNameExt, GodotResource, GodotScene, GodotTypedSignalsPlugin,
-        NodeTreeView, TypedGodotSignals, main_thread_system,
+        NodeTreeView, main_thread_system,
     },
 };
 use std::f32::consts::PI;
@@ -108,7 +109,7 @@ fn spawn_mob(
         .insert(
             GodotScene::from_handle(assets.mob_scn.clone()).with_signal_connection(
                 MobNodes::VISIBILITY_NOTIFIER_PATH,
-                "screen_exited",
+                VisibleOnScreenNotifier2DSignals::SCREEN_EXITED,
                 |_args, _handle, entity| {
                     Some(MobScreenExited {
                         entity: entity.expect("entity was provided"),
@@ -125,26 +126,16 @@ pub struct MobNodes {
     animated_sprite: GodotNodeHandle,
 
     #[node("VisibleOnScreenNotifier2D")]
-    visibility_notifier: GodotNodeHandle,
+    _visibility_notifier: GodotNodeHandle,
 }
 
 #[main_thread_system]
 fn new_mob(
-    mut entities: Query<
-        (
-            Entity,
-            &Mob,
-            &Transform,
-            &mut GodotNodeHandle,
-            &mut AnimationState,
-        ),
-        Added<Mob>,
-    >,
+    mut entities: Query<(&Mob, &Transform, &mut GodotNodeHandle, &mut AnimationState), Added<Mob>>,
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
     assets: Res<MobAssets>,
-    typed: TypedGodotSignals<MobScreenExited>,
 ) {
-    for (entity, mob_data, transform, mut mob, mut anim_state) in entities.iter_mut() {
+    for (mob_data, transform, mut mob, mut anim_state) in entities.iter_mut() {
         let mut mob = mob.get::<RigidBody2D>();
 
         let velocity = Vector2::new(fastrand::f32() * 100.0 + 150.0, 0.0);
