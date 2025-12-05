@@ -203,14 +203,20 @@ fn transform_read_individual_3d() -> i32 {
     let mut nodes = Vec::with_capacity(BENCH_ENTITY_COUNT);
     for i in 0..BENCH_ENTITY_COUNT {
         let mut node = Node3D::new_alloc();
-        node.set_position(Vector3::new(i as f32, i as f32 * 2.0, i as f32 * 3.0));
+        node.set_transform(make_transform_3d(
+            Vector3::new(i as f32, i as f32 * 2.0, i as f32 * 3.0),
+            Vector4::new(0.0, 0.0, 0.0, 1.0),
+            Vector3::new(1.0, 1.0, 1.0),
+        ));
         nodes.push(node);
     }
 
     let mut sum = Vector3::ZERO;
     for _ in 0..UPDATE_ITERATIONS {
         for node in &nodes {
-            sum += node.get_position();
+            let transform = node.get_transform();
+            // Use the transform data to prevent optimization
+            sum += transform.origin;
         }
     }
 
@@ -269,14 +275,20 @@ fn transform_read_individual_2d() -> i32 {
     let mut nodes = Vec::with_capacity(BENCH_ENTITY_COUNT);
     for i in 0..BENCH_ENTITY_COUNT {
         let mut node = Node2D::new_alloc();
-        node.set_position(Vector2::new(i as f32, i as f32 * 2.0));
+        node.set_transform(make_transform_2d(
+            Vector2::new(i as f32, i as f32 * 2.0),
+            0.0,
+            Vector2::new(1.0, 1.0),
+        ));
         nodes.push(node);
     }
 
     let mut sum = Vector2::ZERO;
     for _ in 0..UPDATE_ITERATIONS {
         for node in &nodes {
-            sum += node.get_position();
+            let transform = node.get_transform();
+            // Use the transform data to prevent optimization
+            sum += transform.origin;
         }
     }
 
