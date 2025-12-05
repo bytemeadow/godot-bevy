@@ -39,17 +39,35 @@ fi
 
 echo -e "${CYAN}Using Godot binary: $GODOT4_BIN${NC}"
 
+# Cross-platform temp directory and exit code file
+# Use GODOT_TEST_EXIT_CODE_PATH if set, otherwise use system temp dir
+if [ -z "$GODOT_TEST_EXIT_CODE_PATH" ]; then
+    if [ -n "$TMPDIR" ]; then
+        EXIT_CODE_FILE="$TMPDIR/godot_test_exit_code"
+    elif [ -n "$TEMP" ]; then
+        # Windows compatibility
+        EXIT_CODE_FILE="$TEMP/godot_test_exit_code"
+    else
+        EXIT_CODE_FILE="/tmp/godot_test_exit_code"
+    fi
+else
+    EXIT_CODE_FILE="$GODOT_TEST_EXIT_CODE_PATH"
+fi
+
+# Export for Rust code to use the same path
+export GODOT_TEST_EXIT_CODE_PATH="$EXIT_CODE_FILE"
+
 # Clean up any previous exit code file
-rm -f /tmp/godot_test_exit_code
+rm -f "$EXIT_CODE_FILE"
 
 # Run tests in headless mode
 echo -e "${CYAN}Running integration tests...${NC}"
 "$GODOT4_BIN" --headless --path godot --quit-after 5000
 
 # Read the exit code from the file written by tests
-if [ -f /tmp/godot_test_exit_code ]; then
-    EXIT_CODE=$(cat /tmp/godot_test_exit_code)
-    rm -f /tmp/godot_test_exit_code
+if [ -f "$EXIT_CODE_FILE" ]; then
+    EXIT_CODE=$(cat "$EXIT_CODE_FILE")
+    rm -f "$EXIT_CODE_FILE"
 else
     # If no file exists, assume failure
     EXIT_CODE=1

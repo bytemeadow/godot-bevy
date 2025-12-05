@@ -1,6 +1,4 @@
-/*
- * Ergonomic helpers for writing async integration tests
- */
+//! Ergonomic helpers for writing async integration tests
 
 use std::sync::Arc;
 use std::sync::atomic::AtomicU32;
@@ -32,7 +30,7 @@ impl Counter {
 /// Each test gets its own isolated BevyApp instance with its own configuration.
 ///
 /// Usage:
-/// ```
+/// ```ignore
 /// bevy_app_test!(ctx, counter, |app| {
 ///     // Setup bevy app
 ///     app.add_systems(Update, my_system);
@@ -45,31 +43,33 @@ impl Counter {
 #[macro_export]
 macro_rules! bevy_app_test {
     ($ctx:expr, $counter:ident, |$app:ident| $setup:block, async $test:block) => {{
-        use godot::obj::NewAlloc;
+        use ::godot::obj::NewAlloc;
 
-        let $counter = $crate::framework::Counter::new();
+        let $counter = $crate::Counter::new();
         let ctx_clone = $ctx.clone();
 
-        godot::task::spawn(async move {
+        ::godot::task::spawn(async move {
             // Wait one frame to ensure previous test's BevyApp is cleaned up
-            $crate::framework::await_frame().await;
+            $crate::await_frame().await;
 
             // Create BevyApp and set its instance init function
-            let mut bevy_app = godot_bevy::BevyApp::new_alloc();
+            let mut bevy_app = ::godot_bevy::BevyApp::new_alloc();
 
             // Set the per-instance init function for THIS test
             let c = $counter.clone();
-            bevy_app.bind_mut().set_instance_init_func(Box::new(move |$app: &mut bevy::prelude::App| {
-                let $counter = c.clone();
-                // Now add test-specific setup
-                $setup
-            }));
+            bevy_app
+                .bind_mut()
+                .set_instance_init_func(Box::new(move |$app: &mut ::bevy::prelude::App| {
+                    let $counter = c.clone();
+                    // Now add test-specific setup
+                    $setup
+                }));
 
             // Add to scene tree (this will trigger ready())
             ctx_clone.scene_tree.clone().add_child(&bevy_app);
 
             // Wait for ready() to complete
-            $crate::framework::await_frame().await;
+            $crate::await_frame().await;
 
             // Run the test
             $test
@@ -78,7 +78,7 @@ macro_rules! bevy_app_test {
             bevy_app.queue_free();
 
             // Wait for cleanup to complete
-            $crate::framework::await_frame().await;
+            $crate::await_frame().await;
         })
     }};
 }

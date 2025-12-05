@@ -2425,18 +2425,14 @@ name = "godot-bevy-itest"
 version = "0.0.0"
 dependencies = [
  "bevy",
- "chrono",
  "godot",
  "godot-bevy",
- "godot-bevy-itest-macros",
- "godot-bevy-macros",
- "parking_lot",
- "serde_json",
+ "godot-bevy-test",
 ]
 
 [[package]]
-name = "godot-bevy-itest-macros"
-version = "0.1.0"
+name = "godot-bevy-macros"
+version = "0.9.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2444,7 +2440,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "godot-bevy-macros"
+name = "godot-bevy-test"
+version = "0.9.2"
+dependencies = [
+ "bevy",
+ "chrono",
+ "godot",
+ "godot-bevy",
+ "godot-bevy-test-macros",
+ "serde_json",
+]
+
+[[package]]
+name = "godot-bevy-test-macros"
 version = "0.9.2"
 dependencies = [
  "proc-macro2",

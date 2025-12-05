@@ -1,22 +1,20 @@
-/*
- * Bevy-style test app for frame-by-frame testing
- *
- * This provides a Bevy-like API for tests while ensuring real Godot integration:
- * - app.world() / app.world_mut() for ECS access (just like Bevy)
- * - app.update().await for frame stepping (async because we wait for Godot)
- * - Automatic cleanup on drop
- * - Relies on library's automatic watcher setup
- */
+//! Bevy-style test app for frame-by-frame testing
+//!
+//! This provides a Bevy-like API for tests while ensuring real Godot integration:
+//! - app.world() / app.world_mut() for ECS access (just like Bevy)
+//! - app.update().await for frame stepping (async because we wait for Godot)
+//! - Automatic cleanup on drop
+//! - Relies on library's automatic watcher setup
 
 use bevy::prelude::*;
 use godot::obj::{Gd, NewAlloc};
 
-use super::{TestContext, await_frame};
+use crate::{TestContext, await_frame};
 
 /// A test app that provides Bevy-style API while running in Godot runtime
 ///
 /// Example:
-/// ```rust
+/// ```ignore
 /// let mut app = TestApp::new(ctx, |app| {
 ///     app.add_plugins(GodotTransformSyncPlugin);
 /// }).await;
