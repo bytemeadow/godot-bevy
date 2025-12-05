@@ -31,7 +31,7 @@ permissions:
 
 jobs:
     benchmarks:
-        runs-on: ubuntu-latest
+        runs-on: blaze/compute/ubuntu-latest-amd64
 
         steps:
             - name: Checkout code
