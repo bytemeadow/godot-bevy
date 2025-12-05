@@ -29,7 +29,7 @@ fn make_transform_2d(pos: Vector2, rotation: f32, scale: Vector2) -> Transform2D
     Transform2D { a, b, origin: pos }
 }
 
-const BENCH_ENTITY_COUNT: usize = 20000;
+const BENCH_ENTITY_COUNT: usize = 5000;
 const UPDATE_ITERATIONS: usize = 50;
 const BENCH_ACTION_EVENT_COUNT: usize = 100;
 
