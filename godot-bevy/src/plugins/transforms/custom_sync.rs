@@ -315,8 +315,169 @@ macro_rules! add_transform_sync_systems {
             #[tracing::instrument]
             #[$crate::prelude::main_thread_system]
             pub fn [<pre_update_godot_transforms_ $name:lower>](
+                entities: $crate::bevy_ecs::system::Query<
+                    (
+                        $crate::bevy_ecs::entity::Entity,
+                        &mut $crate::bevy_transform::components::Transform,
+                        &mut $crate::interop::GodotNodeHandle,
+                        &mut $crate::plugins::transforms::TransformSyncMetadata,
+                        $crate::bevy_ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
+                    ),
+                    $godot_to_bevy_query
+                >,
+            ) {
+                use godot::classes::{Engine, Object, SceneTree};
+                use godot::obj::Singleton;
+
+                // Try to get the BevyAppSingleton autoload for bulk optimization
+                let engine = Engine::singleton();
+                if let Some(scene_tree) = engine
+                    .get_main_loop()
+                    .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())
+                {
+                    if let Some(root) = scene_tree.get_root() {
+                        if let Some(bevy_app) = root.get_node_or_null("BevyAppSingleton") {
+                            // Check if this BevyApp has the bulk read methods
+                            if bevy_app.has_method("bulk_get_transforms_3d") {
+                                // Use bulk optimization path
+                                [<pre_update_godot_transforms_ $name:lower _bulk>](
+                                    entities,
+                                    bevy_app.upcast::<Object>(),
+                                );
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                // Fallback to individual FFI calls
+                [<pre_update_godot_transforms_ $name:lower _individual>](entities);
+            }
+
+            fn [<pre_update_godot_transforms_ $name:lower _bulk>](
                 mut entities: $crate::bevy_ecs::system::Query<
                     (
+                        $crate::bevy_ecs::entity::Entity,
+                        &mut $crate::bevy_transform::components::Transform,
+                        &mut $crate::interop::GodotNodeHandle,
+                        &mut $crate::plugins::transforms::TransformSyncMetadata,
+                        $crate::bevy_ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
+                    ),
+                    $godot_to_bevy_query
+                >,
+                mut batch_singleton: godot::prelude::Gd<godot::classes::Object>,
+            ) {
+                use $crate::bevy_ecs::change_detection::DetectChanges;
+                use godot::prelude::ToGodot;
+
+                let _span = tracing::info_span!("bulk_read_preparation", system = stringify!($name)).entered();
+
+                // Collect entity info for 3D and 2D nodes separately
+                let mut entities_3d: Vec<($crate::bevy_ecs::entity::Entity, i64)> = Vec::new();
+                let mut entities_2d: Vec<($crate::bevy_ecs::entity::Entity, i64)> = Vec::new();
+
+                for (entity, _, reference, _, (node2d, node3d)) in entities.iter() {
+                    let instance_id = reference.instance_id().to_i64();
+                    if node2d.is_some() {
+                        entities_2d.push((entity, instance_id));
+                    } else if node3d.is_some() {
+                        entities_3d.push((entity, instance_id));
+                    }
+                }
+
+                drop(_span);
+
+                // Process 3D entities
+                if !entities_3d.is_empty() {
+                    let _span = tracing::info_span!("bulk_read_3d", count = entities_3d.len(), system = stringify!($name)).entered();
+
+                    let instance_ids: Vec<i64> = entities_3d.iter().map(|(_, id)| *id).collect();
+                    let ids_packed = godot::prelude::PackedInt64Array::from(instance_ids.as_slice());
+
+                    let result = batch_singleton
+                        .call("bulk_get_transforms_3d", &[ids_packed.to_variant()])
+                        .to::<godot::builtin::Dictionary>();
+
+                    if let (Some(positions), Some(rotations), Some(scales)) = (
+                        result
+                            .get("positions")
+                            .map(|v| v.to::<godot::builtin::PackedVector3Array>()),
+                        result
+                            .get("rotations")
+                            .map(|v| v.to::<godot::builtin::PackedVector4Array>()),
+                        result
+                            .get("scales")
+                            .map(|v| v.to::<godot::builtin::PackedVector3Array>()),
+                    ) {
+                        for (i, (entity, _)) in entities_3d.iter().enumerate() {
+                            if let Ok((_, mut bevy_transform, _, mut metadata, _)) = entities.get_mut(*entity) {
+                                if let (Some(pos), Some(rot), Some(scale)) =
+                                    (positions.get(i), rotations.get(i), scales.get(i))
+                                {
+                                    let new_bevy_transform = $crate::bevy_transform::components::Transform {
+                                        translation: $crate::bevy_math::Vec3::new(pos.x, pos.y, pos.z),
+                                        rotation: $crate::bevy_math::Quat::from_xyzw(rot.x, rot.y, rot.z, rot.w),
+                                        scale: $crate::bevy_math::Vec3::new(scale.x, scale.y, scale.z),
+                                    };
+
+                                    if *bevy_transform != new_bevy_transform {
+                                        *bevy_transform = new_bevy_transform;
+                                        metadata.last_sync_tick = Some(bevy_transform.last_changed());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Process 2D entities
+                if !entities_2d.is_empty() {
+                    let _span = tracing::info_span!("bulk_read_2d", count = entities_2d.len(), system = stringify!($name)).entered();
+
+                    let instance_ids: Vec<i64> = entities_2d.iter().map(|(_, id)| *id).collect();
+                    let ids_packed = godot::prelude::PackedInt64Array::from(instance_ids.as_slice());
+
+                    let result = batch_singleton
+                        .call("bulk_get_transforms_2d", &[ids_packed.to_variant()])
+                        .to::<godot::builtin::Dictionary>();
+
+                    if let (Some(positions), Some(rotations), Some(scales)) = (
+                        result
+                            .get("positions")
+                            .map(|v| v.to::<godot::builtin::PackedVector2Array>()),
+                        result
+                            .get("rotations")
+                            .map(|v| v.to::<godot::builtin::PackedFloat32Array>()),
+                        result
+                            .get("scales")
+                            .map(|v| v.to::<godot::builtin::PackedVector2Array>()),
+                    ) {
+                        for (i, (entity, _)) in entities_2d.iter().enumerate() {
+                            if let Ok((_, mut bevy_transform, _, mut metadata, _)) = entities.get_mut(*entity) {
+                                if let (Some(pos), Some(rot), Some(scale)) =
+                                    (positions.get(i), rotations.get(i), scales.get(i))
+                                {
+                                    let new_bevy_transform = $crate::bevy_transform::components::Transform {
+                                        translation: $crate::bevy_math::Vec3::new(pos.x, pos.y, 0.0),
+                                        rotation: $crate::bevy_math::Quat::from_rotation_z(rot),
+                                        scale: $crate::bevy_math::Vec3::new(scale.x, scale.y, 1.0),
+                                    };
+
+                                    if *bevy_transform != new_bevy_transform {
+                                        *bevy_transform = new_bevy_transform;
+                                        metadata.last_sync_tick = Some(bevy_transform.last_changed());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            fn [<pre_update_godot_transforms_ $name:lower _individual>](
+                mut entities: $crate::bevy_ecs::system::Query<
+                    (
+                        $crate::bevy_ecs::entity::Entity,
                         &mut $crate::bevy_transform::components::Transform,
                         &mut $crate::interop::GodotNodeHandle,
                         &mut $crate::plugins::transforms::TransformSyncMetadata,
@@ -329,7 +490,7 @@ macro_rules! add_transform_sync_systems {
                 use $crate::bevy_ecs::change_detection::DetectChanges;
                 use godot::classes::{Node2D, Node3D};
 
-                for (mut bevy_transform, mut reference, mut metadata, (node2d, node3d)) in entities.iter_mut() {
+                for (_, mut bevy_transform, mut reference, mut metadata, (node2d, node3d)) in entities.iter_mut() {
                     let new_bevy_transform = if node2d.is_some() {
                         reference
                             .get::<Node2D>()
