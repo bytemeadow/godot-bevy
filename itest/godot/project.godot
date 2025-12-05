@@ -15,6 +15,10 @@ run/main_scene="res://TestRunner.tscn"
 config/features=PackedStringArray("4.2")
 run/flush_stdout_on_print=true
 
+[autoload]
+
+BevyAppSingleton="*res://addons/godot-bevy/bevy_app_singleton.tscn"
+
 [debug]
 
 gdscript/warnings/unused_parameter=0

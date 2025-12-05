@@ -117,6 +117,38 @@ impl BevyApp {
             tracing::debug!("OptimizedSceneTreeWatcher not available - using fallback method");
         }
     }
+
+    fn register_optimized_bulk_operations(&mut self) {
+        // Check if OptimizedBulkOperations already exists (e.g., loaded from tscn)
+        if self.base().has_node("OptimizedBulkOperations") {
+            return;
+        }
+
+        // Check if the bulk operations file exists before trying to load it
+        let path = "res://addons/godot-bevy/optimized_bulk_operations.gd";
+
+        // Use FileAccess to check if file actually exists
+        if godot::classes::FileAccess::file_exists(&godot::builtin::GString::from(path)) {
+            let mut resource_loader = godot::classes::ResourceLoader::singleton();
+
+            // Try to load and instantiate the OptimizedBulkOperations GDScript class
+            if let Some(resource) = resource_loader.load(path)
+                && let Ok(mut script) = resource.try_cast::<godot::classes::GDScript>()
+                && let Ok(instance) = script.try_instantiate(&[])
+                && let Ok(mut node) = instance.try_to::<godot::obj::Gd<godot::classes::Node>>()
+            {
+                node.set_name("OptimizedBulkOperations");
+                self.base_mut().add_child(&node);
+                tracing::info!("Successfully registered OptimizedBulkOperations");
+            } else {
+                tracing::warn!(
+                    "Failed to instantiate OptimizedBulkOperations - bulk operations unavailable"
+                );
+            }
+        } else {
+            tracing::debug!("OptimizedBulkOperations not available");
+        }
+    }
 }
 
 #[godot_api]
@@ -134,14 +166,27 @@ impl INode for BevyApp {
             return;
         }
 
+        // Register bulk operations helper (used by transform sync, input systems, and benchmarks)
+        // Only registered in debug builds where bulk FFI is faster than individual calls
+        // This is done before the init check so benchmarks can use it without a full Bevy app
+        #[cfg(debug_assertions)]
+        self.register_optimized_bulk_operations();
+
+        // If no init function is provided, don't initialize the Bevy app.
+        // This allows the node to exist purely for GDScript utility methods (e.g., bulk transforms)
+        // while tests create their own BevyApp instances with set_instance_init_func().
+        let has_init = self.instance_init_func.is_some() || BEVY_INIT_FUNC.get().is_some();
+        if !has_init {
+            return;
+        }
+
         let mut app = App::new();
         app.add_plugins(crate::plugins::GodotCorePlugins);
 
         // Call the init function - use instance function if set, otherwise global
         if let Some(ref instance_func) = self.instance_init_func {
             instance_func(&mut app);
-        } else {
-            let app_builder_func = BEVY_INIT_FUNC.get().unwrap();
+        } else if let Some(app_builder_func) = BEVY_INIT_FUNC.get() {
             app_builder_func(&mut app);
         }
 

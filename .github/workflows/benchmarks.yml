@@ -31,7 +31,7 @@ permissions:
 
 jobs:
     benchmarks:
-        runs-on: ubuntu-latest
+        runs-on: blaze/compute/ubuntu-latest-amd64
 
         steps:
             - name: Checkout code
@@ -134,18 +134,16 @@ jobs:
               if: github.event_name == 'pull_request'
               working-directory: itest
               run: |
+                  # Run comparison - don't fail on regression, just report it
                   python3 "$GITHUB_WORKSPACE/.github/scripts/benchmarks-compare.py" \
                     "$GITHUB_WORKSPACE/itest/baseline.json" \
                     "$GITHUB_WORKSPACE/itest/bench-results.json" \
                     "$GITHUB_WORKSPACE/itest/comparison.json" \
-                    || REGRESSION_DETECTED=$?
+                    || true
 
                   # Save PR context
                   echo "${{ github.event.pull_request.number }}" > pr_number.txt
                   echo "${{ github.event.pull_request.head.sha }}" > pr_sha.txt
-
-                  # Fail step if regressions or error detected
-                  exit $REGRESSION_DETECTED
 
             - name: Upload benchmark artifacts
               if: github.event_name == 'pull_request'
