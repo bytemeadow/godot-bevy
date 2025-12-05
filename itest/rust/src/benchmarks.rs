@@ -38,9 +38,36 @@ fn get_bulk_operations_node() -> Gd<Node> {
         .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
         .expect("Failed to get SceneTree");
     let root = scene_tree.get_root().expect("Failed to get root node");
-    root.get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
+
+    // Try to find existing node
+    if let Some(node) = root
+        .get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
         .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
-        .expect("OptimizedBulkOperations not found - ensure BevyAppSingleton is configured as an autoload")
+    {
+        return node;
+    }
+
+    // Node doesn't exist (e.g., release build where it's not auto-registered)
+    // Create it dynamically for benchmarks
+    let mut bevy_app = root
+        .get_node_or_null("BevyAppSingleton")
+        .or_else(|| root.get_node_or_null("/root/BevyAppSingleton"))
+        .expect("BevyAppSingleton not found - ensure it is configured as an autoload");
+
+    let path = "res://addons/godot-bevy/optimized_bulk_operations.gd";
+    let mut resource_loader = godot::classes::ResourceLoader::singleton();
+
+    if let Some(resource) = resource_loader.load(path)
+        && let Ok(mut script) = resource.try_cast::<godot::classes::GDScript>()
+        && let Ok(instance) = script.try_instantiate(&[])
+        && let Ok(mut node) = instance.try_to::<Gd<Node>>()
+    {
+        node.set_name("OptimizedBulkOperations");
+        bevy_app.add_child(&node);
+        node
+    } else {
+        panic!("Failed to create OptimizedBulkOperations node from GDScript");
+    }
 }
 
 /// Measures the cost of updating 3D transforms one-by-one via individual FFI calls
