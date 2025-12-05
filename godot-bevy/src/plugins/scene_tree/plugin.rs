@@ -491,13 +491,30 @@ fn create_scene_tree_entity(
             }
             SceneTreeMessageType::NodeRemoved => {
                 if let Some((ent, prot_opt)) = ent {
-                    let protected = prot_opt.is_some();
-                    if !protected {
-                        commands.entity(ent).despawn();
+                    // Check if node is being reparented vs truly removed
+                    // During reparenting, the node is temporarily removed from old parent
+                    // but still exists in the scene tree (has a parent)
+                    // We need to try_get because the node handle might be invalid if freed
+                    let is_reparenting = node
+                        .try_get::<Node>()
+                        .map(|godot_node| godot_node.get_parent().is_some())
+                        .unwrap_or(false);
+
+                    if is_reparenting {
+                        // Node is being reparented - don't despawn entity, it will be re-added
+                        trace!(target: "godot_scene_tree_events",
+                            "Node is being reparented, preserving entity");
+                        // Don't remove from ent_mapping - entity still valid
                     } else {
-                        _strip_godot_components(commands, ent, &node);
+                        // Node is truly being removed (freed or despawned)
+                        let protected = prot_opt.is_some();
+                        if !protected {
+                            commands.entity(ent).despawn();
+                        } else {
+                            _strip_godot_components(commands, ent, &node);
+                        }
+                        ent_mapping.remove(&node.instance_id());
                     }
-                    ent_mapping.remove(&node.instance_id());
                 } else {
                     // Entity was already despawned (common when using queue_free)
                     trace!(target: "godot_scene_tree_messages", "Entity for removed node was already despawned");
