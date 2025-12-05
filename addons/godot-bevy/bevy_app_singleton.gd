@@ -1,7 +1,8 @@
-extends Node
+extends BevyApp
 
-# Benchmark helper that provides bulk optimization methods
-# This is a standalone GDScript node (not extending BevyApp) for benchmark testing
+
+# Bulk Transform Optimization Methods
+# Automatically detected by godot-bevy library for performance optimization
 
 func bulk_update_transforms_3d(
   instance_ids: PackedInt64Array,
@@ -32,6 +33,10 @@ func bulk_update_transforms_2d(
 		node.rotation = rotations[i]
 		node.scale = scales[i]
 
+
+# Bulk Transform Read Methods
+# Returns transform data for multiple nodes in a single FFI call
+
 func bulk_get_transforms_3d(instance_ids: PackedInt64Array) -> Dictionary:
 	var positions: PackedVector3Array = PackedVector3Array()
 	var rotations: PackedVector4Array = PackedVector4Array()
@@ -48,11 +53,7 @@ func bulk_get_transforms_3d(instance_ids: PackedInt64Array) -> Dictionary:
 		rotations[i] = Vector4(q.x, q.y, q.z, q.w)
 		scales[i] = node.scale
 
-	var result: Dictionary = {}
-	result["positions"] = positions
-	result["rotations"] = rotations
-	result["scales"] = scales
-	return result
+	return {"positions": positions, "rotations": rotations, "scales": scales}
 
 func bulk_get_transforms_2d(instance_ids: PackedInt64Array) -> Dictionary:
 	var positions: PackedVector2Array = PackedVector2Array()
@@ -69,11 +70,12 @@ func bulk_get_transforms_2d(instance_ids: PackedInt64Array) -> Dictionary:
 		rotations[i] = node.rotation
 		scales[i] = node.scale
 
-	var result: Dictionary = {}
-	result["positions"] = positions
-	result["rotations"] = rotations
-	result["scales"] = scales
-	return result
+	return {"positions": positions, "rotations": rotations, "scales": scales}
+
+
+# Bulk Input Action Checking
+# Checks an input event against all actions in a single FFI call
+# Returns arrays of matching action data for efficient transfer
 
 func bulk_check_actions(event: InputEvent) -> Dictionary:
 	var actions: PackedStringArray = PackedStringArray()

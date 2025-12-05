@@ -17,7 +17,7 @@ run/flush_stdout_on_print=true
 
 [autoload]
 
-BevyAppSingleton="*res://BenchmarkHelper.gd"
+BevyAppSingleton="*res://addons/godot-bevy/bevy_app_singleton.tscn"
 
 [debug]
 

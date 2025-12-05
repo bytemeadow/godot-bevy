@@ -134,14 +134,20 @@ impl INode for BevyApp {
             return;
         }
 
+        // If no init function is provided, don't initialize the Bevy app.
+        // This allows the node to exist as a shell (e.g., for GDScript bulk methods)
+        // without interfering with other BevyApp instances.
+        let has_init = self.instance_init_func.is_some() || BEVY_INIT_FUNC.get().is_some();
+        if !has_init {
+            return;
+        }
+
         let mut app = App::new();
         app.add_plugins(crate::plugins::GodotCorePlugins);
 
-        // Call the init function - use instance function if set, otherwise global
         if let Some(ref instance_func) = self.instance_init_func {
             instance_func(&mut app);
-        } else {
-            let app_builder_func = BEVY_INIT_FUNC.get().unwrap();
+        } else if let Some(app_builder_func) = BEVY_INIT_FUNC.get() {
             app_builder_func(&mut app);
         }
 
