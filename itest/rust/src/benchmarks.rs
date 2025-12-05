@@ -29,8 +29,7 @@ fn make_transform_2d(pos: Vector2, rotation: f32, scale: Vector2) -> Transform2D
     Transform2D { a, b, origin: pos }
 }
 
-const BENCH_ENTITY_COUNT: usize = 5000;
-const UPDATE_ITERATIONS: usize = 50;
+const BENCH_ENTITY_COUNT: usize = 20000;
 const BENCH_ACTION_EVENT_COUNT: usize = 100;
 
 fn get_bevy_app_singleton() -> Gd<Node> {
@@ -57,18 +56,15 @@ fn transform_update_individual_3d() -> i32 {
         nodes.push(node);
     }
 
-    for iteration in 0..UPDATE_ITERATIONS {
-        let offset = iteration as f32;
-        for node in &mut nodes {
-            node.set_transform(make_transform_3d(
-                Vector3::new(5.0 + offset, 6.0, 7.0),
-                Vector4::new(0.0, 0.0, 0.0, 1.0),
-                Vector3::new(1.0, 1.0, 1.0),
-            ));
-        }
+    for node in &mut nodes {
+        node.set_transform(make_transform_3d(
+            Vector3::new(5.0, 6.0, 7.0),
+            Vector4::new(0.0, 0.0, 0.0, 1.0),
+            Vector3::new(1.0, 1.0, 1.0),
+        ));
     }
 
-    let count = (nodes.len() * UPDATE_ITERATIONS) as i32;
+    let count = nodes.len() as i32;
     for node in nodes {
         node.free();
     }
@@ -91,28 +87,25 @@ fn transform_update_bulk_3d() -> i32 {
     let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
     let mut bevy_app = get_bevy_app_singleton();
 
-    for iteration in 0..UPDATE_ITERATIONS {
-        let offset = iteration as f32;
-        let positions = vec![Vector3::new(5.0 + offset, 6.0, 7.0); BENCH_ENTITY_COUNT];
-        let rotations = vec![Vector4::new(0.0, 0.0, 0.0, 1.0); BENCH_ENTITY_COUNT];
-        let scales = vec![Vector3::new(1.0, 1.0, 1.0); BENCH_ENTITY_COUNT];
+    let positions = vec![Vector3::new(5.0, 6.0, 7.0); BENCH_ENTITY_COUNT];
+    let rotations = vec![Vector4::new(0.0, 0.0, 0.0, 1.0); BENCH_ENTITY_COUNT];
+    let scales = vec![Vector3::new(1.0, 1.0, 1.0); BENCH_ENTITY_COUNT];
 
-        let pos_packed = PackedVector3Array::from(positions.as_slice());
-        let rot_packed = PackedVector4Array::from(rotations.as_slice());
-        let scale_packed = PackedVector3Array::from(scales.as_slice());
+    let pos_packed = PackedVector3Array::from(positions.as_slice());
+    let rot_packed = PackedVector4Array::from(rotations.as_slice());
+    let scale_packed = PackedVector3Array::from(scales.as_slice());
 
-        bevy_app.call(
-            "bulk_update_transforms_3d",
-            &[
-                ids_packed.to_variant(),
-                pos_packed.to_variant(),
-                rot_packed.to_variant(),
-                scale_packed.to_variant(),
-            ],
-        );
-    }
+    bevy_app.call(
+        "bulk_update_transforms_3d",
+        &[
+            ids_packed.to_variant(),
+            pos_packed.to_variant(),
+            rot_packed.to_variant(),
+            scale_packed.to_variant(),
+        ],
+    );
 
-    let count = (nodes.len() * UPDATE_ITERATIONS) as i32;
+    let count = nodes.len() as i32;
     for node in nodes {
         node.free();
     }
@@ -134,18 +127,15 @@ fn transform_update_individual_2d() -> i32 {
         nodes.push(node);
     }
 
-    for iteration in 0..UPDATE_ITERATIONS {
-        let offset = iteration as f32;
-        for node in &mut nodes {
-            node.set_transform(make_transform_2d(
-                Vector2::new(5.0 + offset, 6.0),
-                0.0,
-                Vector2::new(1.0, 1.0),
-            ));
-        }
+    for node in &mut nodes {
+        node.set_transform(make_transform_2d(
+            Vector2::new(5.0, 6.0),
+            0.0,
+            Vector2::new(1.0, 1.0),
+        ));
     }
 
-    let count = (nodes.len() * UPDATE_ITERATIONS) as i32;
+    let count = nodes.len() as i32;
     for node in nodes {
         node.free();
     }
@@ -168,28 +158,25 @@ fn transform_update_bulk_2d() -> i32 {
     let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
     let mut bevy_app = get_bevy_app_singleton();
 
-    for iteration in 0..UPDATE_ITERATIONS {
-        let offset = iteration as f32;
-        let positions = vec![Vector2::new(5.0 + offset, 6.0); BENCH_ENTITY_COUNT];
-        let rotations = vec![0.0f32; BENCH_ENTITY_COUNT];
-        let scales = vec![Vector2::new(1.0, 1.0); BENCH_ENTITY_COUNT];
+    let positions = vec![Vector2::new(5.0, 6.0); BENCH_ENTITY_COUNT];
+    let rotations = vec![0.0f32; BENCH_ENTITY_COUNT];
+    let scales = vec![Vector2::new(1.0, 1.0); BENCH_ENTITY_COUNT];
 
-        let pos_packed = PackedVector2Array::from(positions.as_slice());
-        let rot_packed = PackedFloat32Array::from(rotations.as_slice());
-        let scale_packed = PackedVector2Array::from(scales.as_slice());
+    let pos_packed = PackedVector2Array::from(positions.as_slice());
+    let rot_packed = PackedFloat32Array::from(rotations.as_slice());
+    let scale_packed = PackedVector2Array::from(scales.as_slice());
 
-        bevy_app.call(
-            "bulk_update_transforms_2d",
-            &[
-                ids_packed.to_variant(),
-                pos_packed.to_variant(),
-                rot_packed.to_variant(),
-                scale_packed.to_variant(),
-            ],
-        );
-    }
+    bevy_app.call(
+        "bulk_update_transforms_2d",
+        &[
+            ids_packed.to_variant(),
+            pos_packed.to_variant(),
+            rot_packed.to_variant(),
+            scale_packed.to_variant(),
+        ],
+    );
 
-    let count = (nodes.len() * UPDATE_ITERATIONS) as i32;
+    let count = nodes.len() as i32;
     for node in nodes {
         node.free();
     }
@@ -212,15 +199,13 @@ fn transform_read_individual_3d() -> i32 {
     }
 
     let mut sum = Vector3::ZERO;
-    for _ in 0..UPDATE_ITERATIONS {
-        for node in &nodes {
-            let transform = node.get_transform();
-            // Use the transform data to prevent optimization
-            sum += transform.origin;
-        }
+    for node in &nodes {
+        let transform = node.get_transform();
+        // Use the transform data to prevent optimization
+        sum += transform.origin;
     }
 
-    let count = (nodes.len() * UPDATE_ITERATIONS) as i32;
+    let count = nodes.len() as i32;
     for node in nodes {
         node.free();
     }
@@ -244,24 +229,22 @@ fn transform_read_bulk_3d() -> i32 {
     let mut bevy_app = get_bevy_app_singleton();
 
     let mut sum = Vector3::ZERO;
-    for _ in 0..UPDATE_ITERATIONS {
-        let result = bevy_app
-            .call("bulk_get_transforms_3d", &[ids_packed.to_variant()])
-            .to::<godot::builtin::Dictionary>();
+    let result = bevy_app
+        .call("bulk_get_transforms_3d", &[ids_packed.to_variant()])
+        .to::<godot::builtin::Dictionary>();
 
-        if let Some(positions) = result
-            .get("positions")
-            .map(|v| v.to::<PackedVector3Array>())
-        {
-            for i in 0..positions.len() {
-                if let Some(pos) = positions.get(i) {
-                    sum += pos;
-                }
+    if let Some(positions) = result
+        .get("positions")
+        .map(|v| v.to::<PackedVector3Array>())
+    {
+        for i in 0..positions.len() {
+            if let Some(pos) = positions.get(i) {
+                sum += pos;
             }
         }
     }
 
-    let count = (nodes.len() * UPDATE_ITERATIONS) as i32;
+    let count = nodes.len() as i32;
     for node in nodes {
         node.free();
     }
@@ -284,15 +267,13 @@ fn transform_read_individual_2d() -> i32 {
     }
 
     let mut sum = Vector2::ZERO;
-    for _ in 0..UPDATE_ITERATIONS {
-        for node in &nodes {
-            let transform = node.get_transform();
-            // Use the transform data to prevent optimization
-            sum += transform.origin;
-        }
+    for node in &nodes {
+        let transform = node.get_transform();
+        // Use the transform data to prevent optimization
+        sum += transform.origin;
     }
 
-    let count = (nodes.len() * UPDATE_ITERATIONS) as i32;
+    let count = nodes.len() as i32;
     for node in nodes {
         node.free();
     }
@@ -316,24 +297,22 @@ fn transform_read_bulk_2d() -> i32 {
     let mut bevy_app = get_bevy_app_singleton();
 
     let mut sum = Vector2::ZERO;
-    for _ in 0..UPDATE_ITERATIONS {
-        let result = bevy_app
-            .call("bulk_get_transforms_2d", &[ids_packed.to_variant()])
-            .to::<godot::builtin::Dictionary>();
+    let result = bevy_app
+        .call("bulk_get_transforms_2d", &[ids_packed.to_variant()])
+        .to::<godot::builtin::Dictionary>();
 
-        if let Some(positions) = result
-            .get("positions")
-            .map(|v| v.to::<PackedVector2Array>())
-        {
-            for i in 0..positions.len() {
-                if let Some(pos) = positions.get(i) {
-                    sum += pos;
-                }
+    if let Some(positions) = result
+        .get("positions")
+        .map(|v| v.to::<PackedVector2Array>())
+    {
+        for i in 0..positions.len() {
+            if let Some(pos) = positions.get(i) {
+                sum += pos;
             }
         }
     }
 
-    let count = (nodes.len() * UPDATE_ITERATIONS) as i32;
+    let count = nodes.len() as i32;
     for node in nodes {
         node.free();
     }
