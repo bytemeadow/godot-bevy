@@ -290,7 +290,16 @@ fn test_protected_node_entity(ctx: &TestContext) -> godot::task::TaskHandle {
             "GodotNodeHandle should be removed from protected entity"
         );
 
-        println!("✓ ProtectedNodeEntity: entity survives, GodotNodeHandle removed");
+        // Verify NodeEntityIndex no longer contains the mapping
+        let index_cleared =
+            app.with_world(|world| !world.resource::<NodeEntityIndex>().contains(node_id));
+
+        assert!(
+            index_cleared,
+            "NodeEntityIndex should remove entry for protected entity when node is freed"
+        );
+
+        println!("✓ ProtectedNodeEntity: entity survives, GodotNodeHandle removed, index cleared");
 
         app.cleanup();
         await_frames(1).await;
@@ -426,6 +435,16 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
                 data,
                 Some(CustomData(42)),
                 "Component data should be preserved"
+            );
+
+            // Verify NodeEntityIndex still maps to the same entity after reparenting
+            let child_id = child.instance_id();
+            let index_entity =
+                app.with_world(|world| world.resource::<NodeEntityIndex>().get(child_id));
+            assert_eq!(
+                index_entity,
+                Some(entity),
+                "NodeEntityIndex should still map to same entity after reparenting"
             );
         }
 
