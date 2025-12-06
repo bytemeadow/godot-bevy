@@ -1,3 +1,4 @@
+use crate::interop::GodotNodeHandle;
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
     component::Component,
@@ -11,9 +12,10 @@ use godot::{
     obj::{Gd, InstanceId},
     prelude::{Callable, Variant},
 };
+use std::fmt::Debug;
+use std::sync::Arc;
 use std::sync::mpsc::Sender;
-
-use crate::interop::GodotNodeHandle;
+use tracing::error;
 
 #[derive(Default)]
 pub struct GodotSignalsPlugin;
@@ -298,13 +300,23 @@ fn process_typed_deferred_signal_connections<T: Message + Send + 'static>(
 /// A single typed deferred connection item for `T` messages
 pub struct TypedDeferredConnection<T: Message + Send + 'static> {
     pub signal_name: String,
-    pub mapper: Box<
+    pub mapper: Arc<
         dyn Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
     >,
 }
 
+impl<T: Message + Send + 'static> Debug for TypedDeferredConnection<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "TypedDeferredConnection {{ signal_name: {:?} }}",
+            self.signal_name
+        )
+    }
+}
+
 /// Component to defer Godot signal connections until a `GodotNodeHandle` exists on the entity
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub struct TypedDeferredSignalConnections<T: Message + Send + 'static> {
     pub connections: Vec<TypedDeferredConnection<T>>,
 }
@@ -329,7 +341,7 @@ impl<T: Message + Send + 'static> TypedDeferredSignalConnections<T> {
         Self {
             connections: vec![TypedDeferredConnection {
                 signal_name: signal_name.into(),
-                mapper: Box::new(mapper),
+                mapper: Arc::new(mapper),
             }],
         }
     }
@@ -340,7 +352,62 @@ impl<T: Message + Send + 'static> TypedDeferredSignalConnections<T> {
     {
         self.connections.push(TypedDeferredConnection {
             signal_name: signal_name.into(),
-            mapper: Box::new(mapper),
+            mapper: Arc::new(mapper),
         });
+    }
+}
+
+/// Type-erased deferred connections. Allows deferred connections of any Bevy Message type
+/// to be processed after a GodotNodeHandle exists.
+#[doc(hidden)]
+pub(crate) trait DeferredSignalConnection: Send + Sync + Debug {
+    /// Connect the deferred signal to the given Godot node.
+    fn connect(&self, root_node: &Gd<Node>, entity: Entity, typed_sender: &GlobalTypedSignalSender);
+}
+
+/// Deferred connection information for a specific `T` message type.
+#[doc(hidden)]
+#[derive(Debug)]
+pub(crate) struct SignalConnectionSpec<T: Message + Send + 'static> {
+    pub(crate) node_path: String,
+    pub(crate) signal_name: String,
+    pub(crate) connections: TypedDeferredSignalConnections<T>,
+}
+
+#[doc(hidden)]
+impl<T: Message + Send + Debug + 'static> DeferredSignalConnection for SignalConnectionSpec<T> {
+    fn connect(
+        &self,
+        root_node: &Gd<Node>,
+        source_entity: Entity,
+        typed_sender: &GlobalTypedSignalSender,
+    ) {
+        let Some(mut target_node) = root_node.get_node_or_null(self.node_path.as_str()) else {
+            error!(
+                "Failed to find node at path '{}' for signal connection",
+                self.node_path
+            );
+            return;
+        };
+
+        for connection in self.connections.connections.iter() {
+            let source_node_handle = GodotNodeHandle::new(target_node.clone());
+            let typed_sender_copy = typed_sender.0.clone();
+            let mapper = connection.mapper.clone();
+            let signal_name = self.signal_name.clone();
+
+            let closure = move |args: &[&Variant]| -> Variant {
+                let owned: Vec<Variant> = args.iter().map(|&v| v.clone()).collect();
+                if let Some(event) = mapper(&owned, &source_node_handle, Some(source_entity)) {
+                    let _ = typed_sender_copy.send(Box::new(TypedEnvelope::<T>(event)));
+                }
+                Variant::nil()
+            };
+
+            target_node.connect(
+                &signal_name,
+                &Callable::from_fn(&format!("signal_handler_typed_{signal_name}"), closure),
+            );
+        }
     }
 }

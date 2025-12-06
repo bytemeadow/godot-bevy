@@ -3,7 +3,7 @@
 Fully automatic Godot type generation for godot-bevy.
 
 This script:
-1. Runs `godot --dump-extension-api` to generate extension_api.json
+1. Runs `godot --dump-extension-api-with-docs` to generate extension_api.json
 2. Parses all Node-derived types from the API
 3. Generates comprehensive node marker components
 4. Generates complete type checking functions
@@ -13,7 +13,6 @@ Usage: python scripts/generate_godot_types.py
 """
 
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -26,6 +25,9 @@ class GodotTypeGenerator:
         self.api_file = self.project_root / "extension_api.json"
         self.node_markers_file = (
             self.project_root / "godot-bevy" / "src" / "interop" / "node_markers.rs"
+        )
+        self.signal_names_file = (
+            self.project_root / "godot-bevy" / "src" / "interop" / "signal_names.rs"
         )
         self.type_checking_file = (
             self.project_root
@@ -49,6 +51,73 @@ class GodotTypeGenerator:
             / "godot-bevy"
             / "optimized_scene_tree_watcher.gd"
         )
+        self.signal_names_file = (
+            self.project_root / "godot-bevy" / "src" / "interop" / "signal_names.rs"
+        )
+
+        # Store all classes by name for signal generation
+        self.classes_by_name = {}
+
+        # Known classes that don't exist in current Godot version or aren't available
+        # Used for filtering both node types and signal generation
+        self.excluded_classes = {
+            # CSG classes (require special module)
+            "CSGBox3D",
+            "CSGCombiner3D",
+            "CSGCylinder3D",
+            "CSGMesh3D",
+            "CSGPolygon3D",
+            "CSGPrimitive3D",
+            "CSGShape3D",
+            "CSGSphere3D",
+            "CSGTorus3D",
+            # Editor classes
+            "GridMapEditorPlugin",
+            "ScriptCreateDialog",
+            "FileSystemDock",
+            "OpenXRBindingModifierEditor",
+            "OpenXRInteractionProfileEditor",
+            "OpenXRInteractionProfileEditorBase",
+            # XR classes that might not be available
+            "XRAnchor3D",
+            "XRBodyModifier3D",
+            "XRCamera3D",
+            "XRController3D",
+            "XRFaceModifier3D",
+            "XRHandModifier3D",
+            "XRNode3D",
+            "XROrigin3D",
+            # OpenXR classes
+            "OpenXRCompositionLayer",
+            "OpenXRCompositionLayerCylinder",
+            "OpenXRCompositionLayerEquirect",
+            "OpenXRCompositionLayerQuad",
+            "OpenXRHand",
+            "OpenXRVisibilityMask",
+            # Classes that might not be available in all builds
+            "VoxelGI",
+            "LightmapGI",
+            "FogVolume",
+            "WorldEnvironment",
+            # Navigation classes (might be module-specific)
+            "NavigationAgent2D",
+            "NavigationAgent3D",
+            "NavigationLink2D",
+            "NavigationLink3D",
+            "NavigationObstacle2D",
+            "NavigationObstacle3D",
+            "NavigationRegion2D",
+            "NavigationRegion3D",
+            # Other problematic classes
+            "StatusIndicator",
+            # Graph classes (not available in all Godot builds)
+            "GraphEdit",
+            "GraphElement",
+            "GraphFrame",
+            "GraphNode",
+            # Parallax2D is in extension API but not in current Rust bindings
+            "Parallax2D",
+        }
 
         # Types that require specific Godot API versions
         # Based on Godot release notes and documentation
@@ -72,8 +141,32 @@ class GodotTypeGenerator:
             # Note: Godot 4.5 didn't add significant new node types
         }
 
+    def run_cargo_fmt(self, file_path):
+        """Run cargo fmt on a specific file to format the generated Rust code"""
+        try:
+            # Run cargo fmt on the specific file
+            result = subprocess.run(
+                ["cargo", "fmt", "--", str(file_path)],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            if result.returncode == 0:
+                print(f"  ✓ Formatted {file_path.name}")
+            else:
+                print(f"  ⚠ cargo fmt warning for {file_path.name}: {result.stderr}")
+
+        except FileNotFoundError:
+            print(f"  ⚠ cargo fmt not found - skipping formatting for {file_path.name}")
+        except subprocess.TimeoutExpired:
+            print(f"  ⚠ cargo fmt timed out for {file_path.name}")
+        except Exception as e:
+            print(f"  ⚠ Could not format {file_path.name}: {e}")
+
     def run_godot_dump_api(self):
-        """Run godot --dump-extension-api to generate extension_api.json"""
+        """Run godot --dump-extension-api-with-docs to generate extension_api.json"""
         print("🚀 Generating extension_api.json from Godot...")
 
         try:
@@ -83,7 +176,12 @@ class GodotTypeGenerator:
             for cmd in godot_commands:
                 try:
                     result = subprocess.run(
-                        [cmd, "--headless", "--dump-extension-api", str(self.api_file)],
+                        [
+                            cmd,
+                            "--headless",
+                            "--dump-extension-api-with-docs",
+                            str(self.api_file),
+                        ],
                         capture_output=True,
                         text=True,
                         timeout=30,
@@ -102,7 +200,7 @@ class GodotTypeGenerator:
             raise RuntimeError(
                 "Could not run Godot to generate extension_api.json.\n"
                 "Please ensure Godot 4 is installed and available in PATH.\n"
-                "You can also manually run: godot --dump-extension-api extension_api.json"
+                "You can also manually run: godot --dump-extension-api-with-docs extension_api.json"
             )
 
         except Exception as e:
@@ -118,6 +216,11 @@ class GodotTypeGenerator:
 
         with open(self.api_file) as f:
             api = json.load(f)
+
+        # Store all classes by name for signal generation
+        self.classes_by_name = {
+            class_info["name"]: class_info for class_info in api["classes"]
+        }
 
         # Build inheritance relationships
         inheritance_map = defaultdict(list)
@@ -167,9 +270,9 @@ class GodotTypeGenerator:
         """Generate the node_markers.rs file"""
         print("🏷️  Generating node markers...")
 
-        content = """use bevy::ecs::component::Component;
-use bevy::prelude::ReflectComponent;
-use bevy::reflect::Reflect;
+        content = """use bevy_ecs::component::Component;
+use bevy_ecs::prelude::ReflectComponent;
+use bevy_reflect::Reflect;
 
 /// Marker components for Godot node types.
 /// These enable type-safe ECS queries like: Query<&GodotNodeHandle, With<Sprite2DMarker>>
@@ -197,12 +300,14 @@ pub struct NodeMarker;
             f.write(content)
 
         print(f"✅ Generated {len(node_types)} node markers")
+        self.run_cargo_fmt(self.node_markers_file)
 
-    def categorize_types_by_hierarchy(self, node_types, parent_map):
+    @staticmethod
+    def categorize_types_by_hierarchy(node_types, parent_map):
         """Categorize node types by their inheritance hierarchy"""
 
-        def is_descendant_of(node_type, ancestor):
-            current = node_type
+        def is_descendant_of(ancestor_node_type, ancestor):
+            current = ancestor_node_type
             while current in parent_map:
                 current = parent_map[current]
                 if current == ancestor:
@@ -236,7 +341,7 @@ pub struct NodeMarker;
         content = f"""// 🤖 This file is automatically generated by scripts/generate_godot_types.py
 // To regenerate: python scripts/generate_godot_types.py
 
-use bevy::ecs::system::EntityCommands;
+use bevy_ecs::system::EntityCommands;
 use crate::interop::{{GodotNodeHandle, node_markers::*}};
 
 /// Adds appropriate marker components to an entity based on the Godot node type.
@@ -329,72 +434,15 @@ pub fn remove_comprehensive_node_type_markers(
             f.write(content)
 
         print(f"✅ Generated type checking for {len(valid_types)} types")
+        self.run_cargo_fmt(self.type_checking_file)
 
     def filter_valid_godot_classes(self, node_types):
         """Filter out Godot classes that don't exist or aren't available"""
-        # Known classes that don't exist in current Godot version or aren't available
-        excluded_classes = {
-            # CSG classes (require special module)
-            "CSGBox3D",
-            "CSGCombiner3D",
-            "CSGCylinder3D",
-            "CSGMesh3D",
-            "CSGPolygon3D",
-            "CSGPrimitive3D",
-            "CSGShape3D",
-            "CSGSphere3D",
-            "CSGTorus3D",
-            # Editor classes
-            "GridMapEditorPlugin",
-            "ScriptCreateDialog",
-            "FileSystemDock",
-            "OpenXRBindingModifierEditor",
-            "OpenXRInteractionProfileEditor",
-            "OpenXRInteractionProfileEditorBase",
-            # XR classes that might not be available
-            "XRAnchor3D",
-            "XRBodyModifier3D",
-            "XRCamera3D",
-            "XRController3D",
-            "XRFaceModifier3D",
-            "XRHandModifier3D",
-            "XRNode3D",
-            "XROrigin3D",
-            # OpenXR classes
-            "OpenXRCompositionLayer",
-            "OpenXRCompositionLayerCylinder",
-            "OpenXRCompositionLayerEquirect",
-            "OpenXRCompositionLayerQuad",
-            "OpenXRHand",
-            "OpenXRVisibilityMask",
-            # Classes that might not be available in all builds
-            "VoxelGI",
-            "LightmapGI",
-            "FogVolume",
-            "WorldEnvironment",
-            # Navigation classes (might be module-specific)
-            "NavigationAgent2D",
-            "NavigationAgent3D",
-            "NavigationLink2D",
-            "NavigationLink3D",
-            "NavigationObstacle2D",
-            "NavigationObstacle3D",
-            "NavigationRegion2D",
-            "NavigationRegion3D",
-            # Other problematic classes
-            "StatusIndicator",
-            # Graph classes (not available in all Godot builds)
-            "GraphEdit",
-            "GraphElement",
-            "GraphFrame",
-            "GraphNode",
-            # Parallax2D is in extension API but not in current Rust bindings
-            "Parallax2D",
-        }
+        # Use the shared excluded_classes set defined in __init__
+        return [t for t in node_types if t not in self.excluded_classes]
 
-        return [t for t in node_types if t not in excluded_classes]
-
-    def fix_godot_class_name_for_rust(self, class_name):
+    @staticmethod
+    def fix_godot_class_name_for_rust(class_name):
         """Fix Godot class names to match the actual Rust bindings"""
         # Map class names from extension API to actual Rust struct names
         name_fixes = {
@@ -419,6 +467,40 @@ pub fn remove_comprehensive_node_type_markers(
         }
 
         return name_fixes.get(class_name, class_name)
+
+    @staticmethod
+    def signal_name_to_const(signal_name):
+        """Convert a signal name to UPPER_SNAKE_CASE constant name"""
+        import re
+
+        # Handle empty or invalid names
+        if not signal_name:
+            return "SIGNAL"
+
+        # Insert underscores before uppercase letters (for camelCase/PascalCase)
+        result = re.sub("([a-z0-9])([A-Z])", r"\1_\2", signal_name)
+
+        # Replace non-alphanumeric characters with underscores
+        result = re.sub(r"[^a-zA-Z0-9_]", "_", result)
+
+        # Convert to uppercase
+        result = result.upper()
+
+        # Collapse multiple underscores
+        result = re.sub(r"_+", "_", result)
+
+        # Strip leading/trailing underscores
+        result = result.strip("_")
+
+        # Ensure it doesn't start with a digit (prepend underscore if needed)
+        if result and result[0].isdigit():
+            result = "_" + result
+
+        # Fallback if empty after processing
+        if not result:
+            result = "SIGNAL"
+
+        return result
 
     def _generate_string_match_arms(self, categories):
         """Generate match arms for the string-based marker function"""
@@ -639,13 +721,14 @@ func _analyze_node_type(node: Node) -> String:
 
         print(f"✅ Generated GDScript watcher with {len(valid_types)} node types")
 
-    def _generate_gdscript_type_analysis(self, categories):
+    @staticmethod
+    def _generate_gdscript_type_analysis(categories):
         """Generate the GDScript node type analysis function"""
-        lines = []
-
         # Node3D hierarchy (most common in 3D games)
-        lines.append("\t# Check Node3D hierarchy first (most common in 3D games)")
-        lines.append("\tif node is Node3D:")
+        lines = [
+            "\t# Check Node3D hierarchy first (most common in 3D games)",
+            "\tif node is Node3D:",
+        ]
 
         # Add common 3D types first for better performance
         common_3d = [
@@ -754,7 +837,8 @@ func _analyze_node_type(node: Node) -> String:
 
         return "\n".join(lines)
 
-    def _generate_initial_tree_analysis(self):
+    @staticmethod
+    def _generate_initial_tree_analysis():
         """Generate method for analyzing the initial scene tree with type info"""
         return '''func analyze_initial_tree() -> Dictionary:
 	"""
@@ -947,6 +1031,181 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
             )
             print("   3. This is a one-time setup - future script runs won't need this")
 
+    def generate_signal_names(self):
+        """Generate the signal_names.rs file with signal constants"""
+        print("📡 Generating signal names...")
+
+        content = """#![allow(dead_code)]
+//! 🤖 This file is automatically generated by scripts/generate_godot_types.py
+//! To regenerate: python scripts/generate_godot_types.py
+//!
+//! Signal name constants for Godot classes.
+//! These provide convenient, discoverable signal names for connecting to Godot signals.
+//!
+//! Example usage:
+//! ```ignore
+//! use godot_bevy::interop::signal_names::ButtonSignals;
+//! // Connect to the "pressed" signal
+//! button.connect(ButtonSignals::PRESSED.into(), callable);
+//! ```
+
+"""
+
+        # Collect all classes with signals, sorted by name, skipping excluded classes
+        classes_with_signals = []
+        for class_name in sorted(self.classes_by_name.keys()):
+            # Skip classes that we know are not available / problematic
+            if class_name in self.excluded_classes:
+                continue
+
+            class_info = self.classes_by_name[class_name]
+            signals = class_info.get("signals", [])
+            if signals:
+                classes_with_signals.append((class_name, class_info, signals))
+
+        signal_count = 0
+
+        # Generate a dedicated *Signals struct and impl block for each class
+        for class_name, class_info, signals in classes_with_signals:
+            rust_class_name = self.fix_godot_class_name_for_rust(class_name)
+            signals_struct_name = f"{rust_class_name}Signals"
+
+            # Optional: cfg-gate the whole struct/impl if the class is version-gated
+            cfg_attr = self.get_type_cfg_attribute(class_name)
+            if cfg_attr:
+                content += cfg_attr
+
+            # Struct declaration
+            content += f"/// Signal constants for `{rust_class_name}`\n"
+            content += f"pub struct {signals_struct_name};\n\n"
+
+            # Impl block
+            if cfg_attr:
+                content += cfg_attr
+            content += f"impl {signals_struct_name} {{\n"
+
+            # Generate constants for each signal
+            for signal in signals:
+                signal_name = signal["name"]
+                description = signal.get("description", "").strip()
+                const_name = self.signal_name_to_const(signal_name)
+
+                # Add doc comment with description if available
+                if description:
+                    # Convert BBCode to Markdown
+                    description = self.bbcode_to_markdown(description)
+                    # Sanitize to prevent escaping doc comments
+                    description = self.sanitize_doc_comment(description)
+
+                    # Format description for Rust doc comments
+                    description_lines = description.replace("\r\n", "\n").split("\n")
+                    for line in description_lines:
+                        # Strip trailing whitespace but preserve empty lines
+                        line = line.rstrip()
+                        content += f"    /// {line}\n"
+                else:
+                    # Fallback: just mention the signal name
+                    content += f"    /// Signal `{signal_name}`\n"
+
+                # Constant definition
+                content += (
+                    f'    pub const {const_name}: &\'static str = "{signal_name}";\n\n'
+                )
+                signal_count += 1
+
+            # Close impl block
+            content += "}\n\n"
+
+        # Write the file
+        with open(self.signal_names_file, "w") as f:
+            f.write(content)
+
+        print(
+            f"✅ Generated {signal_count} signal constants across {len(classes_with_signals)} classes"
+        )
+        self.run_cargo_fmt(self.signal_names_file)
+
+    @staticmethod
+    def bbcode_to_markdown(text):
+        """Convert Godot BBCode format to Rustdoc-compatible Markdown"""
+        import re
+        from textwrap import dedent
+
+        # Basic inline formatting
+        text = text.replace("[b]", "**").replace("[/b]", "**")
+        text = text.replace("[i]", "*").replace("[/i]", "*")
+        text = text.replace("[code]", "`").replace("[/code]", "`")
+
+        # [member something] -> `something`
+        text = re.sub(r"\[member\s+([^]]+)]", r"`\1`", text)
+
+        # [param something] -> `something`
+        text = re.sub(r"\[param\s+([^]]+)]", r"`\1`", text)
+
+        # [constant something] -> `something`
+        text = re.sub(r"\[constant\s+([^]]+)]", r"`\1`", text)
+
+        # [method something] -> `something()`
+        text = re.sub(r"\[method\s+([^]]+)]", r"`\1()`", text)
+
+        # [signal something] -> `something`
+        text = re.sub(r"\[signal\s+([^]]+)]", r"`\1`", text)
+
+        # [enum something] -> `something`
+        text = re.sub(r"\[enum\s+([^]]+)]", r"`\1`", text)
+
+        # [url=...]...[/url] -> [link text](url)
+        text = re.sub(r"\[url=([^]]+)]([^\[]+)\[/url]", r"[\2](\1)", text)
+
+        # [codeblock]...[/codeblock] -> ```text\n...\n```
+        def codeblock_repl(m):
+            code = m.group(1).strip()
+            # Dedent the code block
+            code = dedent(code)
+            return f"\n```text\n{code}\n```\n"
+
+        text = re.sub(
+            r"\[codeblock](.*?)\[/codeblock]", codeblock_repl, text, flags=re.S
+        )
+
+        # [codeblocks] (with language specified)
+        def codeblocks_repl(m):
+            code = m.group(1).strip()
+            code = dedent(code)
+            return f"\n```gdscript\n{code}\n```\n"
+
+        text = re.sub(
+            r"\[codeblocks](.*?)\[/codeblocks]", codeblocks_repl, text, flags=re.S
+        )
+
+        # Remove any remaining BBCode-style tags that we didn't handle
+        text = re.sub(r"\[/?[a-zA-Z0-9_]+]", "", text)
+
+        return text
+
+    @staticmethod
+    def sanitize_doc_comment(text):
+        """Sanitize text to be safe for Rustdoc /// comments"""
+        # The main concern is preventing */ or */ sequences that could escape the comment
+        # Also handle other problematic sequences
+
+        # Replace tabs with 4 spaces for consistent formatting
+        text = text.replace("\t", "    ")
+
+        # Replace */ with *\/ to prevent closing block comments
+        text = text.replace("*/", r"*\/")
+
+        # Replace leading /// with \/\/\/ to prevent nested doc comments
+        text = text.replace("///", r"\/\/\/")
+
+        # Ensure we don't have unclosed backticks that would break markdown
+        # Count backticks and add one if odd
+        backtick_count = text.count("`")
+        if backtick_count % 2 != 0:
+            text += "`"
+
+        return text
+
     def run(self):
         """Run the complete generation pipeline"""
         print("🎯 Starting Godot type generation pipeline...")
@@ -967,7 +1226,10 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
             # Step 5: Generate optimized GDScript watcher
             self.generate_gdscript_watcher(node_types, parent_map)
 
-            # Step 6: Verify plugin integration
+            # Step 6: Generate signal names
+            self.generate_signal_names()
+
+            # Step 7: Verify plugin integration
             self.verify_plugin_integration()
 
             print(
@@ -978,11 +1240,13 @@ Generated:
   • {len(node_types)} node marker components
   • Complete type checking functions
   • Optimized GDScript scene tree watcher
+  • Signal name constants for all Godot classes
 
 Files generated:
   • {self.node_markers_file.relative_to(self.project_root)}
   • {self.type_checking_file.relative_to(self.project_root)}
   • {self.gdscript_watcher_file.relative_to(self.project_root)}
+  • {self.signal_names_file.relative_to(self.project_root)}
 
 Next steps:
   • Run 'cargo check' to verify the build
