@@ -1,5 +1,6 @@
 use crate::interop::GodotNodeHandle;
 use crate::plugins::core::PrePhysicsUpdate;
+use crate::plugins::scene_tree::NodeEntityIndex;
 use bevy_app::{App, Plugin};
 use bevy_ecs::prelude::ReflectComponent;
 use bevy_ecs::{
@@ -7,7 +8,7 @@ use bevy_ecs::{
     entity::Entity,
     message::{Message, MessageReader, MessageWriter, message_update_system},
     schedule::IntoScheduleConfigs,
-    system::{NonSendMut, Query},
+    system::{NonSendMut, Query, Res},
 };
 use bevy_reflect::Reflect;
 use godot::obj::InstanceId;
@@ -79,13 +80,9 @@ pub enum CollisionMessageType {
 fn update_godot_collisions(
     mut messages: MessageReader<CollisionMessage>,
     mut entities: Query<(Entity, &GodotNodeHandle, &mut Collisions)>,
-    all_entities: Query<(Entity, &GodotNodeHandle)>,
+    node_index: Res<NodeEntityIndex>,
 ) {
-    let instance_to_entity: HashMap<InstanceId, Entity> = all_entities
-        .iter()
-        .map(|(entity, handle)| (handle.instance_id(), entity))
-        .collect();
-
+    // Build collision entity map (only entities with Collisions component)
     let collisions_by_instance: HashMap<InstanceId, Entity> = entities
         .iter()
         .map(|(entity, handle, _)| (handle.instance_id(), entity))
@@ -98,7 +95,8 @@ fn update_godot_collisions(
     for event in messages.read() {
         trace!(target: "godot_collisions_update", event = ?event);
 
-        let target = instance_to_entity.get(&event.target.instance_id()).copied();
+        // Use NodeEntityIndex for O(1) target lookup
+        let target = node_index.get(event.target.instance_id());
         let origin_entity = collisions_by_instance
             .get(&event.origin.instance_id())
             .copied();
