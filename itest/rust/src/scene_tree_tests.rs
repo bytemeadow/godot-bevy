@@ -290,7 +290,16 @@ fn test_protected_node_entity(ctx: &TestContext) -> godot::task::TaskHandle {
             "GodotNodeHandle should be removed from protected entity"
         );
 
-        println!("✓ ProtectedNodeEntity: entity survives, GodotNodeHandle removed");
+        // Verify NodeEntityIndex no longer contains the mapping
+        let index_cleared =
+            app.with_world(|world| !world.resource::<NodeEntityIndex>().contains(node_id));
+
+        assert!(
+            index_cleared,
+            "NodeEntityIndex should remove entry for protected entity when node is freed"
+        );
+
+        println!("✓ ProtectedNodeEntity: entity survives, GodotNodeHandle removed, index cleared");
 
         app.cleanup();
         await_frames(1).await;
@@ -427,6 +436,16 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
                 Some(CustomData(42)),
                 "Component data should be preserved"
             );
+
+            // Verify NodeEntityIndex still maps to the same entity after reparenting
+            let child_id = child.instance_id();
+            let index_entity =
+                app.with_world(|world| world.resource::<NodeEntityIndex>().get(child_id));
+            assert_eq!(
+                index_entity,
+                Some(entity),
+                "NodeEntityIndex should still map to same entity after reparenting"
+            );
         }
 
         println!("✓ Entity and component data preserved during reparenting");
@@ -493,6 +512,109 @@ fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHand
         app.cleanup();
         parent.queue_free();
         // Note: Don't queue_free the child - it was already removed and may be auto-freed
+        await_frames(1).await;
+    })
+}
+
+/// Test that NodeEntityIndex is populated when nodes are added
+#[itest(async)]
+fn test_node_entity_index_populated_on_add(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        await_frames(1).await;
+
+        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+
+        app.update().await;
+
+        // Add a new node
+        let mut node = godot::classes::Node2D::new_alloc();
+        node.set_name("IndexTestNode");
+        ctx_clone.scene_tree.clone().add_child(&node);
+
+        let node_id = node.instance_id();
+
+        app.update().await;
+
+        // Verify NodeEntityIndex contains the mapping
+        let (index_has_entry, entity_from_index) = app.with_world(|world| {
+            let index = world.resource::<NodeEntityIndex>();
+            (index.contains(node_id), index.get(node_id))
+        });
+
+        assert!(
+            index_has_entry,
+            "NodeEntityIndex should contain entry for added node"
+        );
+
+        // Verify the entity in the index matches the actual entity
+        let actual_entity = app.with_world_mut(|world| {
+            world
+                .query::<(Entity, &GodotNodeHandle)>()
+                .iter(world)
+                .find(|(_, handle)| handle.instance_id() == node_id)
+                .map(|(e, _)| e)
+        });
+
+        assert_eq!(
+            entity_from_index, actual_entity,
+            "NodeEntityIndex should map to correct entity"
+        );
+
+        println!("✓ NodeEntityIndex correctly populated on node add");
+
+        app.cleanup();
+        node.queue_free();
+        await_frames(1).await;
+    })
+}
+
+/// Test that NodeEntityIndex is updated when nodes are removed
+#[itest(async)]
+fn test_node_entity_index_updated_on_remove(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        await_frames(1).await;
+
+        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+
+        app.update().await;
+
+        // Add a node
+        let mut node = godot::classes::Node2D::new_alloc();
+        node.set_name("IndexRemovalTestNode");
+        ctx_clone.scene_tree.clone().add_child(&node);
+
+        let node_id = node.instance_id();
+
+        app.update().await;
+
+        // Verify it's in the index
+        let in_index_before =
+            app.with_world(|world| world.resource::<NodeEntityIndex>().contains(node_id));
+        assert!(in_index_before, "Node should be in index after add");
+
+        // Remove the node
+        node.queue_free();
+
+        // Need two frames: one for queue_free to execute, one for the removal event to be processed
+        app.update().await;
+        app.update().await;
+
+        // Verify it's removed from the index
+        let in_index_after =
+            app.with_world(|world| world.resource::<NodeEntityIndex>().contains(node_id));
+
+        assert!(
+            !in_index_after,
+            "NodeEntityIndex should remove entry when node is freed"
+        );
+
+        println!("✓ NodeEntityIndex correctly updated on node remove");
+
+        app.cleanup();
         await_frames(1).await;
     })
 }

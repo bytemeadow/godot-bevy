@@ -18,19 +18,89 @@ use bevy_ecs::{
     message::{Message, MessageReader, MessageWriter, message_update_system},
     prelude::{Name, ReflectComponent, ReflectResource, Resource},
     schedule::IntoScheduleConfigs,
-    system::{Commands, NonSendMut, Query, Res, SystemParam},
+    system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam},
 };
 use bevy_reflect::Reflect;
 use godot::{
     builtin::GString,
     classes::{Engine, Node, SceneTree},
     meta::ToGodot,
-    obj::{Gd, Inherits, Singleton},
+    obj::{Gd, Inherits, InstanceId, Singleton},
     prelude::GodotConvert,
 };
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use tracing::{debug, trace, warn};
+
+/// A resource that maintains an O(1) lookup from Godot `InstanceId` to Bevy `Entity`.
+///
+/// This index is automatically maintained by the scene tree plugin as entities are
+/// added and removed. Use this for efficient collision handling, signal routing,
+/// and any scenario where you need to find the Bevy entity for a Godot node.
+///
+/// # Example
+///
+/// ```ignore
+/// fn handle_collision(
+///     index: Res<NodeEntityIndex>,
+///     // ... other params
+/// ) {
+///     let colliding_instance_id = /* from collision event */;
+///     if let Some(entity) = index.get(colliding_instance_id) {
+///         // Do something with the entity
+///     }
+/// }
+/// ```
+#[derive(Resource, Default, Debug, Reflect)]
+#[reflect(Resource)]
+pub struct NodeEntityIndex {
+    #[reflect(ignore)]
+    index: HashMap<InstanceId, Entity>,
+}
+
+impl NodeEntityIndex {
+    /// Look up the Bevy `Entity` for a Godot `InstanceId`.
+    ///
+    /// Returns `None` if no entity is registered for this instance ID.
+    #[inline]
+    pub fn get(&self, instance_id: InstanceId) -> Option<Entity> {
+        self.index.get(&instance_id).copied()
+    }
+
+    /// Check if an entity exists for the given `InstanceId`.
+    #[inline]
+    pub fn contains(&self, instance_id: InstanceId) -> bool {
+        self.index.contains_key(&instance_id)
+    }
+
+    /// Returns the number of entries in the index.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.index.len()
+    }
+
+    /// Returns true if the index is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.index.is_empty()
+    }
+
+    /// Insert a mapping from `InstanceId` to `Entity`.
+    ///
+    /// This is called internally by the scene tree plugin.
+    #[inline]
+    pub(crate) fn insert(&mut self, instance_id: InstanceId, entity: Entity) {
+        self.index.insert(instance_id, entity);
+    }
+
+    /// Remove a mapping by `InstanceId`.
+    ///
+    /// This is called internally by the scene tree plugin.
+    #[inline]
+    pub(crate) fn remove(&mut self, instance_id: InstanceId) -> Option<Entity> {
+        self.index.remove(&instance_id)
+    }
+}
 
 /// Unified scene tree plugin that provides:
 /// - SceneTreeRef for accessing the Godot scene tree
@@ -74,6 +144,7 @@ impl Plugin for GodotSceneTreePlugin {
         super::autosync::register_all_autosync_bundles(app);
 
         app.init_non_send_resource::<SceneTreeRefImpl>()
+            .init_resource::<NodeEntityIndex>()
             .insert_resource(SceneTreeConfig {
                 add_child_relationship: self.add_child_relationship,
             })
@@ -130,6 +201,7 @@ fn initialize_scene_tree(
     mut entities: Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
     config: Res<SceneTreeConfig>,
     component_registry: Res<SceneTreeComponentRegistry>,
+    mut node_index: ResMut<NodeEntityIndex>,
 ) {
     let root = scene_tree.get().get_root().unwrap();
 
@@ -183,6 +255,7 @@ fn initialize_scene_tree(
         &mut entities,
         &config,
         &component_registry,
+        &mut node_index,
     );
 }
 
@@ -351,7 +424,9 @@ fn create_scene_tree_entity(
     entities: &mut Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
     config: &SceneTreeConfig,
     component_registry: &SceneTreeComponentRegistry,
+    node_index: &mut NodeEntityIndex,
 ) {
+    // Build local mapping with protection info (only needed during this function)
     let mut ent_mapping = entities
         .iter()
         .map(|(reference, ent, protected)| (reference.instance_id(), (ent, protected)))
@@ -470,7 +545,9 @@ fn create_scene_tree_entity(
                 component_registry.add_to_entity(&mut ent, &message.node);
 
                 let ent = ent.id();
-                ent_mapping.insert(node.instance_id(), (ent, None));
+                let instance_id = node.instance_id();
+                ent_mapping.insert(instance_id, (ent, None));
+                node_index.insert(instance_id, ent);
 
                 // Try to add any registered bundles for this node type
                 super::autosync::try_add_bundles_for_node(commands, ent, &message.node);
@@ -513,7 +590,9 @@ fn create_scene_tree_entity(
                         } else {
                             _strip_godot_components(commands, ent, &node);
                         }
-                        ent_mapping.remove(&node.instance_id());
+                        let instance_id = node.instance_id();
+                        ent_mapping.remove(&instance_id);
+                        node_index.remove(instance_id);
                     }
                 } else {
                     // Entity was already despawned (common when using queue_free)
@@ -545,6 +624,7 @@ fn _strip_godot_components(commands: &mut Commands, ent: Entity, node: &GodotNod
 }
 
 #[main_thread_system]
+#[allow(clippy::too_many_arguments)]
 fn read_scene_tree_messages(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
@@ -552,6 +632,7 @@ fn read_scene_tree_messages(
     mut entities: Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
     config: Res<SceneTreeConfig>,
     component_registry: Res<SceneTreeComponentRegistry>,
+    mut node_index: ResMut<NodeEntityIndex>,
 ) {
     create_scene_tree_entity(
         &mut commands,
@@ -560,5 +641,6 @@ fn read_scene_tree_messages(
         &mut entities,
         &config,
         &component_registry,
+        &mut node_index,
     );
 }

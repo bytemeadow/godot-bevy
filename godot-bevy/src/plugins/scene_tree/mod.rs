@@ -8,6 +8,6 @@ pub use autosync::{
     try_add_bundles_for_node,
 };
 pub use plugin::{
-    GodotSceneTreePlugin, Groups, ProtectedNodeEntity, SceneTreeConfig, SceneTreeMessage,
-    SceneTreeMessageReader, SceneTreeMessageType, SceneTreeRef,
+    GodotSceneTreePlugin, Groups, NodeEntityIndex, ProtectedNodeEntity, SceneTreeConfig,
+    SceneTreeMessage, SceneTreeMessageReader, SceneTreeMessageType, SceneTreeRef,
 };
