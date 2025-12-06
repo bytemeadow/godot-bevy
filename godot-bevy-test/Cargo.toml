@@ -1,0 +1,21 @@
+[package]
+name = "godot-bevy-test"
+description = "Integration testing framework for godot-bevy projects"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
+
+[dependencies]
+godot = { workspace = true, features = ["__trace"] }
+godot-bevy = { path = "../godot-bevy" }
+godot-bevy-test-macros = { path = "../godot-bevy-test-macros" }
+bevy = { version = "0.17", default-features = false, features = [
+    "bevy_asset",
+    "multi_threaded",
+] }
+serde_json = "1.0"
+chrono = "0.4"

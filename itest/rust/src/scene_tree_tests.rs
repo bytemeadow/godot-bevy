@@ -16,9 +16,7 @@ use godot::obj::NewAlloc;
 use godot::prelude::*;
 use godot_bevy::plugins::scene_tree::ProtectedNodeEntity;
 use godot_bevy::prelude::*;
-use godot_bevy_itest_macros::itest;
-
-use crate::framework::{TestApp, TestContext, await_frames};
+use godot_bevy_test::prelude::*;
 
 /// Test that adding a node to the scene tree creates an entity
 #[itest(async)]

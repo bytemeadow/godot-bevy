@@ -4,12 +4,7 @@
  */
 
 use bevy::prelude::*;
-use godot_bevy_itest_macros::itest;
-
-use crate::{
-    bevy_app_test,
-    framework::{TestContext, await_frame, await_frames},
-};
+use godot_bevy_test::prelude::*;
 
 /// Test that Update systems run on real Godot frames
 #[itest(async)]
@@ -19,7 +14,7 @@ fn test_update_runs_on_real_frames(ctx: &TestContext) -> godot::task::TaskHandle
         counter,
         |app| {
             #[derive(Resource)]
-            struct FrameCounter(crate::framework::Counter);
+            struct FrameCounter(Counter);
 
             app.insert_resource(FrameCounter(counter.clone()));
             app.add_systems(Update, |c: Res<FrameCounter>| c.0.increment());
@@ -52,7 +47,7 @@ fn test_entity_persists_across_frames(ctx: &TestContext) -> godot::task::TaskHan
             struct Persistent;
 
             #[derive(Resource)]
-            struct Tracker(crate::framework::Counter);
+            struct Tracker(Counter);
 
             app.insert_resource(Tracker(counter.clone()));
             app.add_systems(
@@ -91,7 +86,7 @@ fn test_physics_update_runs(ctx: &TestContext) -> godot::task::TaskHandle {
         counter,
         |app| {
             #[derive(Resource)]
-            struct PhysicsCounter(crate::framework::Counter);
+            struct PhysicsCounter(Counter);
 
             app.insert_resource(PhysicsCounter(counter.clone()));
             app.add_systems(
@@ -125,7 +120,7 @@ fn test_frame_pacing_controlled_by_godot(ctx: &TestContext) -> godot::task::Task
         counter,
         |app| {
             #[derive(Resource)]
-            struct UpdateCounter(crate::framework::Counter);
+            struct UpdateCounter(Counter);
 
             app.insert_resource(UpdateCounter(counter.clone()));
             app.add_systems(Update, |c: Res<UpdateCounter>| c.0.increment());

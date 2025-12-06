@@ -44,6 +44,10 @@
 
 ---
 
+- [Integration Testing](./testing/index.md)
+
+---
+
 - [Platform Targets](./platform-targets/index.md)
   - [Android](./platform-targets/android.md)
 

@@ -12,15 +12,12 @@
 use bevy::prelude::*;
 use godot::obj::NewAlloc;
 use godot::prelude::*;
-use godot_bevy_itest_macros::itest;
-
-use crate::framework::{TestApp, TestContext, await_frames};
+use godot_bevy::prelude::*;
+use godot_bevy_test::prelude::*;
 
 /// Test that transforms sync from Bevy to Godot (OneWay mode - default)
 #[itest(async)]
 fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHandle {
-    use godot_bevy::prelude::*;
-
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
@@ -86,8 +83,6 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
 /// Test that transforms sync from Godot to Bevy (TwoWay mode)
 #[itest(async)]
 fn test_godot_to_bevy_transform_sync(ctx: &TestContext) -> godot::task::TaskHandle {
-    use godot_bevy::prelude::*;
-
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
@@ -144,8 +139,6 @@ fn test_godot_to_bevy_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
 /// Test bidirectional transform sync (TwoWay mode)
 #[itest(async)]
 fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHandle {
-    use godot_bevy::prelude::*;
-
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
@@ -239,8 +232,6 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
 /// Test that sync can be disabled
 #[itest(async)]
 fn test_transform_sync_disabled(ctx: &TestContext) -> godot::task::TaskHandle {
-    use godot_bevy::prelude::*;
-
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {

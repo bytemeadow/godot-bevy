@@ -6,7 +6,7 @@ use godot::classes::{Engine, InputEventKey, InputMap};
 use godot::global::Key;
 use godot::obj::{NewAlloc, NewGd};
 use godot::prelude::*;
-use godot_bevy_itest_macros::bench;
+use godot_bevy_test::bench;
 
 /// Helper to create a Transform3D from position, rotation (quaternion xyzw), and scale
 fn make_transform_3d(pos: Vector3, rot: Vector4, scale: Vector3) -> Transform3D {

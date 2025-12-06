@@ -1,24 +1,33 @@
-/*
- * Test framework for godot-bevy integration tests
- * All tests are async and wait for actual Godot frame progression
- */
+//! Test runner implementation for godot-bevy integration tests
 
-use godot::classes::Node;
+use godot::builtin::{Callable, Signal};
+use godot::classes::object::ConnectFlags;
+use godot::classes::{Engine, Node};
 use godot::obj::{Gd, Singleton};
-use godot::register::{GodotClass, godot_api};
+use godot::task::has_godot_task_panicked;
+use std::cell::RefCell;
+use std::collections::HashSet;
+use std::rc::Rc;
 use std::time::Instant;
 
-use godot::builtin::Signal;
-use godot::classes::Engine;
+use crate::TestContext;
+use crate::bencher;
+use crate::exit_code::write_exit_code;
 
-// Plugin registries
-godot::sys::plugin_registry!(pub(crate) __GODOT_ASYNC_ITEST: AsyncRustTestCase);
-godot::sys::plugin_registry!(pub(crate) __GODOT_BENCH: RustBenchmark);
+// Plugin registries - defined here so plugin_foreach! can access them as simple identifiers
+godot::sys::plugin_registry!(pub __GODOT_ITEST: RustTestCase);
+godot::sys::plugin_registry!(pub __GODOT_ASYNC_ITEST: AsyncRustTestCase);
+godot::sys::plugin_registry!(pub __GODOT_BENCH: RustBenchmark);
 
-/// Context passed to each test
-#[derive(Clone)]
-pub struct TestContext {
-    pub scene_tree: Gd<Node>,
+/// Represents a single sync test case
+#[derive(Copy, Clone)]
+pub struct RustTestCase {
+    pub name: &'static str,
+    pub file: &'static str,
+    pub skipped: bool,
+    pub focused: bool,
+    pub line: u32,
+    pub function: fn(&TestContext),
 }
 
 /// Represents a single async test case
@@ -42,18 +51,18 @@ pub struct RustBenchmark {
     pub repetitions: usize,
 }
 
-/// Main test runner class exposed to Godot
-#[derive(GodotClass, Debug)]
-#[class(init)]
-pub struct IntegrationTests {}
+/// The test runner implementation that does the actual work
+/// This is used by the `declare_test_runner!` macro
+#[derive(Default, Debug)]
+pub struct TestRunnerImpl {}
 
-#[godot_api]
-impl IntegrationTests {
+impl TestRunnerImpl {
+    pub fn new() -> Self {
+        Self {}
+    }
+
     /// Run all registered async tests
-    /// This starts the async test execution and returns immediately
-    /// Tests will complete asynchronously and call get_tree().quit() when done
-    #[func]
-    fn run_all_tests(&mut self, scene_tree: Gd<Node>) {
+    pub fn run_all_tests(&mut self, scene_tree: Gd<Node>) {
         println!(
             "\n{}Run{} godot-bevy async integration tests...",
             FMT_CYAN_BOLD, FMT_END
@@ -81,8 +90,7 @@ impl IntegrationTests {
     }
 
     /// Run all registered benchmarks
-    #[func]
-    fn run_all_benchmarks(&mut self, _scene_tree: Gd<Node>) {
+    pub fn run_all_benchmarks(&mut self, _scene_tree: Gd<Node>) {
         println!(
             "\n\n{}Run{} godot-bevy benchmarks...",
             FMT_CYAN_BOLD, FMT_END
@@ -124,11 +132,9 @@ impl IntegrationTests {
 
         println!("\nBenchmarks completed in {:.2}s.", elapsed.as_secs_f32());
     }
-}
 
-impl IntegrationTests {
     fn collect_tests(&self) -> CollectedTests {
-        let mut all_files = std::collections::HashSet::new();
+        let mut all_files = HashSet::new();
         let mut tests = Vec::new();
         let mut is_focus_run = false;
 
@@ -162,7 +168,7 @@ impl IntegrationTests {
     }
 
     fn collect_benchmarks(&self) -> (Vec<RustBenchmark>, usize) {
-        let mut all_files = std::collections::HashSet::new();
+        let mut all_files = HashSet::new();
         let mut benchmarks = Vec::new();
 
         godot::sys::plugin_foreach!(__GODOT_BENCH; |bench: &RustBenchmark| {
@@ -182,9 +188,6 @@ impl IntegrationTests {
         ctx: TestContext,
         start_time: Instant,
     ) {
-        use std::cell::RefCell;
-        use std::rc::Rc;
-
         // Shared state for test execution
         let state = Rc::new(RefCell::new(TestRunState {
             passed: 0,
@@ -236,48 +239,8 @@ impl IntegrationTests {
 
         // Output JSON if requested
         if output_json {
-            self.output_json_results(results);
+            output_json_results(results);
         }
-    }
-
-    fn output_json_results(&self, results: Vec<(&str, std::time::Duration, std::time::Duration)>) {
-        use std::collections::HashMap;
-
-        let mut benchmarks = HashMap::new();
-
-        for (name, min, median) in results {
-            let mut entry = HashMap::new();
-            entry.insert("min_ns", min.as_nanos().to_string());
-            entry.insert("median_ns", median.as_nanos().to_string());
-            entry.insert("min_display", format!("{:.2?}", min));
-            entry.insert("median_display", format!("{:.2?}", median));
-
-            benchmarks.insert(name.to_string(), entry);
-        }
-
-        let output = serde_json::json!({
-            "benchmarks": benchmarks,
-            "timestamp": chrono::Utc::now().to_rfc3339(),
-            "environment": {
-                "rust_debug": cfg!(debug_assertions),
-                "godot_debug": godot::classes::Os::singleton().is_debug_build(),
-            }
-        });
-
-        // Write to file
-        if let Ok(path) = std::env::var("BENCHMARK_JSON_PATH")
-            && let Ok(file) = std::fs::File::create(path)
-        {
-            let _ = serde_json::to_writer_pretty(file, &output);
-        }
-
-        // Also output to stdout with special markers for parsing
-        println!("===BENCHMARK_JSON_START===");
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&output).unwrap_or_default()
-        );
-        println!("===BENCHMARK_JSON_END===");
     }
 }
 
@@ -300,7 +263,7 @@ fn run_next_test(
     index: usize,
     tests: Vec<AsyncRustTestCase>,
     ctx: TestContext,
-    state: std::rc::Rc<std::cell::RefCell<TestRunState>>,
+    state: Rc<RefCell<TestRunState>>,
     start_time: Instant,
 ) {
     // All tests done?
@@ -361,13 +324,9 @@ fn check_async_test(
     index: usize,
     tests: Vec<AsyncRustTestCase>,
     ctx: TestContext,
-    state: std::rc::Rc<std::cell::RefCell<TestRunState>>,
+    state: Rc<RefCell<TestRunState>>,
     start_time: Instant,
 ) {
-    use godot::builtin::Callable;
-    use godot::classes::object::ConnectFlags;
-    use godot::task::has_godot_task_panicked;
-
     if !task_handle.is_pending() {
         // Task completed
         if has_godot_task_panicked(task_handle) {
@@ -409,7 +368,7 @@ fn check_async_test(
 
 fn finish_test_run(
     total: usize,
-    state: std::rc::Rc<std::cell::RefCell<TestRunState>>,
+    state: Rc<RefCell<TestRunState>>,
     start_time: Instant,
     ctx: &TestContext,
 ) {
@@ -455,16 +414,52 @@ fn finish_test_run(
         println!("{}All tests passed!{}", FMT_GREEN, FMT_END);
     }
 
-    // Exit with appropriate code
+    // Exit with appropriate code (cross-platform)
     let exit_code: i32 = if success { 0 } else { 1 };
-
-    // Write exit code to a file for the wrapper script to read
-    if let Err(e) = std::fs::write("/tmp/godot_test_exit_code", exit_code.to_string()) {
-        eprintln!("Warning: Failed to write exit code file: {}", e);
-    }
+    write_exit_code(exit_code);
 
     // Now quit
     ctx.scene_tree.get_tree().expect("tree").quit();
+}
+
+fn output_json_results(results: Vec<(&str, std::time::Duration, std::time::Duration)>) {
+    use std::collections::HashMap;
+
+    let mut benchmarks = HashMap::new();
+
+    for (name, min, median) in results {
+        let mut entry = HashMap::new();
+        entry.insert("min_ns", min.as_nanos().to_string());
+        entry.insert("median_ns", median.as_nanos().to_string());
+        entry.insert("min_display", format!("{:.2?}", min));
+        entry.insert("median_display", format!("{:.2?}", median));
+
+        benchmarks.insert(name.to_string(), entry);
+    }
+
+    let output = serde_json::json!({
+        "benchmarks": benchmarks,
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "environment": {
+            "rust_debug": cfg!(debug_assertions),
+            "godot_debug": godot::classes::Os::singleton().is_debug_build(),
+        }
+    });
+
+    // Write to file
+    if let Ok(path) = std::env::var("BENCHMARK_JSON_PATH")
+        && let Ok(file) = std::fs::File::create(path)
+    {
+        let _ = serde_json::to_writer_pretty(file, &output);
+    }
+
+    // Also output to stdout with special markers for parsing
+    println!("===BENCHMARK_JSON_START===");
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&output).unwrap_or_default()
+    );
+    println!("===BENCHMARK_JSON_END===");
 }
 
 // ANSI color codes for terminal output
@@ -476,7 +471,6 @@ const FMT_RED: &str = "\x1b[31m";
 const FMT_END: &str = "\x1b[0m";
 
 /// Helper function to wait for the next Godot process frame
-/// This allows async tests to yield control back to Godot's frame loop
 pub async fn await_frame() {
     let tree = Engine::singleton()
         .get_main_loop()
@@ -493,12 +487,3 @@ pub async fn await_frames(count: u32) {
         await_frame().await;
     }
 }
-
-pub mod bencher;
-pub use bencher::*;
-
-pub mod test_helpers;
-pub use test_helpers::*;
-
-pub mod test_app;
-pub use test_app::TestApp;

@@ -5,7 +5,7 @@ use syn::{ItemFn, Lit, Meta, MetaNameValue, ReturnType, parse_macro_input};
 /// Attribute macro for integration tests
 ///
 /// Usage:
-/// ```
+/// ```ignore
 /// #[itest]
 /// fn my_sync_test(ctx: &TestContext) {
 ///     // test code
@@ -17,6 +17,16 @@ use syn::{ItemFn, Lit, Meta, MetaNameValue, ReturnType, parse_macro_input};
 ///         // async test code
 ///     })
 /// }
+///
+/// #[itest(skip)]
+/// fn skipped_test(ctx: &TestContext) {
+///     // this test will be skipped
+/// }
+///
+/// #[itest(focus)]
+/// fn focused_test(ctx: &TestContext) {
+///     // only focused tests will run when any test has focus
+/// }
 /// ```
 #[proc_macro_attribute]
 pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -24,24 +34,25 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr_str = attr.to_string();
     let is_async = attr_str.contains("async");
     let is_skipped = attr_str.contains("skip");
+    let is_focused = attr_str.contains("focus");
 
     let test_name = &input.sig.ident;
     let test_name_str = test_name.to_string();
     let visibility = &input.vis;
     let body = &input.block;
 
-    // Extract parameter or use default
+    // Extract parameter or use default - use absolute path to godot_bevy_test
     let param = if let Some(param) = input.sig.inputs.first() {
         quote! { #param }
     } else {
-        quote! { _ctx: &crate::framework::TestContext }
+        quote! { _ctx: &::godot_bevy_test::TestContext }
     };
 
     if is_async {
         // Async test - returns TaskHandle
         let return_ty = match &input.sig.output {
             ReturnType::Type(_, ty) => quote! { -> #ty },
-            ReturnType::Default => quote! { -> godot::task::TaskHandle },
+            ReturnType::Default => quote! { -> ::godot::task::TaskHandle },
         };
 
         TokenStream::from(quote! {
@@ -50,12 +61,12 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             ::godot::sys::plugin_add!(
-                crate::framework::__GODOT_ASYNC_ITEST;
-                crate::framework::AsyncRustTestCase {
+                ::godot_bevy_test::__GODOT_ASYNC_ITEST;
+                ::godot_bevy_test::AsyncRustTestCase {
                     name: #test_name_str,
                     file: file!(),
                     skipped: #is_skipped,
-                    focused: false,
+                    focused: #is_focused,
                     line: line!(),
                     function: #test_name,
                 }
@@ -69,12 +80,12 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             ::godot::sys::plugin_add!(
-                crate::framework::__GODOT_ITEST;
-                crate::framework::RustTestCase {
+                ::godot_bevy_test::__GODOT_ITEST;
+                ::godot_bevy_test::RustTestCase {
                     name: #test_name_str,
                     file: file!(),
-                    skipped: false,
-                    focused: false,
+                    skipped: #is_skipped,
+                    focused: #is_focused,
                     line: line!(),
                     function: #test_name,
                 }
@@ -86,7 +97,7 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Attribute macro for benchmarks
 ///
 /// Usage:
-/// ```
+/// ```ignore
 /// #[bench]
 /// fn my_benchmark() -> ReturnType {
 ///     // benchmark code - must return a value
@@ -110,14 +121,12 @@ pub fn bench(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     if !attr.is_empty() {
         let attr_meta = parse_macro_input!(attr as Meta);
-        if let Meta::NameValue(MetaNameValue { path, value, .. }) = attr_meta {
-            if path.is_ident("repeat") {
-                if let syn::Expr::Lit(expr_lit) = value {
-                    if let Lit::Int(lit_int) = &expr_lit.lit {
-                        repetitions = lit_int.base10_parse().unwrap_or(default_repetitions);
-                    }
-                }
-            }
+        if let Meta::NameValue(MetaNameValue { path, value, .. }) = attr_meta
+            && path.is_ident("repeat")
+            && let syn::Expr::Lit(expr_lit) = value
+            && let Lit::Int(lit_int) = &expr_lit.lit
+        {
+            repetitions = lit_int.base10_parse().unwrap_or(default_repetitions);
         }
     }
 
@@ -136,13 +145,13 @@ pub fn bench(attr: TokenStream, item: TokenStream) -> TokenStream {
         #visibility fn #bench_name() {
             for _ in 0..#reps_literal {
                 let __ret: #ret_ty = #body;
-                std::hint::black_box(__ret);
+                ::std::hint::black_box(__ret);
             }
         }
 
         ::godot::sys::plugin_add!(
-            crate::framework::__GODOT_BENCH;
-            crate::framework::RustBenchmark {
+            ::godot_bevy_test::__GODOT_BENCH;
+            ::godot_bevy_test::RustBenchmark {
                 name: #bench_name_str,
                 file: file!(),
                 line: line!(),
