@@ -599,6 +599,8 @@ fn test_node_entity_index_updated_on_remove(ctx: &TestContext) -> godot::task::T
         // Remove the node
         node.queue_free();
 
+        // Need two frames: one for queue_free to execute, one for the removal event to be processed
+        app.update().await;
         app.update().await;
 
         // Verify it's removed from the index
