@@ -51,6 +51,7 @@ All other features must be explicitly added as plugins.
   - Transform component addition (configurable)
   - AutoSync bundle registration
   - Groups component for Godot groups
+  - `NodeEntityIndex` resource for O(1) lookup from Godot `InstanceId` to Bevy `Entity`
 
 ### Additional Plugins
 
