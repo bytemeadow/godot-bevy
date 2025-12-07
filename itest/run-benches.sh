@@ -46,6 +46,6 @@ fi
 
 # Run benchmarks in headless mode with BenchRunner scene
 echo -e "${CYAN}Running benchmarks...${NC}"
-"$GODOT4_BIN" --headless --path godot BenchRunner.tscn --quit-after 30000
+"$GODOT4_BIN" --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000
 
 echo -e "${GREEN}Benchmarks complete!${NC}"

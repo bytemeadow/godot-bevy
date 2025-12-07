@@ -112,7 +112,7 @@ jobs:
                   export BENCHMARK_JSON=1
                   export BENCHMARK_JSON_PATH=bench-results.json
 
-                  godot --headless --path godot BenchRunner.tscn --quit-after 60000 2>&1 | tee bench-output.txt
+                  godot --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 60000 2>&1 | tee bench-output.txt
 
                   # Extract JSON from output as fallback if file write failed
                   if [ ! -f bench-results.json ]; then
