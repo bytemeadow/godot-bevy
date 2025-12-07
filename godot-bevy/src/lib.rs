@@ -32,6 +32,7 @@ pub use paste;
 // users who depend on individual sub-crates and users who depend on the main bevy crate
 pub use bevy_app;
 pub use bevy_ecs;
+pub use bevy_math;
 pub use bevy_transform;
 
 pub struct GodotPlugin;
