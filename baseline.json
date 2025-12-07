@@ -1,0 +1,69 @@
+{
+  "benchmarks": {
+    "action_check_bulk": {
+      "median_display": "4.59ms",
+      "median_ns": "4590557",
+      "min_display": "4.32ms",
+      "min_ns": "4317286"
+    },
+    "action_check_individual": {
+      "median_display": "4.24ms",
+      "median_ns": "4240229",
+      "min_display": "4.03ms",
+      "min_ns": "4031994"
+    },
+    "transform_read_bulk_2d": {
+      "median_display": "14.82ms",
+      "median_ns": "14815948",
+      "min_display": "14.47ms",
+      "min_ns": "14469952"
+    },
+    "transform_read_bulk_3d": {
+      "median_display": "13.29ms",
+      "median_ns": "13285821",
+      "min_display": "12.71ms",
+      "min_ns": "12708743"
+    },
+    "transform_read_individual_2d": {
+      "median_display": "11.53ms",
+      "median_ns": "11528283",
+      "min_display": "11.07ms",
+      "min_ns": "11071209"
+    },
+    "transform_read_individual_3d": {
+      "median_display": "8.48ms",
+      "median_ns": "8477691",
+      "min_display": "8.23ms",
+      "min_ns": "8229404"
+    },
+    "transform_update_bulk_2d": {
+      "median_display": "15.33ms",
+      "median_ns": "15327895",
+      "min_display": "14.58ms",
+      "min_ns": "14583758"
+    },
+    "transform_update_bulk_3d": {
+      "median_display": "13.24ms",
+      "median_ns": "13241718",
+      "min_display": "12.65ms",
+      "min_ns": "12645537"
+    },
+    "transform_update_individual_2d": {
+      "median_display": "11.64ms",
+      "median_ns": "11643554",
+      "min_display": "11.40ms",
+      "min_ns": "11398766"
+    },
+    "transform_update_individual_3d": {
+      "median_display": "11.29ms",
+      "median_ns": "11293622",
+      "min_display": "10.89ms",
+      "min_ns": "10886515"
+    }
+  },
+  "environment": {
+    "godot_debug": true,
+    "rust_debug": false
+  },
+  "timestamp": "2025-12-07T08:00:29.235000267+00:00"
+}
