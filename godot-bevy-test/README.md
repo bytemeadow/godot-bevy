@@ -104,8 +104,6 @@ Create a minimal Godot project for running tests:
 my-game-tests/
 ├── godot/
 │   ├── project.godot
-│   ├── TestRunner.gd      # Copy from addons/godot-bevy/test/
-│   ├── TestRunner.tscn    # Copy from addons/godot-bevy/test/
 │   └── my-game-tests.gdextension
 ```
 
@@ -219,7 +217,7 @@ godot_bevy_test::declare_test_runner!(MyCustomTestRunner);
 unsafe impl ExtensionLibrary for MyCustomTestRunner {}
 ```
 
-Then update `TestRunner.gd`:
+Then update `addons/godot-bevy/test/TestRunner.gd`:
 
 ```gdscript
 @export var test_class_name: String = "MyCustomTestRunner"

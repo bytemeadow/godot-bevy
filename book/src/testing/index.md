@@ -81,12 +81,8 @@ my-game-tests/
 │   └── ... (your test crate)
 └── godot/
     ├── project.godot
-    ├── TestRunner.gd
-    ├── TestRunner.tscn
     └── my-game-tests.gdextension
 ```
-
-Copy `TestRunner.gd` and `TestRunner.tscn` from `addons/godot-bevy/test/` in the godot-bevy repository. These scripts handle running tests in headless mode.
 
 Your `.gdextension` file should point to your test library:
 
@@ -266,7 +262,7 @@ fn benchmark_expensive_op() -> i32 {
 Run benchmarks with a separate runner:
 
 ```bash
-godot4 --headless --path godot -s BenchRunner.tscn --quit-after 30000
+godot4 --headless --path godot -s addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000
 ```
 
 ## Best Practices
