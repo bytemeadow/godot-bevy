@@ -171,6 +171,18 @@ jobs:
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
+                  # Verify benchmark results JSON exists, is valid and non-empty
+                  # Check if the file exists
+                  if [ ! -f "itest/bench-results.json" ]; then
+                    echo "Error: Benchmark results file not found"
+                    exit 1
+                  fi
+                  # Check if the file is non-empty. (3 characters will reject "{}" but allow valid benchmark results)
+                  if [ "$(wc -c < itest/bench-results.json)" -le 3 ]; then
+                    echo "Error: Benchmark results JSON is empty or invalid"
+                    exit 1
+                  fi
+
                   # Configure git
                   git config --global user.name "github-actions[bot]"
                   git config --global user.email "github-actions[bot]@users.noreply.github.com"
