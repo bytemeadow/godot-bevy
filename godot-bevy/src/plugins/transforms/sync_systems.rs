@@ -8,7 +8,7 @@ use bevy_ecs::query::{AnyOf, Changed};
 use bevy_ecs::system::{Query, SystemChangeTick};
 use bevy_math::Quat;
 use bevy_transform::components::Transform as BevyTransform;
-use godot::builtin::{VarDictionary, PackedInt64Array};
+use godot::builtin::{PackedInt64Array, VarDictionary};
 use godot::classes::{Engine, Node, Node2D, Node3D, Object, SceneTree};
 use godot::obj::Singleton;
 use godot::prelude::{Gd, ToGodot};
