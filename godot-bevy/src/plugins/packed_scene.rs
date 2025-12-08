@@ -88,6 +88,11 @@ impl GodotScene {
     /// Connect a typed Godot signal from a child node to a Bevy `Message`.
     /// The signal will be connected when the scene is spawned.
     ///
+    /// # Requirements
+    /// This method requires [`GodotTypedSignalsPlugin<T>`] to be added to your app for the
+    /// message type `T` you're using. If the plugin is not added, the signal connections
+    /// will be ignored and an error will be logged at runtime.
+    ///
     /// # Arguments
     /// * `node_path` - Path relative to the scene root (e.g., "VBox/MyButton" or "." for root node).
     ///   Argument supports the same syntax as [Node.get_node](https://docs.godotengine.org/en/stable/classes/class_node.html#class-node-method-get-node).
@@ -142,7 +147,7 @@ fn spawn_scene(
     mut new_scenes: Query<(&mut GodotScene, Entity, Option<&Transform>), Without<GodotNodeHandle>>,
     mut scene_tree: SceneTreeRef,
     mut assets: ResMut<Assets<GodotResource>>,
-    typed_message_sender: NonSend<GlobalTypedSignalSender>,
+    typed_message_sender: Option<NonSend<GlobalTypedSignalSender>>,
 ) {
     for (mut scene, ent, transform) in new_scenes.iter_mut() {
         let packed_scene = match &scene.resource {
@@ -184,9 +189,19 @@ fn spawn_scene(
             }
         }
 
-        // Connect signals
-        for deferred_connection in scene.deferred_signal_connections.drain(..) {
-            deferred_connection.connect(&instance, ent, &typed_message_sender);
+        // Connect signals (only if typed signals plugin is available)
+        if !scene.deferred_signal_connections.is_empty() {
+            if let Some(ref sender) = typed_message_sender {
+                for deferred_connection in scene.deferred_signal_connections.drain(..) {
+                    deferred_connection.connect(&instance, ent, sender);
+                }
+            } else {
+                error!(
+                    "GodotScene has signal connections but GodotTypedSignalsPlugin is not added. \
+                     Add GodotTypedSignalsPlugin<YourMessageType> to enable signal connections."
+                );
+                scene.deferred_signal_connections.clear();
+            }
         }
 
         match &mut scene.parent {
