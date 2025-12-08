@@ -210,7 +210,7 @@ macro_rules! add_transform_sync_systems {
                 }
                 drop(_collect_span);
 
-                // Convert to Godot packed arrays (much more efficient than Dictionary arrays)
+                // Convert to Godot packed arrays (much more efficient than VarDictionary arrays)
                 let _convert_span = tracing::info_span!("convert_to_packed_arrays", system = stringify!($name)).entered();
                 let has_3d_updates = !instance_ids_3d.is_empty();
                 let has_2d_updates = !instance_ids_2d.is_empty();
@@ -406,7 +406,7 @@ macro_rules! add_transform_sync_systems {
 
                     let result = batch_singleton
                         .call("bulk_get_transforms_3d", &[ids_packed.to_variant()])
-                        .to::<godot::builtin::Dictionary>();
+                        .to::<godot::builtin::VarDictionary>();
 
                     if let (Some(positions), Some(rotations), Some(scales)) = (
                         result
@@ -449,7 +449,7 @@ macro_rules! add_transform_sync_systems {
 
                     let result = batch_singleton
                         .call("bulk_get_transforms_2d", &[ids_packed.to_variant()])
-                        .to::<godot::builtin::Dictionary>();
+                        .to::<godot::builtin::VarDictionary>();
 
                     if let (Some(positions), Some(rotations), Some(scales)) = (
                         result
