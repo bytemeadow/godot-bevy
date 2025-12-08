@@ -215,7 +215,7 @@ fn initialize_scene_tree(
         tracing::info!("Using optimized initial tree analysis with type pre-analysis");
 
         let analysis_result = watcher.call("analyze_initial_tree", &[]);
-        let result_dict = analysis_result.to::<godot::builtin::Dictionary>();
+        let result_dict = analysis_result.to::<godot::builtin::VarDictionary>();
         let instance_ids = result_dict
             .get("instance_ids")
             .unwrap()

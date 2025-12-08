@@ -97,7 +97,7 @@ func bulk_get_transforms_2d(instance_ids: PackedInt64Array) -> Dictionary:
 
 func bulk_check_actions(event: InputEvent) -> Dictionary:
 	var actions: PackedStringArray = PackedStringArray()
-	var pressed: Array = []
+	var pressed: Array[bool] = []
 	var strengths: PackedFloat32Array = PackedFloat32Array()
 
 	for action in InputMap.get_actions():

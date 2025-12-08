@@ -7,7 +7,7 @@ use bevy_ecs::{
 use bevy_math::Vec2;
 use bevy_reflect::Reflect;
 use godot::{
-    builtin::Dictionary,
+    builtin::VarDictionary,
     classes::{
         Engine, InputEvent as GodotInputEvent, InputEventJoypadButton, InputEventJoypadMotion,
         InputEventKey, InputEventMouseButton, InputEventMouseMotion, InputEventPanGesture,
@@ -326,7 +326,7 @@ fn check_action_events_bulk(
 ) {
     let result = batch_singleton
         .call("bulk_check_actions", &[input_event.to_variant()])
-        .to::<Dictionary>();
+        .to::<VarDictionary>();
 
     if let (Some(actions), Some(pressed_arr), Some(strengths)) = (
         result

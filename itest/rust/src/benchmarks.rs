@@ -259,7 +259,7 @@ fn transform_read_bulk_3d() -> i32 {
     let mut sum = Vector3::ZERO;
     let result = bulk_ops
         .call("bulk_get_transforms_3d", &[ids_packed.to_variant()])
-        .to::<godot::builtin::Dictionary>();
+        .to::<godot::builtin::VarDictionary>();
 
     if let Some(positions) = result
         .get("positions")
@@ -327,7 +327,7 @@ fn transform_read_bulk_2d() -> i32 {
     let mut sum = Vector2::ZERO;
     let result = bulk_ops
         .call("bulk_get_transforms_2d", &[ids_packed.to_variant()])
-        .to::<godot::builtin::Dictionary>();
+        .to::<godot::builtin::VarDictionary>();
 
     if let Some(positions) = result
         .get("positions")
@@ -386,7 +386,7 @@ fn action_check_bulk() -> i32 {
     for _ in 0..BENCH_ACTION_EVENT_COUNT {
         let result = bulk_ops
             .call("bulk_check_actions", &[key_event.to_variant()])
-            .to::<godot::builtin::Dictionary>();
+            .to::<godot::builtin::VarDictionary>();
 
         if let Some(actions) = result
             .get("actions")

@@ -8,7 +8,7 @@ use bevy_ecs::query::{AnyOf, Changed};
 use bevy_ecs::system::{Query, SystemChangeTick};
 use bevy_math::Quat;
 use bevy_transform::components::Transform as BevyTransform;
-use godot::builtin::{Dictionary, PackedInt64Array};
+use godot::builtin::{VarDictionary, PackedInt64Array};
 use godot::classes::{Engine, Node, Node2D, Node3D, Object, SceneTree};
 use godot::obj::Singleton;
 use godot::prelude::{Gd, ToGodot};
@@ -95,7 +95,7 @@ fn pre_update_godot_transforms_bulk(
 
         let result = batch_singleton
             .call("bulk_get_transforms_3d", &[ids_packed.to_variant()])
-            .to::<Dictionary>();
+            .to::<VarDictionary>();
 
         if let (Some(positions), Some(rotations), Some(scales)) = (
             result
@@ -137,7 +137,7 @@ fn pre_update_godot_transforms_bulk(
 
         let result = batch_singleton
             .call("bulk_get_transforms_2d", &[ids_packed.to_variant()])
-            .to::<Dictionary>();
+            .to::<VarDictionary>();
 
         if let (Some(positions), Some(rotations), Some(scales)) = (
             result
