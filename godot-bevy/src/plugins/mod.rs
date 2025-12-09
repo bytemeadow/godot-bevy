@@ -10,6 +10,7 @@ pub mod core;
 pub mod godot_bevy_logger;
 pub mod input;
 pub mod packed_scene;
+pub mod reflection;
 pub mod scene_tree;
 pub mod signals;
 pub mod transforms;
@@ -23,6 +24,7 @@ pub use core::GodotBaseCorePlugin;
 pub use godot_bevy_logger::GodotBevyLogPlugin;
 pub use input::{BevyInputBridgePlugin, GodotInputEventPlugin};
 pub use packed_scene::GodotPackedScenePlugin;
+pub use reflection::{AppTypeRegistry, GodotReflectionPlugin};
 pub use scene_tree::GodotSceneTreePlugin;
 pub use signals::GodotSignalsPlugin;
 pub use transforms::GodotTransformSyncPlugin;
@@ -33,8 +35,9 @@ pub use input::GodotInputEventPlugin as GodotInputPlugin;
 
 plugin_group! {
     /// Minimal core functionality required for Godot-Bevy integration.
-    /// This includes scene tree management
+    /// This includes scene tree management and reflection support.
     pub struct GodotCorePlugins {
+        :GodotReflectionPlugin,
         :GodotBaseCorePlugin,
         :GodotSceneTreePlugin,
     }
