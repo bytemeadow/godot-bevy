@@ -9,7 +9,8 @@ use bevy::prelude::*;
 use godot_bevy::prelude::GodotNode;
 
 /// Component representing movement speed in pixels per second
-#[derive(Component, Debug, Clone, PartialEq)]
+#[derive(Component, Debug, Clone, PartialEq, Reflect)]
+#[reflect(Component)]
 pub struct Speed(pub f32);
 
 impl Default for Speed {
@@ -19,7 +20,8 @@ impl Default for Speed {
 }
 
 /// Component representing jump velocity (negative for upward movement in Godot)
-#[derive(Component, Debug, Clone, PartialEq)]
+#[derive(Component, Debug, Clone, PartialEq, Reflect)]
+#[reflect(Component)]
 pub struct JumpVelocity(pub f32);
 
 impl Default for JumpVelocity {
@@ -29,7 +31,8 @@ impl Default for JumpVelocity {
 }
 
 /// Component representing gravity in pixels per second squared
-#[derive(Component, Debug, Clone, PartialEq)]
+#[derive(Component, Debug, Clone, PartialEq, Reflect)]
+#[reflect(Component)]
 pub struct Gravity(pub f32);
 
 impl Default for Gravity {
@@ -39,7 +42,8 @@ impl Default for Gravity {
 }
 
 /// Component marking an entity as the player
-#[derive(Component, Debug, Clone, Default)]
+#[derive(Component, Debug, Clone, Default, Reflect)]
+#[reflect(Component)]
 pub struct Player;
 
 /// Component marking an entity as a gem

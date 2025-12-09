@@ -2,6 +2,7 @@
 
 use bevy_app::{App, Plugin, Update};
 use bevy_ecs::prelude::*;
+use bevy_ecs::system::SystemState;
 use godot::classes::Input;
 use godot::global::Key;
 use godot::obj::InstanceId;
@@ -14,7 +15,7 @@ use crate::panels::{ComponentDataSerializer, EntityDataCollector, WorldInspector
 
 /// Resource holding the inspector window reference via instance ID.
 /// We store the instance ID rather than `Gd<T>` because `Gd<T>` is not Send+Sync.
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct InspectorWindowHandle {
     instance_id: InstanceId,
 }
@@ -49,7 +50,7 @@ pub struct EntitySelectedEvent {
 }
 
 /// Configuration for the inspector plugin.
-#[derive(Clone)]
+#[derive(Clone, Resource)]
 pub struct InspectorPluginConfig {
     /// Whether to show the inspector window on startup.
     pub show_on_startup: bool,
@@ -132,33 +133,32 @@ impl Plugin for InspectorPlugin {
         let config = self.config.clone();
 
         app.insert_resource(InspectorSelection::default())
-            .insert_resource(InspectorConfig(config))
+            .insert_resource(config)
             .insert_resource(InspectorFrameCounter(0))
-            .add_systems(
-                Update,
-                (
-                    inspector_input_system,
-                    inspector_refresh_system,
-                    inspector_selection_system,
-                )
-                    .chain(),
-            );
+            .insert_resource(InspectorKeyState::default())
+            .add_systems(Update, inspector_input_system)
+            // Use exclusive systems for world access
+            .add_systems(Update, inspector_refresh_exclusive_system)
+            .add_systems(Update, inspector_selection_exclusive_system);
     }
 }
 
 #[derive(Resource)]
-struct InspectorConfig(InspectorPluginConfig);
-
-#[derive(Resource)]
 struct InspectorFrameCounter(u32);
+
+#[derive(Resource, Default)]
+struct InspectorKeyState {
+    was_pressed: bool,
+}
 
 /// System that handles keyboard input for the inspector.
 fn inspector_input_system(
-    config: Res<InspectorConfig>,
+    config: Res<InspectorPluginConfig>,
     window_handle: Option<Res<InspectorWindowHandle>>,
+    mut key_state: ResMut<InspectorKeyState>,
 ) {
     // Check for toggle key press
-    if let Some(ref key_str) = config.0.toggle_key {
+    if let Some(ref key_str) = config.toggle_key {
         let input = Input::singleton();
 
         // Parse key string to Godot key
@@ -178,8 +178,11 @@ fn inspector_input_system(
             _ => return,
         };
 
-        let action_name = format!("toggle_inspector_{}", key_str.to_lowercase());
-        if input.is_action_just_pressed(&action_name) {
+        // Check for key press directly instead of using InputMap action
+        let is_pressed = input.is_key_pressed(key);
+
+        if is_pressed && !key_state.was_pressed {
+            // Key just pressed - toggle the inspector
             if let Some(ref handle) = window_handle {
                 if let Some(mut window) = handle.get_window() {
                     window.bind_mut().toggle_inspector();
@@ -187,72 +190,110 @@ fn inspector_input_system(
             }
         }
 
-        // Suppress unused variable warning
-        let _ = key;
+        key_state.was_pressed = is_pressed;
     }
 }
 
-/// System that refreshes the inspector data.
-fn inspector_refresh_system(
-    config: Res<InspectorConfig>,
-    mut counter: ResMut<InspectorFrameCounter>,
-    window_handle: Option<Res<InspectorWindowHandle>>,
-    world: &World,
-    type_registry: Res<AppTypeRegistry>,
-) {
-    if !config.0.auto_refresh {
+/// Exclusive system that refreshes the inspector data.
+fn inspector_refresh_exclusive_system(world: &mut World) {
+    // First, get what we need from resources
+    let (should_refresh, window_instance_id) = {
+        let mut state: SystemState<(
+            Res<InspectorPluginConfig>,
+            ResMut<InspectorFrameCounter>,
+            Option<Res<InspectorWindowHandle>>,
+        )> = SystemState::new(world);
+
+        let (config, mut counter, window_handle) = state.get_mut(world);
+
+        if !config.auto_refresh {
+            state.apply(world);
+            return;
+        }
+
+        counter.0 += 1;
+        if counter.0 < config.refresh_interval {
+            state.apply(world);
+            return;
+        }
+        counter.0 = 0;
+
+        let instance_id = window_handle.as_ref().map(|h| h.instance_id);
+        state.apply(world);
+
+        (true, instance_id)
+    };
+
+    if !should_refresh {
         return;
     }
 
-    counter.0 += 1;
-    if counter.0 < config.0.refresh_interval {
+    let Some(instance_id) = window_instance_id else {
+        return;
+    };
+
+    // Get the type registry
+    let registry = {
+        let type_registry = world.resource::<AppTypeRegistry>();
+        type_registry.read()
+    };
+
+    // Now collect entity data with full world access
+    let entity_data = EntityDataCollector::collect(world, &registry);
+
+    // Update hierarchy in the window
+    if let Ok(mut window) = Gd::<WorldInspectorWindow>::try_from_instance_id(instance_id) {
+        if let Some(mut panel) = window.bind_mut().get_panel() {
+            panel.bind_mut().update_hierarchy(entity_data);
+        }
+    }
+}
+
+/// Exclusive system that handles entity selection changes.
+fn inspector_selection_exclusive_system(world: &mut World) {
+    // First, check if selection changed and get necessary data
+    let (selected_entity, window_instance_id, selection_changed) = {
+        let mut state: SystemState<(Res<InspectorSelection>, Option<Res<InspectorWindowHandle>>)> =
+            SystemState::new(world);
+
+        let (selection, window_handle) = state.get(world);
+
+        let changed = selection.is_changed();
+        let entity = selection.selected;
+        let instance_id = window_handle.as_ref().map(|h| h.instance_id);
+
+        state.apply(world);
+
+        (entity, instance_id, changed)
+    };
+
+    if !selection_changed {
         return;
     }
-    counter.0 = 0;
 
-    // Update hierarchy data
-    if let Some(ref handle) = window_handle {
-        if let Some(mut window) = handle.get_window() {
-            let registry = type_registry.read();
-            let entity_data = EntityDataCollector::collect(world, &registry);
+    let Some(instance_id) = window_instance_id else {
+        return;
+    };
 
+    let Some(entity) = selected_entity else {
+        if let Ok(mut window) = Gd::<WorldInspectorWindow>::try_from_instance_id(instance_id) {
             if let Some(mut panel) = window.bind_mut().get_panel() {
-                panel.bind_mut().update_hierarchy(entity_data);
+                panel.bind_mut().clear_inspector();
             }
         }
-    }
-}
-
-/// System that handles entity selection changes.
-fn inspector_selection_system(
-    selection: Res<InspectorSelection>,
-    window_handle: Option<Res<InspectorWindowHandle>>,
-    world: &World,
-    type_registry: Res<AppTypeRegistry>,
-) {
-    if !selection.is_changed() {
-        return;
-    }
-
-    let Some(ref handle) = window_handle else {
-        return;
-    };
-    let Some(mut window) = handle.get_window() else {
-        return;
-    };
-    let Some(entity) = selection.selected else {
-        if let Some(mut panel) = window.bind_mut().get_panel() {
-            panel.bind_mut().clear_inspector();
-        }
         return;
     };
 
-    // Get entity data
+    // Get the type registry
+    let registry = {
+        let type_registry = world.resource::<AppTypeRegistry>();
+        type_registry.read()
+    };
+
+    // Get entity data with full world access
     let Ok(entity_ref) = world.get_entity(entity) else {
         return;
     };
-
-    let registry = type_registry.read();
 
     // Get entity name
     let name = entity_ref
@@ -283,9 +324,11 @@ fn inspector_selection_system(
     }
 
     // Update inspector
-    if let Some(mut panel) = window.bind_mut().get_panel() {
-        panel
-            .bind_mut()
-            .inspect_entity(entity.to_bits(), name, components);
+    if let Ok(mut window) = Gd::<WorldInspectorWindow>::try_from_instance_id(instance_id) {
+        if let Some(mut panel) = window.bind_mut().get_panel() {
+            panel
+                .bind_mut()
+                .inspect_entity(entity.to_bits(), name, components);
+        }
     }
 }

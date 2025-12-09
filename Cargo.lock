@@ -4075,6 +4075,7 @@ dependencies = [
  "fastrand",
  "godot",
  "godot-bevy",
+ "godot-bevy-inspector",
  "which 8.0.0",
 ]
 
