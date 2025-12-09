@@ -3,13 +3,14 @@
 use bevy_app::{App, Plugin, Update};
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemState;
+use godot::classes::Engine;
 use godot::classes::Input;
 use godot::global::Key;
 use godot::obj::InstanceId;
 use godot::prelude::*;
 
-// Use the AppTypeRegistry from godot-bevy
-use godot_bevy::prelude::AppTypeRegistry;
+// Use the AppTypeRegistry and main_thread_system from godot-bevy
+use godot_bevy::prelude::{AppTypeRegistry, main_thread_system};
 
 use crate::panels::{ComponentDataSerializer, EntityDataCollector, WorldInspectorWindow};
 
@@ -136,6 +137,8 @@ impl Plugin for InspectorPlugin {
             .insert_resource(config)
             .insert_resource(InspectorFrameCounter(0))
             .insert_resource(InspectorKeyState::default())
+            .insert_resource(InspectorInitialized(false))
+            .add_systems(Update, inspector_init_system)
             .add_systems(Update, inspector_input_system)
             // Use exclusive systems for world access
             .add_systems(Update, inspector_refresh_exclusive_system)
@@ -151,7 +154,52 @@ struct InspectorKeyState {
     was_pressed: bool,
 }
 
+#[derive(Resource)]
+struct InspectorInitialized(bool);
+
+/// System that initializes the inspector window.
+#[main_thread_system]
+fn inspector_init_system(
+    mut commands: Commands,
+    mut initialized: ResMut<InspectorInitialized>,
+    config: Res<InspectorPluginConfig>,
+) {
+    if initialized.0 {
+        return;
+    }
+    initialized.0 = true;
+
+    // Create the inspector window
+    let mut window = WorldInspectorWindow::create();
+
+    // Mark this window to be excluded from scene tree watcher
+    // The GDScript watcher checks for this meta and skips nodes with it
+    window
+        .clone()
+        .upcast::<godot::classes::Node>()
+        .set_meta("_bevy_exclude", &true.to_variant());
+
+    // Add window to the scene tree
+    if let Some(scene_tree) = Engine::singleton().get_main_loop() {
+        if let Ok(root) = scene_tree.try_cast::<godot::classes::SceneTree>() {
+            if let Some(mut root_node) = root.get_root() {
+                root_node.add_child(&window);
+            }
+        }
+    }
+
+    // Hide by default unless show_on_startup is set
+    if !config.show_on_startup {
+        window.bind_mut().hide_inspector();
+    }
+
+    // Store the handle
+    let handle = InspectorWindowHandle::new(&window);
+    commands.insert_resource(handle);
+}
+
 /// System that handles keyboard input for the inspector.
+#[main_thread_system]
 fn inspector_input_system(
     config: Res<InspectorPluginConfig>,
     window_handle: Option<Res<InspectorWindowHandle>>,

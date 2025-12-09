@@ -47,14 +47,20 @@ func _on_node_added(node: Node):
 	"""Handle node added events with type optimization"""
 	if not rust_watcher:
 		return
-	
+
 	# Check if node is still valid
 	if not is_instance_valid(node):
 		return
-	
+
+	# Check if node is marked to be excluded from scene tree watcher
+	# This is used by godot-bevy-inspector and other tools that add nodes
+	# that shouldn't be tracked as Bevy entities
+	if node.has_meta("_bevy_exclude"):
+		return
+
 	# Analyze node type on GDScript side - this is much faster than FFI
 	var node_type = _analyze_node_type(node)
-	
+
 	# Forward to Rust watcher with pre-analyzed type - this uses the MPSC sender
 	if rust_watcher.has_method("scene_tree_event_typed"):
 		rust_watcher.scene_tree_event_typed(node, "NodeAdded", node_type)
@@ -66,7 +72,7 @@ func _on_node_removed(node: Node):
 	"""Handle node removed events - no type analysis needed for removal"""
 	if not rust_watcher:
 		return
-	
+
 	# This is called immediately (not deferred) so the node should still be valid
 	# We need to send this event so Rust can clean up the corresponding Bevy entity
 	rust_watcher.scene_tree_event(node, "NodeRemoved")
@@ -75,11 +81,11 @@ func _on_node_renamed(node: Node):
 	"""Handle node renamed events - no type analysis needed for renaming"""
 	if not rust_watcher:
 		return
-	
+
 	# Check if node is still valid
 	if not is_instance_valid(node):
 		return
-		
+
 	rust_watcher.scene_tree_event(node, "NodeRenamed")
 
 func _analyze_node_type(node: Node) -> String:
@@ -89,7 +95,7 @@ func _analyze_node_type(node: Node) -> String:
 	This avoids multiple FFI calls that would be needed on the Rust side.
 	Generated from Godot extension API to ensure completeness.
 	"""
-	
+
 	# Check Node3D hierarchy first (most common in 3D games)
 	if node is Node3D:
 		if node is MeshInstance3D: return "MeshInstance3D"
@@ -298,7 +304,7 @@ func _analyze_node_type(node: Node) -> String:
 	elif node is ResourcePreloader: return "ResourcePreloader"
 	elif node is ShaderGlobalsOverride: return "ShaderGlobalsOverride"
 	elif node is Viewport: return "Viewport"
-	
+
 	# Default fallback
 	return "Node"
 
@@ -317,7 +323,7 @@ func analyze_initial_tree() -> Dictionary:
 	var root = get_tree().get_root()
 	if root:
 		_analyze_node_recursive(root, instance_ids, node_types)
-	
+
 	return {
 		"instance_ids": instance_ids,
 		"node_types": node_types
@@ -328,16 +334,20 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 	# Check if node is still valid before processing
 	if not is_instance_valid(node):
 		return
-	
+
+	# Check if node is marked to be excluded from scene tree watcher
+	if node.has_meta("_bevy_exclude"):
+		return
+
 	# Add this node's information with pre-analyzed type
 	var instance_id = node.get_instance_id()
 	var node_type = _analyze_node_type(node)
-	
+
 	# Only append if we have valid data
 	if instance_id != 0 and node_type != "":
 		instance_ids.append(instance_id)
 		node_types.append(node_type)
-	
+
 	# Recursively process children
 	for child in node.get_children():
 		_analyze_node_recursive(child, instance_ids, node_types)
