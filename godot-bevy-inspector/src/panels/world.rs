@@ -12,6 +12,8 @@ pub struct WorldInspectorPanel {
     base: Base<HSplitContainer>,
     hierarchy: Option<Gd<HierarchyPanel>>,
     inspector: Option<Gd<InspectorPanel>>,
+    /// Pending entity selection that Bevy systems can poll
+    pending_selection: Option<u64>,
 }
 
 #[godot_api]
@@ -21,6 +23,7 @@ impl IHSplitContainer for WorldInspectorPanel {
             base,
             hierarchy: None,
             inspector: None,
+            pending_selection: None,
         }
     }
 
@@ -67,6 +70,7 @@ impl WorldInspectorPanel {
             base,
             hierarchy: None,
             inspector: None,
+            pending_selection: None,
         })
     }
 
@@ -115,9 +119,20 @@ impl WorldInspectorPanel {
 
     #[func]
     fn _on_entity_selected(&mut self, entity_bits: u64) {
+        // Store as pending selection for Bevy to poll
+        self.pending_selection = Some(entity_bits);
         // Re-emit for external listeners
         self.base_mut()
             .emit_signal("entity_selected", &[Variant::from(entity_bits)]);
+    }
+
+    /// Take pending selection (returns and clears it)
+    #[func]
+    pub fn take_pending_selection(&mut self) -> i64 {
+        match self.pending_selection.take() {
+            Some(bits) => bits as i64,
+            None => -1,
+        }
     }
 }
 

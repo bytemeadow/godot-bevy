@@ -1,6 +1,7 @@
 //! Bevy plugin for the inspector.
 
 use bevy_app::{App, Plugin, Update};
+use bevy_ecs::entity::Entity;
 use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemState;
 use godot::classes::Engine;
@@ -34,13 +35,6 @@ impl InspectorWindowHandle {
     pub fn get_window(&self) -> Option<Gd<WorldInspectorWindow>> {
         Gd::try_from_instance_id(self.instance_id).ok()
     }
-}
-
-/// Resource tracking the currently selected entity.
-#[derive(Resource, Default)]
-pub struct InspectorSelection {
-    /// The selected entity, if any.
-    pub selected: Option<Entity>,
 }
 
 /// Event sent when an entity is selected in the inspector.
@@ -133,16 +127,14 @@ impl Plugin for InspectorPlugin {
     fn build(&self, app: &mut App) {
         let config = self.config.clone();
 
-        app.insert_resource(InspectorSelection::default())
-            .insert_resource(config)
+        app.insert_resource(config)
             .insert_resource(InspectorFrameCounter(0))
             .insert_resource(InspectorKeyState::default())
             .insert_resource(InspectorInitialized(false))
             .add_systems(Update, inspector_init_system)
             .add_systems(Update, inspector_input_system)
-            // Use exclusive systems for world access
-            .add_systems(Update, inspector_refresh_exclusive_system)
-            .add_systems(Update, inspector_selection_exclusive_system);
+            // Use exclusive system for world access
+            .add_systems(Update, inspector_refresh_exclusive_system);
     }
 }
 
@@ -242,7 +234,7 @@ fn inspector_input_system(
     }
 }
 
-/// Exclusive system that refreshes the inspector data.
+/// Exclusive system that refreshes the inspector data and handles selection.
 fn inspector_refresh_exclusive_system(world: &mut World) {
     // First, get what we need from resources
     let (should_refresh, window_instance_id) = {
@@ -289,94 +281,70 @@ fn inspector_refresh_exclusive_system(world: &mut World) {
     // Now collect entity data with full world access
     let entity_data = EntityDataCollector::collect(world, &registry);
 
-    // Update hierarchy in the window
+    // Update hierarchy and check for selection in the window
     if let Ok(mut window) = Gd::<WorldInspectorWindow>::try_from_instance_id(instance_id) {
         if let Some(mut panel) = window.bind_mut().get_panel() {
             panel.bind_mut().update_hierarchy(entity_data);
-        }
-    }
-}
 
-/// Exclusive system that handles entity selection changes.
-fn inspector_selection_exclusive_system(world: &mut World) {
-    // First, check if selection changed and get necessary data
-    let (selected_entity, window_instance_id, selection_changed) = {
-        let mut state: SystemState<(Res<InspectorSelection>, Option<Res<InspectorWindowHandle>>)> =
-            SystemState::new(world);
+            // Check if user selected an entity in the UI
+            let pending = panel.bind_mut().take_pending_selection();
+            if pending >= 0 {
+                let entity_bits = pending as u64;
+                // Look up the entity and show its components
+                if let Some(entity) = Entity::try_from_bits(entity_bits) {
+                    if let Ok(entity_ref) = world.get_entity(entity) {
+                        // Get entity name
+                        let name = entity_ref
+                            .get::<Name>()
+                            .map(|n| GString::from(n.as_str()))
+                            .unwrap_or_else(|| {
+                                GString::from(&format!("Entity {}", entity.index())[..])
+                            });
 
-        let (selection, window_handle) = state.get(world);
+                        // Collect component data
+                        let mut components = VarDictionary::new();
 
-        let changed = selection.is_changed();
-        let entity = selection.selected;
-        let instance_id = window_handle.as_ref().map(|h| h.instance_id);
+                        for component_id in entity_ref.archetype().components() {
+                            if let Some(component_info) = world.components().get_info(*component_id)
+                            {
+                                let component_name = component_info.name();
+                                let name_str: &str = component_name.as_ref();
 
-        state.apply(world);
+                                // Try to get reflect data for this component
+                                let mut data = VarDictionary::new();
+                                let mut has_reflect_data = false;
 
-        (entity, instance_id, changed)
-    };
+                                if let Some(type_id) = component_info.type_id() {
+                                    if let Some(registration) = registry.get(type_id) {
+                                        if let Some(reflect_component) =
+                                            registration.data::<ReflectComponent>()
+                                        {
+                                            if let Some(component) =
+                                                reflect_component.reflect(entity_ref)
+                                            {
+                                                data =
+                                                    ComponentDataSerializer::serialize(component);
+                                                has_reflect_data = true;
+                                            }
+                                        }
+                                    }
+                                }
 
-    if !selection_changed {
-        return;
-    }
+                                // If no reflect data, just add an empty entry so the component name shows
+                                if !has_reflect_data {
+                                    data.set("_no_reflect", "(no reflection data)");
+                                }
 
-    let Some(instance_id) = window_instance_id else {
-        return;
-    };
-
-    let Some(entity) = selected_entity else {
-        if let Ok(mut window) = Gd::<WorldInspectorWindow>::try_from_instance_id(instance_id) {
-            if let Some(mut panel) = window.bind_mut().get_panel() {
-                panel.bind_mut().clear_inspector();
-            }
-        }
-        return;
-    };
-
-    // Get the type registry
-    let registry = {
-        let type_registry = world.resource::<AppTypeRegistry>();
-        type_registry.read()
-    };
-
-    // Get entity data with full world access
-    let Ok(entity_ref) = world.get_entity(entity) else {
-        return;
-    };
-
-    // Get entity name
-    let name = entity_ref
-        .get::<Name>()
-        .map(|n| GString::from(n.as_str()))
-        .unwrap_or_else(|| GString::from(&format!("Entity {}", entity.index())[..]));
-
-    // Collect component data
-    let mut components = VarDictionary::new();
-
-    for component_id in entity_ref.archetype().components() {
-        if let Some(component_info) = world.components().get_info(*component_id) {
-            let component_name = component_info.name();
-
-            // Try to get reflect data for this component
-            if let Some(type_id) = component_info.type_id() {
-                if let Some(registration) = registry.get(type_id) {
-                    if let Some(reflect_component) = registration.data::<ReflectComponent>() {
-                        if let Some(component) = reflect_component.reflect(entity_ref) {
-                            let data = ComponentDataSerializer::serialize(component);
-                            let name_str: &str = component_name.as_ref();
-                            components.set(GString::from(name_str), data);
+                                components.set(GString::from(name_str), data);
+                            }
                         }
+
+                        panel
+                            .bind_mut()
+                            .inspect_entity(entity_bits, name, components);
                     }
                 }
             }
-        }
-    }
-
-    // Update inspector
-    if let Ok(mut window) = Gd::<WorldInspectorWindow>::try_from_instance_id(instance_id) {
-        if let Some(mut panel) = window.bind_mut().get_panel() {
-            panel
-                .bind_mut()
-                .inspect_entity(entity.to_bits(), name, components);
         }
     }
 }
