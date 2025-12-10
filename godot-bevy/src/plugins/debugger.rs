@@ -4,6 +4,7 @@
 //! real-time inspection of Bevy entities and components in the Godot editor.
 
 use bevy_app::{App, Plugin, Update};
+use bevy_ecs::hierarchy::ChildOf;
 use bevy_ecs::prelude::{Name, Resource, World};
 use bevy_ecs::world::EntityRef;
 use bevy_time::Time;
@@ -48,10 +49,7 @@ impl Plugin for GodotDebuggerPlugin {
     }
 }
 
-/// Exclusive system that collects and sends entity data
-/// Uses exclusive world access to get component information from archetypes
 fn debugger_exclusive_system(world: &mut World) {
-    // Get config and check if enabled
     let config = world.get_resource::<DebuggerConfig>();
     let enabled = config.map(|c| c.enabled).unwrap_or(false);
     let update_interval = config.map(|c| c.update_interval).unwrap_or(0.5);
@@ -60,7 +58,6 @@ fn debugger_exclusive_system(world: &mut World) {
         return;
     }
 
-    // Check timer
     let delta = world
         .get_resource::<Time>()
         .map(|t| t.delta_secs())
@@ -85,27 +82,26 @@ fn debugger_exclusive_system(world: &mut World) {
         return;
     }
 
-    // Check if debugger is active (this is a Godot call, should be on main thread)
-    // In practice, the Update schedule runs on main thread for godot-bevy
     if !EngineDebugger::singleton().is_active() {
         return;
     }
 
-    // Collect entity data with component names
     let mut entities = VarArray::new();
-
     let mut query = world.query::<EntityRef>();
+
     for entity_ref in query.iter(world) {
-        // Get name if present
         let name = entity_ref
             .get::<Name>()
             .map(|n| n.as_str().to_string())
             .unwrap_or_default();
 
-        // Check for GodotNodeHandle
         let has_godot_node = entity_ref.get::<GodotNodeHandle>().is_some();
 
-        // Get component names from archetype
+        let parent_bits: i64 = entity_ref
+            .get::<ChildOf>()
+            .map(|child_of| child_of.parent().to_bits() as i64)
+            .unwrap_or(-1);
+
         let mut components = VarArray::new();
         let archetype = entity_ref.archetype();
         for component_id in archetype.components() {
@@ -115,17 +111,16 @@ fn debugger_exclusive_system(world: &mut World) {
             }
         }
 
-        // Create array: [entity_bits, name, has_godot_node, components]
         let mut entry = VarArray::new();
         entry.push(&Variant::from(entity_ref.id().to_bits() as i64));
         entry.push(&Variant::from(GString::from(&name)));
         entry.push(&Variant::from(has_godot_node));
+        entry.push(&Variant::from(parent_bits));
         entry.push(&components.to_variant());
 
         entities.push(&entry.to_variant());
     }
 
-    // Send to debugger
     let mut debugger = EngineDebugger::singleton();
     let message: GString = "bevy:entities".into();
     debugger.send_message(&message, &entities);

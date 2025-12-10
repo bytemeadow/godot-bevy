@@ -2,11 +2,7 @@
 extends Panel
 ## Bevy Entity Inspector Panel
 ##
-## This panel shows Bevy entities and their components when the game is running.
-## It appears as a tab next to the Scene tab in the editor.
-##
-## Entities are shown as expandable items with components as children,
-## similar to bevy-inspector-egui.
+## Displays Bevy entities and their components in the editor when the game is running.
 
 # UI elements
 var entity_tree: Tree
@@ -42,7 +38,7 @@ func _setup_ui() -> void:
 
 	main_vbox.add_child(header)
 
-	# Entity tree with components as children
+	# Entity tree with hierarchy
 	entity_tree = Tree.new()
 	entity_tree.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	entity_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -56,9 +52,6 @@ func _on_item_collapsed(item: TreeItem) -> void:
 	if entity_bits != null:
 		_expanded_entities[entity_bits] = not item.collapsed
 
-# Called by the debugger plugin when entity data is received
-# Data format: Array of [entity_bits, name, has_godot_node, components]
-# where components is Array of component name strings
 func update_entities(data: Array) -> void:
 	if not entity_tree:
 		return
@@ -67,40 +60,74 @@ func update_entities(data: Array) -> void:
 	status_label.add_theme_color_override("font_color", Color(0.5, 0.9, 0.5))
 
 	entity_tree.clear()
-	var root: TreeItem = entity_tree.create_item()
+	var tree_root: TreeItem = entity_tree.create_item()
+
+	# Data format: [entity_bits, name, has_godot_node, parent_bits, components]
+	var entities_by_id: Dictionary = {}
+	var children_by_parent: Dictionary = {}
 
 	for entity_data in data:
-		if entity_data is Array and entity_data.size() >= 3:
-			var entity_bits: int = entity_data[0]
-			var entity_name: String = entity_data[1]
-			var has_godot_node: bool = entity_data[2]
-			var components: Array = entity_data[3] if entity_data.size() >= 4 else []
+		if not (entity_data is Array and entity_data.size() >= 5):
+			continue
 
-			# Create entity item (expandable if has components)
-			var entity_item: TreeItem = entity_tree.create_item(root)
-			var display_name: String = entity_name if entity_name else "Entity %d" % (entity_bits & 0xFFFFFFFF)
+		var entity_bits: int = entity_data[0]
+		var entity_name: String = entity_data[1]
+		var has_godot_node: bool = entity_data[2]
+		var parent_bits: int = entity_data[3]
+		var components: Array = entity_data[4]
 
-			if has_godot_node:
-				display_name += " [G]"
+		entities_by_id[entity_bits] = {
+			"name": entity_name,
+			"has_godot_node": has_godot_node,
+			"parent_bits": parent_bits,
+			"components": components
+		}
 
-			entity_item.set_text(0, display_name)
-			entity_item.set_metadata(0, entity_bits)
+		if parent_bits == -1:
+			if not children_by_parent.has(-1):
+				children_by_parent[-1] = []
+			children_by_parent[-1].append(entity_bits)
+		else:
+			if not children_by_parent.has(parent_bits):
+				children_by_parent[parent_bits] = []
+			children_by_parent[parent_bits].append(entity_bits)
 
-			# Add components as children
-			for component_name in components:
-				var comp_item: TreeItem = entity_tree.create_item(entity_item)
+	# Build tree recursively starting from root entities (parent_bits == -1)
+	var tree_items: Dictionary = {}
+	_build_entity_tree(tree_root, -1, entities_by_id, children_by_parent, tree_items)
 
-				# Extract just the short type name (after last ::)
-				var short_name: String = component_name
-				var last_sep: int = component_name.rfind("::")
-				if last_sep >= 0:
-					short_name = component_name.substr(last_sep + 2)
+func _build_entity_tree(parent_item: TreeItem, parent_bits: int, entities_by_id: Dictionary, children_by_parent: Dictionary, tree_items: Dictionary) -> void:
+	if not children_by_parent.has(parent_bits):
+		return
 
-				comp_item.set_text(0, short_name)
-				comp_item.set_tooltip_text(0, component_name)  # Full name on hover
-				comp_item.set_custom_color(0, Color(0.6, 0.8, 1.0))  # Light blue for components
+	for entity_bits in children_by_parent[parent_bits]:
+		var info: Dictionary = entities_by_id[entity_bits]
+		var entity_item: TreeItem = entity_tree.create_item(parent_item)
 
-			# Restore expanded/collapsed state (default to collapsed)
-			if components.size() > 0:
-				var is_expanded: bool = _expanded_entities.get(entity_bits, false)
-				entity_item.collapsed = not is_expanded
+		var display_name: String = info["name"] if info["name"] else "Entity %d" % (entity_bits & 0xFFFFFFFF)
+		if info["has_godot_node"]:
+			display_name += " [G]"
+
+		entity_item.set_text(0, display_name)
+		entity_item.set_metadata(0, entity_bits)
+		tree_items[entity_bits] = entity_item
+
+		# Add components as children of entity
+		for component_name in info["components"]:
+			var comp_item: TreeItem = entity_tree.create_item(entity_item)
+			var short_name: String = component_name
+			var last_sep: int = component_name.rfind("::")
+			if last_sep >= 0:
+				short_name = component_name.substr(last_sep + 2)
+			comp_item.set_text(0, short_name)
+			comp_item.set_tooltip_text(0, component_name)
+			comp_item.set_custom_color(0, Color(0.6, 0.8, 1.0))
+
+		# Recursively add child entities
+		_build_entity_tree(entity_item, entity_bits, entities_by_id, children_by_parent, tree_items)
+
+		# Restore expanded/collapsed state
+		var has_children: bool = info["components"].size() > 0 or children_by_parent.has(entity_bits)
+		if has_children:
+			var is_expanded: bool = _expanded_entities.get(entity_bits, false)
+			entity_item.collapsed = not is_expanded
