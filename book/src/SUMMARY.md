@@ -45,6 +45,10 @@
 
 ---
 
+- [Debugging](./debugging/index.md)
+
+---
+
 - [Integration Testing](./testing/index.md)
 
 ---

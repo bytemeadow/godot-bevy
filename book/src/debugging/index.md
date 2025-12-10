@@ -1,0 +1,91 @@
+# Debugging
+
+Godot-bevy includes a built-in entity inspector that displays your Bevy ECS state directly in the Godot editor. When running your game, you can see all entities, their components, and parent-child relationships in real time.
+
+## Entity Inspector
+
+The inspector appears as a "Entities" tab next to the Scene tab in the editor's left dock. It shows:
+
+- All Bevy entities with their names
+- Entity hierarchy (parent-child relationships)
+- Components attached to each entity
+- Which entities have associated Godot nodes (marked with `[G]`)
+
+### Enabling the Inspector
+
+The inspector is included in `GodotDefaultPlugins`:
+
+```rust
+#[bevy_app]
+fn build_app(app: &mut App) {
+    app.add_plugins(GodotDefaultPlugins);
+}
+```
+
+Or add it individually:
+
+```rust
+#[bevy_app]
+fn build_app(app: &mut App) {
+    app.add_plugins(GodotDebuggerPlugin);
+}
+```
+
+### Configuration
+
+Control the inspector through the `DebuggerConfig` resource:
+
+```rust
+fn configure_debugger(mut config: ResMut<DebuggerConfig>) {
+    config.enabled = true;       // Toggle on/off
+    config.update_interval = 0.5; // Seconds between updates
+}
+```
+
+### Using the Inspector
+
+1. Open your project in Godot
+2. Look for the "Bevy" tab in the left dock (next to Scene/Import)
+3. Run your game
+4. The inspector populates with your ECS state
+
+Entities display as a tree. Click to expand and see:
+- Child entities (nested under parents)
+- Components (shown in blue, with full type path on hover)
+
+Entities with a `[G]` suffix have an associated `GodotNodeHandle`, meaning they're linked to a Godot node.
+
+### Debugging Hierarchy Issues
+
+The inspector mirrors Bevy's `ChildOf`/`Children` hierarchy, not Godot's scene tree. If an entity appears at the wrong level:
+
+1. Check if `SceneTreeConfig::add_child_relationship` is enabled (it is by default)
+2. Verify the Godot node was in the scene tree when the entity was created
+
+```rust
+// Check hierarchy config
+fn debug_hierarchy(config: Res<SceneTreeConfig>) {
+    if !config.add_child_relationship {
+        warn!("Parent-child relationships are disabled");
+    }
+}
+```
+
+### Performance Considerations
+
+The inspector sends data every 0.5 seconds by default. For games with thousands of entities, you may want to increase the interval or disable it in release builds:
+
+```rust
+fn setup_debugger(mut config: ResMut<DebuggerConfig>) {
+    #[cfg(debug_assertions)]
+    {
+        config.enabled = true;
+        config.update_interval = 1.0; // Slower updates for large scenes
+    }
+    
+    #[cfg(not(debug_assertions))]
+    {
+        config.enabled = false;
+    }
+}
+```
