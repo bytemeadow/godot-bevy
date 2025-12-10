@@ -17,11 +17,13 @@ var _icon_entity_godot: Texture2D
 var _icon_component: Texture2D
 var _icon_transform: Texture2D
 var _icon_node: Texture2D
-
 var _icon_visibility: Texture2D
 var _icon_mesh: Texture2D
 var _icon_camera: Texture2D
 var _icon_audio: Texture2D
+
+# Dynamic icon cache for marker components (node_type -> icon)
+var _marker_icon_cache: Dictionary = {}
 
 func _ready() -> void:
 	_load_icons()
@@ -137,11 +139,10 @@ func _build_entity_tree(parent_item: TreeItem, parent_bits: int, entities_by_id:
 		entity_item.set_metadata(0, entity_bits)
 		tree_items[entity_bits] = entity_item
 
-		# Set entity icon based on whether it has a Godot node
-		if info["has_godot_node"] and _icon_entity_godot:
-			entity_item.set_icon(0, _icon_entity_godot)
-		elif _icon_entity:
-			entity_item.set_icon(0, _icon_entity)
+		# Find the node type from marker components and set appropriate icon
+		var entity_icon: Texture2D = _get_entity_icon(info["components"], info["has_godot_node"])
+		if entity_icon:
+			entity_item.set_icon(0, entity_icon)
 
 		# Add components as children of entity
 		for component in info["components"]:
@@ -206,6 +207,43 @@ func _add_component_item(parent_item: TreeItem, component) -> void:
 	if component_value is Dictionary and component_value.has("fields"):
 		_add_fields(comp_item, component_value)
 
+func _get_marker_icon(node_type: String) -> Texture2D:
+	# Check cache first
+	if _marker_icon_cache.has(node_type):
+		return _marker_icon_cache[node_type]
+
+	# Look up icon from editor theme
+	var theme := EditorInterface.get_editor_theme()
+	if theme:
+		var icon: Texture2D = theme.get_icon(node_type, &"EditorIcons")
+		_marker_icon_cache[node_type] = icon
+		return icon
+
+	_marker_icon_cache[node_type] = null
+	return null
+
+func _get_entity_icon(components: Array, has_godot_node: bool) -> Texture2D:
+	# Look for marker components to determine the Godot node type
+	for component in components:
+		if not component is Dictionary:
+			continue
+
+		var short_name: String = component.get("short_name", "")
+
+		# Check if this is a marker component (ends with "Marker")
+		if short_name.ends_with("Marker"):
+			# Extract the node type name (e.g., "Node2DMarker" -> "Node2D")
+			var node_type: String = short_name.substr(0, short_name.length() - 6)
+			var icon: Texture2D = _get_marker_icon(node_type)
+			if icon:
+				return icon
+
+	# Fallback icons
+	if has_godot_node:
+		return _icon_entity_godot
+
+	return _icon_entity
+
 func _get_component_icon(short_name: String) -> Texture2D:
 	# Map component types to appropriate icons
 	match short_name:
@@ -223,8 +261,15 @@ func _get_component_icon(short_name: String) -> Texture2D:
 			return _icon_audio
 		"Name":
 			return null  # No icon for Name, it's common
-		_:
-			return _icon_component
+
+	# Check if this is a marker component - use the corresponding Godot node icon
+	if short_name.ends_with("Marker"):
+		var node_type: String = short_name.substr(0, short_name.length() - 6)
+		var icon: Texture2D = _get_marker_icon(node_type)
+		if icon:
+			return icon
+
+	return _icon_component
 
 func _add_fields(parent_item: TreeItem, value_dict: Dictionary) -> void:
 	var fields = value_dict.get("fields")
