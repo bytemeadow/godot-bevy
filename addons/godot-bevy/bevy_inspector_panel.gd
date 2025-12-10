@@ -46,7 +46,6 @@ func _setup_ui() -> void:
 	entity_tree.item_collapsed.connect(_on_item_collapsed)
 	main_vbox.add_child(entity_tree)
 
-# Track when user expands/collapses an entity
 func _on_item_collapsed(item: TreeItem) -> void:
 	var entity_bits = item.get_metadata(0)
 	if entity_bits != null:
@@ -113,15 +112,8 @@ func _build_entity_tree(parent_item: TreeItem, parent_bits: int, entities_by_id:
 		tree_items[entity_bits] = entity_item
 
 		# Add components as children of entity
-		for component_name in info["components"]:
-			var comp_item: TreeItem = entity_tree.create_item(entity_item)
-			var short_name: String = component_name
-			var last_sep: int = component_name.rfind("::")
-			if last_sep >= 0:
-				short_name = component_name.substr(last_sep + 2)
-			comp_item.set_text(0, short_name)
-			comp_item.set_tooltip_text(0, component_name)
-			comp_item.set_custom_color(0, Color(0.6, 0.8, 1.0))
+		for component in info["components"]:
+			_add_component_item(entity_item, component)
 
 		# Recursively add child entities
 		_build_entity_tree(entity_item, entity_bits, entities_by_id, children_by_parent, tree_items)
@@ -131,3 +123,111 @@ func _build_entity_tree(parent_item: TreeItem, parent_bits: int, entities_by_id:
 		if has_children:
 			var is_expanded: bool = _expanded_entities.get(entity_bits, false)
 			entity_item.collapsed = not is_expanded
+
+func _add_component_item(parent_item: TreeItem, component) -> void:
+	var comp_item: TreeItem = entity_tree.create_item(parent_item)
+
+	# Handle both old format (string) and new format (dictionary)
+	var component_name: String
+	var component_value = null
+
+	if component is Dictionary:
+		component_name = component.get("name", "Unknown")
+		component_value = component.get("value", null)
+	else:
+		component_name = str(component)
+
+	# Extract short name
+	var short_name: String = component_name
+	var last_sep: int = component_name.rfind("::")
+	if last_sep >= 0:
+		short_name = component_name.substr(last_sep + 2)
+
+	# Format display based on whether we have reflected value
+	var display_text: String = short_name
+	if component_value != null:
+		var value_str: String = _format_value(component_value)
+		if value_str:
+			display_text = "%s: %s" % [short_name, value_str]
+
+	comp_item.set_text(0, display_text)
+	comp_item.set_tooltip_text(0, component_name)
+	comp_item.set_custom_color(0, Color(0.6, 0.8, 1.0))
+
+	# Add fields as children if we have structured data
+	if component_value is Dictionary and component_value.has("fields"):
+		_add_fields(comp_item, component_value)
+
+func _add_fields(parent_item: TreeItem, value_dict: Dictionary) -> void:
+	var fields = value_dict.get("fields")
+	if fields == null:
+		return
+
+	if fields is Dictionary:
+		for field_name in fields:
+			var field_value = fields[field_name]
+			var field_item: TreeItem = entity_tree.create_item(parent_item)
+			var display: String = "%s: %s" % [field_name, _format_value(field_value)]
+			field_item.set_text(0, display)
+			field_item.set_custom_color(0, Color(0.8, 0.8, 0.6))
+
+			# Recurse for nested structs
+			if field_value is Dictionary and field_value.has("fields"):
+				_add_fields(field_item, field_value)
+	elif fields is Array:
+		for i in range(fields.size()):
+			var field_value = fields[i]
+			var field_item: TreeItem = entity_tree.create_item(parent_item)
+			var display: String = "[%d]: %s" % [i, _format_value(field_value)]
+			field_item.set_text(0, display)
+			field_item.set_custom_color(0, Color(0.8, 0.8, 0.6))
+
+func _format_value(value) -> String:
+	if value == null:
+		return ""
+
+	if value is bool or value is int or value is float:
+		return str(value)
+
+	if value is String:
+		return '"%s"' % value
+
+	if value is Dictionary:
+		var type_name: String = value.get("type", "")
+
+		match type_name:
+			"struct":
+				var fields = value.get("fields", {})
+				if fields.size() <= 3:
+					var parts: Array = []
+					for key in fields:
+						parts.append("%s: %s" % [key, _format_value(fields[key])])
+					return "{ %s }" % ", ".join(parts)
+				return "{ %d fields }" % fields.size()
+			"tuple_struct", "tuple":
+				var fields = value.get("fields", [])
+				if fields.size() <= 3:
+					var parts: Array = []
+					for f in fields:
+						parts.append(_format_value(f))
+					return "(%s)" % ", ".join(parts)
+				return "(%d items)" % fields.size()
+			"enum":
+				var variant: String = value.get("variant", "?")
+				var fields = value.get("fields", {})
+				if fields.is_empty():
+					return variant
+				return "%s { ... }" % variant
+			"list", "array":
+				var items = value.get("items", [])
+				return "[%d items]" % items.size()
+			"map":
+				return "{%d entries}" % value.get("len", 0)
+			"set":
+				return "{%d items}" % value.get("len", 0)
+			"opaque":
+				return value.get("debug", "?")
+
+		return str(value)
+
+	return str(value)
