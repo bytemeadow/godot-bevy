@@ -20,6 +20,5 @@ func _capture(message: String, data: Array, session_id: int) -> bool:
 		_:
 			return false
 
-func _setup_session(session_id: int) -> void:
-	# We don't add UI here anymore - we use the dock panel instead
+func _setup_session(_session_id: int) -> void:
 	pass
