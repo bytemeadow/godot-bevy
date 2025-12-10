@@ -16,7 +16,6 @@ var _icon_entity: Texture2D
 var _icon_entity_godot: Texture2D
 var _icon_component: Texture2D
 var _icon_transform: Texture2D
-var _icon_node: Texture2D
 var _icon_visibility: Texture2D
 var _icon_mesh: Texture2D
 var _icon_camera: Texture2D
@@ -37,8 +36,6 @@ func _load_icons() -> void:
 		_icon_entity_godot = theme.get_icon(&"Godot", &"EditorIcons")
 		_icon_component = theme.get_icon(&"Object", &"EditorIcons")
 		_icon_transform = theme.get_icon(&"Transform3D", &"EditorIcons")
-		_icon_node = theme.get_icon(&"NodePath", &"EditorIcons")
-
 		_icon_visibility = theme.get_icon(&"GuiVisibilityVisible", &"EditorIcons")
 		_icon_mesh = theme.get_icon(&"MeshInstance3D", &"EditorIcons")
 		_icon_camera = theme.get_icon(&"Camera3D", &"EditorIcons")
@@ -270,7 +267,7 @@ func _get_component_icon(short_name: String) -> Texture2D:
 		"Transform", "GlobalTransform", "Transform2D", "Transform3D":
 			return _icon_transform
 		"GodotNodeHandle":
-			return _icon_node
+			return _icon_entity_godot
 		"Visibility", "InheritedVisibility", "ViewVisibility":
 			return _icon_visibility
 		"Mesh", "Mesh2d", "Mesh3d", "Handle<Mesh>":
@@ -280,7 +277,7 @@ func _get_component_icon(short_name: String) -> Texture2D:
 		"AudioPlayer", "AudioSink", "SpatialAudioSink":
 			return _icon_audio
 		"Name":
-			return null  # No icon for Name, it's common
+			return _get_marker_icon("String")
 
 	# Check if this is a marker component - use the corresponding Godot node icon
 	if short_name.ends_with("Marker"):
