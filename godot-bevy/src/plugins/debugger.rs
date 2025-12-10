@@ -14,7 +14,7 @@ use godot::meta::ToGodot;
 use godot::prelude::{VarDictionary as Dictionary, *};
 
 use crate::interop::GodotNodeHandle;
-use crate::plugins::reflection::AppTypeRegistry;
+use bevy_ecs::reflect::AppTypeRegistry;
 
 /// Configuration for the debugger plugin
 #[derive(Resource)]
@@ -119,7 +119,7 @@ fn debugger_exclusive_system(world: &mut World) {
 
             let mut component_dict = Dictionary::new();
 
-            // Try to get pretty type name from registry, fallback to full name
+            // Try to get pretty type name from registry, fallback to extracting from full path
             let (full_name, short_name) = if let Some(ref registry) = type_registry {
                 let registry = registry.read();
                 if let Some(type_id) = component_info.type_id() {
@@ -128,16 +128,13 @@ fn debugger_exclusive_system(world: &mut World) {
                         let table = type_info.type_path_table();
                         (table.path().to_string(), table.short_path().to_string())
                     } else {
-                        let name = component_info.name().to_string();
-                        (name.clone(), name)
+                        extract_short_name(component_info.name().to_string())
                     }
                 } else {
-                    let name = component_info.name().to_string();
-                    (name.clone(), name)
+                    extract_short_name(component_info.name().to_string())
                 }
             } else {
-                let name = component_info.name().to_string();
-                (name.clone(), name)
+                extract_short_name(component_info.name().to_string())
             };
 
             // Skip hierarchy components - already shown visually in the tree
@@ -183,6 +180,16 @@ fn debugger_exclusive_system(world: &mut World) {
     let mut debugger = EngineDebugger::singleton();
     let message: GString = "bevy:entities".into();
     debugger.send_message(&message, &entities);
+}
+
+/// Extract a short type name from a full path (e.g., "foo::bar::Baz" -> "Baz")
+fn extract_short_name(full_name: String) -> (String, String) {
+    let short = if let Some(pos) = full_name.rfind("::") {
+        full_name[pos + 2..].to_string()
+    } else {
+        full_name.clone()
+    };
+    (full_name, short)
 }
 
 /// Convert a reflected value to a Godot Dictionary

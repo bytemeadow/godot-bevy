@@ -14,7 +14,7 @@ license.workspace = true
 bevy_app = { version = "0.17", default-features = false }
 bevy_asset = { version = "0.17", default-features = false }
 bevy_diagnostic = { version = "0.17", default-features = false }
-bevy_ecs = { version = "0.17", default-features = false, features = ["multi_threaded"] }
+bevy_ecs = { version = "0.17", default-features = false, features = ["multi_threaded", "bevy_reflect"] }
 bevy_utils = { version = "0.17", default-features = false, features = ["debug"] }
 bevy_input = { version = "0.17", default-features = false }
 bevy_math = { version = "0.17", default-features = false }

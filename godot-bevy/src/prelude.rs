@@ -4,13 +4,8 @@ pub use crate::node_tree_view::{NodeTreeView, NodeTreeViewError};
 #[cfg(feature = "godot_bevy_log")]
 pub use crate::plugins::godot_bevy_logger::GodotBevyLogPlugin;
 pub use crate::plugins::{
-    // Reflection
-    AppTypeRegistry,
-    // Signals
     GodotCorePlugins,
-    // Transforms
     GodotDefaultPlugins,
-    GodotReflectionPlugin,
     assets::{GodotAssetsPlugin, GodotResource},
     audio::{
         Audio, AudioApp, AudioChannel, AudioChannelMarker, AudioEasing, AudioError, AudioOutput,

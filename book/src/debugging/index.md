@@ -6,10 +6,10 @@ Godot-bevy includes a built-in entity inspector that displays your Bevy ECS stat
 
 The inspector appears as a "Entities" tab next to the Scene tab in the editor's left dock. It shows:
 
-- All Bevy entities with their names
-- Entity hierarchy (parent-child relationships)
-- Components attached to each entity
-- Which entities have associated Godot nodes (marked with `[G]`)
+- All Bevy entities with their names and appropriate icons
+- Entity hierarchy (parent-child relationships matching Bevy's `ChildOf`/`Children`)
+- Components attached to each entity with type-specific icons
+- Entities with Godot nodes show their node type icon (e.g., Node2D, Sprite2D)
 
 ### Enabling the Inspector
 
@@ -53,7 +53,7 @@ Entities display as a tree. Click to expand and see:
 - Child entities (nested under parents)
 - Components (shown in blue, with full type path on hover)
 
-Entities with a `[G]` suffix have an associated `GodotNodeHandle`, meaning they're linked to a Godot node.
+Entity icons indicate the Godot node type when a marker component is present (e.g., `Node2DMarker` shows the Node2D icon). Entities with a `GodotNodeHandle` but no specific marker show the Godot logo.
 
 ### Debugging Hierarchy Issues
 
