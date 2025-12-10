@@ -104,8 +104,3 @@ func update_entities(data: Array) -> void:
 			if components.size() > 0:
 				var is_expanded: bool = _expanded_entities.get(entity_bits, false)
 				entity_item.collapsed = not is_expanded
-
-# Called by the debugger plugin when component data is received
-func update_components(data: Array) -> void:
-	# Currently unused - component names are sent with entity data
-	pass

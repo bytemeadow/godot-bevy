@@ -16,5 +16,4 @@ bevy_asset_loader = "0.24.0-rc.1"
 fastrand = { version = "2.3.0" }
 godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }
-godot-bevy-inspector = { path = "../../../godot-bevy-inspector" }
 which = "8"

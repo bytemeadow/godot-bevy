@@ -17,10 +17,6 @@ func _capture(message: String, data: Array, session_id: int) -> bool:
 			if inspector_panel and inspector_panel.has_method("update_entities"):
 				inspector_panel.update_entities(data)
 			return true
-		"bevy:components":
-			if inspector_panel and inspector_panel.has_method("update_components"):
-				inspector_panel.update_components(data)
-			return true
 		_:
 			return false
 

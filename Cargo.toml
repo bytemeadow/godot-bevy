@@ -11,7 +11,6 @@ license = "MIT OR Apache-2.0"
 members = [
   "godot-bevy",
   "godot-bevy-macros",
-  "godot-bevy-inspector",
   "godot-bevy-test",
   "godot-bevy-test-macros",
   "itest/rust",
