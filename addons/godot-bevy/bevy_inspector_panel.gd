@@ -12,6 +12,9 @@ extends Panel
 var entity_tree: Tree
 var status_label: Label
 
+# Track expanded state by entity_bits (persists across refreshes)
+var _expanded_entities: Dictionary = {}
+
 func _ready() -> void:
 	_setup_ui()
 
@@ -44,7 +47,14 @@ func _setup_ui() -> void:
 	entity_tree.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	entity_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	entity_tree.hide_root = true
+	entity_tree.item_collapsed.connect(_on_item_collapsed)
 	main_vbox.add_child(entity_tree)
+
+# Track when user expands/collapses an entity
+func _on_item_collapsed(item: TreeItem) -> void:
+	var entity_bits = item.get_metadata(0)
+	if entity_bits != null:
+		_expanded_entities[entity_bits] = not item.collapsed
 
 # Called by the debugger plugin when entity data is received
 # Data format: Array of [entity_bits, name, has_godot_node, components]
@@ -90,9 +100,10 @@ func update_entities(data: Array) -> void:
 				comp_item.set_tooltip_text(0, component_name)  # Full name on hover
 				comp_item.set_custom_color(0, Color(0.6, 0.8, 1.0))  # Light blue for components
 
-			# Collapse by default if there are components
+			# Restore expanded/collapsed state (default to collapsed)
 			if components.size() > 0:
-				entity_item.collapsed = true
+				var is_expanded: bool = _expanded_entities.get(entity_bits, false)
+				entity_item.collapsed = not is_expanded
 
 # Called by the debugger plugin when component data is received
 func update_components(data: Array) -> void:
