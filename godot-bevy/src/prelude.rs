@@ -22,6 +22,8 @@ pub use crate::plugins::{
         CollisionMessage, CollisionMessageType, Collisions, GodotCollisionsPlugin,
     },
     core::{FindEntityByNameExt, MainThreadMarker, PhysicsDelta, PhysicsUpdate},
+    // Debugger
+    debugger::{DebuggerConfig, GodotDebuggerPlugin},
     // Collisions
     input::{
         ActionInput, BevyInputBridgePlugin, GodotInputEventPlugin, KeyboardInput, MouseButtonInput,

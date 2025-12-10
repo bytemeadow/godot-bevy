@@ -6,6 +6,7 @@ pub mod assets;
 pub mod audio;
 pub mod collisions;
 pub mod core;
+pub mod debugger;
 #[cfg(feature = "godot_bevy_log")]
 pub mod godot_bevy_logger;
 pub mod input;
@@ -20,6 +21,7 @@ pub use assets::GodotAssetsPlugin;
 pub use audio::GodotAudioPlugin;
 pub use collisions::GodotCollisionsPlugin;
 pub use core::GodotBaseCorePlugin;
+pub use debugger::{DebuggerConfig, GodotDebuggerPlugin};
 #[cfg(feature = "godot_bevy_log")]
 pub use godot_bevy_logger::GodotBevyLogPlugin;
 pub use input::{BevyInputBridgePlugin, GodotInputEventPlugin};
@@ -53,6 +55,7 @@ plugin_group! {
         :GodotAudioPlugin,
         :GodotPackedScenePlugin,
         :GodotTransformSyncPlugin,
+        :GodotDebuggerPlugin,
         #[cfg(feature = "godot_bevy_log")]
         :GodotBevyLogPlugin,
         #[cfg(feature = "bevy_gamepad")]

@@ -23,6 +23,10 @@ BevyAppSingleton="*res://scenes/bevy_app_singleton.tscn"
 
 window/stretch/mode="canvas_items"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/godot-bevy/plugin.cfg")
+
 [input]
 
 ui_accept={
