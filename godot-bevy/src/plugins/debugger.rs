@@ -155,17 +155,15 @@ fn debugger_exclusive_system(world: &mut World) {
             // Try to get reflected value
             if let Some(ref registry) = type_registry {
                 let registry = registry.read();
-                if let Some(type_id) = component_info.type_id() {
-                    if let Some(registration) = registry.get(type_id) {
-                        if let Some(reflect_from_ptr) = registration.data::<ReflectFromPtr>() {
-                            if let Ok(ptr) = entity_ref.get_by_id(*component_id) {
-                                // SAFETY: ptr is valid and type matches registration
-                                let reflected = unsafe { reflect_from_ptr.as_reflect(ptr) };
-                                let value_dict = reflect_to_dict(reflected);
-                                component_dict.set("value", value_dict);
-                            }
-                        }
-                    }
+                if let Some(type_id) = component_info.type_id()
+                    && let Some(registration) = registry.get(type_id)
+                    && let Some(reflect_from_ptr) = registration.data::<ReflectFromPtr>()
+                    && let Ok(ptr) = entity_ref.get_by_id(*component_id)
+                {
+                    // SAFETY: ptr is valid and type matches registration
+                    let reflected = unsafe { reflect_from_ptr.as_reflect(ptr) };
+                    let value_dict = reflect_to_dict(reflected);
+                    component_dict.set("value", value_dict);
                 }
             }
 
@@ -196,10 +194,10 @@ fn reflect_to_dict(value: &dyn PartialReflect) -> Dictionary {
             dict.set("type", "struct");
             let mut fields = Dictionary::new();
             for i in 0..s.field_len() {
-                if let Some(field_name) = s.name_at(i) {
-                    if let Some(field_value) = s.field_at(i) {
-                        fields.set(field_name, reflect_value_to_variant(field_value));
-                    }
+                if let Some(field_name) = s.name_at(i)
+                    && let Some(field_value) = s.field_at(i)
+                {
+                    fields.set(field_name, reflect_value_to_variant(field_value));
                 }
             }
             dict.set("fields", fields);
