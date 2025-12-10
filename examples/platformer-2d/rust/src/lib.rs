@@ -29,7 +29,12 @@ fn build_app(app: &mut App) {
             main_menu::MainMenuPlugin,
             level_manager::LevelManagerPlugin,
             gameplay::GameplayPlugin,
-        ));
+        ))
+        // Register types for inspector reflection
+        .register_type::<components::Speed>()
+        .register_type::<components::JumpVelocity>()
+        .register_type::<components::Gravity>()
+        .register_type::<components::Player>();
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, States)]

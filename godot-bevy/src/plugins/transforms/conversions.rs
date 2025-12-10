@@ -374,9 +374,7 @@ mod tests {
         let (_, _, z_rot) = back_to_bevy.rotation.to_euler(bevy_math::EulerRot::XYZ);
         assert!(
             (z_rot - angle).abs() < EPSILON,
-            "Z rotation mismatch: {} vs {}",
-            z_rot,
-            angle
+            "Z rotation mismatch: {z_rot} vs {angle}"
         );
 
         assert!((back_to_bevy.scale.x - 1.0).abs() < EPSILON);
@@ -412,9 +410,7 @@ mod tests {
         let (_, _, back_z) = back_to_bevy.rotation.to_euler(bevy_math::EulerRot::XYZ);
         assert!(
             (back_z - original_z).abs() < EPSILON,
-            "Z rotation mismatch: {} vs {}",
-            back_z,
-            original_z
+            "Z rotation mismatch: {back_z} vs {original_z}"
         );
 
         assert!((back_to_bevy.scale.x - bevy_transform.scale.x).abs() < EPSILON);

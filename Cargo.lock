@@ -2405,6 +2405,7 @@ dependencies = [
  "bevy_tasks",
  "bevy_time",
  "bevy_transform",
+ "bevy_utils",
  "chrono",
  "criterion",
  "futures-lite",

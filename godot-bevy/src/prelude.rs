@@ -4,9 +4,7 @@ pub use crate::node_tree_view::{NodeTreeView, NodeTreeViewError};
 #[cfg(feature = "godot_bevy_log")]
 pub use crate::plugins::godot_bevy_logger::GodotBevyLogPlugin;
 pub use crate::plugins::{
-    // Signals
     GodotCorePlugins,
-    // Transforms
     GodotDefaultPlugins,
     assets::{GodotAssetsPlugin, GodotResource},
     audio::{
@@ -19,6 +17,8 @@ pub use crate::plugins::{
         CollisionMessage, CollisionMessageType, Collisions, GodotCollisionsPlugin,
     },
     core::{FindEntityByNameExt, MainThreadMarker, PhysicsDelta, PhysicsUpdate},
+    // Debugger
+    debugger::{DebuggerConfig, GodotDebuggerPlugin},
     // Collisions
     input::{
         ActionInput, BevyInputBridgePlugin, GodotInputEventPlugin, KeyboardInput, MouseButtonInput,

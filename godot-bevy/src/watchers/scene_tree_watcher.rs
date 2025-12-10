@@ -29,6 +29,12 @@ impl INode for SceneTreeWatcher {
 impl SceneTreeWatcher {
     #[func]
     pub fn scene_tree_event(&self, node: Gd<Node>, message_type: SceneTreeMessageType) {
+        // Check if node is marked to be excluded from scene tree watcher
+        // This is used by godot-bevy-inspector and other tools
+        if node.has_meta("_bevy_exclude") {
+            return;
+        }
+
         if let Some(channel) = self.notification_channel.as_ref() {
             let _ = channel.send(SceneTreeMessage {
                 node: GodotNodeHandle::from_instance_id(node.instance_id()),
@@ -45,6 +51,12 @@ impl SceneTreeWatcher {
         message_type: SceneTreeMessageType,
         node_type: String,
     ) {
+        // Check if node is marked to be excluded from scene tree watcher
+        // This is used by godot-bevy-inspector and other tools
+        if node.has_meta("_bevy_exclude") {
+            return;
+        }
+
         if let Some(channel) = self.notification_channel.as_ref() {
             let _ = channel.send(SceneTreeMessage {
                 node: GodotNodeHandle::from_instance_id(node.instance_id()),
