@@ -5,10 +5,12 @@ const WIZARD_SCENE_PATH = "res://addons/godot-bevy/wizard/project_wizard.tscn"
 const AUTOLOAD_NAME = "BevyAppSingleton"
 const AUTOLOAD_PATH = "res://addons/godot-bevy/bevy_app_singleton.tscn"
 const BEVY_DEBUGGER_SCRIPT = "res://addons/godot-bevy/bevy_debugger_plugin.gd"
+const BEVY_INSPECTOR_SCENE = "res://addons/godot-bevy/bevy_inspector_panel.tscn"
 
 var wizard_dialog: Window
 var _should_restart_after_build: bool = false
 var _bevy_debugger: EditorDebuggerPlugin = null
+var _bevy_inspector: Control = null
 
 func _enable_plugin():
 	# Automatically register the BevyApp singleton when plugin is enabled
@@ -27,17 +29,26 @@ func _enter_tree():
 	add_tool_menu_item("Setup godot-bevy Project", _on_setup_project)
 	add_tool_menu_item("Build Rust Project", _on_build_rust)
 
-	# Register the Bevy debugger plugin
-	print("godot-bevy: Loading debugger script from: ", BEVY_DEBUGGER_SCRIPT)
+	# Create the Bevy Inspector panel (dock tab next to Scene)
+	var inspector_scene = load(BEVY_INSPECTOR_SCENE) as PackedScene
+	if inspector_scene:
+		_bevy_inspector = inspector_scene.instantiate()
+		add_control_to_dock(EditorPlugin.DOCK_SLOT_LEFT_UR, _bevy_inspector)
+		print("godot-bevy: Bevy Inspector panel added to dock")
+	else:
+		push_error("godot-bevy: Failed to load Bevy Inspector scene")
+
+	# Register the Bevy debugger plugin (for message capture)
 	var debugger_script = load(BEVY_DEBUGGER_SCRIPT)
-	print("godot-bevy: Debugger script loaded: ", debugger_script)
 	if debugger_script:
 		_bevy_debugger = debugger_script.new()
-		print("godot-bevy: Created debugger instance: ", _bevy_debugger)
+		# Connect debugger to inspector panel
+		if _bevy_inspector:
+			_bevy_debugger.inspector_panel = _bevy_inspector
 		add_debugger_plugin(_bevy_debugger)
-		print("godot-bevy: Bevy Debugger plugin registered successfully")
+		print("godot-bevy: Bevy Debugger plugin registered")
 	else:
-		push_error("godot-bevy: Failed to load Bevy Debugger plugin from: " + BEVY_DEBUGGER_SCRIPT)
+		push_error("godot-bevy: Failed to load Bevy Debugger plugin")
 
 	print("godot-bevy plugin activated!")
 
@@ -45,6 +56,12 @@ func _exit_tree():
 	# Remove menu items
 	remove_tool_menu_item("Setup godot-bevy Project")
 	remove_tool_menu_item("Build Rust Project")
+
+	# Remove the Bevy Inspector panel
+	if is_instance_valid(_bevy_inspector):
+		remove_control_from_docks(_bevy_inspector)
+		_bevy_inspector.free()
+		_bevy_inspector = null
 
 	# Remove the Bevy debugger plugin
 	if _bevy_debugger:
