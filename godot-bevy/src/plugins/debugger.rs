@@ -117,9 +117,40 @@ fn debugger_exclusive_system(world: &mut World) {
                 continue;
             };
 
-            let component_name = component_info.name().to_string();
             let mut component_dict = Dictionary::new();
-            component_dict.set("name", GString::from(&component_name));
+
+            // Try to get pretty type name from registry, fallback to full name
+            let (full_name, short_name) = if let Some(ref registry) = type_registry {
+                let registry = registry.read();
+                if let Some(type_id) = component_info.type_id() {
+                    if let Some(registration) = registry.get(type_id) {
+                        let type_info = registration.type_info();
+                        let table = type_info.type_path_table();
+                        (table.path().to_string(), table.short_path().to_string())
+                    } else {
+                        let name = component_info.name().to_string();
+                        (name.clone(), name)
+                    }
+                } else {
+                    let name = component_info.name().to_string();
+                    (name.clone(), name)
+                }
+            } else {
+                let name = component_info.name().to_string();
+                (name.clone(), name)
+            };
+
+            // Skip hierarchy components - already shown visually in the tree
+            if short_name == "ChildOf"
+                || short_name == "Children"
+                || full_name.contains("::ChildOf")
+                || full_name.contains("::Children")
+            {
+                continue;
+            }
+
+            component_dict.set("name", GString::from(&full_name));
+            component_dict.set("short_name", GString::from(&short_name));
 
             // Try to get reflected value
             if let Some(ref registry) = type_registry {
@@ -241,7 +272,7 @@ fn reflect_to_dict(value: &dyn PartialReflect) -> Dictionary {
         ReflectRef::Opaque(_) => {
             dict.set("type", "opaque");
             // Try to get debug representation
-            if let Some(debug_str) = value.try_as_reflect().map(|r| format!("{:?}", r)) {
+            if let Some(debug_str) = value.try_as_reflect().map(|r| format!("{r:?}")) {
                 dict.set("debug", GString::from(&debug_str));
             }
         }
