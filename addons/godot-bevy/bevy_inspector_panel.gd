@@ -223,20 +223,40 @@ func _get_marker_icon(node_type: String) -> Texture2D:
 	return null
 
 func _get_entity_icon(components: Array, has_godot_node: bool) -> Texture2D:
-	# Look for marker components to determine the Godot node type
+	# Look for the most specific marker component to determine the Godot node type
+	# (e.g., prefer Sprite2D over Node2D over CanvasItem over Node)
+	var best_node_type: StringName = &""
+
 	for component in components:
 		if not component is Dictionary:
 			continue
 
 		var short_name: String = component.get("short_name", "")
 
+		# Fallback: extract short name from full path if not provided
+		if short_name.is_empty():
+			var full_name: String = component.get("name", "")
+			var last_sep: int = full_name.rfind("::")
+			if last_sep >= 0:
+				short_name = full_name.substr(last_sep + 2)
+			else:
+				short_name = full_name
+
 		# Check if this is a marker component (ends with "Marker")
 		if short_name.ends_with("Marker"):
 			# Extract the node type name (e.g., "Node2DMarker" -> "Node2D")
-			var node_type: String = short_name.substr(0, short_name.length() - 6)
-			var icon: Texture2D = _get_marker_icon(node_type)
-			if icon:
-				return icon
+			var node_type: StringName = StringName(short_name.substr(0, short_name.length() - 6))
+
+			if best_node_type.is_empty():
+				best_node_type = node_type
+			elif ClassDB.is_parent_class(node_type, best_node_type):
+				# node_type is more specific (node_type inherits from best_node_type)
+				best_node_type = node_type
+
+	if not best_node_type.is_empty():
+		var icon: Texture2D = _get_marker_icon(best_node_type)
+		if icon:
+			return icon
 
 	# Fallback icons
 	if has_godot_node:
