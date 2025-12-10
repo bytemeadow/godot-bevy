@@ -2,5 +2,5 @@
 
 [ext_resource type="Script" path="res://addons/godot-bevy/bevy_inspector_panel.gd" id="1"]
 
-[node name="BevyInspector" type="Panel"]
+[node name="Entities" type="Panel"]
 script = ExtResource("1")
