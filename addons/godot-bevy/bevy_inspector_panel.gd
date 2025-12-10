@@ -15,14 +15,9 @@ var _expanded_entities: Dictionary = {}
 var _icon_entity: Texture2D
 var _icon_entity_godot: Texture2D
 var _icon_component: Texture2D
-var _icon_transform: Texture2D
-var _icon_visibility: Texture2D
-var _icon_mesh: Texture2D
-var _icon_camera: Texture2D
-var _icon_audio: Texture2D
 
-# Dynamic icon cache for marker components (node_type -> icon)
-var _marker_icon_cache: Dictionary = {}
+# Dynamic icon cache (icon_name -> icon)
+var _icon_cache: Dictionary = {}
 
 func _ready() -> void:
 	_load_icons()
@@ -35,11 +30,6 @@ func _load_icons() -> void:
 		_icon_entity = theme.get_icon(&"Node", &"EditorIcons")
 		_icon_entity_godot = theme.get_icon(&"Godot", &"EditorIcons")
 		_icon_component = theme.get_icon(&"Object", &"EditorIcons")
-		_icon_transform = theme.get_icon(&"Transform3D", &"EditorIcons")
-		_icon_visibility = theme.get_icon(&"GuiVisibilityVisible", &"EditorIcons")
-		_icon_mesh = theme.get_icon(&"MeshInstance3D", &"EditorIcons")
-		_icon_camera = theme.get_icon(&"Camera3D", &"EditorIcons")
-		_icon_audio = theme.get_icon(&"AudioStreamPlayer", &"EditorIcons")
 
 func _setup_ui() -> void:
 	name = "Bevy"
@@ -204,19 +194,19 @@ func _add_component_item(parent_item: TreeItem, component) -> void:
 	if component_value is Dictionary and component_value.has("fields"):
 		_add_fields(comp_item, component_value)
 
-func _get_marker_icon(node_type: String) -> Texture2D:
+func _get_icon(icon_name: String) -> Texture2D:
 	# Check cache first
-	if _marker_icon_cache.has(node_type):
-		return _marker_icon_cache[node_type]
+	if _icon_cache.has(icon_name):
+		return _icon_cache[icon_name]
 
 	# Look up icon from editor theme
 	var theme := EditorInterface.get_editor_theme()
 	if theme:
-		var icon: Texture2D = theme.get_icon(node_type, &"EditorIcons")
-		_marker_icon_cache[node_type] = icon
+		var icon: Texture2D = theme.get_icon(icon_name, &"EditorIcons")
+		_icon_cache[icon_name] = icon
 		return icon
 
-	_marker_icon_cache[node_type] = null
+	_icon_cache[icon_name] = null
 	return null
 
 func _get_entity_icon(components: Array, has_godot_node: bool) -> Texture2D:
@@ -251,7 +241,7 @@ func _get_entity_icon(components: Array, has_godot_node: bool) -> Texture2D:
 				best_node_type = node_type
 
 	if not best_node_type.is_empty():
-		var icon: Texture2D = _get_marker_icon(best_node_type)
+		var icon: Texture2D = _get_icon(best_node_type)
 		if icon:
 			return icon
 
@@ -265,24 +255,30 @@ func _get_component_icon(short_name: String) -> Texture2D:
 	# Map component types to appropriate icons
 	match short_name:
 		"Transform", "GlobalTransform", "Transform2D", "Transform3D":
-			return _icon_transform
+			return _get_icon("Transform3D")
 		"GodotNodeHandle":
 			return _icon_entity_godot
 		"Visibility", "InheritedVisibility", "ViewVisibility":
-			return _icon_visibility
+			return _get_icon("GuiVisibilityVisible")
 		"Mesh", "Mesh2d", "Mesh3d", "Handle<Mesh>":
-			return _icon_mesh
+			return _get_icon("MeshInstance3D")
 		"Camera", "Camera2d", "Camera3d":
-			return _icon_camera
+			return _get_icon("Camera3D")
 		"AudioPlayer", "AudioSink", "SpatialAudioSink":
-			return _icon_audio
+			return _get_icon("AudioStreamPlayer")
 		"Name":
-			return _get_marker_icon("String")
+			return _get_icon("String")
+		"TransformSyncMetadata":
+			return _get_icon("VisualShaderNodeComment")
+		"Groups":
+			return _get_icon("Groups")
+		"TransformTreeChanged":
+			return _get_icon("StatusWarning")
 
 	# Check if this is a marker component - use the corresponding Godot node icon
 	if short_name.ends_with("Marker"):
 		var node_type: String = short_name.substr(0, short_name.length() - 6)
-		var icon: Texture2D = _get_marker_icon(node_type)
+		var icon: Texture2D = _get_icon(node_type)
 		if icon:
 			return icon
 
