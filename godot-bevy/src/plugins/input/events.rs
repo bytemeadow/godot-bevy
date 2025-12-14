@@ -161,15 +161,15 @@ fn write_input_messages(
         match event_type {
             InputEventType::Normal => {
                 // Only process ActionInput events from normal input (mapped keys/actions)
-                extract_action_events_only(input_event, &mut action_events);
+                extract_action_events_only(&input_event, &mut action_events);
+                extract_input_mouse_motion_events(&input_event, &mut mouse_motion_events);
             }
             InputEventType::Unhandled => {
                 // Process raw input events from unhandled input (unmapped keys, mouse, etc.)
                 extract_input_events_no_actions(
-                    input_event,
+                    &input_event,
                     &mut keyboard_events,
                     &mut mouse_button_events,
-                    &mut mouse_motion_events,
                     &mut touch_events,
                     &mut gamepad_button_events,
                     &mut gamepad_axis_events,
@@ -181,7 +181,7 @@ fn write_input_messages(
 }
 
 fn extract_action_events_only(
-    input_event: Gd<GodotInputEvent>,
+    input_event: &Gd<GodotInputEvent>,
     action_messages: &mut MessageWriter<ActionInput>,
 ) {
     // Only process ActionInput events from normal input (mapped keys/actions)
@@ -190,11 +190,18 @@ fn extract_action_events_only(
 }
 
 #[allow(clippy::too_many_arguments)]
+fn extract_input_mouse_motion_events(
+    input_event: &Gd<GodotInputEvent>,
+    mouse_motion_events: &mut MessageWriter<MouseMotion>,
+) {
+    extract_mouse_motion_events(input_event, mouse_motion_events);
+}
+
+#[allow(clippy::too_many_arguments)]
 fn extract_input_events_no_actions(
-    input_event: Gd<GodotInputEvent>,
+    input_event: &Gd<GodotInputEvent>,
     keyboard_events: &mut MessageWriter<KeyboardInput>,
     mouse_button_events: &mut MessageWriter<MouseButtonInput>,
-    mouse_motion_events: &mut MessageWriter<MouseMotion>,
     touch_events: &mut MessageWriter<TouchInput>,
     gamepad_button_events: &mut MessageWriter<GamepadButtonInput>,
     gamepad_axis_events: &mut MessageWriter<GamepadAxisInput>,
@@ -204,7 +211,6 @@ fn extract_input_events_no_actions(
         input_event,
         keyboard_events,
         mouse_button_events,
-        mouse_motion_events,
         touch_events,
         gamepad_button_events,
         gamepad_axis_events,
@@ -213,11 +219,28 @@ fn extract_input_events_no_actions(
 }
 
 #[allow(clippy::too_many_arguments)]
+fn extract_mouse_motion_events(
+    input_event: &Gd<GodotInputEvent>,
+    mouse_motion_events: &mut MessageWriter<MouseMotion>,
+) {
+    // Try to cast to specific input event types and extract data
+
+    // Mouse motion
+    if let Ok(mouse_motion_event) = input_event.clone().try_cast::<InputEventMouseMotion>() {
+        let position = mouse_motion_event.get_position();
+        let relative = mouse_motion_event.get_relative();
+        mouse_motion_events.write(MouseMotion {
+            delta: Vec2::new(relative.x, relative.y),
+            position: Vec2::new(position.x, position.y),
+        });
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn extract_basic_input_events(
-    input_event: Gd<GodotInputEvent>,
+    input_event: &Gd<GodotInputEvent>,
     keyboard_events: &mut MessageWriter<KeyboardInput>,
     mouse_button_events: &mut MessageWriter<MouseButtonInput>,
-    mouse_motion_events: &mut MessageWriter<MouseMotion>,
     touch_events: &mut MessageWriter<TouchInput>,
     gamepad_button_events: &mut MessageWriter<GamepadButtonInput>,
     gamepad_axis_events: &mut MessageWriter<GamepadAxisInput>,
@@ -244,15 +267,6 @@ fn extract_basic_input_events(
             factor: mouse_button_event.get_factor(),
             canceled: mouse_button_event.is_canceled(),
             is_double_click: mouse_button_event.is_double_click(),
-        });
-    }
-    // Mouse motion
-    else if let Ok(mouse_motion_event) = input_event.clone().try_cast::<InputEventMouseMotion>() {
-        let position = mouse_motion_event.get_position();
-        let relative = mouse_motion_event.get_relative();
-        mouse_motion_events.write(MouseMotion {
-            delta: Vec2::new(relative.x, relative.y),
-            position: Vec2::new(position.x, position.y),
         });
     }
     // Touch input
