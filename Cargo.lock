@@ -274,6 +274,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
+name = "avian-physics-example"
+version = "0.1.0"
+dependencies = [
+ "avian3d",
+ "bevy",
+ "bevy_asset_loader",
+ "godot",
+ "godot-bevy",
+ "run_godot_util",
+ "which 8.0.0",
+]
+
+[[package]]
 name = "avian3d"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -309,18 +322,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "avian_physics_test"
-version = "0.1.0"
-dependencies = [
- "avian3d",
- "bevy",
- "bevy_asset_loader",
- "godot",
- "godot-bevy",
- "which 8.0.0",
 ]
 
 [[package]]
@@ -1919,6 +1920,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "dodge-the-creeps-example"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_asset_loader",
+ "fastrand",
+ "godot",
+ "godot-bevy",
+ "run_godot_util",
+ "which 8.0.0",
+]
+
+[[package]]
 name = "downcast-rs"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2743,6 +2757,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e05c02b5e89bff3b946cedeca278abc628fe811e604f027c45a8aa3cf793d0eb"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "input-event-example"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_enhanced_input",
+ "fastrand",
+ "godot",
+ "godot-bevy",
+ "leafwing-input-manager",
+ "run_godot_util",
+ "which 8.0.0",
 ]
 
 [[package]]
@@ -3642,6 +3670,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e91099d4268b0e11973f036e885d652fb0b21fedcf69738c627f94db6a44f42"
 
 [[package]]
+name = "pathdiff"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
+
+[[package]]
+name = "perf-test"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "fastrand",
+ "godot",
+ "godot-bevy",
+ "run_godot_util",
+ "tracing",
+ "tracing-tracy",
+ "which 7.0.3",
+]
+
+[[package]]
 name = "pin-project"
 version = "1.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3683,6 +3731,19 @@ name = "pkg-config"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
+
+[[package]]
+name = "platformer-2d-example"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_asset_loader",
+ "fastrand",
+ "godot",
+ "godot-bevy",
+ "run_godot_util",
+ "which 8.0.0",
+]
 
 [[package]]
 name = "plotters"
@@ -4030,50 +4091,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust"
-version = "0.1.0"
+name = "run_godot_util"
+version = "0.9.2"
 dependencies = [
- "bevy",
- "bevy_asset_loader",
- "fastrand",
- "godot",
- "godot-bevy",
+ "pathdiff",
+ "serde_json",
  "which 8.0.0",
-]
-
-[[package]]
-name = "rust-perf-test"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "fastrand",
- "godot",
- "godot-bevy",
- "tracing",
- "tracing-tracy",
- "which 7.0.3",
-]
-
-[[package]]
-name = "rust-platformer-2d"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_asset_loader",
- "fastrand",
- "godot",
- "godot-bevy",
- "which 8.0.0",
-]
-
-[[package]]
-name = "rust-simple-node2d-movement"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "godot",
- "godot-bevy",
- "which 7.0.3",
 ]
 
 [[package]]
@@ -4081,19 +4104,6 @@ name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
-
-[[package]]
-name = "rustinput"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy_enhanced_input",
- "fastrand",
- "godot",
- "godot-bevy",
- "leafwing-input-manager",
- "which 8.0.0",
-]
 
 [[package]]
 name = "rustix"
@@ -4119,17 +4129,6 @@ dependencies = [
  "libc",
  "linux-raw-sys 0.11.0",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "rusttime"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "fastrand",
- "godot",
- "godot-bevy",
- "which 8.0.0",
 ]
 
 [[package]]
@@ -4282,6 +4281,17 @@ dependencies = [
  "num-traits",
  "paste",
  "wide",
+]
+
+[[package]]
+name = "simple-node2d-movement-example"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "godot",
+ "godot-bevy",
+ "run_godot_util",
+ "which 7.0.3",
 ]
 
 [[package]]
@@ -4483,6 +4493,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "timing-tes"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "fastrand",
+ "godot",
+ "godot-bevy",
+ "run_godot_util",
+ "which 8.0.0",
+]
+
+[[package]]
 name = "tinytemplate"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4666,12 +4688,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c591d83f69777866b9126b24c6dd9a18351f177e49d625920d19f989fd31cf8"
 
 [[package]]
-name = "two-way-sync-demo"
+name = "two-way-sync-example"
 version = "0.1.0"
 dependencies = [
  "bevy",
  "godot",
  "godot-bevy",
+ "run_godot_util",
  "which 8.0.0",
 ]
 

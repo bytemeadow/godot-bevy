@@ -13,6 +13,7 @@
 - [ ] Update examples (if needed)
 - [ ] Run examples
 - [ ] Run `cargo fmt`
+- [ ] Run `cargo clippy`
 
 ## Related Issues
 

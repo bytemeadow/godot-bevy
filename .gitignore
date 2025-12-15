@@ -29,3 +29,6 @@ devenv.local.nix
 /inspo
 
 extension_api.json
+
+**/rust.gdextension
+**/rust.gdextension.uid

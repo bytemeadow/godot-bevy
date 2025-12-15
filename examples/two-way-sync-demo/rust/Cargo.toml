@@ -1,5 +1,5 @@
 [package]
-name = "two-way-sync-demo"
+name = "two-way-sync-example"
 version = "0.1.0"
 edition = "2024"
 
@@ -12,6 +12,7 @@ name = "two-way-sync-demo"
 
 [dependencies]
 godot-bevy = { path = "../../../godot-bevy" }
+run_godot_util = { path = "../../../run_godot_util" }
 bevy = { version = "0.17", default-features = false }
 godot = "0.4"
 which = "8"

@@ -1,5 +1,5 @@
 [package]
-name = "rusttime"
+name = "timing-tes"
 version = "0.1.0"
 edition = "2024"
 
@@ -15,4 +15,5 @@ bevy = { version = "0.17", default-features = false, features = ["bevy_log"] }
 fastrand = { version = "2.3.0" }
 godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }
+run_godot_util = { path = "../../../run_godot_util" }
 which = "8"

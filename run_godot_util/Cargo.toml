@@ -1,0 +1,14 @@
+[package]
+name = "run_godot_util"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
+
+[dependencies]
+serde_json = "1.0.145"
+pathdiff = "0.2.3"
+which = "8.0.0"

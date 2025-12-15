@@ -9,19 +9,20 @@ license = "MIT OR Apache-2.0"
 
 [workspace]
 members = [
-  "godot-bevy",
-  "godot-bevy-macros",
-  "godot-bevy-test",
-  "godot-bevy-test-macros",
-  "itest/rust",
-  "examples/avian-physics-demo/rust",
-  "examples/dodge-the-creeps-2d/rust",
-  "examples/timing-test/rust",
-  "examples/input-event-demo/rust",
-  "examples/platformer-2d/rust",
-  "examples/simple-node2d-movement/rust",
-  "examples/perf-test/rust",
-  "examples/two-way-sync-demo/rust",
+    "godot-bevy",
+    "godot-bevy-macros",
+    "godot-bevy-test",
+    "godot-bevy-test-macros",
+    "itest/rust",
+    "examples/avian-physics-demo/rust",
+    "examples/dodge-the-creeps-2d/rust",
+    "examples/timing-test/rust",
+    "examples/input-event-demo/rust",
+    "examples/platformer-2d/rust",
+    "examples/simple-node2d-movement/rust",
+    "examples/perf-test/rust",
+    "examples/two-way-sync-demo/rust",
+    "run_godot_util",
 ]
 resolver = "2"
 

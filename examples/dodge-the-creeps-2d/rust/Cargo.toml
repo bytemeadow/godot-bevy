@@ -1,5 +1,5 @@
 [package]
-name = "rust"
+name = "dodge-the-creeps-example"
 version = "0.1.0"
 edition = "2024"
 
@@ -16,4 +16,5 @@ bevy_asset_loader = "0.24.0-rc.1"
 fastrand = { version = "2.3.0" }
 godot.workspace = true
 godot-bevy = { path = "../../../godot-bevy" }
+run_godot_util = { path = "../../../run_godot_util" }
 which = "8"

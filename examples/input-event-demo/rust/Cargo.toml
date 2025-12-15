@@ -1,5 +1,5 @@
 [package]
-name = "rustinput"
+name = "input-event-example"
 version = "0.1.0"
 edition = "2024"
 
@@ -15,6 +15,7 @@ bevy = { version = "0.17", default-features = false }
 fastrand = { version = "2.3.0" }
 godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }
+run_godot_util = { path = "../../../run_godot_util" }
 leafwing-input-manager = "0.18.0"
 which = "8"
 bevy_enhanced_input = "0.19.1"
