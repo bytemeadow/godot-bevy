@@ -11,6 +11,8 @@ let
   # visit rust-toolchain.toml to specify rust toolchain version and associated tools (clippy, etc)
   rust-toolchain = rustPkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
   godot-bin = pkgs.callPackage ./nix/godot-bin.nix { };
+  # tracy profiler - version pinned in devenv.yaml
+  # On macOS, zig build needs framework search paths from system SDK
   tracy = inputs.tracy.packages.${system}.default;
 in
 {
@@ -32,6 +34,9 @@ in
       godot-bin
     ]
     ++ lib.optionals pkgs.stdenv.isLinux [
+      # tracy profiler - version pinned in devenv.yaml
+      tracy
+
       #
       # Linux specific packages
       #
@@ -53,8 +58,7 @@ in
       # faster link times
       mold-wrapped
 
-      # profiler - TODO: should work on mac but currently fails
-      tracy
+
     ];
 
   # speed up rust builds through caching
