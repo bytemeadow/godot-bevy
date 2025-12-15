@@ -1,69 +1,69 @@
 {
   "benchmarks": {
     "action_check_bulk": {
-      "median_display": "4.77ms",
-      "median_ns": "4768394",
-      "min_display": "4.55ms",
-      "min_ns": "4552932"
+      "median_display": "3.83ms",
+      "median_ns": "3825671",
+      "min_display": "3.82ms",
+      "min_ns": "3820535"
     },
     "action_check_individual": {
-      "median_display": "4.50ms",
-      "median_ns": "4498949",
-      "min_display": "4.31ms",
-      "min_ns": "4309519"
+      "median_display": "3.57ms",
+      "median_ns": "3569047",
+      "min_display": "3.56ms",
+      "min_ns": "3557709"
     },
     "transform_read_bulk_2d": {
-      "median_display": "15.70ms",
-      "median_ns": "15700198",
-      "min_display": "15.28ms",
-      "min_ns": "15279336"
+      "median_display": "12.73ms",
+      "median_ns": "12727667",
+      "min_display": "12.69ms",
+      "min_ns": "12686728"
     },
     "transform_read_bulk_3d": {
-      "median_display": "13.92ms",
-      "median_ns": "13921825",
-      "min_display": "13.60ms",
-      "min_ns": "13601769"
+      "median_display": "11.28ms",
+      "median_ns": "11282772",
+      "min_display": "11.20ms",
+      "min_ns": "11195235"
     },
     "transform_read_individual_2d": {
-      "median_display": "12.71ms",
-      "median_ns": "12706390",
-      "min_display": "12.19ms",
-      "min_ns": "12186431"
+      "median_display": "10.23ms",
+      "median_ns": "10229580",
+      "min_display": "10.11ms",
+      "min_ns": "10111260"
     },
     "transform_read_individual_3d": {
-      "median_display": "9.51ms",
-      "median_ns": "9505211",
-      "min_display": "9.06ms",
-      "min_ns": "9063755"
+      "median_display": "7.40ms",
+      "median_ns": "7397019",
+      "min_display": "7.34ms",
+      "min_ns": "7337679"
     },
     "transform_update_bulk_2d": {
-      "median_display": "16.43ms",
-      "median_ns": "16427046",
-      "min_display": "16.03ms",
-      "min_ns": "16033331"
+      "median_display": "13.04ms",
+      "median_ns": "13035888",
+      "min_display": "12.93ms",
+      "min_ns": "12928990"
     },
     "transform_update_bulk_3d": {
-      "median_display": "14.12ms",
-      "median_ns": "14117488",
-      "min_display": "13.51ms",
-      "min_ns": "13511039"
+      "median_display": "11.25ms",
+      "median_ns": "11249470",
+      "min_display": "11.20ms",
+      "min_ns": "11196402"
     },
     "transform_update_individual_2d": {
-      "median_display": "12.66ms",
-      "median_ns": "12661681",
-      "min_display": "12.38ms",
-      "min_ns": "12378729"
+      "median_display": "10.23ms",
+      "median_ns": "10231555",
+      "min_display": "10.18ms",
+      "min_ns": "10175685"
     },
     "transform_update_individual_3d": {
-      "median_display": "11.29ms",
-      "median_ns": "11286273",
-      "min_display": "10.88ms",
-      "min_ns": "10875900"
+      "median_display": "8.98ms",
+      "median_ns": "8982414",
+      "min_display": "8.92ms",
+      "min_ns": "8920844"
     }
   },
   "environment": {
     "godot_debug": true,
     "rust_debug": false
   },
-  "timestamp": "2025-12-10T18:00:08.612027479+00:00"
+  "timestamp": "2025-12-15T23:55:33.889921474+00:00"
 }
