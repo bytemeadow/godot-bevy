@@ -1,29 +1,67 @@
-# copied/modified from https://github.com/mlabs-haskell/godot-cardano/blob/af8642895adf1c08efd2374f09fd7c1282484b34/nix/godot-bin.nix
-{ stdenv, lib, autoPatchelfHook, makeWrapper, fetchurl, unzip, alsa-lib, dbus
-, fontconfig, udev, vulkan-loader, libpulseaudio, libGL, libXcursor, libXinerama
-, libxkbcommon, libXrandr, libXrender, libX11, libXext, libXi, speechd, wayland
-, libdecor }:
+# Cross-platform Godot binary package
+# Fetches official binaries from godotengine/godot-builds
+{
+  stdenv,
+  lib,
+  fetchurl,
+  unzip,
+  autoPatchelfHook,
+  makeWrapper,
+  # Linux dependencies
+  alsa-lib ? null,
+  dbus ? null,
+  fontconfig ? null,
+  libGL ? null,
+  libpulseaudio ? null,
+  libX11 ? null,
+  libXcursor ? null,
+  libXext ? null,
+  libXi ? null,
+  libXinerama ? null,
+  libxkbcommon ? null,
+  libXrandr ? null,
+  libXrender ? null,
+  speechd ? null,
+  udev ? null,
+  vulkan-loader ? null,
+  wayland ? null,
+}:
 let
-  godot-version = "4.5-dev5";
-  qualifier = ""; # e.g. `-stable`
-in stdenv.mkDerivation rec {
-  pname = "godot-latest";
-  version = "${godot-version}";
-  src = fetchurl {
-    # https://github.com/godotengine/godot-builds/releases/download/4.5-dev5/Godot_v4.5-dev5_linux.x86_64.zip
-    url =
-      "https://github.com/godotengine/godot-builds/releases/download/${version}${qualifier}/Godot_v${version}${qualifier}_linux.x86_64.zip";
-    sha256 = "sha256-19eEOrta4z8KO+3Q1ZzwWPJnO6xVw5gTYGfymqxsxZ8=";
+  version = "4.5.1";
+  qualifier = "stable";
+
+  sources = {
+    # macOS universal binary (works on both x86_64 and aarch64)
+    "x86_64-darwin" = {
+      url = "https://github.com/godotengine/godot-builds/releases/download/${version}-${qualifier}/Godot_v${version}-${qualifier}_macos.universal.zip";
+      hash = "sha256-ZcJ5WdAqqs/BMex+y5AXm6gEUgDLApgr8r6W0RcBC4o=";
+      executable = "Godot.app/Contents/MacOS/Godot";
+    };
+    "aarch64-darwin" = {
+      url = "https://github.com/godotengine/godot-builds/releases/download/${version}-${qualifier}/Godot_v${version}-${qualifier}_macos.universal.zip";
+      hash = "sha256-ZcJ5WdAqqs/BMex+y5AXm6gEUgDLApgr8r6W0RcBC4o=";
+      executable = "Godot.app/Contents/MacOS/Godot";
+    };
+    "x86_64-linux" = {
+      url = "https://github.com/godotengine/godot-builds/releases/download/${version}-${qualifier}/Godot_v${version}-${qualifier}_linux.x86_64.zip";
+      hash = "sha256-AuxT0czNu9nPvMxjU1Oys0NEQRJEoEKLPy+WoMeHiM0=";
+      executable = "Godot_v${version}-${qualifier}_linux.x86_64";
+    };
+    "aarch64-linux" = {
+      url = "https://github.com/godotengine/godot-builds/releases/download/${version}-${qualifier}/Godot_v${version}-${qualifier}_linux.arm64.zip";
+      hash = "sha256-SkxtbQYGrMnQD3dVRkUp8SKy/LIhJEdU+JoNAyhwiA8=";
+      executable = "Godot_v${version}-${qualifier}_linux.arm64";
+    };
   };
 
-  nativeBuildInputs = [ autoPatchelfHook makeWrapper unzip ];
+  src = sources.${stdenv.system} or (throw "Unsupported system: ${stdenv.system}");
 
-  buildInputs = [
+  # Linux runtime dependencies
+  linuxLibs = [
     alsa-lib
     dbus
     dbus.lib
     fontconfig
-    # libdecor # <- For client-side decorations (look bad)
     libGL
     libX11
     libXcursor
@@ -39,17 +77,41 @@ in stdenv.mkDerivation rec {
     vulkan-loader
     wayland
   ];
+in
+stdenv.mkDerivation {
+  pname = "godot-bin";
+  inherit version;
 
-  libraries = lib.makeLibraryPath buildInputs;
+  src = fetchurl {
+    inherit (src) url hash;
+  };
 
-  unpackCmd = "unzip $curSrc -d source";
-  installPhase = ''
+  nativeBuildInputs = [ unzip ]
+    ++ lib.optionals stdenv.isLinux [ autoPatchelfHook makeWrapper ];
+
+  buildInputs = lib.optionals stdenv.isLinux linuxLibs;
+
+  unpackPhase = "unzip $src";
+
+  installPhase = if stdenv.isDarwin then ''
+    mkdir -p $out/Applications $out/bin
+    cp -r Godot.app $out/Applications/
+    ln -s "$out/Applications/Godot.app/Contents/MacOS/Godot" $out/bin/godot
+  '' else ''
     mkdir -p $out/bin
-    install -m 0755 Godot_v${version}${qualifier}_linux.x86_64 $out/bin/godot-latest
+    install -m 0755 "${src.executable}" $out/bin/godot
   '';
 
-  postFixup = ''
-    wrapProgram $out/bin/godot-latest \
-      --set LD_LIBRARY_PATH ${libraries}
+  postFixup = lib.optionalString stdenv.isLinux ''
+    wrapProgram $out/bin/godot \
+      --set LD_LIBRARY_PATH ${lib.makeLibraryPath linuxLibs}
   '';
+
+  meta = with lib; {
+    description = "Godot Engine - Multi-platform 2D and 3D game engine";
+    homepage = "https://godotengine.org";
+    license = licenses.mit;
+    platforms = builtins.attrNames sources;
+    mainProgram = "godot";
+  };
 }
