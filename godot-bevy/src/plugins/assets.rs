@@ -8,6 +8,7 @@ use bevy_asset::{
 use bevy_reflect::TypePath;
 use futures_lite::stream;
 use godot::classes::ResourceLoader;
+#[cfg(not(feature = "experimental-wasm"))]
 use godot::classes::resource_loader::ThreadLoadStatus;
 use godot::obj::{Gd, Singleton};
 use godot::prelude::Resource as GodotBaseResource;
@@ -204,6 +205,7 @@ impl AssetLoader for GodotResourceAssetLoader {
     type Settings = ();
     type Error = GodotAssetLoaderError;
 
+    #[cfg(not(feature = "experimental-wasm"))]
     async fn load(
         &self,
         _reader: &mut dyn Reader,
@@ -289,6 +291,50 @@ impl AssetLoader for GodotResourceAssetLoader {
 
                     futures_lite::future::yield_now().await;
                 }
+            }
+        }
+    }
+
+    /// Web/WASM version uses synchronous loading since threaded loading
+    /// is not available in the web export.
+    #[cfg(feature = "experimental-wasm")]
+    async fn load(
+        &self,
+        _reader: &mut dyn Reader,
+        _settings: &(),
+        load_context: &mut LoadContext<'_>,
+    ) -> Result<Self::Asset, Self::Error> {
+        let godot_path = load_context.asset_path().to_string();
+        let path_gstring = godot::builtin::GString::from(&godot_path);
+
+        {
+            let mut tracker = LOADING_TRACKER.lock().unwrap();
+            tracker.insert(godot_path.clone(), LoadingState::Requested);
+        }
+
+        // Use synchronous load for web builds
+        let mut resource_loader = ResourceLoader::singleton();
+        let resource = resource_loader.load(&path_gstring);
+
+        match resource {
+            Some(resource) => {
+                {
+                    let mut tracker = LOADING_TRACKER.lock().unwrap();
+                    tracker.insert(godot_path.clone(), LoadingState::Ready);
+                }
+
+                let handle = GodotResourceHandle::new(resource);
+                Ok(GodotResource { handle })
+            }
+            None => {
+                {
+                    let mut tracker = LOADING_TRACKER.lock().unwrap();
+                    tracker.insert(godot_path.clone(), LoadingState::Failed);
+                }
+
+                Err(GodotAssetLoaderError::ResourceLoadFailed(format!(
+                    "Failed to load Godot resource: {godot_path}"
+                )))
             }
         }
     }

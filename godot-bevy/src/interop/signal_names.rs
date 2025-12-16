@@ -1204,9 +1204,11 @@ impl OpenXRInterfaceSignals {
     pub const GPU_LEVEL_CHANGED: &'static str = "gpu_level_changed";
 }
 
+#[cfg(not(feature = "experimental-wasm"))]
 /// Signal constants for `OpenXrRenderModel`
 pub struct OpenXrRenderModelSignals;
 
+#[cfg(not(feature = "experimental-wasm"))]
 impl OpenXrRenderModelSignals {
     /// Emitted when the top level path of this render model has changed.
     pub const RENDER_MODEL_TOP_LEVEL_PATH_CHANGED: &'static str =
@@ -1228,9 +1230,11 @@ impl OpenXRRenderModelExtensionSignals {
         "render_model_top_level_path_changed";
 }
 
+#[cfg(not(feature = "experimental-wasm"))]
 /// Signal constants for `OpenXrRenderModelManager`
 pub struct OpenXrRenderModelManagerSignals;
 
+#[cfg(not(feature = "experimental-wasm"))]
 impl OpenXrRenderModelManagerSignals {
     /// Emitted when a render model node is added as a child to this node.
     pub const RENDER_MODEL_ADDED: &'static str = "render_model_added";

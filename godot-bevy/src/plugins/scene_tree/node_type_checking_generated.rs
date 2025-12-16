@@ -238,10 +238,12 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(OmniLight3DMarker);
         }
+        #[cfg(not(feature = "experimental-wasm"))]
         "OpenXRRenderModel" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(OpenXRRenderModelMarker);
         }
+        #[cfg(not(feature = "experimental-wasm"))]
         "OpenXRRenderModelManager" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(OpenXRRenderModelManagerMarker);
@@ -1157,12 +1159,14 @@ fn check_3d_node_types_comprehensive(
     if node.try_get::<godot::classes::OmniLight3D>().is_some() {
         entity_commands.insert(OmniLight3DMarker);
     }
+    #[cfg(not(feature = "experimental-wasm"))]
     if node
         .try_get::<godot::classes::OpenXrRenderModel>()
         .is_some()
     {
         entity_commands.insert(OpenXRRenderModelMarker);
     }
+    #[cfg(not(feature = "experimental-wasm"))]
     if node
         .try_get::<godot::classes::OpenXrRenderModelManager>()
         .is_some()
@@ -1357,8 +1361,6 @@ fn remove_3d_node_types_comprehensive(
         .remove::<MultiMeshInstance3DMarker>()
         .remove::<OccluderInstance3DMarker>()
         .remove::<OmniLight3DMarker>()
-        .remove::<OpenXRRenderModelMarker>()
-        .remove::<OpenXRRenderModelManagerMarker>()
         .remove::<Path3DMarker>()
         .remove::<PathFollow3DMarker>()
         .remove::<PhysicalBone3DMarker>()
@@ -1396,6 +1398,11 @@ fn remove_3d_node_types_comprehensive(
         .remove::<SpringBoneCollisionPlane3DMarker>()
         .remove::<SpringBoneCollisionSphere3DMarker>()
         .remove::<SpringBoneSimulator3DMarker>();
+
+    #[cfg(not(feature = "experimental-wasm"))]
+    entity_commands
+        .remove::<OpenXRRenderModelMarker>()
+        .remove::<OpenXRRenderModelManagerMarker>();
 }
 
 fn check_2d_node_types_comprehensive(

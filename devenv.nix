@@ -8,8 +8,14 @@ let
   overlays = [ (import inputs.rust-overlay) ];
   system = pkgs.stdenv.system;
   rustPkgs = import inputs.nixpkgs { inherit system overlays; };
+  # Pinned nixpkgs for emscripten 3.1.73 (godot-rust web export compatibility)
+  emscriptenPkgs = import inputs.nixpkgs-emscripten { inherit system; };
   # visit rust-toolchain.toml to specify rust toolchain version and associated tools (clippy, etc)
   rust-toolchain = rustPkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+  # nightly toolchain for web builds (-Zbuild-std requires nightly)
+  rust-nightly = rustPkgs.rust-bin.nightly.latest.default.override {
+    extensions = [ "rust-src" ];
+  };
   godot-bin = pkgs.callPackage ./nix/godot-bin.nix { };
   # tracy profiler - version pinned in devenv.yaml
   # On macOS, zig build needs framework search paths from system SDK
@@ -29,6 +35,13 @@ in
       sccache # cache rust build artifacts, ref https://github.com/mozilla/sccache
       python3 # for godot type generation script
       rust-toolchain
+      rust-nightly # for web builds (-Zbuild-std requires nightly)
+
+      # web export support - pinned to emscripten 3.1.73 for godot-rust compatibility
+      # The latest nixpkgs has emscripten 4.x which causes linker errors with godot-rust
+      # We also need binaryen from the same pinned nixpkgs for version compatibility
+      emscriptenPkgs.emscripten
+      emscriptenPkgs.binaryen
 
       # godot editor - version defined in nix/godot-bin.nix
       godot-bin
@@ -63,6 +76,10 @@ in
 
   # speed up rust builds through caching
   env.RUSTC_WRAPPER = "${pkgs.sccache}/bin/sccache";
+
+  # nightly toolchain paths for web builds
+  env.CARGO_NIGHTLY = "${rust-nightly}/bin/cargo";
+  env.RUSTC_NIGHTLY = "${rust-nightly}/bin/rustc";
 
   files =
     if pkgs.stdenv.isLinux then

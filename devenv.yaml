@@ -6,6 +6,11 @@ inputs:
   # https://devenv.sh/common-patterns/
   nixpkgs:
     url: github:nixos/nixpkgs/nixpkgs-unstable
+  # Pinned nixpkgs for emscripten 3.1.73 (required for Godot 4.3+ web exports)
+  # The latest nixpkgs has emscripten 4.x which is incompatible with godot-rust
+  # This commit introduced 3.1.73 and should have working builds
+  nixpkgs-emscripten:
+    url: github:nixos/nixpkgs/e255a9090e25aed2486f9fb00e5d645fb342d654
   tracy:
     # tracy 0.12.2 - version must align with bevy's tracy-client
     # see https://github.com/bevyengine/bevy/blob/main/docs/profiling.md

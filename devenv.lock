@@ -101,6 +101,21 @@
         "type": "github"
       }
     },
+    "nixpkgs-emscripten": {
+      "locked": {
+        "lastModified": 1732896023,
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "e255a9090e25aed2486f9fb00e5d645fb342d654",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "e255a9090e25aed2486f9fb00e5d645fb342d654",
+        "type": "github"
+      }
+    },
     "nixpkgs_2": {
       "locked": {
         "lastModified": 1765772535,
@@ -121,6 +136,7 @@
         "devenv": "devenv",
         "git-hooks": "git-hooks",
         "nixpkgs": "nixpkgs",
+        "nixpkgs-emscripten": "nixpkgs-emscripten",
         "pre-commit-hooks": [
           "git-hooks"
         ],

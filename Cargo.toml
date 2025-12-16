@@ -22,11 +22,14 @@ members = [
   "examples/simple-node2d-movement/rust",
   "examples/perf-test/rust",
   "examples/two-way-sync-demo/rust",
+  "examples/web-demo/rust",
 ]
 resolver = "2"
 
 [workspace.dependencies]
-godot = { version = "0.4.4", features = ["experimental-threads"] }
+# Note: experimental-threads is enabled via godot-bevy's default features, not here
+# This allows web builds to use lazy-function-tables instead (they're incompatible)
+godot = { version = "0.4.5" }
 godot-bevy-macros = { version = "0.9.2", path = "godot-bevy-macros" }
 godot-bevy-test = { version = "0.9.2", path = "godot-bevy-test" }
 godot-bevy-test-macros = { version = "0.9.2", path = "godot-bevy-test-macros" }
