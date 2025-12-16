@@ -52,9 +52,7 @@ fn test_node_added_creates_entity(ctx: &TestContext) -> godot::task::TaskHandle 
 
         assert!(
             final_count > initial_count,
-            "Entity should be created for new node, initial={}, final={}",
-            initial_count,
-            final_count
+            "Entity should be created for new node, initial={initial_count}, final={final_count}"
         );
 
         // Verify entity has correct node handle
@@ -67,10 +65,7 @@ fn test_node_added_creates_entity(ctx: &TestContext) -> godot::task::TaskHandle 
 
         assert!(found, "Entity should have correct GodotNodeHandle");
 
-        println!(
-            "✓ Node added: entity created (entities: {} → {})",
-            initial_count, final_count
-        );
+        println!("✓ Node added: entity created (entities: {initial_count} → {final_count})");
 
         // Cleanup
         app.cleanup();

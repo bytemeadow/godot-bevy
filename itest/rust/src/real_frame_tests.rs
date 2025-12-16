@@ -27,9 +27,7 @@ fn test_update_runs_on_real_frames(ctx: &TestContext) -> godot::task::TaskHandle
             // We expect at least 4 increments (one less because of frame timing)
             assert!(
                 end >= start + 4,
-                "Expected 4+ increments, got {} -> {}",
-                start,
-                end
+                "Expected 4+ increments, got {start} -> {end}"
             );
             println!("✓ Systems ran on {} real Godot frames!", end - start);
         }
@@ -72,8 +70,8 @@ fn test_entity_persists_across_frames(ctx: &TestContext) -> godot::task::TaskHan
             let count = counter.get();
 
             // Account for setup frames - we expect at least 8 frames
-            assert!(count >= 8, "Entity should persist 8+ frames, got {}", count);
-            println!("✓ Entity persisted across {} frames!", count);
+            assert!(count >= 8, "Entity should persist 8+ frames, got {count}");
+            println!("✓ Entity persisted across {count} frames!");
         }
     )
 }
@@ -103,9 +101,7 @@ fn test_physics_update_runs(ctx: &TestContext) -> godot::task::TaskHandle {
 
             assert!(
                 end > start,
-                "PhysicsUpdate should run, got {} -> {}",
-                start,
-                end
+                "PhysicsUpdate should run, got {start} -> {end}"
             );
             println!("✓ PhysicsUpdate ran {} times!", end - start);
         }
@@ -136,7 +132,7 @@ fn test_frame_pacing_controlled_by_godot(ctx: &TestContext) -> godot::task::Task
             let c3 = counter.get();
 
             assert!(c2 > c1 && c3 > c2, "Each frame should increment");
-            println!("✓ Frame pacing: f1={}, f2={}, f3={}", c1, c2, c3);
+            println!("✓ Frame pacing: f1={c1}, f2={c2}, f3={c3}");
             println!("✓ Systems run ONLY when Godot advances frames!");
         }
     )

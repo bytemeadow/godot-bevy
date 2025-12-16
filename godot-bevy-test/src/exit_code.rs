@@ -19,7 +19,7 @@ pub fn exit_code_path() -> PathBuf {
 pub fn write_exit_code(code: i32) {
     let path = exit_code_path();
     if let Err(e) = std::fs::write(&path, code.to_string()) {
-        eprintln!("Warning: Failed to write exit code to {:?}: {}", path, e);
+        eprintln!("Warning: Failed to write exit code to {path:?}: {e}");
     }
 }
 

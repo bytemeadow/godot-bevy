@@ -46,17 +46,27 @@ tracing-tracy = { version = "0.11.4", default-features = false, features = [
 tracing-subscriber = { version = "0.3.19", optional = true }
 
 [features]
-default = ["bevy_gamepad", "godot_bevy_log"]
+default = ["bevy_gamepad", "godot_bevy_log", "experimental-threads"]
 # Enable Bevy's gamepad support via gilrs
 bevy_gamepad = ["dep:bevy_gilrs"]
 godot_bevy_log = ["dep:chrono", "dep:bevy_log"]
 trace_tracy = ["dep:tracing-tracy", "dep:tracing-subscriber"]
+# Enable godot's experimental threading support (default for native builds)
+# Note: This is incompatible with experimental-wasm's lazy-function-tables
+experimental-threads = ["godot/experimental-threads"]
 # Godot API version features - matches gdext naming convention
 api-4-2 = ["godot/api-4-2"]
 api-4-2-1 = ["godot/api-4-2-1"]
 api-4-2-2 = ["godot/api-4-2-2"]
 api-4-3 = ["godot/api-4-3"]
 api-4-4 = ["godot/api-4-4"]
+api-4-5 = ["godot/api-4-5"]
+# Web/WASM support (experimental)
+# Note: These features intentionally exclude bevy_gamepad, godot_bevy_log,
+# and experimental-threads to avoid incompatible dependencies.
+# Uses api-custom-json to avoid cross-compilation issues with struct sizes.
+experimental-wasm = ["godot/experimental-wasm", "godot/lazy-function-tables", "godot/api-custom-json"]
+experimental-wasm-nothreads = ["experimental-wasm", "godot/experimental-wasm-nothreads"]
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

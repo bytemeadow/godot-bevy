@@ -63,15 +63,10 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
 
         assert!(
             end_pos > start_pos,
-            "Godot node should move (Bevy→Godot sync), start={:.1}, end={:.1}",
-            start_pos,
-            end_pos
+            "Godot node should move (Bevy→Godot sync), start={start_pos:.1}, end={end_pos:.1}"
         );
 
-        println!(
-            "✓ Bevy→Godot transform sync: moved from {:.1} to {:.1}",
-            start_pos, end_pos
-        );
+        println!("✓ Bevy→Godot transform sync: moved from {start_pos:.1} to {end_pos:.1}");
 
         // Cleanup: free BevyApp BEFORE freeing node
         app.cleanup();
@@ -120,14 +115,10 @@ fn test_godot_to_bevy_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
 
         assert!(
             (synced_x - 10.0).abs() < 0.1,
-            "Bevy should detect Godot transform changes, expected ~10.0, got {:.1}",
-            synced_x
+            "Bevy should detect Godot transform changes, expected ~10.0, got {synced_x:.1}"
         );
 
-        println!(
-            "✓ Godot→Bevy transform sync: {:.1} → {:.1}",
-            initial_x, synced_x
-        );
+        println!("✓ Godot→Bevy transform sync: {initial_x:.1} → {synced_x:.1}");
 
         // Cleanup: free BevyApp BEFORE freeing node
         app.cleanup();
@@ -194,9 +185,7 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         // Check Bevy→Godot sync
         assert!(
             bevy_end > bevy_start,
-            "Bevy-controlled node should move (Bevy→Godot), start={:.1}, end={:.1}",
-            bevy_start,
-            bevy_end
+            "Bevy-controlled node should move (Bevy→Godot), start={bevy_start:.1}, end={bevy_end:.1}"
         );
 
         // Check Godot→Bevy sync
@@ -212,13 +201,11 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
 
         assert!(
             (godot_entity_x - 20.0).abs() < 0.1,
-            "Godot-controlled entity should sync to Bevy (Godot→Bevy), expected ~20.0, got {:.1}",
-            godot_entity_x
+            "Godot-controlled entity should sync to Bevy (Godot→Bevy), expected ~20.0, got {godot_entity_x:.1}"
         );
 
         println!(
-            "✓ Bidirectional sync: Bevy {:.1}→{:.1}, Godot→Bevy {:.1}",
-            bevy_start, bevy_end, godot_entity_x
+            "✓ Bidirectional sync: Bevy {bevy_start:.1}→{bevy_end:.1}, Godot→Bevy {godot_entity_x:.1}"
         );
 
         // Cleanup: free BevyApp BEFORE freeing nodes
@@ -281,18 +268,15 @@ fn test_transform_sync_disabled(ctx: &TestContext) -> godot::task::TaskHandle {
 
         assert!(
             bevy_x > 0.0,
-            "Bevy entity should move internally, got {:.1}",
-            bevy_x
+            "Bevy entity should move internally, got {bevy_x:.1}"
         );
         assert_eq!(
             end_pos, start_pos,
-            "Godot node should NOT move when sync disabled, start={:.1}, end={:.1}",
-            start_pos, end_pos
+            "Godot node should NOT move when sync disabled, start={start_pos:.1}, end={end_pos:.1}"
         );
 
         println!(
-            "✓ Transform sync disabled: Godot at {:.1}, Bevy at {:.1} (no sync)",
-            start_pos, bevy_x
+            "✓ Transform sync disabled: Godot at {start_pos:.1}, Bevy at {bevy_x:.1} (no sync)"
         );
 
         // Cleanup: free BevyApp BEFORE freeing node

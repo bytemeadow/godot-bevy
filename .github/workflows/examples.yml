@@ -1,191 +1,262 @@
 name: examples
 
 on:
-    push:
-        branches: [main, develop]
-        paths:
-            - "godot-bevy/**"
-            - "godot-bevy-macros/**"
-            - "examples/**"
-            - ".github/workflows/examples.yml"
-            - "Cargo.toml"
-    pull_request:
-        branches: [main, develop]
-        paths:
-            - "godot-bevy/**"
-            - "godot-bevy-macros/**"
-            - "examples/**"
-            - ".github/workflows/examples.yml"
-            - "Cargo.toml"
+  push:
+    branches: [main, develop]
+    paths:
+      - "godot-bevy/**"
+      - "godot-bevy-macros/**"
+      - "examples/**"
+      - ".github/workflows/examples.yml"
+      - "Cargo.toml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "godot-bevy/**"
+      - "godot-bevy-macros/**"
+      - "examples/**"
+      - ".github/workflows/examples.yml"
+      - "Cargo.toml"
 
 env:
-    CARGO_TERM_COLOR: always
-    GODOT_VERSION: "4.5.1"
+  CARGO_TERM_COLOR: always
+  GODOT_VERSION: "4.5.1"
 
 permissions:
-    contents: read
+  contents: read
 
 concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-    # Detect which examples changed
-    changes:
-        name: detect changes
-        runs-on: ubuntu-latest
-        outputs:
-            examples: ${{ steps.filter.outputs.changes }}
-        steps:
-            - uses: actions/checkout@v4
-            - uses: dorny/paths-filter@v3
-              id: filter
-              with:
-                  filters: |
-                      avian-physics-demo:
-                        - 'godot-bevy/**'
-                        - 'godot-bevy-macros/**'
-                        - 'examples/avian-physics-demo/**'
-                        - '.github/workflows/examples.yml'
-                        - 'Cargo.toml'
-                      dodge-the-creeps-2d:
-                        - 'godot-bevy/**'
-                        - 'godot-bevy-macros/**'
-                        - 'examples/dodge-the-creeps-2d/**'
-                        - '.github/workflows/examples.yml'
-                        - 'Cargo.toml'
-                      perf-test:
-                        - 'godot-bevy/**'
-                        - 'godot-bevy-macros/**'
-                        - 'examples/perf-test/**'
-                        - '.github/workflows/examples.yml'
-                        - 'Cargo.toml'
-                      platformer-2d:
-                        - 'godot-bevy/**'
-                        - 'godot-bevy-macros/**'
-                        - 'examples/platformer-2d/**'
-                        - '.github/workflows/examples.yml'
-                        - 'Cargo.toml'
+  # Detect which examples changed
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      examples: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            avian-physics-demo:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/avian-physics-demo/**'
+              - '.github/workflows/examples.yml'
+              - 'Cargo.toml'
+            dodge-the-creeps-2d:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/dodge-the-creeps-2d/**'
+              - '.github/workflows/examples.yml'
+              - 'Cargo.toml'
+            perf-test:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/perf-test/**'
+              - '.github/workflows/examples.yml'
+              - 'Cargo.toml'
+            platformer-2d:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/platformer-2d/**'
+              - '.github/workflows/examples.yml'
+              - 'Cargo.toml'
+            simple-node2d-movement:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/simple-node2d-movement/**'
+              - '.github/workflows/examples.yml'
+              - 'Cargo.toml'
 
-    # Build example libraries on all platforms (needed for cross-platform Godot export)
-    build:
-        name: build ${{ matrix.example }} (${{ matrix.platform }})
-        runs-on: ${{ matrix.os }}
-        needs: changes
-        if: needs.changes.outputs.examples != '[]'
-        strategy:
-            fail-fast: false
-            matrix:
-                os: [ubuntu-latest, macos-latest, windows-latest]
-                example: ${{ fromJson(needs.changes.outputs.examples) }}
-                include:
-                    - os: ubuntu-latest
-                      platform: linux
-                    - os: macos-latest
-                      platform: macos
-                    - os: windows-latest
-                      platform: windows
+  # Build example libraries on all platforms (needed for cross-platform Godot export)
+  build:
+    name: build ${{ matrix.example }} (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    needs: changes
+    if: needs.changes.outputs.examples != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        example: ${{ fromJson(needs.changes.outputs.examples) }}
+        exclude:
+          # Exclude nothing - all examples build for native platforms
+          # simple-node2d-movement also has a web build in the build-web job
+          - example: ""
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: macos
+          - os: windows-latest
+            platform: windows
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-            - name: Setup Rust cache
-              uses: Swatinem/rust-cache@v2
-              with:
-                  workspaces: . -> target
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
 
-            - name: Cache and install Linux dependencies
-              if: runner.os == 'linux'
-              uses: awalsh128/cache-apt-pkgs-action@latest
-              with:
-                  packages: libasound2-dev libudev-dev pkg-config
-                  version: 1.0
+      - name: Cache and install Linux dependencies
+        if: runner.os == 'linux'
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libasound2-dev libudev-dev pkg-config
+          version: 1.0
 
-            - name: Build example library
-              run: cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
+      - name: Build example library
+        run: cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
 
-            - name: Upload example libraries
-              uses: actions/upload-artifact@v4
-              with:
-                  name: example-libs-${{ matrix.example }}-${{ runner.os }}
-                  path: |
-                      target/release/*.so
-                      target/release/*.dylib
-                      target/release/*.dll
-                  if-no-files-found: warn
+      - name: Upload example libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: example-libs-${{ matrix.example }}-${{ runner.os }}
+          path: |
+            target/release/*.so
+            target/release/*.dylib
+            target/release/*.dll
+          if-no-files-found: warn
 
-    # Export examples for all platforms (requires libraries from build)
-    export:
-        name: export (${{ matrix.example }})
-        runs-on: macos-latest
-        needs: [build, changes]
-        if: contains(needs.changes.outputs.examples, 'dodge-the-creeps-2d') || contains(needs.changes.outputs.examples, 'platformer-2d')
-        strategy:
-            fail-fast: false
-            matrix:
-                example: [dodge-the-creeps-2d, platformer-2d]
-                exclude:
-                    - example: ${{ !contains(needs.changes.outputs.examples, 'dodge-the-creeps-2d') && 'dodge-the-creeps-2d' || 'none' }}
-                    - example: ${{ !contains(needs.changes.outputs.examples, 'platformer-2d') && 'platformer-2d' || 'none' }}
+  # Export examples for all platforms (requires libraries from build)
+  export:
+    name: export (${{ matrix.example }})
+    runs-on: macos-latest
+    needs: [build, changes]
+    if: contains(needs.changes.outputs.examples, 'dodge-the-creeps-2d') || contains(needs.changes.outputs.examples, 'platformer-2d')
+    strategy:
+      fail-fast: false
+      matrix:
+        example: [dodge-the-creeps-2d, platformer-2d]
+        exclude:
+          - example: ${{ !contains(needs.changes.outputs.examples, 'dodge-the-creeps-2d') && 'dodge-the-creeps-2d' || 'none' }}
+          - example: ${{ !contains(needs.changes.outputs.examples, 'platformer-2d') && 'platformer-2d' || 'none' }}
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Install Godot
-              uses: chickensoft-games/setup-godot@v2
-              with:
-                  version: ${{ env.GODOT_VERSION }}
-                  use-dotnet: false
-                  include-templates: true
+      - name: Install Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+          include-templates: true
 
-            - name: Download all platform libraries
-              uses: actions/download-artifact@v4
-              with:
-                  pattern: example-libs-${{ matrix.example }}-*
-                  path: artifacts/
+      - name: Download all platform libraries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: example-libs-${{ matrix.example }}-*
+          path: artifacts/
 
-            - name: Setup cross-platform libraries
-              run: |
-                  mkdir -p target/release target/debug
+      - name: Setup cross-platform libraries
+        run: |
+          mkdir -p target/release target/debug
 
-                  # Copy all platform libraries to both release and debug directories
-                  # (Godot import runs in debug mode, export uses release)
-                  find artifacts/ -type f \( -name "*.so" -o -name "*.dylib" -o -name "*.dll" \) | while read file; do
-                    cp "$file" target/release/
-                    cp "$file" target/debug/
-                  done
+          # Copy all platform libraries to both release and debug directories
+          # (Godot import runs in debug mode, export uses release)
+          find artifacts/ -type f \( -name "*.so" -o -name "*.dylib" -o -name "*.dll" \) | while read file; do
+            cp "$file" target/release/
+            cp "$file" target/debug/
+          done
 
-                  echo "Available libraries:"
-                  ls -la target/release/
+          echo "Available libraries:"
+          ls -la target/release/
 
-            - name: Cache Godot imports
-              uses: actions/cache@v4
-              with:
-                  path: examples/${{ matrix.example }}/godot/.godot
-                  key: ${{ runner.os }}-godot-imports-${{ matrix.example }}-${{ hashFiles(format('examples/{0}/godot/**/*.import', matrix.example)) }}
-                  restore-keys: |
-                      ${{ runner.os }}-godot-imports-${{ matrix.example }}-
+      - name: Cache Godot imports
+        uses: actions/cache@v4
+        with:
+          path: examples/${{ matrix.example }}/godot/.godot
+          key: ${{ runner.os }}-godot-imports-${{ matrix.example }}-${{ hashFiles(format('examples/{0}/godot/**/*.import', matrix.example)) }}
+          restore-keys: |
+            ${{ runner.os }}-godot-imports-${{ matrix.example }}-
 
-            - name: Import Godot project
-              working-directory: examples/${{ matrix.example }}/godot
-              run: godot --editor --headless --quit || true
+      - name: Import Godot project
+        working-directory: examples/${{ matrix.example }}/godot
+        run: godot --editor --headless --quit || true
 
-            - name: Export for all platforms
-              working-directory: examples/${{ matrix.example }}/godot
-              run: |
-                  mkdir -p exports
-                  godot --headless --export-release "Linux/X11" exports/${{ matrix.example }}-linux
-                  godot --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
-                  godot --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
+      - name: Export for all platforms
+        working-directory: examples/${{ matrix.example }}/godot
+        run: |
+          mkdir -p exports
+          godot --headless --export-release "Linux/X11" exports/${{ matrix.example }}-linux
+          godot --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
+          godot --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
 
-            - name: Upload game exports
-              uses: actions/upload-artifact@v4
-              with:
-                  name: ${{ matrix.example }}-exports
-                  path: examples/${{ matrix.example }}/godot/exports/
-                  if-no-files-found: error
+      - name: Upload game exports
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.example }}-exports
+          path: examples/${{ matrix.example }}/godot/exports/
+          if-no-files-found: error
+
+  # Build simple-node2d-movement for WebAssembly (requires Emscripten)
+  build-web:
+    name: build simple-node2d-movement (wasm)
+    runs-on: ubuntu-latest
+    needs: changes
+    if: contains(needs.changes.outputs.examples, 'simple-node2d-movement')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+
+      - name: Cache and install Linux dependencies
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libasound2-dev libudev-dev pkg-config
+          version: 1.0
+
+      - name: Install Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+          include-templates: false
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.73
+
+      - name: Verify Emscripten
+        run: emcc --version
+
+      - name: Generate extension_api.json
+        run: godot --headless --dump-extension-api
+        working-directory: examples
+
+      - name: Build for WASM
+        working-directory: examples/simple-node2d-movement
+        env:
+          GODOT4_GDEXTENSION_JSON: ${{ github.workspace }}/examples/extension_api.json
+        run: ./build-web.sh release
+
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: simple-node2d-movement-wasm
+          path: |
+            target/wasm32-unknown-emscripten/release/rust_simple_node2d_movement.wasm
+            target/wasm32-unknown-emscripten/release/rust_simple_node2d_movement.threads.wasm
+          if-no-files-found: error

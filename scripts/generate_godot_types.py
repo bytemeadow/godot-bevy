@@ -15,8 +15,8 @@ Usage: python scripts/generate_godot_types.py
 import json
 import subprocess
 import sys
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
 
 class GodotTypeGenerator:
@@ -141,6 +141,13 @@ class GodotTypeGenerator:
             # Note: Godot 4.5 didn't add significant new node types
         }
 
+        # Types that are excluded when building for web/WASM
+        # These types don't exist in the web extension API
+        self.wasm_excluded_types = {
+            "OpenXRRenderModel",
+            "OpenXRRenderModelManager",
+        }
+
     def run_cargo_fmt(self, file_path):
         """Run cargo fmt on a specific file to format the generated Rust code"""
         try:
@@ -260,7 +267,11 @@ class GodotTypeGenerator:
         return filtered_types, parent_map
 
     def get_type_cfg_attribute(self, node_type):
-        """Get the cfg attribute for a type if it needs version gating."""
+        """Get the cfg attribute for a type if it needs version or feature gating."""
+        # Check for WASM-excluded types first
+        if node_type in self.wasm_excluded_types:
+            return '#[cfg(not(feature = "experimental-wasm"))]\n'
+        # Check for version-gated types
         for version, types in self.version_gated_types.items():
             if node_type in types:
                 return f'#[cfg(feature = "api-{version}")]\n'
@@ -384,7 +395,7 @@ pub fn add_node_type_markers_from_string(
 ) {{
     // All nodes inherit from Node
     entity_commands.insert(NodeMarker);
-    
+
     // Add appropriate markers based on the type string
     match node_type {{
 {self._generate_string_match_arms(categories)}
@@ -665,14 +676,14 @@ func _on_node_added(node: Node):
 	"""Handle node added events with type optimization"""
 	if not rust_watcher:
 		return
-	
+
 	# Check if node is still valid
 	if not is_instance_valid(node):
 		return
-	
+
 	# Analyze node type on GDScript side - this is much faster than FFI
 	var node_type = _analyze_node_type(node)
-	
+
 	# Forward to Rust watcher with pre-analyzed type - this uses the MPSC sender
 	if rust_watcher.has_method("scene_tree_event_typed"):
 		rust_watcher.scene_tree_event_typed(node, "NodeAdded", node_type)
@@ -684,7 +695,7 @@ func _on_node_removed(node: Node):
 	"""Handle node removed events - no type analysis needed for removal"""
 	if not rust_watcher:
 		return
-	
+
 	# This is called immediately (not deferred) so the node should still be valid
 	# We need to send this event so Rust can clean up the corresponding Bevy entity
 	rust_watcher.scene_tree_event(node, "NodeRemoved")
@@ -693,11 +704,11 @@ func _on_node_renamed(node: Node):
 	"""Handle node renamed events - no type analysis needed for renaming"""
 	if not rust_watcher:
 		return
-	
+
 	# Check if node is still valid
 	if not is_instance_valid(node):
 		return
-		
+
 	rust_watcher.scene_tree_event(node, "NodeRenamed")
 
 func _analyze_node_type(node: Node) -> String:
@@ -707,9 +718,9 @@ func _analyze_node_type(node: Node) -> String:
 	This avoids multiple FFI calls that would be needed on the Rust side.
 	Generated from Godot extension API to ensure completeness.
 	"""
-	
+
 {self._generate_gdscript_type_analysis(categories)}
-	
+
 	# Default fallback
 	return "Node"
 
@@ -855,7 +866,7 @@ func _analyze_node_type(node: Node) -> String:
 	var root = get_tree().get_root()
 	if root:
 		_analyze_node_recursive(root, instance_ids, node_types)
-	
+
 	return {
 		"instance_ids": instance_ids,
 		"node_types": node_types
@@ -866,16 +877,16 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 	# Check if node is still valid before processing
 	if not is_instance_valid(node):
 		return
-	
+
 	# Add this node's information with pre-analyzed type
 	var instance_id = node.get_instance_id()
 	var node_type = _analyze_node_type(node)
-	
+
 	# Only append if we have valid data
 	if instance_id != 0 and node_type != "":
 		instance_ids.append(instance_id)
 		node_types.append(node_type)
-	
+
 	# Recursively process children
 	for child in node.get_children():
 		_analyze_node_recursive(child, instance_ids, node_types)'''

@@ -607,10 +607,12 @@ pub struct OpenXRInteractionProfileEditorMarker;
 #[reflect(Component)]
 pub struct OpenXRInteractionProfileEditorBaseMarker;
 
+#[cfg(not(feature = "experimental-wasm"))]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct OpenXRRenderModelMarker;
 
+#[cfg(not(feature = "experimental-wasm"))]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct OpenXRRenderModelManagerMarker;

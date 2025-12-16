@@ -63,18 +63,12 @@ impl TestRunnerImpl {
 
     /// Run all registered async tests
     pub fn run_all_tests(&mut self, scene_tree: Gd<Node>) {
-        println!(
-            "\n{}Run{} godot-bevy async integration tests...",
-            FMT_CYAN_BOLD, FMT_END
-        );
+        println!("\n{FMT_CYAN_BOLD}Run{FMT_END} godot-bevy async integration tests...");
 
         let tests = self.collect_tests();
 
         if tests.focus_run {
-            println!(
-                "  {}Focused run{} -- execute only selected tests.",
-                FMT_CYAN, FMT_END
-            );
+            println!("  {FMT_CYAN}Focused run{FMT_END} -- execute only selected tests.");
         }
 
         println!(
@@ -91,24 +85,21 @@ impl TestRunnerImpl {
 
     /// Run all registered benchmarks
     pub fn run_all_benchmarks(&mut self, _scene_tree: Gd<Node>) {
-        println!(
-            "\n\n{}Run{} godot-bevy benchmarks...",
-            FMT_CYAN_BOLD, FMT_END
-        );
+        println!("\n\n{FMT_CYAN_BOLD}Run{FMT_END} godot-bevy benchmarks...");
 
         // Check for debug builds and warn
         let rust_debug = cfg!(debug_assertions);
         let godot_debug = godot::classes::Os::singleton().is_debug_build();
 
         if rust_debug || godot_debug {
-            print!("  {}Warning: ", FMT_YELLOW);
+            print!("  {FMT_YELLOW}Warning: ");
             match (rust_debug, godot_debug) {
                 (true, true) => println!("Both Rust and Godot are debug builds"),
                 (true, false) => println!("Rust is a debug build"),
                 (false, true) => println!("Godot is a debug build"),
                 _ => {}
             }
-            println!("  For accurate benchmarks, use release builds{}", FMT_END);
+            println!("  For accurate benchmarks, use release builds{FMT_END}");
         }
 
         let (benchmarks, file_count) = self.collect_benchmarks();
@@ -231,7 +222,7 @@ impl TestRunnerImpl {
             // Print results (human-readable mode)
             if !output_json {
                 for stat in result.stats {
-                    print!(" {:>12.2?}", stat);
+                    print!(" {stat:>12.2?}");
                 }
                 println!();
             }
@@ -310,8 +301,8 @@ fn run_next_test(
                 "unknown panic".to_string()
             };
 
-            println!("{}FAILED{}", FMT_RED, FMT_END);
-            println!("    {}", msg);
+            println!("{FMT_RED}FAILED{FMT_END}");
+            println!("    {msg}");
             state.borrow_mut().failed_list.push(test.name.to_string());
             run_next_test(index + 1, tests, ctx, state, start_time);
         }
@@ -330,10 +321,10 @@ fn check_async_test(
     if !task_handle.is_pending() {
         // Task completed
         if has_godot_task_panicked(task_handle) {
-            println!("{}FAILED{}", FMT_RED, FMT_END);
+            println!("{FMT_RED}FAILED{FMT_END}");
             state.borrow_mut().failed_list.push(test_name);
         } else {
-            println!("{}ok{}", FMT_GREEN, FMT_END);
+            println!("{FMT_GREEN}ok{FMT_END}");
             state.borrow_mut().passed += 1;
         }
 
@@ -377,7 +368,7 @@ fn finish_test_run(
     let failed_count = total - state.passed - state.skipped;
 
     println!();
-    println!("{}Test result:{}", FMT_CYAN_BOLD, FMT_END);
+    println!("{FMT_CYAN_BOLD}Test result:{FMT_END}");
     print!("  ");
 
     if state.passed > 0 {
@@ -388,7 +379,7 @@ fn finish_test_run(
         if state.passed > 0 {
             print!(", ");
         }
-        print!("{}{} failed{}", FMT_RED, failed_count, FMT_END);
+        print!("{FMT_RED}{failed_count} failed{FMT_END}");
     }
 
     if state.skipped > 0 {
@@ -402,16 +393,16 @@ fn finish_test_run(
 
     if !state.failed_list.is_empty() {
         println!();
-        println!("{}Failed tests:{}", FMT_RED, FMT_END);
+        println!("{FMT_RED}Failed tests:{FMT_END}");
         for name in &state.failed_list {
-            println!("  - {}", name);
+            println!("  - {name}");
         }
     }
 
     let success = failed_count == 0;
 
     if success {
-        println!("{}All tests passed!{}", FMT_GREEN, FMT_END);
+        println!("{FMT_GREEN}All tests passed!{FMT_END}");
     }
 
     // Exit with appropriate code (cross-platform)
@@ -431,8 +422,8 @@ fn output_json_results(results: Vec<(&str, std::time::Duration, std::time::Durat
         let mut entry = HashMap::new();
         entry.insert("min_ns", min.as_nanos().to_string());
         entry.insert("median_ns", median.as_nanos().to_string());
-        entry.insert("min_display", format!("{:.2?}", min));
-        entry.insert("median_display", format!("{:.2?}", median));
+        entry.insert("min_display", format!("{min:.2?}"));
+        entry.insert("median_display", format!("{median:.2?}"));
 
         benchmarks.insert(name.to_string(), entry);
     }
