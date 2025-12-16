@@ -8,7 +8,7 @@ use bevy_asset::{
 use bevy_reflect::TypePath;
 use futures_lite::stream;
 use godot::classes::ResourceLoader;
-#[cfg(not(feature = "experimental-wasm"))]
+#[cfg(feature = "experimental-threads")]
 use godot::classes::resource_loader::ThreadLoadStatus;
 use godot::obj::{Gd, Singleton};
 use godot::prelude::Resource as GodotBaseResource;
@@ -205,7 +205,7 @@ impl AssetLoader for GodotResourceAssetLoader {
     type Settings = ();
     type Error = GodotAssetLoaderError;
 
-    #[cfg(not(feature = "experimental-wasm"))]
+    #[cfg(feature = "experimental-threads")]
     async fn load(
         &self,
         _reader: &mut dyn Reader,
@@ -295,9 +295,9 @@ impl AssetLoader for GodotResourceAssetLoader {
         }
     }
 
-    /// Web/WASM version uses synchronous loading since threaded loading
-    /// is not available in the web export.
-    #[cfg(feature = "experimental-wasm")]
+    /// Synchronous loading fallback when threaded loading is not available.
+    /// Used for web/WASM builds and when experimental-threads is not enabled.
+    #[cfg(not(feature = "experimental-threads"))]
     async fn load(
         &self,
         _reader: &mut dyn Reader,
