@@ -36,6 +36,7 @@ struct Initialized;
 
 /// System that finds Sprite2D nodes and adds rotation components to them
 #[main_thread_system]
+#[allow(clippy::type_complexity)]
 fn setup_rotators(
     mut commands: Commands,
     mut query: Query<(Entity, &mut GodotNodeHandle), (With<Sprite2DMarker>, Without<Initialized>)>,
