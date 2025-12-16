@@ -86,6 +86,17 @@ if [[ -z "$EM_CACHE" ]]; then
     echo ""
 fi
 
+# Set up bindgen to use Emscripten's sysroot for cross-compilation
+# This prevents bindgen from using the host system's headers
+if [[ -n "$EMSDK" ]]; then
+    EMSCRIPTEN_SYSROOT="$EMSDK/upstream/emscripten/cache/sysroot"
+    if [[ -d "$EMSCRIPTEN_SYSROOT" ]]; then
+        export BINDGEN_EXTRA_CLANG_ARGS="--sysroot=$EMSCRIPTEN_SYSROOT"
+        echo "Using Emscripten sysroot for bindgen: $EMSCRIPTEN_SYSROOT"
+        echo ""
+    fi
+fi
+
 # Generate extension_api.json if it doesn't exist (needed for api-custom-json)
 API_JSON="$SCRIPT_DIR/../../extension_api.json"
 if [[ ! -f "$API_JSON" ]]; then
