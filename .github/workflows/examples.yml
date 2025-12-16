@@ -66,10 +66,10 @@ jobs:
               - 'examples/platformer-2d/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
-            web-demo:
+            simple-node2d-movement:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
-              - 'examples/web-demo/**'
+              - 'examples/simple-node2d-movement/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
 
@@ -85,8 +85,9 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         example: ${{ fromJson(needs.changes.outputs.examples) }}
         exclude:
-          # web-demo requires Emscripten and is built separately in build-web job
-          - example: web-demo
+          # Exclude nothing - all examples build for native platforms
+          # simple-node2d-movement also has a web build in the build-web job
+          - example: ""
         include:
           - os: ubuntu-latest
             platform: linux
@@ -199,12 +200,12 @@ jobs:
           path: examples/${{ matrix.example }}/godot/exports/
           if-no-files-found: error
 
-  # Build web demo for WebAssembly (requires Emscripten)
+  # Build simple-node2d-movement for WebAssembly (requires Emscripten)
   build-web:
-    name: build web-demo (wasm)
+    name: build simple-node2d-movement (wasm)
     runs-on: ubuntu-latest
     needs: changes
-    if: contains(needs.changes.outputs.examples, 'web-demo')
+    if: contains(needs.changes.outputs.examples, 'simple-node2d-movement')
 
     steps:
       - name: Checkout code
@@ -241,13 +242,21 @@ jobs:
       - name: Verify Emscripten
         run: emcc --version
 
-      - name: Build web-demo for WASM
-        working-directory: examples/web-demo
+      - name: Generate extension_api.json
+        run: godot --headless --dump-extension-api
+        working-directory: examples
+
+      - name: Build for WASM
+        working-directory: examples/simple-node2d-movement
+        env:
+          GODOT4_GDEXTENSION_JSON: ${{ github.workspace }}/examples/extension_api.json
         run: ./build-web.sh release
 
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: web-demo-wasm
-          path: target/wasm32-unknown-emscripten/release/*.wasm
+          name: simple-node2d-movement-wasm
+          path: |
+            target/wasm32-unknown-emscripten/release/rust_simple_node2d_movement.wasm
+            target/wasm32-unknown-emscripten/release/rust_simple_node2d_movement.threads.wasm
           if-no-files-found: error

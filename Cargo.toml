@@ -22,7 +22,6 @@ members = [
   "examples/simple-node2d-movement/rust",
   "examples/perf-test/rust",
   "examples/two-way-sync-demo/rust",
-  "examples/web-demo/rust",
 ]
 resolver = "2"
 

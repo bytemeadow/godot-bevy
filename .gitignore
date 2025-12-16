@@ -1,4 +1,5 @@
 target/
+target-threaded/
 .DS_Store
 
 # Jetbrains IDEs
