@@ -12,7 +12,7 @@ name = "dodge_the_creeps"
 
 [dependencies]
 bevy = { version = "0.17", default-features = false, features = ["bevy_state", "bevy_asset", "bevy_log"] }
-bevy_asset_loader = "0.24.0-rc.1"
+bevy_asset_loader = "0.24"
 fastrand = { version = "2.3.0" }
 godot.workspace = true
 godot-bevy = { path = "../../../godot-bevy" }
