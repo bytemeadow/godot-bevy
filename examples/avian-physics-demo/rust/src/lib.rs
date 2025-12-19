@@ -97,18 +97,17 @@ fn update_scene_tree_config(mut config: ResMut<SceneTreeConfig>) {
 }
 
 fn spawn_entities(mut commands: Commands, assets: Res<GameAssets>) {
-    // Spawn a static floor
-    commands.spawn(GodotPhysicsStatic::cuboid(
+    // Static physics object with a collision shape (cylinder floor)
+    commands.spawn(GodotPhysicsStatic::cylinder(
         assets.floor_scene.clone(),
-        10.0,
-        0.0,
-        10.0,
+        4.0, // radius
+        0.1, // height
     ));
 
-    // Spawn a falling box with angular velocity
+    // Dynamic physics object with a collision shape and initial angular velocity
     commands.spawn(GodotPhysicsBox::dynamic_with_spin(
         assets.simple_box_scene.clone(),
-        Vec3::new(0.0, 10.0, 0.0),
-        Vec3::new(1.0, 2.0, 3.0),
+        Vec3::new(0.0, 4.0, 0.0),
+        Vec3::new(2.5, 3.5, 1.5),
     ));
 }

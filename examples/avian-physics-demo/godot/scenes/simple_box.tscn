@@ -1,9 +1,13 @@
 [gd_scene load_steps=3 format=3 uid="uid://cu8x4bfjw26qf"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_x1iyk"]
+size = Vector3(1.0, 1.0, 1.0)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_x1iyk"]
-albedo_color = Color(0.639216, 0.745098, 0.54902, 1)
+albedo_color = Color(0.486275, 0.564706, 1, 1)
+metallic = 0.0
+roughness = 0.7
+shading_mode = 1
 
 [node name="SimpleBox" type="MeshInstance3D"]
 mesh = SubResource("BoxMesh_x1iyk")
