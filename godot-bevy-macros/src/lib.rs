@@ -5,6 +5,7 @@ mod node_tree_view;
 use crate::godot_node::derive_godot_node;
 use proc_macro::TokenStream;
 use quote::quote;
+use syn::parse::Parser;
 use syn::{DeriveInput, Error, parse_macro_input};
 
 /// Attribute macro that ensures a system runs on the main thread by adding a `NonSend<MainThreadMarker>` parameter.
@@ -39,9 +40,22 @@ pub fn main_thread_system(_attr: TokenStream, item: TokenStream) -> TokenStream 
 }
 
 #[proc_macro_attribute]
-pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn bevy_app(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as syn::ItemFn);
     let name = &input_fn.sig.ident;
+
+    // Parse attribute for configuration options
+    let config = if !attr.is_empty() {
+        match parse_bevy_app_config(attr) {
+            Ok(cfg) => cfg,
+            Err(err) => return err.into_compile_error().into(),
+        }
+    } else {
+        BevyAppConfig::default()
+    };
+
+    let scene_tree_child_relationships = config.scene_tree_add_child_relationship;
+
     let expanded = quote! {
         struct BevyExtensionLibrary;
 
@@ -50,6 +64,11 @@ pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
             fn on_level_init(level: godot::prelude::InitLevel) {
                 if level == godot::prelude::InitLevel::Core {
                     godot::private::class_macros::registry::class::auto_register_classes(level);
+
+                    // Store the scene tree configuration
+                    let _ = godot_bevy::app::BEVY_APP_CONFIG.set(godot_bevy::app::BevyAppConfig {
+                        scene_tree_add_child_relationship: #scene_tree_child_relationships,
+                    });
 
                     // Stores the client's entrypoint, which we'll call shortly when our `BevyApp`
                     // Godot Node has its `ready()` invoked
@@ -75,6 +94,33 @@ pub fn bevy_app(_attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     expanded.into()
+}
+
+struct BevyAppConfig {
+    scene_tree_add_child_relationship: bool,
+}
+
+impl Default for BevyAppConfig {
+    fn default() -> Self {
+        Self {
+            scene_tree_add_child_relationship: true,
+        }
+    }
+}
+
+fn parse_bevy_app_config(attr: TokenStream) -> Result<BevyAppConfig, Error> {
+    let mut config = BevyAppConfig::default();
+    let parser = syn::meta::parser(|meta| {
+        if meta.path.is_ident("scene_tree_add_child_relationship") {
+            config.scene_tree_add_child_relationship = meta.value()?.parse::<syn::LitBool>()?.value;
+            Ok(())
+        } else {
+            Err(meta.error("unsupported bevy_app attribute"))
+        }
+    });
+
+    parser.parse(attr)?;
+    Ok(config)
 }
 
 /// Derive this macro on a struct for easy access to a scene's nodes.

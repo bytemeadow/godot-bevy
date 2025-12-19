@@ -18,6 +18,14 @@ use std::sync::mpsc::channel;
 // Stores the client's entrypoint (the function they decorated with the `#[bevy_app]` macro) at runtime
 pub static BEVY_INIT_FUNC: OnceLock<Box<dyn Fn(&mut App) + Send + Sync>> = OnceLock::new();
 
+// Configuration for BevyApp, set by the #[bevy_app] macro attributes
+pub static BEVY_APP_CONFIG: OnceLock<BevyAppConfig> = OnceLock::new();
+
+#[derive(Debug, Clone, Copy)]
+pub struct BevyAppConfig {
+    pub scene_tree_add_child_relationship: bool,
+}
+
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct BevyApp {
@@ -181,7 +189,17 @@ impl INode for BevyApp {
         }
 
         let mut app = App::new();
-        app.add_plugins(crate::plugins::GodotCorePlugins);
+
+        // Configure GodotCorePlugins based on #[bevy_app] attribute configuration
+        let config = BEVY_APP_CONFIG.get().copied().unwrap_or(BevyAppConfig {
+            scene_tree_add_child_relationship: true,
+        });
+
+        // Manually add core plugins with configuration
+        app.add_plugins(crate::plugins::core::GodotBaseCorePlugin)
+            .add_plugins(crate::plugins::scene_tree::GodotSceneTreePlugin {
+                add_child_relationship: config.scene_tree_add_child_relationship,
+            });
 
         // Call the init function - use instance function if set, otherwise global
         if let Some(ref instance_func) = self.instance_init_func {
