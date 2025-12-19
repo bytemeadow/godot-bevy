@@ -11,8 +11,7 @@ use bevy::ecs::schedule::common_conditions::run_once;
 use bevy::ecs::system::ResMut;
 use bevy::prelude::{
     Added, App, AppExtStates, AssetEvent, Assets, Commands, Component, Entity, Handle, Mesh,
-    Message, MessageReader, MessageWriter, OnExit, Plugin, Query, Res, Resource, Result, States,
-    Transform, Vec3, debug,
+    OnExit, Plugin, Query, Res, Resource, States, Transform, Vec3, debug,
 };
 use bevy::{scene::ScenePlugin, state::app::StatesPlugin};
 use bevy_asset_loader::{
@@ -69,8 +68,7 @@ impl Plugin for AvianPhysicsDemo {
             )
             .add_systems(Startup, update_scene_tree_config.run_if(run_once))
             .add_systems(OnExit(GameState::LoadAssets), spawn_entities)
-            .add_systems(PhysicsUpdate, add_avian_collider)
-            .add_message::<ColliderRequired>()
+            .add_systems(PhysicsUpdate, process_collider_from_godot_mesh)
             // Register AssetEvent<Mesh> since we're manually initializing Assets<Mesh> without the full asset plugin
             .add_message::<AssetEvent<Mesh>>();
     }
@@ -78,6 +76,42 @@ impl Plugin for AvianPhysicsDemo {
 
 #[derive(Component)]
 pub struct SimpleBoxTag;
+
+/// Marker component that automatically adds an Avian collider based on the Godot mesh dimensions.
+/// Add this component to entities with a GodotScene, and when the GodotNodeHandle is ready,
+/// the system will extract the mesh dimensions and insert the appropriate Collider component.
+#[derive(Component)]
+pub struct ColliderFromGodotMesh;
+
+/// System that processes entities with ColliderFromGodotMesh marker and newly added GodotNodeHandles.
+/// This follows the same pattern as TypedDeferredSignalConnections in godot-bevy.
+fn process_collider_from_godot_mesh(
+    mut commands: Commands,
+    query: Query<(Entity, &GodotNodeHandle, &ColliderFromGodotMesh), Added<GodotNodeHandle>>,
+) {
+    for (entity, node_handle, _marker) in query.iter() {
+        // Try to get BoxMesh and extract dimensions
+        let mut node_handle_mut = node_handle.clone();
+        if let Some(mesh_instance) = node_handle_mut.try_get::<MeshInstance3D>() {
+            if let Some(mesh) = mesh_instance.get_mesh() {
+                if let Ok(box_mesh) = mesh.try_cast::<BoxMesh>() {
+                    let size = box_mesh.get_size();
+
+                    commands
+                        .entity(entity)
+                        .insert(Collider::cuboid(size.x, size.y, size.z))
+                        .remove::<ColliderFromGodotMesh>();
+
+                    debug!(
+                        "ColliderFromGodotMesh: Added collider matching BoxMesh size of {:?}",
+                        size
+                    );
+                }
+            }
+        }
+        // You can extend this with support for other Godot mesh types (SphereMesh, CapsuleMesh, etc.)
+    }
+}
 
 #[derive(AssetCollection, Resource, Debug)]
 pub struct GameAssets {
@@ -87,9 +121,6 @@ pub struct GameAssets {
     #[asset(path = "scenes/floor.tscn")]
     floor_scene: Handle<GodotResource>,
 }
-
-#[derive(Message)]
-struct ColliderRequired(Entity);
 
 // NOTE: Would really prefer initialize these values by adding the GodotSceneTreePlugin plugin
 // ourselves, but that's somewhat hardcoded at the moment, so this is a workaround until we
@@ -104,11 +135,7 @@ fn update_scene_tree_config(mut config: ResMut<SceneTreeConfig>) {
     config.add_child_relationship = false;
 }
 
-fn spawn_entities(
-    mut commands: Commands,
-    assets: Res<GameAssets>,
-    mut events: MessageWriter<ColliderRequired>,
-) {
+fn spawn_entities(mut commands: Commands, assets: Res<GameAssets>) {
     //
     // Spawn a static floor
     //
@@ -121,51 +148,16 @@ fn spawn_entities(
     //
     // Spawn a falling cuboid body with an initial angular velocity
     //
-    let commands = commands.spawn((
+    commands.spawn((
         SimpleBoxTag,
         RigidBody::Dynamic,
-        // NOTE: Instead of manually inserting a collider here, we
-        // do it dynamically in `add_avian_collider` below so we can query
-        // the loaded Godot BoxMesh for dimensions and set the
-        // Collider size appropriately
+        // ColliderFromGodotMesh automatically extracts the BoxMesh dimensions
+        // and inserts the appropriate Collider component when the GodotNodeHandle is ready
+        ColliderFromGodotMesh,
         GodotScene::from_handle(assets.simple_box_scene.clone()),
         AngularVelocity(Vec3::new(1.0, 2.0, 3.0)),
         // Initialize a bevy transform with the correct starting position so avian's
         // physics simulation is aware of our position
         Transform::default().with_translation(Vec3::new(0., 10., 0.)),
     ));
-
-    events.write(ColliderRequired(commands.id()));
-}
-
-fn add_avian_collider(
-    mut commands: Commands,
-    mut events: MessageReader<ColliderRequired>,
-    mut query: Query<&mut GodotNodeHandle, Added<RigidBody>>,
-) -> Result {
-    for collider_required in events.read() {
-        let mut entity_commands = commands.get_entity(collider_required.0).unwrap();
-        if let Ok(mut node_handle) = query.get_mut(entity_commands.id())
-            && let Ok(box_mesh) = node_handle
-                .get::<MeshInstance3D>()
-                .get_mesh()
-                .unwrap()
-                .try_cast::<BoxMesh>()
-        {
-            let box_mesh_size = box_mesh.get_size();
-            entity_commands.insert_if_new(Collider::cuboid(
-                box_mesh_size.x,
-                box_mesh_size.y,
-                box_mesh_size.z,
-            ));
-
-            debug!(
-                "Added collider matching Godot's BoxMesh size of {:?}",
-                box_mesh_size
-            );
-        }
-        // You can, of course, add support for the other godot Mesh types
-    }
-
-    Ok(())
 }
