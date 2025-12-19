@@ -7,6 +7,7 @@
 use bevy_ecs::component::Component;
 use bevy_ecs::entity::Entity;
 use bevy_ecs::lifecycle::HookContext;
+use bevy_ecs::prelude::ReflectComponent;
 use bevy_ecs::relationship::RelationshipTarget;
 use bevy_ecs::world::DeferredWorld;
 use bevy_reflect::Reflect;
@@ -104,7 +105,7 @@ impl GodotChildren {
     }
 }
 
-fn godot_children_on_despawn(mut world: DeferredWorld, context: HookContext) {
+fn godot_children_on_despawn(world: DeferredWorld, context: HookContext) {
     let auto_despawn = world
         .get_resource::<super::SceneTreeConfig>()
         .map(|config| config.auto_despawn_children)
