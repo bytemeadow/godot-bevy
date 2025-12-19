@@ -104,7 +104,7 @@ impl NodeEntityIndex {
 
 /// Unified scene tree plugin that provides:
 /// - SceneTreeRef for accessing the Godot scene tree
-/// - Scene tree messsages (NodeAdded, NodeRemoved, NodeRenamed)
+/// - Scene tree messages (NodeAdded, NodeRemoved, NodeRenamed)
 /// - Automatic entity creation and mirroring for scene tree nodes
 /// - Custom GodotChildOf/GodotChildren relationship for scene tree hierarchy
 ///

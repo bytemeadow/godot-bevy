@@ -25,7 +25,7 @@ use bevy_reflect::Reflect;
 ///     query: Query<&GodotChildOf>,
 ///     entity: Entity,
 /// ) -> Option<Entity> {
-///     query.get(entity).ok().map(|child_of| child_of.0)
+///     query.get(entity).ok().map(|child_of| child_of.get())
 /// }
 /// ```
 ///
