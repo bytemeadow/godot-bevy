@@ -186,7 +186,7 @@ fn extract_action_events_only(
 ) {
     // Only process ActionInput events from normal input (mapped keys/actions)
     // Note: InputEventAction is not emitted by the engine, so we need to check manually
-    check_action_events(&input_event, action_messages);
+    check_action_events(input_event, action_messages);
 }
 
 #[allow(clippy::too_many_arguments)]
