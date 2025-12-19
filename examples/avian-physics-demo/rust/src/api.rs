@@ -65,6 +65,7 @@ pub fn process_collider_from_godot_mesh(
                     "ColliderFromGodotMesh: Added cylinder collider with radius {} and height {}",
                     radius, height
                 );
+                collider_added = true;
             }
 
             // You can extend this with support for other Godot mesh types (SphereMesh, CapsuleMesh, etc.)
