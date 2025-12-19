@@ -1,11 +1,7 @@
 mod api;
 
 use api::{GodotPhysicsBox, GodotPhysicsStatic, process_collider_from_godot_mesh};
-use avian3d::{
-    collision::CollisionDiagnostics,
-    dynamics::solver::SolverDiagnostics,
-    prelude::{Gravity, PhysicsPlugins, SpatialQueryDiagnostics},
-};
+use avian3d::prelude::{Gravity, PhysicsPlugins};
 use bevy::app::Startup;
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::schedule::common_conditions::run_once;
@@ -54,12 +50,9 @@ impl Plugin for AvianPhysicsDemo {
                 // Configure Avian to use godot-bevy's PhysicsUpdate schedule instead of FixedPostUpdate
                 PhysicsPlugins::new(PhysicsUpdate),
             ))
-            // The following 4 resource initializations are required by Avian
+            // Assets<Mesh> is required by Avian but normally comes from DefaultPlugins
+            // We don't use DefaultPlugins in godot-bevy, so we initialize it manually
             .init_resource::<Assets<Mesh>>()
-            .init_resource::<CollisionDiagnostics>()
-            .init_resource::<SolverDiagnostics>()
-            .init_resource::<SpatialQueryDiagnostics>()
-            .insert_resource(Gravity::default())
             .init_state::<GameState>()
             .add_loading_state(
                 LoadingState::new(GameState::LoadAssets)
