@@ -4,7 +4,6 @@
 //! real-time inspection of Bevy entities and components in the Godot editor.
 
 use bevy_app::{App, Plugin, Update};
-use bevy_ecs::hierarchy::ChildOf;
 use bevy_ecs::prelude::{Name, Resource, World};
 use bevy_ecs::world::EntityRef;
 use bevy_reflect::{PartialReflect, ReflectFromPtr, ReflectRef};
@@ -14,6 +13,7 @@ use godot::meta::ToGodot;
 use godot::prelude::{VarDictionary as Dictionary, *};
 
 use crate::interop::GodotNodeHandle;
+use crate::plugins::scene_tree::GodotChildOf;
 use bevy_ecs::reflect::AppTypeRegistry;
 
 /// Configuration for the debugger plugin
@@ -104,8 +104,8 @@ fn debugger_exclusive_system(world: &mut World) {
         let has_godot_node = entity_ref.get::<GodotNodeHandle>().is_some();
 
         let parent_bits: i64 = entity_ref
-            .get::<ChildOf>()
-            .map(|child_of| child_of.parent().to_bits() as i64)
+            .get::<GodotChildOf>()
+            .map(|child_of| child_of.get().to_bits() as i64)
             .unwrap_or(-1);
 
         // Build component data with reflection
@@ -138,10 +138,10 @@ fn debugger_exclusive_system(world: &mut World) {
             };
 
             // Skip hierarchy components - already shown visually in the tree
-            if short_name == "ChildOf"
-                || short_name == "Children"
-                || full_name.contains("::ChildOf")
-                || full_name.contains("::Children")
+            if short_name == "GodotChildOf"
+                || short_name == "GodotChildren"
+                || full_name.contains("::GodotChildOf")
+                || full_name.contains("::GodotChildren")
             {
                 continue;
             }

@@ -18,7 +18,7 @@ use godot_bevy::prelude::{
 };
 use std::fmt::Debug;
 
-#[bevy_app(scene_tree_add_child_relationship = false)]
+#[bevy_app]
 fn build_app(app: &mut App) {
     app.add_plugins(AvianPhysicsDemo);
 }

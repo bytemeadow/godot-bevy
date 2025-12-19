@@ -7,7 +7,7 @@ Godot-bevy includes a built-in entity inspector that displays your Bevy ECS stat
 The inspector appears as a "Entities" tab next to the Scene tab in the editor's left dock. It shows:
 
 - All Bevy entities with their names and appropriate icons
-- Entity hierarchy (parent-child relationships matching Bevy's `ChildOf`/`Children`)
+- Entity hierarchy (scene tree via `GodotChildOf`/`GodotChildren`)
 - Components attached to each entity with type-specific icons
 - Entities with Godot nodes show their node type icon (e.g., Node2D, Sprite2D)
 
@@ -57,19 +57,11 @@ Entity icons indicate the Godot node type when a marker component is present (e.
 
 ### Debugging Hierarchy Issues
 
-The inspector mirrors Bevy's `ChildOf`/`Children` hierarchy, not Godot's scene tree. If an entity appears at the wrong level:
+The inspector mirrors the Godot scene tree via `GodotChildOf`/`GodotChildren`, not Bevy's
+built-in `ChildOf`/`Children`. If an entity appears at the wrong level:
 
-1. Check if `SceneTreeConfig::add_child_relationship` is enabled (it is by default)
-2. Verify the Godot node was in the scene tree when the entity was created
-
-```rust
-// Check hierarchy config
-fn debug_hierarchy(config: Res<SceneTreeConfig>) {
-    if !config.add_child_relationship {
-        warn!("Parent-child relationships are disabled");
-    }
-}
-```
+1. Verify the Godot node was in the scene tree when the entity was created
+2. If you reparent nodes, wait a frame for the hierarchy update to process
 
 ### Performance Considerations
 

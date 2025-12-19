@@ -91,27 +91,29 @@ This macro:
 
 The `#[bevy_app]` macro accepts configuration attributes to customize godot-bevy's core behavior:
 
-#### Scene Tree Parent-Child Relationships
+#### Scene Tree Relationships
 
-By default, godot-bevy automatically creates ECS parent-child entity relationships that mirror Godot's scene tree hierarchy. However, some physics engines (like Avian Physics) manage their own entity hierarchies for constraints and joints, which can conflict with automatic parent-child relationships.
+godot-bevy mirrors Godot's scene tree with a custom ECS relationship:
+`GodotChildOf` / `GodotChildren`. This avoids conflicts with Bevy's built-in
+`ChildOf` / `Children` relationship (used by many plugins for their own hierarchies).
 
-You can disable this behavior with the `scene_tree_add_child_relationship` attribute:
+By default, despawning a parent entity will also despawn its Godot children. You can
+disable that behavior with the `scene_tree_auto_despawn_children` attribute:
 
 ```rust
-#[bevy_app(scene_tree_add_child_relationship = false)]
+#[bevy_app(scene_tree_auto_despawn_children = false)]
 fn build_app(app: &mut App) {
-    // This configuration is required when using Avian Physics
+    // Children can outlive their parents (useful for pooling or custom lifetimes)
     app.add_plugins(PhysicsPlugins::new(PhysicsUpdate));
 }
 ```
 
 **When to use this:**
-- ✅ When integrating with Avian Physics or similar physics engines
-- ✅ When you want full control over entity hierarchies
-- ❌ When you rely on Godot's scene tree hierarchy in your ECS logic
-- ❌ For most standard godot-bevy projects (default behavior is preferred)
+- ✅ When you want entities to outlive their Godot nodes
+- ✅ When you manage lifetimes manually (pooling, reuse, gameplay-driven despawns)
+- ❌ When you rely on automatic child cleanup on parent despawn
 
-**Default behavior** (when not specified): `scene_tree_add_child_relationship = true`
+**Default behavior** (when not specified): `scene_tree_auto_despawn_children = true`
 
 ## Data Flow
 

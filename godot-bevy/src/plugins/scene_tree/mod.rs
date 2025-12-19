@@ -1,6 +1,7 @@
 pub mod autosync;
 pub mod node_type_checking_generated;
 pub mod plugin;
+pub mod relationship;
 
 // Re-export main components
 pub use autosync::{
@@ -11,3 +12,4 @@ pub use plugin::{
     GodotSceneTreePlugin, Groups, NodeEntityIndex, ProtectedNodeEntity, SceneTreeConfig,
     SceneTreeMessage, SceneTreeMessageReader, SceneTreeMessageType, SceneTreeRef,
 };
+pub use relationship::{GodotChildOf, GodotChildren};

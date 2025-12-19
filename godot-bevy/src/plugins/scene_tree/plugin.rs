@@ -106,22 +106,23 @@ impl NodeEntityIndex {
 /// - SceneTreeRef for accessing the Godot scene tree
 /// - Scene tree messsages (NodeAdded, NodeRemoved, NodeRenamed)
 /// - Automatic entity creation and mirroring for scene tree nodes
+/// - Custom GodotChildOf/GodotChildren relationship for scene tree hierarchy
 ///
 /// This plugin is always included in the core plugins and provides
 /// complete scene tree integration out of the box.
 pub struct GodotSceneTreePlugin {
-    /// When true, adds a parent child entity relationship in ECS
-    /// that mimics Godot's parent child node relationship.
-    /// NOTE: You should disable this if you want to use Avian Physics,
-    /// as it is incompatible, i.e., Avian Physics has its own notions
-    /// for what parent/child entity relatonships mean
-    pub add_child_relationship: bool,
+    /// When true, despawning a parent entity will automatically despawn all children
+    /// via the GodotChildren on_despawn hook.
+    ///
+    /// Set to false if you want to manually manage entity lifetimes independently
+    /// of the Godot scene tree (e.g., for object pooling or entities that outlive their nodes).
+    pub auto_despawn_children: bool,
 }
 
 impl Default for GodotSceneTreePlugin {
     fn default() -> Self {
         Self {
-            add_child_relationship: true,
+            auto_despawn_children: true,
         }
     }
 }
@@ -130,12 +131,12 @@ impl Default for GodotSceneTreePlugin {
 #[derive(Resource, Reflect)]
 #[reflect(Resource)]
 pub struct SceneTreeConfig {
-    /// When true, adds a parent child entity relationship in ECS
-    /// that mimics Godot's parent child node relationship.
-    /// NOTE: You should disable this if you want to use Avian Physics,
-    /// as it is incompatible, i.e., Avian Physics has its own notions
-    /// for what parent/child entity relatonships mean
-    pub add_child_relationship: bool,
+    /// When true, despawning a parent entity will automatically despawn all children
+    /// via the GodotChildren on_despawn hook.
+    ///
+    /// Set to false if you want to manually manage entity lifetimes independently
+    /// of the Godot scene tree (e.g., for object pooling or entities that outlive their nodes).
+    pub auto_despawn_children: bool,
 }
 
 impl Plugin for GodotSceneTreePlugin {
@@ -146,7 +147,7 @@ impl Plugin for GodotSceneTreePlugin {
         app.init_non_send_resource::<SceneTreeRefImpl>()
             .init_resource::<NodeEntityIndex>()
             .insert_resource(SceneTreeConfig {
-                add_child_relationship: self.add_child_relationship,
+                auto_despawn_children: self.auto_despawn_children,
             })
             .add_message::<SceneTreeMessage>()
             .add_systems(
@@ -199,7 +200,6 @@ fn initialize_scene_tree(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
     mut entities: Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
-    config: Res<SceneTreeConfig>,
     component_registry: Res<SceneTreeComponentRegistry>,
     mut node_index: ResMut<NodeEntityIndex>,
 ) {
@@ -253,7 +253,6 @@ fn initialize_scene_tree(
         messages,
         &mut scene_tree,
         &mut entities,
-        &config,
         &component_registry,
         &mut node_index,
     );
@@ -422,7 +421,6 @@ fn create_scene_tree_entity(
     messages: impl IntoIterator<Item = SceneTreeMessage>,
     scene_tree: &mut SceneTreeRef,
     entities: &mut Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
-    config: &SceneTreeConfig,
     component_registry: &SceneTreeComponentRegistry,
     node_index: &mut NodeEntityIndex,
 ) {
@@ -552,13 +550,15 @@ fn create_scene_tree_entity(
                 // Try to add any registered bundles for this node type
                 super::autosync::try_add_bundles_for_node(commands, ent, &message.node);
 
-                if config.add_child_relationship
-                    && node.instance_id() != scene_root.instance_id()
+                // Add GodotChildOf relationship to mirror Godot's scene tree hierarchy
+                if node.instance_id() != scene_root.instance_id()
                     && let Some(parent) = node.get_parent()
                 {
                     let parent_id = parent.instance_id();
                     if let Some((parent_entity, _)) = ent_mapping.get(&parent_id) {
-                        commands.entity(*parent_entity).add_children(&[ent]);
+                        commands
+                            .entity(ent)
+                            .insert(super::relationship::GodotChildOf(*parent_entity));
                     } else {
                         warn!(target: "godot_scene_tree_messages",
                             "Parent entity with ID {} not found in ent_mapping. This might indicate a missing or incorrect mapping.",
@@ -630,7 +630,6 @@ fn read_scene_tree_messages(
     mut scene_tree: SceneTreeRef,
     mut message_reader: MessageReader<SceneTreeMessage>,
     mut entities: Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
-    config: Res<SceneTreeConfig>,
     component_registry: Res<SceneTreeComponentRegistry>,
     mut node_index: ResMut<NodeEntityIndex>,
 ) {
@@ -639,7 +638,6 @@ fn read_scene_tree_messages(
         message_reader.read().cloned(),
         &mut scene_tree,
         &mut entities,
-        &config,
         &component_registry,
         &mut node_index,
     );

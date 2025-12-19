@@ -109,7 +109,7 @@ mod tests {
         );
 
         let config = SceneTreeConfig {
-            add_child_relationship: false,
+            auto_despawn_children: false,
         };
         let reflected = config.as_reflect();
 
@@ -119,7 +119,7 @@ mod tests {
 
         // Check struct fields
         if let ReflectRef::Struct(struct_ref) = reflected.reflect_ref() {
-            assert!(struct_ref.field("add_child_relationship").is_some());
+            assert!(struct_ref.field("auto_despawn_children").is_some());
         } else {
             panic!("Expected Struct reflection");
         }

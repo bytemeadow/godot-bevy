@@ -23,7 +23,7 @@ pub static BEVY_APP_CONFIG: OnceLock<BevyAppConfig> = OnceLock::new();
 
 #[derive(Debug, Clone, Copy)]
 pub struct BevyAppConfig {
-    pub scene_tree_add_child_relationship: bool,
+    pub scene_tree_auto_despawn_children: bool,
 }
 
 #[derive(GodotClass)]
@@ -192,13 +192,13 @@ impl INode for BevyApp {
 
         // Configure GodotCorePlugins based on #[bevy_app] attribute configuration
         let config = BEVY_APP_CONFIG.get().copied().unwrap_or(BevyAppConfig {
-            scene_tree_add_child_relationship: true,
+            scene_tree_auto_despawn_children: true,
         });
 
         // Manually add core plugins with configuration
         app.add_plugins(crate::plugins::core::GodotBaseCorePlugin)
             .add_plugins(crate::plugins::scene_tree::GodotSceneTreePlugin {
-                add_child_relationship: config.scene_tree_add_child_relationship,
+                auto_despawn_children: config.scene_tree_auto_despawn_children,
             });
 
         // Call the init function - use instance function if set, otherwise global
