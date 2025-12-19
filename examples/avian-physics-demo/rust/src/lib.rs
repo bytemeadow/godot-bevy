@@ -1,11 +1,7 @@
 mod api;
 
 use api::{GodotPhysicsBox, GodotPhysicsStatic, process_collider_from_godot_mesh};
-use avian3d::prelude::{Gravity, PhysicsPlugins};
-use bevy::app::Startup;
-use bevy::ecs::schedule::IntoScheduleConfigs;
-use bevy::ecs::schedule::common_conditions::run_once;
-use bevy::ecs::system::ResMut;
+use avian3d::prelude::PhysicsPlugins;
 use bevy::prelude::{
     App, AppExtStates, AssetEvent, Assets, Commands, Handle, Mesh, OnExit, Plugin, Res, Resource,
     States, Vec3,
@@ -17,13 +13,12 @@ use bevy_asset_loader::{
 };
 use godot_bevy::prelude::{
     GodotAssetsPlugin, GodotBevyLogPlugin, GodotPackedScenePlugin, GodotResource,
-    GodotTransformSyncPlugin, PhysicsUpdate, SceneTreeConfig, bevy_app,
+    GodotTransformSyncPlugin, PhysicsUpdate, bevy_app,
     godot_prelude::{ExtensionLibrary, gdextension},
-    main_thread_system,
 };
 use std::fmt::Debug;
 
-#[bevy_app]
+#[bevy_app(scene_tree_add_child_relationship = false)]
 fn build_app(app: &mut App) {
     app.add_plugins(AvianPhysicsDemo);
 }
@@ -59,7 +54,6 @@ impl Plugin for AvianPhysicsDemo {
                     .load_collection::<GameAssets>()
                     .continue_to_state(GameState::InGame),
             )
-            .add_systems(Startup, update_scene_tree_config.run_if(run_once))
             .add_systems(OnExit(GameState::LoadAssets), spawn_entities)
             .add_systems(PhysicsUpdate, process_collider_from_godot_mesh)
             // Register AssetEvent<Mesh> since we're manually initializing Assets<Mesh> without the full asset plugin
@@ -74,19 +68,6 @@ pub struct GameAssets {
 
     #[asset(path = "scenes/floor.tscn")]
     floor_scene: Handle<GodotResource>,
-}
-
-// NOTE: Would really prefer initialize these values by adding the GodotSceneTreePlugin plugin
-// ourselves, but that's somewhat hardcoded at the moment, so this is a workaround until we
-// fix that
-#[main_thread_system]
-fn update_scene_tree_config(mut config: ResMut<SceneTreeConfig>) {
-    // When true, adds a parent child entity relationship in ECS
-    // that mimics Godot's parent child node relationship.
-    // NOTE: You should **disable** this if you want to use Avian Physics,
-    // as it is incompatible, i.e., Avian Physics has its own notions
-    // for what parent/child entity relatonships mean
-    config.add_child_relationship = false;
 }
 
 fn spawn_entities(mut commands: Commands, assets: Res<GameAssets>) {
