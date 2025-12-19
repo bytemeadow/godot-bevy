@@ -1,27 +1,27 @@
+mod api;
+
+use api::{GodotPhysicsBox, GodotPhysicsStatic, process_collider_from_godot_mesh};
 use avian3d::{
     collision::CollisionDiagnostics,
     dynamics::solver::SolverDiagnostics,
-    prelude::{
-        AngularVelocity, Collider, Gravity, PhysicsPlugins, RigidBody, SpatialQueryDiagnostics,
-    },
+    prelude::{Gravity, PhysicsPlugins, SpatialQueryDiagnostics},
 };
 use bevy::app::Startup;
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::schedule::common_conditions::run_once;
 use bevy::ecs::system::ResMut;
 use bevy::prelude::{
-    Added, App, AppExtStates, AssetEvent, Assets, Commands, Component, Entity, Handle, Mesh,
-    OnExit, Plugin, Query, Res, Resource, States, Transform, Vec3, debug,
+    App, AppExtStates, AssetEvent, Assets, Commands, Handle, Mesh, OnExit, Plugin, Res, Resource,
+    States, Vec3,
 };
 use bevy::{scene::ScenePlugin, state::app::StatesPlugin};
 use bevy_asset_loader::{
     asset_collection::AssetCollection,
     loading_state::{LoadingState, LoadingStateAppExt, config::ConfigureLoadingState},
 };
-use godot::classes::{BoxMesh, MeshInstance3D};
 use godot_bevy::prelude::{
-    GodotAssetsPlugin, GodotBevyLogPlugin, GodotNodeHandle, GodotPackedScenePlugin, GodotResource,
-    GodotScene, GodotTransformSyncPlugin, PhysicsUpdate, SceneTreeConfig, bevy_app,
+    GodotAssetsPlugin, GodotBevyLogPlugin, GodotPackedScenePlugin, GodotResource,
+    GodotTransformSyncPlugin, PhysicsUpdate, SceneTreeConfig, bevy_app,
     godot_prelude::{ExtensionLibrary, gdextension},
     main_thread_system,
 };
@@ -74,45 +74,6 @@ impl Plugin for AvianPhysicsDemo {
     }
 }
 
-#[derive(Component)]
-pub struct SimpleBoxTag;
-
-/// Marker component that automatically adds an Avian collider based on the Godot mesh dimensions.
-/// Add this component to entities with a GodotScene, and when the GodotNodeHandle is ready,
-/// the system will extract the mesh dimensions and insert the appropriate Collider component.
-#[derive(Component)]
-pub struct ColliderFromGodotMesh;
-
-/// System that processes entities with ColliderFromGodotMesh marker and newly added GodotNodeHandles.
-/// This follows the same pattern as TypedDeferredSignalConnections in godot-bevy.
-fn process_collider_from_godot_mesh(
-    mut commands: Commands,
-    query: Query<(Entity, &GodotNodeHandle, &ColliderFromGodotMesh), Added<GodotNodeHandle>>,
-) {
-    for (entity, node_handle, _marker) in query.iter() {
-        // Try to get BoxMesh and extract dimensions
-        let mut node_handle_mut = node_handle.clone();
-        if let Some(mesh_instance) = node_handle_mut.try_get::<MeshInstance3D>() {
-            if let Some(mesh) = mesh_instance.get_mesh() {
-                if let Ok(box_mesh) = mesh.try_cast::<BoxMesh>() {
-                    let size = box_mesh.get_size();
-
-                    commands
-                        .entity(entity)
-                        .insert(Collider::cuboid(size.x, size.y, size.z))
-                        .remove::<ColliderFromGodotMesh>();
-
-                    debug!(
-                        "ColliderFromGodotMesh: Added collider matching BoxMesh size of {:?}",
-                        size
-                    );
-                }
-            }
-        }
-        // You can extend this with support for other Godot mesh types (SphereMesh, CapsuleMesh, etc.)
-    }
-}
-
 #[derive(AssetCollection, Resource, Debug)]
 pub struct GameAssets {
     #[asset(path = "scenes/simple_box.tscn")]
@@ -136,28 +97,18 @@ fn update_scene_tree_config(mut config: ResMut<SceneTreeConfig>) {
 }
 
 fn spawn_entities(mut commands: Commands, assets: Res<GameAssets>) {
-    //
     // Spawn a static floor
-    //
-    commands.spawn((
-        RigidBody::Static,
-        Collider::cuboid(10.0, 0.0, 10.0),
-        GodotScene::from_handle(assets.floor_scene.clone()),
+    commands.spawn(GodotPhysicsStatic::cuboid(
+        assets.floor_scene.clone(),
+        10.0,
+        0.0,
+        10.0,
     ));
 
-    //
-    // Spawn a falling cuboid body with an initial angular velocity
-    //
-    commands.spawn((
-        SimpleBoxTag,
-        RigidBody::Dynamic,
-        // ColliderFromGodotMesh automatically extracts the BoxMesh dimensions
-        // and inserts the appropriate Collider component when the GodotNodeHandle is ready
-        ColliderFromGodotMesh,
-        GodotScene::from_handle(assets.simple_box_scene.clone()),
-        AngularVelocity(Vec3::new(1.0, 2.0, 3.0)),
-        // Initialize a bevy transform with the correct starting position so avian's
-        // physics simulation is aware of our position
-        Transform::default().with_translation(Vec3::new(0., 10., 0.)),
+    // Spawn a falling box with angular velocity
+    commands.spawn(GodotPhysicsBox::dynamic_with_spin(
+        assets.simple_box_scene.clone(),
+        Vec3::new(0.0, 10.0, 0.0),
+        Vec3::new(1.0, 2.0, 3.0),
     ));
 }
