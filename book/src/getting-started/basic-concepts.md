@@ -87,6 +87,32 @@ This macro:
 3. Integrates with Godot's lifecycle
 4. Handles all the bridging magic
 
+### Configuring Core Behavior
+
+The `#[bevy_app]` macro accepts configuration attributes to customize godot-bevy's core behavior:
+
+#### Scene Tree Parent-Child Relationships
+
+By default, godot-bevy automatically creates ECS parent-child entity relationships that mirror Godot's scene tree hierarchy. However, some physics engines (like Avian Physics) manage their own entity hierarchies for constraints and joints, which can conflict with automatic parent-child relationships.
+
+You can disable this behavior with the `scene_tree_add_child_relationship` attribute:
+
+```rust
+#[bevy_app(scene_tree_add_child_relationship = false)]
+fn build_app(app: &mut App) {
+    // This configuration is required when using Avian Physics
+    app.add_plugins(PhysicsPlugins::new(PhysicsUpdate));
+}
+```
+
+**When to use this:**
+- ✅ When integrating with Avian Physics or similar physics engines
+- ✅ When you want full control over entity hierarchies
+- ❌ When you rely on Godot's scene tree hierarchy in your ECS logic
+- ❌ For most standard godot-bevy projects (default behavior is preferred)
+
+**Default behavior** (when not specified): `scene_tree_add_child_relationship = true`
+
 ## Data Flow
 
 Understanding how data flows between Godot and Bevy is crucial:
