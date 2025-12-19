@@ -37,8 +37,6 @@ pub fn process_collider_from_godot_mesh(
         if let Some(mesh_instance) = node_handle_mut.try_get::<MeshInstance3D>()
             && let Some(mesh) = mesh_instance.get_mesh()
         {
-            let mut collider_added = false;
-
             // Try BoxMesh
             if let Ok(box_mesh) = mesh.clone().try_cast::<BoxMesh>() {
                 let size = box_mesh.get_size();
@@ -50,11 +48,9 @@ pub fn process_collider_from_godot_mesh(
                     "ColliderFromGodotMesh: Added cuboid collider with size {:?}",
                     size
                 );
-                collider_added = true;
             }
-
             // Try CylinderMesh
-            if !collider_added && let Ok(cylinder_mesh) = mesh.try_cast::<CylinderMesh>() {
+            else if let Ok(cylinder_mesh) = mesh.try_cast::<CylinderMesh>() {
                 let radius = cylinder_mesh.get_top_radius();
                 let height = cylinder_mesh.get_height();
                 commands
@@ -65,7 +61,6 @@ pub fn process_collider_from_godot_mesh(
                     "ColliderFromGodotMesh: Added cylinder collider with radius {} and height {}",
                     radius, height
                 );
-                collider_added = true;
             }
 
             // You can extend this with support for other Godot mesh types (SphereMesh, CapsuleMesh, etc.)
