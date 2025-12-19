@@ -116,6 +116,8 @@ pub struct GodotSceneTreePlugin {
     ///
     /// Set to false if you want to manually manage entity lifetimes independently
     /// of the Godot scene tree (e.g., for object pooling or entities that outlive their nodes).
+    ///
+    /// `ProtectedNodeEntity` children are never despawned automatically.
     pub auto_despawn_children: bool,
 }
 
@@ -136,6 +138,8 @@ pub struct SceneTreeConfig {
     ///
     /// Set to false if you want to manually manage entity lifetimes independently
     /// of the Godot scene tree (e.g., for object pooling or entities that outlive their nodes).
+    ///
+    /// `ProtectedNodeEntity` children are never despawned automatically.
     pub auto_despawn_children: bool,
 }
 
