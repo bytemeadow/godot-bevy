@@ -321,7 +321,7 @@ func _format_value(value) -> String:
 	if value is float:
 		# Format floats nicely - avoid excessive precision
 		if abs(value) < 0.0001 and value != 0.0:
-			return "%.2e" % value
+			return String.num(value, 6)
 		return "%.3f" % value if fmod(value, 1.0) != 0.0 else "%.1f" % value
 
 	if value is String:
