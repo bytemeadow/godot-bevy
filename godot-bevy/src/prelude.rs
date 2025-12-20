@@ -28,8 +28,8 @@ pub use crate::plugins::{
     packed_scene::{GodotPackedScenePlugin, GodotScene},
     // Input
     scene_tree::{
-        AutoSyncBundleRegistry, GodotSceneTreePlugin, Groups, NodeEntityIndex, SceneTreeConfig,
-        SceneTreeRef,
+        AutoSyncBundleRegistry, GodotChildOf, GodotChildren, GodotSceneTreePlugin, Groups,
+        NodeEntityIndex, SceneTreeConfig, SceneTreeRef,
     },
     signals::{GodotTypedSignalsPlugin, TypedGodotSignals},
     // Scene tree

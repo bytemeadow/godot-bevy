@@ -54,7 +54,7 @@ pub fn bevy_app(attr: TokenStream, item: TokenStream) -> TokenStream {
         BevyAppConfig::default()
     };
 
-    let scene_tree_child_relationships = config.scene_tree_add_child_relationship;
+    let scene_tree_auto_despawn_children = config.scene_tree_auto_despawn_children;
 
     let expanded = quote! {
         struct BevyExtensionLibrary;
@@ -67,7 +67,7 @@ pub fn bevy_app(attr: TokenStream, item: TokenStream) -> TokenStream {
 
                     // Store the scene tree configuration
                     let _ = godot_bevy::app::BEVY_APP_CONFIG.set(godot_bevy::app::BevyAppConfig {
-                        scene_tree_add_child_relationship: #scene_tree_child_relationships,
+                        scene_tree_auto_despawn_children: #scene_tree_auto_despawn_children,
                     });
 
                     // Stores the client's entrypoint, which we'll call shortly when our `BevyApp`
@@ -97,13 +97,13 @@ pub fn bevy_app(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 struct BevyAppConfig {
-    scene_tree_add_child_relationship: bool,
+    scene_tree_auto_despawn_children: bool,
 }
 
 impl Default for BevyAppConfig {
     fn default() -> Self {
         Self {
-            scene_tree_add_child_relationship: true,
+            scene_tree_auto_despawn_children: true,
         }
     }
 }
@@ -111,9 +111,13 @@ impl Default for BevyAppConfig {
 fn parse_bevy_app_config(attr: TokenStream) -> Result<BevyAppConfig, Error> {
     let mut config = BevyAppConfig::default();
     let parser = syn::meta::parser(|meta| {
-        if meta.path.is_ident("scene_tree_add_child_relationship") {
-            config.scene_tree_add_child_relationship = meta.value()?.parse::<syn::LitBool>()?.value;
+        if meta.path.is_ident("scene_tree_auto_despawn_children") {
+            config.scene_tree_auto_despawn_children = meta.value()?.parse::<syn::LitBool>()?.value;
             Ok(())
+        } else if meta.path.is_ident("scene_tree_add_child_relationship") {
+            Err(meta.error(
+                "scene_tree_add_child_relationship was removed; use scene_tree_auto_despawn_children",
+            ))
         } else {
             Err(meta.error("unsupported bevy_app attribute"))
         }
