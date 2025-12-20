@@ -7,7 +7,7 @@ signal project_created(project_info: Dictionary)
 @onready var version_input: LineEdit = $VBox/Version/LineEdit
 @onready var release_build_check: CheckBox = $VBox/ReleaseBuild
 
-const DEFAULT_VERSION = "0.9.2"
+const DEFAULT_VERSION = "0.10.0"
 
 func _ready():
 	title = "Setup godot-bevy Project"
