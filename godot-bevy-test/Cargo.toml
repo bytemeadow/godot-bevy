@@ -11,8 +11,8 @@ license.workspace = true
 
 [dependencies]
 godot = { workspace = true, features = ["__trace"] }
-godot-bevy = { path = "../godot-bevy" }
-godot-bevy-test-macros = { path = "../godot-bevy-test-macros" }
+godot-bevy = { workspace = true }
+godot-bevy-test-macros = { workspace = true }
 bevy = { version = "0.17", default-features = false, features = [
     "bevy_asset",
     "multi_threaded",
