@@ -3,9 +3,9 @@ use super::node_type_checking_generated::{
     remove_comprehensive_node_type_markers,
 };
 use crate::plugins::core::SceneTreeComponentRegistry;
-use crate::prelude::{GodotScene, main_thread_system};
+use crate::prelude::GodotScene;
 use crate::{
-    interop::{GodotNodeHandle, GodotNodeId},
+    interop::{GodotAccess, GodotNodeHandle},
     plugins::collisions::{
         AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED, COLLISION_START_SIGNALS,
         CollisionMessageType, Collisions,
@@ -73,16 +73,16 @@ impl NodeEntityIndex {
         self.index.contains_key(&instance_id)
     }
 
-    /// Look up the Bevy `Entity` for a Godot `GodotNodeId`.
+    /// Look up the Bevy `Entity` for a Godot `GodotNodeHandle`.
     #[inline]
-    pub fn get_id(&self, node_id: GodotNodeId) -> Option<Entity> {
-        self.get(node_id.instance_id())
+    pub fn get_handle(&self, handle: GodotNodeHandle) -> Option<Entity> {
+        self.get(handle.instance_id())
     }
 
-    /// Check if an entity exists for the given `GodotNodeId`.
+    /// Check if an entity exists for the given `GodotNodeHandle`.
     #[inline]
-    pub fn contains_id(&self, node_id: GodotNodeId) -> bool {
-        self.contains(node_id.instance_id())
+    pub fn contains_handle(&self, handle: GodotNodeHandle) -> bool {
+        self.contains(handle.instance_id())
     }
 
     /// Returns the number of entries in the index.
@@ -211,13 +211,13 @@ impl Default for SceneTreeRefImpl {
     }
 }
 
-#[main_thread_system]
 fn initialize_scene_tree(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
-    mut entities: Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
+    mut entities: Query<(&GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
     component_registry: Res<SceneTreeComponentRegistry>,
     mut node_index: ResMut<NodeEntityIndex>,
+    mut godot: GodotAccess,
 ) {
     let root = scene_tree.get().get_root().unwrap();
 
@@ -248,7 +248,7 @@ fn initialize_scene_tree(
                 let type_str = type_gstring.to_string();
 
                 messages.push(SceneTreeMessage {
-                    node_id: GodotNodeId::from(godot::prelude::InstanceId::from_i64(
+                    node_id: GodotNodeHandle::from(godot::prelude::InstanceId::from_i64(
                         id,
                     )),
                     message_type: SceneTreeMessageType::NodeAdded,
@@ -271,13 +271,14 @@ fn initialize_scene_tree(
         &mut entities,
         &component_registry,
         &mut node_index,
+        &mut godot,
     );
 }
 
 fn traverse_fallback(node: Gd<Node>) -> Vec<SceneTreeMessage> {
     fn traverse_recursive(node: Gd<Node>, messages: &mut Vec<SceneTreeMessage>) {
         messages.push(SceneTreeMessage {
-            node_id: GodotNodeId::from(node.instance_id()),
+            node_id: GodotNodeHandle::from(node.instance_id()),
             message_type: SceneTreeMessageType::NodeAdded,
             node_type: None, // No type optimization available
         });
@@ -294,7 +295,7 @@ fn traverse_fallback(node: Gd<Node>) -> Vec<SceneTreeMessage> {
 
 #[derive(Debug, Clone, Message)]
 pub struct SceneTreeMessage {
-    pub node_id: GodotNodeId,
+    pub node_id: GodotNodeHandle,
     pub message_type: SceneTreeMessageType,
     pub node_type: Option<String>, // Pre-analyzed node type from GDScript watcher
 }
@@ -327,8 +328,7 @@ fn find_node_by_name(parent: &Gd<Node>, name: &str) -> Option<Gd<Node>> {
     None
 }
 
-#[main_thread_system]
-fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
+fn connect_scene_tree(mut scene_tree: SceneTreeRef, _godot: GodotAccess) {
     let mut scene_tree_gd = scene_tree.get();
     let root = scene_tree_gd.get_root().unwrap();
 
@@ -436,9 +436,10 @@ fn create_scene_tree_entity(
     commands: &mut Commands,
     messages: impl IntoIterator<Item = SceneTreeMessage>,
     scene_tree: &mut SceneTreeRef,
-    entities: &mut Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
+    entities: &mut Query<(&GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
     component_registry: &SceneTreeComponentRegistry,
     node_index: &mut NodeEntityIndex,
+    godot: &mut GodotAccess,
 ) {
     // Build local mapping with protection info (only needed during this function)
     let mut ent_mapping = entities
@@ -469,7 +470,7 @@ fn create_scene_tree_entity(
             node_type,
         } = message;
         let instance_id = node_id.instance_id();
-        let mut node_handle = GodotNodeHandle::from_id(node_id);
+        let node_handle = node_id;
         let ent = ent_mapping.get(&instance_id).cloned();
 
         match message_type {
@@ -485,10 +486,11 @@ fn create_scene_tree_entity(
                     commands.spawn_empty()
                 };
 
-                ent.insert(GodotNodeHandle::from_id(node_id))
-                    .insert(Name::from(
-                        node_handle.get::<Node>().get_name().to_string(),
-                    ));
+                let mut node_accessor = godot.node(node_handle);
+                let mut node = node_accessor.get::<Node>();
+
+                ent.insert(node_id)
+                    .insert(Name::from(node.get_name().to_string()));
 
                 // Add node type marker components - use optimized version if available
                 if let Some(ref node_type_str) = node_type {
@@ -496,10 +498,8 @@ fn create_scene_tree_entity(
                     add_node_type_markers_from_string(&mut ent, node_type_str);
                 } else {
                     // Fallback to comprehensive analysis with FFI calls
-                    add_comprehensive_node_type_markers(&mut ent, &mut node_handle);
+                    add_comprehensive_node_type_markers(&mut ent, &mut node_accessor);
                 }
-
-                let mut node = node_handle.get::<Node>();
 
                 // Check if the node is a collision body (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.)
                 // These nodes typically have collision detection capabilities
@@ -564,14 +564,15 @@ fn create_scene_tree_entity(
                 ent.insert(Groups::from(&node));
 
                 // Add all components registered by plugins
-                component_registry.add_to_entity(&mut ent, &mut node_handle);
+                component_registry.add_to_entity(&mut ent, &mut node_accessor);
+                drop(node_accessor);
 
                 let ent = ent.id();
                 ent_mapping.insert(instance_id, (ent, None));
                 node_index.insert(instance_id, ent);
 
                 // Try to add any registered bundles for this node type
-                super::autosync::try_add_bundles_for_node(commands, ent, &mut node_handle);
+                super::autosync::try_add_bundles_for_node(commands, ent, godot, node_handle);
 
                 // Add GodotChildOf relationship to mirror Godot's scene tree hierarchy
                 if node.instance_id() != scene_root.instance_id()
@@ -595,8 +596,8 @@ fn create_scene_tree_entity(
                     // During reparenting, the node is temporarily removed from old parent
                     // but still exists in the scene tree (has a parent)
                     // We need to try_get because the node handle might be invalid if freed
-                    let is_reparenting = node_handle
-                        .try_get::<Node>()
+                    let is_reparenting = godot
+                        .try_get::<Node>(node_handle)
                         .map(|godot_node| godot_node.get_parent().is_some())
                         .unwrap_or(false);
 
@@ -611,7 +612,7 @@ fn create_scene_tree_entity(
                         if !protected {
                             commands.entity(ent).despawn();
                         } else {
-                            _strip_godot_components(commands, ent, &mut node_handle);
+                            _strip_godot_components(commands, ent, godot, node_handle);
                         }
                         ent_mapping.remove(&instance_id);
                         node_index.remove(instance_id);
@@ -626,7 +627,7 @@ fn create_scene_tree_entity(
                     commands
                         .entity(ent)
                         .insert(Name::from(
-                            node_handle.get::<Node>().get_name().to_string(),
+                            godot.get::<Node>(node_handle).get_name().to_string(),
                         ));
                 } else {
                     trace!(target: "godot_scene_tree_messages", "Entity for renamed node was already despawned");
@@ -636,7 +637,12 @@ fn create_scene_tree_entity(
     }
 }
 
-fn _strip_godot_components(commands: &mut Commands, ent: Entity, node: &mut GodotNodeHandle) {
+fn _strip_godot_components(
+    commands: &mut Commands,
+    ent: Entity,
+    godot: &mut GodotAccess,
+    node_handle: GodotNodeHandle,
+) {
     let mut entity_commands = commands.entity(ent);
 
     entity_commands.remove::<GodotNodeHandle>();
@@ -644,18 +650,19 @@ fn _strip_godot_components(commands: &mut Commands, ent: Entity, node: &mut Godo
     entity_commands.remove::<Name>();
     entity_commands.remove::<Groups>();
 
-    remove_comprehensive_node_type_markers(&mut entity_commands, node);
+    let mut node_accessor = godot.node(node_handle);
+    remove_comprehensive_node_type_markers(&mut entity_commands, &mut node_accessor);
 }
 
-#[main_thread_system]
 #[allow(clippy::too_many_arguments)]
 fn read_scene_tree_messages(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
     mut message_reader: MessageReader<SceneTreeMessage>,
-    mut entities: Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
+    mut entities: Query<(&GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
     component_registry: Res<SceneTreeComponentRegistry>,
     mut node_index: ResMut<NodeEntityIndex>,
+    mut godot: GodotAccess,
 ) {
     create_scene_tree_entity(
         &mut commands,
@@ -664,5 +671,6 @@ fn read_scene_tree_messages(
         &mut entities,
         &component_registry,
         &mut node_index,
+        &mut godot,
     );
 }

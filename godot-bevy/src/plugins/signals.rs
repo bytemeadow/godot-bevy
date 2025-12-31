@@ -1,4 +1,4 @@
-use crate::interop::{GodotNodeHandle, GodotNodeId};
+use crate::interop::{GodotAccess, GodotNodeHandle};
 use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
     component::Component,
@@ -40,8 +40,8 @@ pub struct GodotSignalArgument {
 #[derive(Debug, Message)]
 pub struct GodotSignal {
     pub name: String,
-    pub origin: GodotNodeId,
-    pub target: GodotNodeId,
+    pub origin: GodotNodeHandle,
+    pub target: GodotNodeHandle,
     pub arguments: Vec<GodotSignalArgument>,
 }
 
@@ -89,8 +89,13 @@ mod legacy_signals_param {
 
     impl<'w> GodotSignals<'w> {
         /// Connect a Godot signal to be forwarded to Bevy's message system
-        pub fn connect(&self, node: &mut GodotNodeHandle, signal_name: &str) {
-            connect_godot_signal(node, signal_name, self.signal_sender.0.clone());
+        pub fn connect(
+            &self,
+            godot: &mut GodotAccess,
+            node: GodotNodeHandle,
+            signal_name: &str,
+        ) {
+            connect_godot_signal(godot, node, signal_name, self.signal_sender.0.clone());
         }
     }
 }
@@ -106,14 +111,14 @@ fn write_godot_signal_messages(
 }
 
 pub fn connect_godot_signal(
-    node: &mut GodotNodeHandle,
+    godot: &mut GodotAccess,
+    node: GodotNodeHandle,
     signal_name: &str,
     signal_sender: Sender<GodotSignal>,
 ) {
-    let mut node = node.get::<Node>();
-    let node_clone = node.clone();
+    let mut node_ref = godot.get::<Node>(node);
     let signal_name_copy = signal_name.to_string();
-    let node_id = GodotNodeId::from(node_clone.instance_id());
+    let node_handle = node;
 
     let closure = move |args: &[&Variant]| -> Variant {
         // Use captured sender directly - no global state needed!
@@ -124,8 +129,8 @@ pub fn connect_godot_signal(
 
         let _ = signal_sender.send(GodotSignal {
             name: signal_name_copy.clone(),
-            origin: node_id,
-            target: node_id,
+            origin: node_handle,
+            target: node_handle,
             arguments,
         });
 
@@ -136,7 +141,7 @@ pub fn connect_godot_signal(
     let callable = Callable::from_fn("universal_signal_handler", closure);
 
     // Connect the signal - this will work with ANY number of arguments!
-    node.connect(signal_name, &callable);
+    node_ref.connect(signal_name, &callable);
 }
 
 pub fn variant_to_signal_argument(variant: &Variant) -> GodotSignalArgument {
@@ -235,22 +240,23 @@ impl<'w, T: Message + Send + 'static> TypedGodotSignals<'w, T> {
     /// Multiple connections are supported; each connection sends a `T` when fired.
     pub fn connect_map<F>(
         &self,
-        node: &mut GodotNodeHandle,
+        godot: &mut GodotAccess,
+        node: GodotNodeHandle,
         signal_name: &str,
         source_entity: Option<Entity>,
         mut mapper: F,
     ) where
-        F: FnMut(&[Variant], GodotNodeId, Option<Entity>) -> Option<T> + Send + 'static,
+        F: FnMut(&[Variant], GodotNodeHandle, Option<Entity>) -> Option<T> + Send + 'static,
     {
-        let mut node_ref = node.get::<Node>();
+        let mut node_ref = godot.get::<Node>(node);
         let signal_name_copy = signal_name.to_string();
-        let source_node_id = node.id();
+        let source_node_handle = node;
         let sender_t = self.typed_sender.0.clone();
 
         let closure = move |args: &[&Variant]| -> Variant {
             // Clone variants to owned values we can inspect
             let owned: Vec<Variant> = args.iter().map(|&v| v.clone()).collect();
-            let event = mapper(&owned, source_node_id, source_entity);
+            let event = mapper(&owned, source_node_handle, source_entity);
             if let Some(event) = event {
                 let _ = sender_t.send(Box::new(TypedEnvelope::<T>(event)));
             }
@@ -268,20 +274,22 @@ fn process_typed_deferred_signal_connections<T: Message + Send + 'static>(
     mut commands: Commands,
     mut query: Query<(
         Entity,
-        &mut GodotNodeHandle,
+        &GodotNodeHandle,
         &mut TypedDeferredSignalConnections<T>,
     )>,
     typed: TypedGodotSignals<T>,
+    mut godot: GodotAccess,
 ) {
-    for (entity, mut handle, mut deferred) in query.iter_mut() {
+    for (entity, handle, mut deferred) in query.iter_mut() {
         for conn in deferred.connections.drain(..) {
             let signal = conn.signal_name;
             let mapper = conn.mapper;
             typed.connect_map(
-                &mut handle,
+                &mut godot,
+                *handle,
                 &signal,
                 Some(entity),
-                move |args, node_id, ent| (mapper)(args, node_id, ent),
+                move |args, node_handle, ent| (mapper)(args, node_handle, ent),
             );
         }
         // Remove marker after wiring all deferred connections
@@ -299,7 +307,7 @@ fn process_typed_deferred_signal_connections<T: Message + Send + 'static>(
 pub struct TypedDeferredConnection<T: Message + Send + 'static> {
     pub signal_name: String,
     pub mapper: Arc<
-        dyn Fn(&[Variant], GodotNodeId, Option<Entity>) -> Option<T> + Send + Sync + 'static,
+        dyn Fn(&[Variant], GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
     >,
 }
 
@@ -334,7 +342,7 @@ impl<T: Message + Send + 'static> TypedDeferredSignalConnections<T> {
 
     pub fn with_connection<F>(signal_name: impl Into<String>, mapper: F) -> Self
     where
-        F: Fn(&[Variant], GodotNodeId, Option<Entity>) -> Option<T> + Send + Sync + 'static,
+        F: Fn(&[Variant], GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
     {
         Self {
             connections: vec![TypedDeferredConnection {
@@ -346,7 +354,7 @@ impl<T: Message + Send + 'static> TypedDeferredSignalConnections<T> {
 
     pub fn push<F>(&mut self, signal_name: impl Into<String>, mapper: F)
     where
-        F: Fn(&[Variant], GodotNodeId, Option<Entity>) -> Option<T> + Send + Sync + 'static,
+        F: Fn(&[Variant], GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
     {
         self.connections.push(TypedDeferredConnection {
             signal_name: signal_name.into(),
@@ -389,7 +397,7 @@ impl<T: Message + Send + Debug + 'static> DeferredSignalConnection for SignalCon
         };
 
         for connection in self.connections.connections.iter() {
-            let source_node_id = GodotNodeId::from(target_node.instance_id());
+            let source_node_id = GodotNodeHandle::from(target_node.instance_id());
             let typed_sender_copy = typed_sender.0.clone();
             let mapper = connection.mapper.clone();
             let signal_name = self.signal_name.clone();

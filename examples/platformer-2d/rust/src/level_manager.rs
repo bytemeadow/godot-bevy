@@ -150,13 +150,11 @@ fn handle_level_scene_change(
     }
 }
 
-#[main_thread_system]
 fn emit_level_loaded_event_when_scene_ready(
     mut pending_level: ResMut<PendingLevel>,
-    node_index: Res<NodeEntityIndex>,
-    mut nodes: Query<&mut GodotNodeHandle>,
     mut scene_tree_events: MessageReader<SceneTreeMessage>,
     mut loaded_events: MessageWriter<LevelLoadedMessage>,
+    mut godot: GodotAccess,
 ) {
     if let Some(level_id) = pending_level.level_id {
         let expected_path = match level_id {
@@ -166,10 +164,7 @@ fn emit_level_loaded_event_when_scene_ready(
         };
         for event in scene_tree_events.read() {
             if let SceneTreeMessageType::NodeAdded = event.message_type {
-                if let Some(entity) = node_index.get(event.node_id.instance_id())
-                    && let Ok(mut handle) = nodes.get_mut(entity)
-                    && let Some(node) = handle.try_get::<Node>()
-                {
+                if let Some(node) = godot.try_get::<Node>(event.node_id) {
                     let node_path = node.get_path().to_string();
                     if node_path == expected_path {
                         loaded_events.write(LevelLoadedMessage { level_id });

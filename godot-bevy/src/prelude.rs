@@ -16,7 +16,7 @@ pub use crate::plugins::{
         AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED, COLLISION_START_SIGNALS,
         CollisionMessage, CollisionMessageType, Collisions, GodotCollisionsPlugin,
     },
-    core::{FindEntityByNameExt, MainThreadMarker, PhysicsDelta, PhysicsUpdate},
+    core::{FindEntityByNameExt, PhysicsDelta, PhysicsUpdate},
     // Debugger
     debugger::{DebuggerConfig, GodotDebuggerPlugin},
     // Collisions

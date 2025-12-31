@@ -366,9 +366,10 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
         fn #create_bundle_fn_name(
             commands: &mut godot_bevy::bevy_ecs::system::Commands,
             entity: godot_bevy::bevy_ecs::entity::Entity,
-            handle: &mut godot_bevy::interop::GodotNodeHandle,
+            godot: &mut godot_bevy::interop::GodotAccess,
+            handle: godot_bevy::interop::GodotNodeHandle,
         ) -> bool {
-            if let Some(godot_node) = handle.try_get::<#godot_node_name>() {
+            if let Some(godot_node) = godot.try_get::<#godot_node_name>(handle) {
                 let bundle = #struct_name::from_godot_node(&godot_node);
                 commands.entity(entity).insert(bundle);
                 return true;

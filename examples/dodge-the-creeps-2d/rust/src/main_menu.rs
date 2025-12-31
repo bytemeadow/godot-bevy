@@ -5,20 +5,14 @@ use bevy::{
         message::{MessageReader, MessageWriter},
         resource::Resource,
         schedule::IntoScheduleConfigs,
-        system::{Query, Res, ResMut},
+        system::{Res, ResMut},
     },
     state::{
         condition::in_state,
         state::{NextState, OnEnter, OnExit},
     },
 };
-use godot_bevy::{
-    interop::{GodotNodeHandle, GodotNodeId},
-    prelude::{
-        GodotTypedSignalsPlugin, NodeEntityIndex, NodeTreeView, SceneTreeRef, TypedGodotSignals,
-        main_thread_system,
-    },
-};
+use godot_bevy::prelude::*;
 
 use crate::{
     GameState,
@@ -27,9 +21,9 @@ use crate::{
 
 #[derive(Resource, Default)]
 pub struct MenuAssets {
-    pub message_label: Option<GodotNodeId>,
-    pub start_button: Option<GodotNodeId>,
-    pub score_label: Option<GodotNodeId>,
+    pub message_label: Option<GodotNodeHandle>,
+    pub start_button: Option<GodotNodeHandle>,
+    pub score_label: Option<GodotNodeHandle>,
 }
 pub struct MainMenuPlugin;
 impl Plugin for MainMenuPlugin {
@@ -65,43 +59,39 @@ pub struct MenuUi {
     pub score_label: GodotNodeHandle,
 }
 
-#[main_thread_system]
 fn init_menu_assets(
     mut menu_assets: ResMut<MenuAssets>,
     mut ui_handles: ResMut<UIHandles>,
     mut scene_tree: SceneTreeRef,
+    _godot: GodotAccess,
 ) {
     let menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap()).unwrap();
 
-    menu_assets.message_label = Some(menu_ui.message_label.id());
-    menu_assets.start_button = Some(menu_ui.start_button.id());
-    menu_assets.score_label = Some(menu_ui.score_label.id());
+    menu_assets.message_label = Some(menu_ui.message_label);
+    menu_assets.start_button = Some(menu_ui.start_button);
+    menu_assets.score_label = Some(menu_ui.score_label);
 
     // Initialize UI handles for command system
-    ui_handles.start_button = Some(menu_ui.start_button.id());
-    ui_handles.score_label = Some(menu_ui.score_label.id());
-    ui_handles.message_label = Some(menu_ui.message_label.id());
+    ui_handles.start_button = Some(menu_ui.start_button);
+    ui_handles.score_label = Some(menu_ui.score_label);
+    ui_handles.message_label = Some(menu_ui.message_label);
 }
 
 #[derive(Message, Debug, Clone)]
 struct StartGameRequested;
 
-#[main_thread_system]
 fn connect_start_button(
     menu_assets: Res<MenuAssets>,
-    node_index: Res<NodeEntityIndex>,
-    mut nodes: Query<&mut GodotNodeHandle>,
+    mut godot: GodotAccess,
     typed: TypedGodotSignals<StartGameRequested>,
 ) {
-    if let Some(node_id) = menu_assets.start_button
-        && let Some(entity) = node_index.get(node_id.instance_id())
-        && let Ok(mut handle) = nodes.get_mut(entity)
-    {
+    if let Some(handle) = menu_assets.start_button {
         typed.connect_map(
-            &mut handle,
+            &mut godot,
+            handle,
             "pressed",
             None,
-            |_args, _node_id, _ent| Some(StartGameRequested),
+            |_args, _node_handle, _ent| Some(StartGameRequested),
         );
     }
 }

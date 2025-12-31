@@ -5,8 +5,8 @@ use crate::plugins::signals::{
     TypedDeferredSignalConnections,
 };
 use crate::plugins::transforms::IntoGodotTransform2D;
-use crate::prelude::main_thread_system;
-use crate::{interop::{GodotNodeHandle, GodotNodeId}, plugins::transforms::IntoGodotTransform};
+use crate::interop::{GodotAccess, GodotNodeHandle};
+use crate::plugins::transforms::IntoGodotTransform;
 use bevy_app::{App, Plugin, PostUpdate};
 use bevy_asset::{Assets, Handle};
 use bevy_ecs::message::Message;
@@ -22,7 +22,6 @@ use godot::prelude::Variant;
 use godot::{
     builtin::GString,
     classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader},
-    obj::{Gd, Singleton},
 };
 use std::str::FromStr;
 use tracing::error;
@@ -45,7 +44,7 @@ impl Plugin for GodotPackedScenePlugin {
 #[derive(Debug, Component)]
 pub struct GodotScene {
     resource: GodotSceneResource,
-    parent: Option<GodotNodeId>,
+    parent: Option<GodotNodeHandle>,
     deferred_signal_connections: Vec<Box<dyn DeferredSignalConnection>>,
 }
 
@@ -80,7 +79,7 @@ impl GodotScene {
     }
 
     /// Set the parent node for this scene when spawned.
-    pub fn with_parent(mut self, parent: GodotNodeId) -> Self {
+    pub fn with_parent(mut self, parent: GodotNodeHandle) -> Self {
         self.parent = Some(parent);
         self
     }
@@ -98,9 +97,9 @@ impl GodotScene {
     ///   Argument supports the same syntax as [Node.get_node](https://docs.godotengine.org/en/stable/classes/class_node.html#class-node-method-get-node).
     /// * `signal_name` - Name of the Godot signal to connect (e.g., "pressed").
     /// * `mapper` - Closure that maps signal arguments to your typed message.
-    ///   * The closure receives three arguments: `args`, `node_id`, and `entity`:
+    ///   * The closure receives three arguments: `args`, `node_handle`, and `entity`:
     ///     - `args: &[Variant]`: raw Godot arguments (clone if you need detailed parsing).
-    ///     - `node_id: GodotNodeId`: emitting node ID.
+    ///     - `node_handle: GodotNodeHandle`: emitting node handle.
     ///     - `entity: Option<Entity>`: Bevy entity the GodotScene component is attached to (Always Some).
     ///   * The closure returns an optional Bevy Message, or None to not send the message.
     ///
@@ -126,7 +125,7 @@ impl GodotScene {
     ) -> Self
     where
         T: Message + Send + std::fmt::Debug + 'static,
-        F: Fn(&[Variant], GodotNodeId, Option<Entity>) -> Option<T> + Send + Sync + 'static,
+        F: Fn(&[Variant], GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
     {
         self.deferred_signal_connections
             .push(Box::new(SignalConnectionSpec {
@@ -141,13 +140,13 @@ impl GodotScene {
     }
 }
 
-#[main_thread_system]
 fn spawn_scene(
     mut commands: Commands,
     mut new_scenes: Query<(&mut GodotScene, Entity, Option<&Transform>), Without<GodotNodeHandle>>,
     mut scene_tree: SceneTreeRef,
     mut assets: ResMut<Assets<GodotResource>>,
     typed_message_sender: Option<NonSend<GlobalTypedSignalSender>>,
+    mut godot: GodotAccess,
 ) {
     for (mut scene, ent, transform) in new_scenes.iter_mut() {
         let packed_scene = match &scene.resource {
@@ -156,8 +155,9 @@ fn spawn_scene(
                 .expect("packed scene to exist in assets")
                 .get()
                 .clone(),
-            GodotSceneResource::Path(path) => ResourceLoader::singleton()
-                .load(&GString::from_str(path).expect("path to be a valid GString"))
+            GodotSceneResource::Path(path) => godot
+                .singleton::<ResourceLoader>()
+                .load(&GString::from_str(path.as_str()).expect("path to be a valid GString"))
                 .expect("packed scene to load"),
         };
 
@@ -206,10 +206,7 @@ fn spawn_scene(
 
         match scene.parent {
             Some(parent_id) => {
-                let mut parent = Gd::<Node>::try_from_instance_id(parent_id.instance_id())
-                    .unwrap_or_else(|_| {
-                        panic!("failed to get parent node for instance_id {:?}", parent_id)
-                    });
+                let mut parent = godot.get::<Node>(parent_id);
                 parent.add_child(&instance);
             }
             None => {

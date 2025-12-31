@@ -113,15 +113,15 @@ fn load_assets(mut commands: Commands, server: Res<AssetServer>) {
 }
 
 /// Synchronize parameters from the container to Bevy resources
-#[main_thread_system]
 fn sync_container_params(
     mut particle_count: ResMut<ParticleCount>,
     mut config: ResMut<ParticleConfig>,
     mut simulation_state: ResMut<SimulationState>,
-    mut container_query: Query<&mut GodotNodeHandle, With<ParticleContainer>>,
+    container_query: Query<&GodotNodeHandle, With<ParticleContainer>>,
+    mut godot: GodotAccess,
 ) {
-    for mut handle in container_query.iter_mut() {
-        if let Some(mut particle_rain) = handle.try_get::<ParticleRain>() {
+    for handle in container_query.iter() {
+        if let Some(mut particle_rain) = godot.try_get::<ParticleRain>(*handle) {
             let rain_bind = particle_rain.bind();
 
             // Update simulation state
@@ -146,14 +146,14 @@ fn sync_container_params(
 }
 
 /// System that handles spawning and despawning particles
-#[main_thread_system]
 fn handle_particle_count(
     mut commands: Commands,
     mut particle_count: ResMut<ParticleCount>,
-    mut particles: Query<(Entity, &mut GodotNodeHandle), With<Particle>>,
+    mut particles: Query<(Entity, &GodotNodeHandle), With<Particle>>,
     simulation_state: Res<SimulationState>,
     config: Res<ParticleConfig>,
     particle_scene: Res<ParticleScene>,
+    mut godot: GodotAccess,
 ) {
     // Skip spawning/despawning if simulation isn't running
     if !simulation_state.is_running {
@@ -161,7 +161,7 @@ fn handle_particle_count(
     }
 
     // Count current particles
-    let current_count = particles.iter_mut().count() as i32;
+    let current_count = particles.iter().count() as i32;
     particle_count.current = current_count;
 
     let target_count = particle_count.target;
@@ -174,7 +174,7 @@ fn handle_particle_count(
     // Despawn excess particles if needed (increased batch size)
     else if current_count > target_count {
         let to_despawn = (current_count - target_count).min(100);
-        despawn_particles(&mut commands, to_despawn, &mut particles);
+        despawn_particles(&mut commands, to_despawn, &mut particles, &mut godot);
     }
 }
 
@@ -214,11 +214,12 @@ fn spawn_particles(
 fn despawn_particles(
     commands: &mut Commands,
     count: i32,
-    particles: &mut Query<(Entity, &mut GodotNodeHandle), With<Particle>>,
+    particles: &mut Query<(Entity, &GodotNodeHandle), With<Particle>>,
+    godot: &mut GodotAccess,
 ) {
     // Despawn each entity and free the Godot node
-    for (entity, mut handle) in particles.iter_mut().take(count as usize) {
-        if let Some(mut node) = handle.try_get::<GodotNode>() {
+    for (entity, handle) in particles.iter().take(count as usize) {
+        if let Some(mut node) = godot.try_get::<GodotNode>(*handle) {
             node.queue_free();
         }
         commands.entity(entity).despawn();
@@ -226,17 +227,17 @@ fn despawn_particles(
 }
 
 /// Update simulation state and manage cleanup on stop
-#[main_thread_system]
 fn stop_simulation(
     simulation_state: Res<SimulationState>,
     mut commands: Commands,
-    mut particles: Query<(Entity, &mut GodotNodeHandle), With<Particle>>,
+    particles: Query<(Entity, &GodotNodeHandle), With<Particle>>,
+    mut godot: GodotAccess,
 ) {
     // If simulation was just stopped, clean up all particles
-    if !simulation_state.is_running && particles.iter_mut().count() > 0 {
+    if !simulation_state.is_running && particles.iter().count() > 0 {
         // Queue all Godot nodes for deletion
-        for (entity, mut handle) in particles.iter_mut() {
-            if let Some(mut node) = handle.try_get::<GodotNode>() {
+        for (entity, handle) in particles.iter() {
+            if let Some(mut node) = godot.try_get::<GodotNode>(*handle) {
                 node.queue_free();
             }
             commands.entity(entity).despawn();
@@ -245,25 +246,25 @@ fn stop_simulation(
 }
 
 /// Colorize newly spawned particles
-#[main_thread_system]
 fn colorize_new_particles(
     mut commands: Commands,
-    mut new_particles: Query<(Entity, &mut GodotNodeHandle), With<NeedsColorization>>,
+    new_particles: Query<(Entity, &GodotNodeHandle), With<NeedsColorization>>,
+    mut godot: GodotAccess,
 ) {
-    for (entity, mut handle) in new_particles.iter_mut() {
+    for (entity, handle) in new_particles.iter() {
         // Generate random color (semi-transparent)
         let random_color =
             GodotColor::from_rgba(fastrand::f32(), fastrand::f32(), fastrand::f32(), 0.8);
 
         // Try different node structures
-        if let Some(mut node) = handle.try_get::<Node2D>() {
+        if let Some(mut node) = godot.try_get::<Node2D>(*handle) {
             // Check for Sprite child node
             if node.has_node("Sprite") {
                 let mut sprite = node.get_node_as::<Node2D>("Sprite");
                 sprite.set_modulate(random_color);
             }
             // If it's a Sprite2D directly, set its modulate
-            else if let Some(mut sprite) = handle.try_get::<godot::classes::Sprite2D>() {
+            else if let Some(mut sprite) = godot.try_get::<godot::classes::Sprite2D>(*handle) {
                 sprite.set_modulate(random_color);
             }
             // Fallback: set modulate on the main node

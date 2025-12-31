@@ -79,18 +79,18 @@ impl Plugin for PlayerPlugin {
 ///
 /// Runs in InputDetection set and can execute in parallel with other input systems.
 /// Only reads input and writes events, enabling better parallelization.
-#[main_thread_system]
 fn detect_player_input(
-    mut player: Query<&mut GodotNodeHandle, With<Player>>,
+    player: Query<&GodotNodeHandle, With<Player>>,
     mut input_events: MessageWriter<PlayerInputMessage>,
+    mut godot: GodotAccess,
 ) {
-    if let Ok(mut handle) = player.single_mut() {
+    if let Ok(handle) = player.single() {
         // Use try_get to handle case where Godot node might be invalid during scene transitions
-        let Some(character_body) = handle.try_get::<CharacterBody2D>() else {
+        let Some(character_body) = godot.try_get::<CharacterBody2D>(*handle) else {
             return; // Node is invalid, skip this frame
         };
 
-        let input = Input::singleton();
+        let input = godot.singleton::<Input>();
         let movement_direction = input.get_axis("move_left", "move_right");
         let jump_pressed = input.is_action_just_pressed("jump");
         let is_on_floor = character_body.is_on_floor();
@@ -109,16 +109,16 @@ fn detect_player_input(
 ///
 /// Runs in Movement set after input detection. Handles all physics calculations
 /// and movement execution separately from input detection.
-#[main_thread_system]
 fn apply_player_movement(
     mut input_events: MessageReader<PlayerInputMessage>,
-    mut player: Query<(&mut GodotNodeHandle, &Speed, &JumpVelocity, &Gravity), With<Player>>,
+    player: Query<(&GodotNodeHandle, &Speed, &JumpVelocity, &Gravity), With<Player>>,
     physics_delta: Res<PhysicsDelta>,
     mut sfx_events: MessageWriter<PlaySfxMessage>,
     mut movement_events: MessageWriter<PlayerMovementMessage>,
+    mut godot: GodotAccess,
 ) {
-    if let Ok((mut handle, speed, jump_velocity, gravity)) = player.single_mut() {
-        let Some(mut character_body) = handle.try_get::<CharacterBody2D>() else {
+    if let Ok((handle, speed, jump_velocity, gravity)) = player.single() {
+        let Some(mut character_body) = godot.try_get::<CharacterBody2D>(*handle) else {
             return; // Node is invalid, skip this frame
         };
 
@@ -175,13 +175,13 @@ fn apply_player_movement(
 ///
 /// Runs in Animation set after movement. Handles all animation state
 /// separately from physics and input.
-#[main_thread_system]
 fn update_player_animation(
     mut movement_events: MessageReader<PlayerMovementMessage>,
-    mut player: Query<&mut GodotNodeHandle, With<Player>>,
+    player: Query<&GodotNodeHandle, With<Player>>,
+    mut godot: GodotAccess,
 ) {
-    if let Ok(mut handle) = player.single_mut() {
-        let Some(character_body) = handle.try_get::<CharacterBody2D>() else {
+    if let Ok(handle) = player.single() {
+        let Some(character_body) = godot.try_get::<CharacterBody2D>(*handle) else {
             return; // Node is invalid, skip this frame
         };
 

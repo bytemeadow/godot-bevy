@@ -37,11 +37,18 @@ fn build_app(app: &mut App) {
 
 ```rust
 fn connect_button(
-    mut buttons: Query<&mut GodotNodeHandle, With<Button>>, 
+    buttons: Query<&GodotNodeHandle, With<Button>>,
     typed: TypedGodotSignals<StartGameRequested>,
+    mut godot: GodotAccess,
 ) {
-    for mut handle in &mut buttons {
-        typed.connect_map(&mut handle, "pressed", None, |_args, _node_id, _ent| Some(StartGameRequested));
+    for handle in &buttons {
+        typed.connect_map(
+            &mut godot,
+            *handle,
+            "pressed",
+            None,
+            |_args, _node_handle, _ent| Some(StartGameRequested),
+        );
     }
 }
 ```
@@ -62,7 +69,7 @@ Use one plugin per event type. You can map the same Godot signal to multiple typ
 
 ```rust
 #[derive(Message, Debug, Clone)] struct ToggleFullscreen;
-#[derive(Message, Debug, Clone)] struct QuitRequested { source: GodotNodeId }
+#[derive(Message, Debug, Clone)] struct QuitRequested { source: GodotNodeHandle }
 
 fn setup(app: &mut App) {
     app.add_plugins(GodotTypedSignalsPlugin::<ToggleFullscreen>::default())
@@ -70,21 +77,29 @@ fn setup(app: &mut App) {
 }
 
 fn connect_menu(
-    mut menu: Query<(&mut GodotNodeHandle, &MenuTag)>,
+    menu: Query<(&GodotNodeHandle, &MenuTag)>,
     toggle: TypedGodotSignals<ToggleFullscreen>,
     quit: TypedGodotSignals<QuitRequested>,
+    mut godot: GodotAccess,
 ) {
-    for (mut button, tag) in &mut menu {
+    for (button, tag) in &menu {
         match tag {
             MenuTag::Fullscreen => {
-                toggle.connect_map(&mut button, "pressed", None, |_a, _node_id, _e| Some(ToggleFullscreen));
+                toggle.connect_map(
+                    &mut godot,
+                    *button,
+                    "pressed",
+                    None,
+                    |_a, _node_handle, _e| Some(ToggleFullscreen),
+                );
             }
             MenuTag::Quit => {
                 quit.connect_map(
-                    &mut button,
+                    &mut godot,
+                    *button,
                     "pressed",
                     None,
-                    |_a, node_id, _e| Some(QuitRequested { source: node_id }),
+                    |_a, node_handle, _e| Some(QuitRequested { source: node_handle }),
                 );
             }
         }
@@ -97,10 +112,10 @@ fn connect_menu(
 The mapper closure receives:
 
 - `args: &[Variant]`: raw Godot arguments (clone if you need detailed parsing)
-- `node_id: GodotNodeId`: emitting node ID (use it to look up the entity later)
+- `node_handle: GodotNodeHandle`: emitting node handle (use it later with `GodotAccess`)
 - `entity: Option<Entity>`: Bevy entity if you passed `Some(entity)` to `connect_map`
 
-Important: the mapper runs inside the Godot signal callback. Do not call Godot APIs or `GodotNodeHandle::get/try_get` in the mapper; resolve `node_id` in a `#[main_thread_system]` using `NodeEntityIndex` + `Query<&mut GodotNodeHandle>`. See [Thread Safety and Godot APIs](../threading/index.md).
+Important: the mapper runs inside the Godot signal callback. Do not call Godot APIs in the mapper; resolve the `node_handle` in a system with `GodotAccess` on the main thread. See [Thread Safety and Godot APIs](../threading/index.md).
 
 Example adding the entity:
 
@@ -109,11 +124,18 @@ Example adding the entity:
 struct AreaExited(Entity);
 
 fn connect_area(
-    mut q: Query<(Entity, &mut GodotNodeHandle), With<Area2D>>, 
+    q: Query<(Entity, &GodotNodeHandle), With<Area2D>>,
     typed: TypedGodotSignals<AreaExited>,
+    mut godot: GodotAccess,
 ) {
-    for (entity, mut area) in &mut q {
-        typed.connect_map(&mut area, "body_exited", Some(entity), |_a, _node_id, e| Some(AreaExited(e.unwrap())));
+    for (entity, area) in &q {
+        typed.connect_map(
+            &mut godot,
+            *area,
+            "body_exited",
+            Some(entity),
+            |_a, _node_handle, e| Some(AreaExited(e.unwrap())),
+        );
     }
 }
 ```
@@ -134,7 +156,10 @@ fn spawn_area(mut commands: Commands) {
     commands.spawn((
         MyArea,
         // Defer until GodotNodeHandle is available on this entity
-        TypedDeferredSignalConnections::<BodyEntered>::with_connection("body_entered", |_a, _node_id, e| Some(BodyEntered(e.unwrap()))),
+        TypedDeferredSignalConnections::<BodyEntered>::with_connection(
+            "body_entered",
+            |_a, _node_handle, e| Some(BodyEntered(e.unwrap())),
+        ),
     ));
 }
 ```
@@ -150,9 +175,9 @@ The method arguments are similar to other typed signal constructors such as `con
   Argument supports the same syntax as [Node.get_node](https://docs.godotengine.org/en/stable/classes/class_node.html#class-node-method-get-node).
 * `signal_name` - Name of the Godot signal to connect (e.g., "pressed").
 * `mapper` - Closure that maps signal arguments to your typed message.
-  * The closure receives three arguments: `args`, `node_id`, and `entity`:
+  * The closure receives three arguments: `args`, `node_handle`, and `entity`:
     - `args: &[Variant]`: raw Godot arguments (clone if you need detailed parsing).
-    - `node_id: GodotNodeId`: emitting node ID.
+    - `node_handle: GodotNodeHandle`: emitting node handle.
     - `entity: Option<Entity>`: Bevy entity the GodotScene component is attached to (Always Some).
   * The closure returns an optional Bevy Message, or None to not send the message.
 
@@ -176,7 +201,7 @@ impl Command for SpawnPickup {
                     .with_signal_connection(
                         "Area2D",
                         "area_entered",
-                        |_args, _node_id, _entity| {
+                        |_args, _node_handle, _entity| {
                             // Pickup "area_entered" signal mapped
                             Some(PickupAreaEntered)
                         },
@@ -192,8 +217,14 @@ impl Command for SpawnPickup {
 The legacy API (`GodotSignals`, `GodotSignal`, `connect_godot_signal`) remains available but is deprecated. Prefer the typed API above. Minimal usage for migration:
 
 ```rust
-fn connect_legacy(mut q: Query<&mut GodotNodeHandle, With<Button>>, legacy: GodotSignals) {
-    for mut handle in &mut q { legacy.connect(&mut handle, "pressed"); }
+fn connect_legacy(
+    q: Query<&GodotNodeHandle, With<Button>>,
+    legacy: GodotSignals,
+    mut godot: GodotAccess,
+) {
+    for handle in &q {
+        legacy.connect(&mut godot, *handle, "pressed");
+    }
 }
 
 fn read_legacy(mut ev: MessageReader<GodotSignal>) {

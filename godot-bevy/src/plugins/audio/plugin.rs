@@ -1,12 +1,11 @@
 //! Main audio plugin and systems
-use crate::interop::GodotNodeHandle;
+use crate::interop::{GodotAccess, GodotNodeHandle};
 use crate::plugins::assets::GodotResource;
 use crate::plugins::audio::{
     ActiveTween, AudioChannel, AudioChannelMarker, AudioCommand, AudioOutput, AudioPlayerType,
     AudioSettings, ChannelId, ChannelState, MainAudioTrack, PlayCommand, SoundId, TweenType,
 };
 use crate::plugins::scene_tree::SceneTreeRef;
-use crate::prelude::main_thread_system;
 use bevy_app::{App, Plugin, Update};
 use bevy_asset::Assets;
 use bevy_ecs::prelude::Resource;
@@ -70,6 +69,7 @@ fn process_channel_commands<T: AudioChannelMarker>(
     mut audio_output: ResMut<AudioOutput>,
     mut assets: ResMut<Assets<GodotResource>>,
     mut scene_tree: SceneTreeRef,
+    mut godot: GodotAccess,
 ) {
     // Process all commands from this channel's queue
     let mut commands = channel.commands.write();
@@ -77,7 +77,13 @@ fn process_channel_commands<T: AudioChannelMarker>(
         match command {
             AudioCommand::Play(play_cmd) => {
                 let sound_id =
-                    process_play_command(play_cmd, &mut assets, &mut scene_tree, &mut audio_output);
+                    process_play_command(
+                        play_cmd,
+                        &mut assets,
+                        &mut scene_tree,
+                        &mut audio_output,
+                        &mut godot,
+                    );
                 if sound_id.is_none() {
                     // Asset not ready, re-queue for next frame
                     // Note: We need to re-create the command since play_cmd was consumed
@@ -113,33 +119,53 @@ fn process_channel_commands<T: AudioChannelMarker>(
                 } else {
                     // Immediate stop
                     for sound_id in sound_ids {
-                        audio_output.stop_sound(sound_id);
+                        audio_output.stop_sound(sound_id, &mut godot);
                     }
                 }
                 trace!("Processed stop command for channel: {:?}", channel_id);
             }
             AudioCommand::Pause(channel_id, _tween) => {
-                apply_to_channel_sounds(&mut audio_output, channel_id, |output, sound_id| {
-                    output.pause_sound(sound_id);
-                });
+                apply_to_channel_sounds(
+                    &mut audio_output,
+                    channel_id,
+                    &mut godot,
+                    |output, sound_id, godot| {
+                        output.pause_sound(sound_id, godot);
+                    },
+                );
                 trace!("Paused channel: {:?}", channel_id);
             }
             AudioCommand::Resume(channel_id, _tween) => {
-                apply_to_channel_sounds(&mut audio_output, channel_id, |output, sound_id| {
-                    output.resume_sound(sound_id);
-                });
+                apply_to_channel_sounds(
+                    &mut audio_output,
+                    channel_id,
+                    &mut godot,
+                    |output, sound_id, godot| {
+                        output.resume_sound(sound_id, godot);
+                    },
+                );
                 trace!("Resumed channel: {:?}", channel_id);
             }
             AudioCommand::SetVolume(channel_id, volume, _tween) => {
-                apply_to_channel_sounds(&mut audio_output, channel_id, |output, sound_id| {
-                    output.set_sound_volume(sound_id, volume);
-                });
+                apply_to_channel_sounds(
+                    &mut audio_output,
+                    channel_id,
+                    &mut godot,
+                    |output, sound_id, godot| {
+                        output.set_sound_volume(sound_id, volume, godot);
+                    },
+                );
                 trace!("Set volume to {} for channel: {:?}", volume, channel_id);
             }
             AudioCommand::SetPitch(channel_id, pitch, _tween) => {
-                apply_to_channel_sounds(&mut audio_output, channel_id, |output, sound_id| {
-                    output.set_sound_pitch(sound_id, pitch);
-                });
+                apply_to_channel_sounds(
+                    &mut audio_output,
+                    channel_id,
+                    &mut godot,
+                    |output, sound_id, godot| {
+                        output.set_sound_pitch(sound_id, pitch, godot);
+                    },
+                );
                 trace!("Set pitch to {} for channel: {:?}", pitch, channel_id);
             }
             AudioCommand::SetPanning(_channel_id, _panning, _tween) => {
@@ -147,7 +173,7 @@ fn process_channel_commands<T: AudioChannelMarker>(
                 warn!("Panning not yet implemented for individual sounds");
             }
             AudioCommand::StopSound(sound_id, _tween) => {
-                audio_output.stop_sound(sound_id);
+                audio_output.stop_sound(sound_id, &mut godot);
                 trace!("Stopped sound: {:?}", sound_id);
             }
         }
@@ -155,9 +181,14 @@ fn process_channel_commands<T: AudioChannelMarker>(
 }
 
 /// Helper function to apply an operation to all sounds in a channel
-fn apply_to_channel_sounds<F>(output: &mut AudioOutput, channel_id: ChannelId, operation: F)
+fn apply_to_channel_sounds<F>(
+    output: &mut AudioOutput,
+    channel_id: ChannelId,
+    godot: &mut GodotAccess,
+    mut operation: F,
+)
 where
-    F: Fn(&mut AudioOutput, SoundId),
+    F: FnMut(&mut AudioOutput, SoundId, &mut GodotAccess),
 {
     let sound_ids: Vec<SoundId> = output
         .sound_to_channel
@@ -167,7 +198,7 @@ where
         .collect();
 
     for sound_id in sound_ids {
-        operation(output, sound_id);
+        operation(output, sound_id, godot);
     }
 }
 
@@ -177,6 +208,7 @@ fn process_play_command(
     assets: &mut Assets<GodotResource>,
     scene_tree: &mut SceneTreeRef,
     output: &mut AudioOutput,
+    godot: &mut GodotAccess,
 ) -> Option<SoundId> {
     let audio_stream = if let Some(asset) = assets.get_mut(&play_cmd.handle) {
         asset.try_cast::<AudioStream>()
@@ -216,15 +248,15 @@ fn process_play_command(
         }
     };
 
-    if let Some(mut handle) = player_handle {
+    if let Some(handle) = player_handle {
         if let Some(mut root) = scene_tree.get().get_root() {
             // Get the node from the handle and add it to the scene tree
-            let node = handle.get::<godot::classes::Node>();
+            let node = godot.get::<godot::classes::Node>(handle);
             root.add_child(&node);
         }
 
         // Now that the node is in the scene tree, start playback
-        start_audio_playback(&mut handle);
+        start_audio_playback(godot, handle);
 
         output.playing_sounds.insert(play_cmd.sound_id, handle);
         output
@@ -343,28 +375,27 @@ fn configure_looping(
     }
 }
 
-fn start_audio_playback(handle: &mut GodotNodeHandle) {
+fn start_audio_playback(godot: &mut GodotAccess, handle: GodotNodeHandle) {
     // Try each player type and start playback
-    if let Some(mut player) = handle.try_get::<AudioStreamPlayer>() {
+    if let Some(mut player) = godot.try_get::<AudioStreamPlayer>(handle) {
         player.play();
-    } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer2D>() {
+    } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
         player.play();
-    } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer3D>() {
+    } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
         player.play();
     }
 }
 
 /// System that cleans up finished sounds
-#[main_thread_system]
-fn cleanup_finished_sounds(mut audio_output: ResMut<AudioOutput>) {
+fn cleanup_finished_sounds(mut audio_output: ResMut<AudioOutput>, mut godot: GodotAccess) {
     let mut finished_sounds = Vec::new();
 
-    for (&sound_id, handle) in audio_output.playing_sounds.iter_mut() {
-        let is_playing = if let Some(player) = handle.try_get::<AudioStreamPlayer>() {
+    for (&sound_id, &handle) in audio_output.playing_sounds.iter() {
+        let is_playing = if let Some(player) = godot.try_get::<AudioStreamPlayer>(handle) {
             player.is_playing()
-        } else if let Some(player) = handle.try_get::<AudioStreamPlayer2D>() {
+        } else if let Some(player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
             player.is_playing()
-        } else if let Some(player) = handle.try_get::<AudioStreamPlayer3D>() {
+        } else if let Some(player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
             player.is_playing()
         } else {
             false // Player was freed
@@ -377,8 +408,8 @@ fn cleanup_finished_sounds(mut audio_output: ResMut<AudioOutput>) {
 
     for sound_id in finished_sounds {
         // First, remove the node from the scene tree and free it
-        if let Some(handle) = audio_output.playing_sounds.get_mut(&sound_id) {
-            remove_and_free_audio_node(handle);
+        if let Some(handle) = audio_output.playing_sounds.get(&sound_id).copied() {
+            remove_and_free_audio_node(&mut godot, handle);
         }
 
         // Then clean up our tracking
@@ -391,8 +422,8 @@ fn cleanup_finished_sounds(mut audio_output: ResMut<AudioOutput>) {
 }
 
 /// Helper function to remove an audio node from the scene tree and free it
-fn remove_and_free_audio_node(handle: &mut GodotNodeHandle) {
-    if let Some(mut node) = handle.try_get::<godot::classes::Node>() {
+fn remove_and_free_audio_node(godot: &mut GodotAccess, handle: GodotNodeHandle) {
+    if let Some(mut node) = godot.try_get::<godot::classes::Node>(handle) {
         // Remove from parent and queue for deletion
         if let Some(mut parent) = node.get_parent() {
             parent.remove_child(&node);
@@ -403,8 +434,11 @@ fn remove_and_free_audio_node(handle: &mut GodotNodeHandle) {
 }
 
 /// System that updates active audio tweens
-#[main_thread_system]
-fn update_audio_tweens(mut audio_output: ResMut<AudioOutput>, time: Res<Time>) {
+fn update_audio_tweens(
+    mut audio_output: ResMut<AudioOutput>,
+    time: Res<Time>,
+    mut godot: GodotAccess,
+) {
     let delta = time.delta();
     let mut completed_tweens = Vec::new();
     let mut sounds_to_stop = Vec::new();
@@ -437,14 +471,14 @@ fn update_audio_tweens(mut audio_output: ResMut<AudioOutput>, time: Res<Time>) {
 
     // Second pass: apply parameter changes to audio players
     for (sound_id, volume) in volume_updates {
-        if let Some(handle) = audio_output.playing_sounds.get_mut(&sound_id) {
+        if let Some(handle) = audio_output.playing_sounds.get(&sound_id).copied() {
             let volume_db = volume_to_db(volume);
 
-            if let Some(mut player) = handle.try_get::<AudioStreamPlayer>() {
+            if let Some(mut player) = godot.try_get::<AudioStreamPlayer>(handle) {
                 player.set_volume_db(volume_db);
-            } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer2D>() {
+            } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
                 player.set_volume_db(volume_db);
-            } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer3D>() {
+            } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
                 player.set_volume_db(volume_db);
             }
 
@@ -454,12 +488,12 @@ fn update_audio_tweens(mut audio_output: ResMut<AudioOutput>, time: Res<Time>) {
     }
 
     for (sound_id, pitch) in pitch_updates {
-        if let Some(handle) = audio_output.playing_sounds.get_mut(&sound_id) {
-            if let Some(mut player) = handle.try_get::<AudioStreamPlayer>() {
+        if let Some(handle) = audio_output.playing_sounds.get(&sound_id).copied() {
+            if let Some(mut player) = godot.try_get::<AudioStreamPlayer>(handle) {
                 player.set_pitch_scale(pitch);
-            } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer2D>() {
+            } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
                 player.set_pitch_scale(pitch);
-            } else if let Some(mut player) = handle.try_get::<AudioStreamPlayer3D>() {
+            } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
                 player.set_pitch_scale(pitch);
             }
         }
@@ -473,7 +507,7 @@ fn update_audio_tweens(mut audio_output: ResMut<AudioOutput>, time: Res<Time>) {
 
     // Stop sounds that finished fading out
     for sound_id in sounds_to_stop {
-        audio_output.stop_sound(sound_id);
+        audio_output.stop_sound(sound_id, &mut godot);
         trace!("Stopped sound after fade-out: {:?}", sound_id);
     }
 }

@@ -4,7 +4,7 @@ use godot::prelude::*;
 use std::sync::mpsc::Sender;
 
 use crate::{
-    interop::GodotNodeId,
+    interop::GodotNodeHandle,
     plugins::scene_tree::{SceneTreeMessage, SceneTreeMessageType},
 };
 
@@ -37,7 +37,7 @@ impl SceneTreeWatcher {
 
         if let Some(channel) = self.notification_channel.as_ref() {
             let _ = channel.send(SceneTreeMessage {
-                node_id: GodotNodeId::from(node.instance_id()),
+                node_id: GodotNodeHandle::from(node.instance_id()),
                 message_type,
                 node_type: None, // No type optimization in basic method
             });
@@ -59,7 +59,7 @@ impl SceneTreeWatcher {
 
         if let Some(channel) = self.notification_channel.as_ref() {
             let _ = channel.send(SceneTreeMessage {
-                node_id: GodotNodeId::from(node.instance_id()),
+                node_id: GodotNodeHandle::from(node.instance_id()),
                 message_type,
                 node_type: Some(node_type), // Pre-analyzed type from GDScript
             });

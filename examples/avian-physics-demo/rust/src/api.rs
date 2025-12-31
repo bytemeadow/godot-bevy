@@ -9,7 +9,7 @@ use avian3d::prelude::{AngularVelocity, Collider, RigidBody};
 use bevy::asset::Handle;
 use bevy::prelude::{Added, Bundle, Commands, Component, Entity, Query, Transform, Vec3, debug};
 use godot::classes::{BoxMesh, CylinderMesh, MeshInstance3D};
-use godot_bevy::prelude::{GodotNodeHandle, GodotResource, GodotScene};
+use godot_bevy::prelude::{GodotAccess, GodotNodeHandle, GodotResource, GodotScene};
 
 /// Marker component that automatically adds an Avian collider based on the Godot mesh dimensions.
 /// Add this component to entities with a GodotScene, and when the GodotNodeHandle is ready,
@@ -30,14 +30,11 @@ pub struct ColliderFromGodotMesh;
 /// ```
 pub fn process_collider_from_godot_mesh(
     mut commands: Commands,
-    mut query: Query<(
-        Entity,
-        &mut GodotNodeHandle,
-        &ColliderFromGodotMesh,
-    ), Added<GodotNodeHandle>>,
+    query: Query<(Entity, &GodotNodeHandle, &ColliderFromGodotMesh), Added<GodotNodeHandle>>,
+    mut godot: GodotAccess,
 ) {
-    for (entity, mut node_handle, _marker) in query.iter_mut() {
-        if let Some(mesh_instance) = node_handle.try_get::<MeshInstance3D>()
+    for (entity, node_handle, _marker) in query.iter() {
+        if let Some(mesh_instance) = godot.try_get::<MeshInstance3D>(*node_handle)
             && let Some(mesh) = mesh_instance.get_mesh()
         {
             // Try BoxMesh
