@@ -110,7 +110,7 @@ fn spawn_mob(
             GodotScene::from_handle(assets.mob_scn.clone()).with_signal_connection(
                 MobNodes::VISIBILITY_NOTIFIER_PATH,
                 VisibleOnScreenNotifier2DSignals::SCREEN_EXITED,
-                |_args, _handle, entity| {
+                |_args, _node_id, entity| {
                     Some(MobScreenExited {
                         entity: entity.expect("entity was provided"),
                     })

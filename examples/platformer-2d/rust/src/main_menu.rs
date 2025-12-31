@@ -9,7 +9,7 @@ use bevy::{
         message::{MessageReader, MessageWriter},
         resource::Resource,
         schedule::IntoScheduleConfigs,
-        system::{Res, ResMut},
+        system::{Query, Res, ResMut},
     },
     log::{debug, info},
     state::{
@@ -23,9 +23,9 @@ use godot_bevy::prelude::*;
 
 #[derive(Resource, Default)]
 pub struct MenuAssets {
-    pub start_button: Option<GodotNodeHandle>,
-    pub fullscreen_button: Option<GodotNodeHandle>,
-    pub quit_button: Option<GodotNodeHandle>,
+    pub start_button: Option<GodotNodeId>,
+    pub fullscreen_button: Option<GodotNodeId>,
+    pub quit_button: Option<GodotNodeId>,
     pub initialized: bool,
     pub signals_connected: bool,
 }
@@ -79,9 +79,9 @@ fn init_menu_assets(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTr
         match MenuUi::from_node(root) {
             Ok(menu_ui) => {
                 info!("MainMenu: Successfully found menu nodes");
-                menu_assets.start_button = Some(menu_ui.start_button.clone());
-                menu_assets.fullscreen_button = Some(menu_ui.fullscreen_button.clone());
-                menu_assets.quit_button = Some(menu_ui.quit_button.clone());
+                menu_assets.start_button = Some(menu_ui.start_button.id());
+                menu_assets.fullscreen_button = Some(menu_ui.fullscreen_button.id());
+                menu_assets.quit_button = Some(menu_ui.quit_button.id());
                 menu_assets.initialized = true;
             }
             Err(_) => {
@@ -114,11 +114,14 @@ struct ToggleFullscreenRequested;
 
 #[derive(Message, Debug, Clone)]
 struct QuitRequested {
-    source: GodotNodeHandle,
+    source: GodotNodeId,
 }
 
+#[main_thread_system]
 fn connect_buttons(
     mut menu_assets: ResMut<MenuAssets>,
+    node_index: Res<NodeEntityIndex>,
+    mut nodes: Query<&mut GodotNodeHandle>,
     // Typed bridges for precise events
     typed_start: TypedGodotSignals<StartGameRequested>,
     typed_fullscreen: TypedGodotSignals<ToggleFullscreenRequested>,
@@ -130,22 +133,33 @@ fn connect_buttons(
         && menu_assets.quit_button.is_some()
         && !menu_assets.signals_connected
     {
-        // Get mutable references one at a time to avoid multiple borrows
-        if let Some(start_btn) = menu_assets.start_button.as_mut() {
-            typed_start.connect_map(start_btn, "pressed", None, |_args, _node, _ent| {
+        if let Some(start_id) = menu_assets.start_button
+            && let Some(entity) = node_index.get(start_id.instance_id())
+            && let Ok(mut handle) = nodes.get_mut(entity)
+        {
+            typed_start.connect_map(&mut handle, "pressed", None, |_args, _node_id, _ent| {
                 Some(StartGameRequested)
             });
         }
-        if let Some(fullscreen_btn) = menu_assets.fullscreen_button.as_mut() {
-            typed_fullscreen.connect_map(fullscreen_btn, "pressed", None, |_args, _node, _ent| {
-                Some(ToggleFullscreenRequested)
-            });
+
+        if let Some(fullscreen_id) = menu_assets.fullscreen_button
+            && let Some(entity) = node_index.get(fullscreen_id.instance_id())
+            && let Ok(mut handle) = nodes.get_mut(entity)
+        {
+            typed_fullscreen.connect_map(
+                &mut handle,
+                "pressed",
+                None,
+                |_args, _node_id, _ent| Some(ToggleFullscreenRequested),
+            );
         }
-        if let Some(quit_btn) = menu_assets.quit_button.as_mut() {
-            typed_quit.connect_map(quit_btn, "pressed", None, |_args, node, _ent| {
-                Some(QuitRequested {
-                    source: node.clone(),
-                })
+
+        if let Some(quit_id) = menu_assets.quit_button
+            && let Some(entity) = node_index.get(quit_id.instance_id())
+            && let Ok(mut handle) = nodes.get_mut(entity)
+        {
+            typed_quit.connect_map(&mut handle, "pressed", None, |_args, node_id, _ent| {
+                Some(QuitRequested { source: node_id })
             });
         }
 
@@ -157,6 +171,8 @@ fn connect_buttons(
 #[main_thread_system]
 fn listen_for_button_press(
     _menu_assets: Res<MenuAssets>,
+    node_index: Res<NodeEntityIndex>,
+    mut nodes: Query<&mut GodotNodeHandle>,
     mut start_ev: MessageReader<StartGameRequested>,
     mut toggle_ev: MessageReader<ToggleFullscreenRequested>,
     mut quit_ev: MessageReader<QuitRequested>,
@@ -182,7 +198,9 @@ fn listen_for_button_press(
 
     for ev in quit_ev.read() {
         println!("Quit button pressed (typed)");
-        if let Some(button) = ev.source.clone().try_get::<Button>()
+        if let Some(entity) = node_index.get(ev.source.instance_id())
+            && let Ok(mut handle) = nodes.get_mut(entity)
+            && let Some(button) = handle.try_get::<Button>()
             && let Some(mut tree) = button.get_tree()
         {
             tree.quit();

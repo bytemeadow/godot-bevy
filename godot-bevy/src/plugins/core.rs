@@ -49,7 +49,7 @@ use godot::{classes::Node, obj::Gd};
 use tracing::debug;
 
 /// Function that adds a component to an entity with access to the Godot node
-type ComponentInserter = Box<dyn Fn(&mut EntityCommands, &GodotNodeHandle) + Send + Sync>;
+type ComponentInserter = Box<dyn Fn(&mut EntityCommands, &mut GodotNodeHandle) + Send + Sync>;
 
 /// Registry for components that should be added to entities spawned from the scene tree
 #[derive(Resource, Default)]
@@ -72,7 +72,7 @@ impl SceneTreeComponentRegistry {
             return;
         }
 
-        let inserter = Box::new(|entity: &mut EntityCommands, _node: &GodotNodeHandle| {
+        let inserter = Box::new(|entity: &mut EntityCommands, _node: &mut GodotNodeHandle| {
             entity.insert(C::default());
         });
         self.components.push((type_id, inserter));
@@ -82,7 +82,7 @@ impl SceneTreeComponentRegistry {
     pub fn register_with_init<C, F>(&mut self, init_fn: F)
     where
         C: Component,
-        F: Fn(&mut EntityCommands, &GodotNodeHandle) + Send + Sync + 'static,
+        F: Fn(&mut EntityCommands, &mut GodotNodeHandle) + Send + Sync + 'static,
     {
         let type_id = TypeId::of::<C>();
 
@@ -96,7 +96,7 @@ impl SceneTreeComponentRegistry {
     }
 
     /// Add all registered components to an entity
-    pub fn add_to_entity(&self, entity: &mut EntityCommands, node: &GodotNodeHandle) {
+    pub fn add_to_entity(&self, entity: &mut EntityCommands, node: &mut GodotNodeHandle) {
         for (_, inserter) in &self.components {
             inserter(entity, node);
         }
@@ -114,7 +114,7 @@ pub trait AppSceneTreeExt {
     fn register_scene_tree_component_with_init<C, F>(&mut self, init_fn: F) -> &mut Self
     where
         C: Component,
-        F: Fn(&mut EntityCommands, &GodotNodeHandle) + Send + Sync + 'static;
+        F: Fn(&mut EntityCommands, &mut GodotNodeHandle) + Send + Sync + 'static;
 }
 
 impl AppSceneTreeExt for App {
@@ -141,7 +141,7 @@ impl AppSceneTreeExt for App {
     fn register_scene_tree_component_with_init<C, F>(&mut self, init_fn: F) -> &mut Self
     where
         C: Component,
-        F: Fn(&mut EntityCommands, &GodotNodeHandle) + Send + Sync + 'static,
+        F: Fn(&mut EntityCommands, &mut GodotNodeHandle) + Send + Sync + 'static,
     {
         // Get or create the registry
         if !self

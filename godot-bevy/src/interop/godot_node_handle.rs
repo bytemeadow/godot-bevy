@@ -4,7 +4,29 @@ use godot::{
     obj::{Gd, Inherits, InstanceId},
 };
 
-#[derive(Debug, Component, Clone, PartialEq, Eq)]
+/// Opaque identifier for a Godot node (safe to pass across threads).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct GodotNodeId(InstanceId);
+
+impl GodotNodeId {
+    pub fn instance_id(self) -> InstanceId {
+        self.0
+    }
+}
+
+impl From<InstanceId> for GodotNodeId {
+    fn from(instance_id: InstanceId) -> Self {
+        Self(instance_id)
+    }
+}
+
+impl From<GodotNodeId> for InstanceId {
+    fn from(node_id: GodotNodeId) -> Self {
+        node_id.0
+    }
+}
+
+#[derive(Debug, Component, PartialEq, Eq)]
 pub struct GodotNodeHandle {
     instance_id: InstanceId,
 }
@@ -38,11 +60,21 @@ impl GodotNodeHandle {
         }
     }
 
+    pub fn id(&self) -> GodotNodeId {
+        GodotNodeId(self.instance_id)
+    }
+
     pub fn instance_id(&self) -> InstanceId {
         self.instance_id
     }
 
     pub fn from_instance_id(instance_id: InstanceId) -> Self {
         Self { instance_id }
+    }
+
+    pub fn from_id(node_id: GodotNodeId) -> Self {
+        Self {
+            instance_id: node_id.instance_id(),
+        }
     }
 }

@@ -187,7 +187,7 @@ fn spawn_character_with_signals(mut commands: Commands, assets: Res<CharacterAss
                     VisibleOnScreenNotifier2DSignals::SCREEN_EXITED,
                     
                     // Closure to turn a Godot signal into a Bevy message:
-                    |_args, _handle, entity| {
+                    |_args, _node_id, entity| {
                         Some(CharacterScreenExited {
                             entity: entity.expect("entity was provided"),
                         })

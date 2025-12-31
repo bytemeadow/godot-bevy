@@ -25,8 +25,8 @@ pub enum HudUpdateMessage {
 
 #[derive(Resource, Default)]
 pub struct HudHandles {
-    pub current_level_label: Option<GodotNodeHandle>,
-    pub gems_label: Option<GodotNodeHandle>,
+    pub current_level_label: Option<GodotNodeId>,
+    pub gems_label: Option<GodotNodeId>,
 }
 
 impl HudHandles {
@@ -79,8 +79,8 @@ fn setup_hud_on_level_loaded(
         // Try to get HUD node handles - this is the only SceneTreeRef access in HUD
         let root = scene_tree.get().get_root().unwrap();
         let mut hud_ui = HudUi::from_node(root).unwrap();
-        hud_handles.current_level_label = Some(hud_ui.current_level_label.clone());
-        hud_handles.gems_label = Some(hud_ui.gems_label.clone());
+        hud_handles.current_level_label = Some(hud_ui.current_level_label.id());
+        hud_handles.gems_label = Some(hud_ui.gems_label.id());
 
         // Set the current level label immediately
         hud_ui
@@ -116,13 +116,17 @@ fn generate_hud_update_events(
 fn handle_hud_update_events(
     mut hud_events: MessageReader<HudUpdateMessage>,
     hud_handles: Res<HudHandles>,
+    node_index: Res<NodeEntityIndex>,
+    mut nodes: Query<&mut GodotNodeHandle>,
 ) {
     for event in hud_events.read() {
         match event {
             HudUpdateMessage::GemsChanged(gem_count) => {
-                if let Some(gems_label) = &hud_handles.gems_label {
-                    let mut label_handle = gems_label.clone();
-                    label_handle
+                if let Some(node_id) = hud_handles.gems_label
+                    && let Some(entity) = node_index.get(node_id.instance_id())
+                    && let Ok(mut handle) = nodes.get_mut(entity)
+                {
+                    handle
                         .get::<Label>()
                         .set_text(&format!("Gems: {gem_count}"));
                 }

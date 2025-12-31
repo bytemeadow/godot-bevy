@@ -1,6 +1,6 @@
-use crate::interop::GodotNodeHandle;
 use crate::plugins::core::PrePhysicsUpdate;
 use crate::plugins::scene_tree::NodeEntityIndex;
+use crate::interop::{GodotNodeHandle, GodotNodeId};
 use bevy_app::{App, Plugin};
 use bevy_ecs::prelude::ReflectComponent;
 use bevy_ecs::{
@@ -35,8 +35,8 @@ pub struct CollisionMessageReader(pub Receiver<CollisionMessage>);
 #[derive(Debug, Message)]
 pub struct CollisionMessage {
     pub event_type: CollisionMessageType,
-    pub origin: GodotNodeHandle,
-    pub target: GodotNodeHandle,
+    pub origin: GodotNodeId,
+    pub target: GodotNodeId,
 }
 
 impl Plugin for GodotCollisionsPlugin {

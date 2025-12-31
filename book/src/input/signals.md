@@ -41,7 +41,7 @@ fn connect_button(
     typed: TypedGodotSignals<StartGameRequested>,
 ) {
     for mut handle in &mut buttons {
-        typed.connect_map(&mut handle, "pressed", None, |_args, _node, _ent| Some(StartGameRequested));
+        typed.connect_map(&mut handle, "pressed", None, |_args, _node_id, _ent| Some(StartGameRequested));
     }
 }
 ```
@@ -62,7 +62,7 @@ Use one plugin per event type. You can map the same Godot signal to multiple typ
 
 ```rust
 #[derive(Message, Debug, Clone)] struct ToggleFullscreen;
-#[derive(Message, Debug, Clone)] struct QuitRequested { source: GodotNodeHandle }
+#[derive(Message, Debug, Clone)] struct QuitRequested { source: GodotNodeId }
 
 fn setup(app: &mut App) {
     app.add_plugins(GodotTypedSignalsPlugin::<ToggleFullscreen>::default())
@@ -77,10 +77,15 @@ fn connect_menu(
     for (mut button, tag) in &mut menu {
         match tag {
             MenuTag::Fullscreen => {
-                toggle.connect_map(&mut button, "pressed", None, |_a, _n, _e| Some(ToggleFullscreen));
+                toggle.connect_map(&mut button, "pressed", None, |_a, _node_id, _e| Some(ToggleFullscreen));
             }
             MenuTag::Quit => {
-                quit.connect_map(&mut button, "pressed", None, |_a, n, _e| Some(QuitRequested { source: n.clone() }));
+                quit.connect_map(
+                    &mut button,
+                    "pressed",
+                    None,
+                    |_a, node_id, _e| Some(QuitRequested { source: node_id }),
+                );
             }
         }
     }
@@ -92,10 +97,10 @@ fn connect_menu(
 The mapper closure receives:
 
 - `args: &[Variant]`: raw Godot arguments (clone if you need detailed parsing)
-- `node: &GodotNodeHandle`: emitting node; you can read ID-related data (like `node.instance_id()`), but do not call `get/try_get` in the mapper
+- `node_id: GodotNodeId`: emitting node ID (use it to look up the entity later)
 - `entity: Option<Entity>`: Bevy entity if you passed `Some(entity)` to `connect_map`
 
-Important: the mapper runs inside the Godot signal callback. Do not call Godot APIs or `GodotNodeHandle::get/try_get` in the mapper. Cloning the handle to obtain `&mut` is not safe and defeats the thread-safety model; send `InstanceId` or `Entity` in your message and resolve it in a `#[main_thread_system]`. See [Thread Safety and Godot APIs](../threading/index.md).
+Important: the mapper runs inside the Godot signal callback. Do not call Godot APIs or `GodotNodeHandle::get/try_get` in the mapper; resolve `node_id` in a `#[main_thread_system]` using `NodeEntityIndex` + `Query<&mut GodotNodeHandle>`. See [Thread Safety and Godot APIs](../threading/index.md).
 
 Example adding the entity:
 
@@ -108,7 +113,7 @@ fn connect_area(
     typed: TypedGodotSignals<AreaExited>,
 ) {
     for (entity, mut area) in &mut q {
-        typed.connect_map(&mut area, "body_exited", Some(entity), |_a, _n, e| Some(AreaExited(e.unwrap())));
+        typed.connect_map(&mut area, "body_exited", Some(entity), |_a, _node_id, e| Some(AreaExited(e.unwrap())));
     }
 }
 ```
@@ -129,7 +134,7 @@ fn spawn_area(mut commands: Commands) {
     commands.spawn((
         MyArea,
         // Defer until GodotNodeHandle is available on this entity
-        TypedDeferredSignalConnections::<BodyEntered>::with_connection("body_entered", |_a, _n, e| Some(BodyEntered(e.unwrap()))),
+        TypedDeferredSignalConnections::<BodyEntered>::with_connection("body_entered", |_a, _node_id, e| Some(BodyEntered(e.unwrap()))),
     ));
 }
 ```
@@ -145,9 +150,9 @@ The method arguments are similar to other typed signal constructors such as `con
   Argument supports the same syntax as [Node.get_node](https://docs.godotengine.org/en/stable/classes/class_node.html#class-node-method-get-node).
 * `signal_name` - Name of the Godot signal to connect (e.g., "pressed").
 * `mapper` - Closure that maps signal arguments to your typed message.
-  * The closure receives three arguments: `args`, `node_handle`, and `entity`:
+  * The closure receives three arguments: `args`, `node_id`, and `entity`:
     - `args: &[Variant]`: raw Godot arguments (clone if you need detailed parsing).
-    - `node_handle: &GodotNodeHandle`: emitting node; clone into your event if useful.
+    - `node_id: GodotNodeId`: emitting node ID.
     - `entity: Option<Entity>`: Bevy entity the GodotScene component is attached to (Always Some).
   * The closure returns an optional Bevy Message, or None to not send the message.
 
@@ -171,7 +176,7 @@ impl Command for SpawnPickup {
                     .with_signal_connection(
                         "Area2D",
                         "area_entered",
-                        |_args, _handle, _entity| {
+                        |_args, _node_id, _entity| {
                             // Pickup "area_entered" signal mapped
                             Some(PickupAreaEntered)
                         },

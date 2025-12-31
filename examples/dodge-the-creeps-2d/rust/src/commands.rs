@@ -65,17 +65,17 @@ pub enum UIElement {
 /// Resource to hold UI element handles
 #[derive(Resource, Default)]
 pub struct UIHandles {
-    pub start_button: Option<GodotNodeHandle>,
-    pub score_label: Option<GodotNodeHandle>,
-    pub message_label: Option<GodotNodeHandle>,
+    pub start_button: Option<GodotNodeId>,
+    pub score_label: Option<GodotNodeId>,
+    pub message_label: Option<GodotNodeId>,
 }
 
 impl UIHandles {
-    pub fn get_handle(&self, element: &UIElement) -> Option<&GodotNodeHandle> {
+    pub fn get_id(&self, element: &UIElement) -> Option<GodotNodeId> {
         match element {
-            UIElement::StartButton => self.start_button.as_ref(),
-            UIElement::ScoreLabel => self.score_label.as_ref(),
-            UIElement::MessageLabel => self.message_label.as_ref(),
+            UIElement::StartButton => self.start_button,
+            UIElement::ScoreLabel => self.score_label,
+            UIElement::MessageLabel => self.message_label,
         }
     }
 }
@@ -167,28 +167,39 @@ impl Plugin for CommandSystemPlugin {
 
 /// Main thread system that processes UI commands
 #[main_thread_system]
-fn process_ui_commands(mut ui_commands: MessageReader<UICommand>, ui_handles: Res<UIHandles>) {
+fn process_ui_commands(
+    mut ui_commands: MessageReader<UICommand>,
+    ui_handles: Res<UIHandles>,
+    node_index: Res<NodeEntityIndex>,
+    mut nodes: Query<&mut GodotNodeHandle>,
+) {
     use godot::classes::{Button, Label};
 
     for command in ui_commands.read() {
         match command {
             UICommand::SetText { target, text } => {
-                if let Some(handle) = ui_handles.get_handle(target)
-                    && let Some(mut label) = handle.clone().try_get::<Label>()
+                if let Some(node_id) = ui_handles.get_id(target)
+                    && let Some(entity) = node_index.get(node_id.instance_id())
+                    && let Ok(mut handle) = nodes.get_mut(entity)
+                    && let Some(mut label) = handle.try_get::<Label>()
                 {
                     label.set_text(text);
                 }
             }
             UICommand::SetVisible { target, visible } => {
-                if let Some(handle) = ui_handles.get_handle(target)
-                    && let Some(mut button) = handle.clone().try_get::<Button>()
+                if let Some(node_id) = ui_handles.get_id(target)
+                    && let Some(entity) = node_index.get(node_id.instance_id())
+                    && let Ok(mut handle) = nodes.get_mut(entity)
+                    && let Some(mut button) = handle.try_get::<Button>()
                 {
                     button.set_visible(*visible);
                 }
             }
             UICommand::ShowMessage { text } => {
-                if let Some(handle) = ui_handles.get_handle(&UIElement::MessageLabel)
-                    && let Some(mut label) = handle.clone().try_get::<Label>()
+                if let Some(node_id) = ui_handles.get_id(&UIElement::MessageLabel)
+                    && let Some(entity) = node_index.get(node_id.instance_id())
+                    && let Ok(mut handle) = nodes.get_mut(entity)
+                    && let Some(mut label) = handle.try_get::<Label>()
                 {
                     label.set_text(text);
                 }

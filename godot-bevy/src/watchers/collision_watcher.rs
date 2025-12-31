@@ -4,7 +4,7 @@ use godot::prelude::*;
 use std::sync::mpsc::Sender;
 
 use crate::{
-    interop::GodotNodeHandle,
+    interop::GodotNodeId,
     plugins::collisions::{CollisionMessage, CollisionMessageType},
 };
 
@@ -37,8 +37,8 @@ impl CollisionWatcher {
         if let Some(channel) = self.notification_channel.as_ref() {
             let _ = channel.send(CollisionMessage {
                 event_type,
-                origin: GodotNodeHandle::from_instance_id(origin_node.instance_id()),
-                target: GodotNodeHandle::from_instance_id(colliding_body.instance_id()),
+                origin: GodotNodeId::from(origin_node.instance_id()),
+                target: GodotNodeId::from(colliding_body.instance_id()),
             });
         }
     }

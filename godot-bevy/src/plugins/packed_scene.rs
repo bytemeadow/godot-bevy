@@ -6,7 +6,7 @@ use crate::plugins::signals::{
 };
 use crate::plugins::transforms::IntoGodotTransform2D;
 use crate::prelude::main_thread_system;
-use crate::{interop::GodotNodeHandle, plugins::transforms::IntoGodotTransform};
+use crate::{interop::{GodotNodeHandle, GodotNodeId}, plugins::transforms::IntoGodotTransform};
 use bevy_app::{App, Plugin, PostUpdate};
 use bevy_asset::{Assets, Handle};
 use bevy_ecs::message::Message;
@@ -22,7 +22,7 @@ use godot::prelude::Variant;
 use godot::{
     builtin::GString,
     classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader},
-    obj::Singleton,
+    obj::{Gd, Singleton},
 };
 use std::str::FromStr;
 use tracing::error;
@@ -45,7 +45,7 @@ impl Plugin for GodotPackedScenePlugin {
 #[derive(Debug, Component)]
 pub struct GodotScene {
     resource: GodotSceneResource,
-    parent: Option<GodotNodeHandle>,
+    parent: Option<GodotNodeId>,
     deferred_signal_connections: Vec<Box<dyn DeferredSignalConnection>>,
 }
 
@@ -80,7 +80,7 @@ impl GodotScene {
     }
 
     /// Set the parent node for this scene when spawned.
-    pub fn with_parent(mut self, parent: GodotNodeHandle) -> Self {
+    pub fn with_parent(mut self, parent: GodotNodeId) -> Self {
         self.parent = Some(parent);
         self
     }
@@ -98,9 +98,9 @@ impl GodotScene {
     ///   Argument supports the same syntax as [Node.get_node](https://docs.godotengine.org/en/stable/classes/class_node.html#class-node-method-get-node).
     /// * `signal_name` - Name of the Godot signal to connect (e.g., "pressed").
     /// * `mapper` - Closure that maps signal arguments to your typed message.
-    ///   * The closure receives three arguments: `args`, `node_handle`, and `entity`:
+    ///   * The closure receives three arguments: `args`, `node_id`, and `entity`:
     ///     - `args: &[Variant]`: raw Godot arguments (clone if you need detailed parsing).
-    ///     - `node_handle: &GodotNodeHandle`: emitting node; clone into your event if useful.
+    ///     - `node_id: GodotNodeId`: emitting node ID.
     ///     - `entity: Option<Entity>`: Bevy entity the GodotScene component is attached to (Always Some).
     ///   * The closure returns an optional Bevy Message, or None to not send the message.
     ///
@@ -112,7 +112,7 @@ impl GodotScene {
     ///     GodotScene::from_handle(scene).with_signal_connection::<MyMessage>(
     ///         "VBox/MyButton",
     ///         "pressed",
-    ///         |args, _node, _entity| {
+    ///         |args, _node_id, _entity| {
     ///             Some(MyMessage::from_args(args))
     ///         }
     ///     )
@@ -126,7 +126,7 @@ impl GodotScene {
     ) -> Self
     where
         T: Message + Send + std::fmt::Debug + 'static,
-        F: Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
+        F: Fn(&[Variant], GodotNodeId, Option<Entity>) -> Option<T> + Send + Sync + 'static,
     {
         self.deferred_signal_connections
             .push(Box::new(SignalConnectionSpec {
@@ -204,9 +204,12 @@ fn spawn_scene(
             }
         }
 
-        match &mut scene.parent {
-            Some(parent) => {
-                let mut parent = parent.get::<Node>();
+        match scene.parent {
+            Some(parent_id) => {
+                let mut parent = Gd::<Node>::try_from_instance_id(parent_id.instance_id())
+                    .unwrap_or_else(|_| {
+                        panic!("failed to get parent node for instance_id {:?}", parent_id)
+                    });
                 parent.add_child(&instance);
             }
             None => {

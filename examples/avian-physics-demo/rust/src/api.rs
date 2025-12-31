@@ -30,11 +30,14 @@ pub struct ColliderFromGodotMesh;
 /// ```
 pub fn process_collider_from_godot_mesh(
     mut commands: Commands,
-    query: Query<(Entity, &GodotNodeHandle, &ColliderFromGodotMesh), Added<GodotNodeHandle>>,
+    mut query: Query<(
+        Entity,
+        &mut GodotNodeHandle,
+        &ColliderFromGodotMesh,
+    ), Added<GodotNodeHandle>>,
 ) {
-    for (entity, node_handle, _marker) in query.iter() {
-        let mut node_handle_mut = node_handle.clone();
-        if let Some(mesh_instance) = node_handle_mut.try_get::<MeshInstance3D>()
+    for (entity, mut node_handle, _marker) in query.iter_mut() {
+        if let Some(mesh_instance) = node_handle.try_get::<MeshInstance3D>()
             && let Some(mesh) = mesh_instance.get_mesh()
         {
             // Try BoxMesh

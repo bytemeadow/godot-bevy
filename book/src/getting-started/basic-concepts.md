@@ -227,7 +227,7 @@ fn spawn_enemy(
 ) {
     commands.spawn((
         GodotScene::from_handle(enemy_scene.0.clone())
-            .with_parent(enemy_spawner.into_inner().clone()),
+            .with_parent(enemy_spawner.into_inner().id()),
         Enemy { health: 100 },
         Transform::default(),
     ));
