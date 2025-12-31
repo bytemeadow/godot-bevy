@@ -97,7 +97,7 @@ When not using defaults, you can individually select:
 - `GodotAssetsPlugin` - Asset loading through Bevy
 - `GodotTransformSyncPlugin` - Transform synchronization
 - `GodotCollisionsPlugin` - Collision detection
-- `GodotSignalsPlugin` - Signal event bridge
+- `GodotTypedSignalsPlugin::<T>` - Typed signal bridge (add one per message type)
 - `BevyInputBridgePlugin` - Bevy input API
 - `GodotAudioPlugin` - Audio system
 - `GodotPackedScenePlugin` - Scene spawning

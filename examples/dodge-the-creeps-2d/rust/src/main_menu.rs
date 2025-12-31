@@ -81,12 +81,10 @@ struct StartGameRequested;
 
 fn connect_start_button(
     menu_assets: Res<MenuAssets>,
-    mut godot: GodotAccess,
     typed: TypedGodotSignals<StartGameRequested>,
 ) {
     if let Some(handle) = menu_assets.start_button {
         typed.connect_map(
-            &mut godot,
             handle,
             "pressed",
             None,

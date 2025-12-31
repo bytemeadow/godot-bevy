@@ -38,12 +38,6 @@ pub use crate::plugins::{
         TransformSyncMetadata, TransformSyncMode, add_transform_sync_systems,
     },
 };
-
-// Legacy re-exports (deprecated). Keep available for downstreams while avoiding warnings here.
-#[allow(deprecated)]
-pub use crate::plugins::signals::{
-    GodotSignal, GodotSignals, GodotSignalsPlugin, connect_godot_signal,
-};
 pub use bevy_ecs::prelude as bevy_ecs_prelude;
 pub use godot::prelude as godot_prelude;
 pub use godot_bevy_macros::*;

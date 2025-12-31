@@ -49,7 +49,6 @@ cargo build --release --manifest-path examples/{example}/rust/Cargo.toml
 
 **Watchers** (`godot-bevy/src/watchers/`): Thread-safe event bridges:
 - `SceneTreeWatcher` - Monitors Godot scene tree changes
-- `GodotSignalWatcher` - Converts Godot signals to Bevy events  
 - `GodotInputWatcher` - Bridges Godot input events to Bevy
 
 ### Plugin Architecture
@@ -62,7 +61,7 @@ cargo build --release --manifest-path examples/{example}/rust/Cargo.toml
 - **Individual plugins**: 
   - `GodotTransformSyncPlugin` (move/position nodes from Bevy)
   - `GodotAudioPlugin` (play sounds/music from Bevy) 
-  - `GodotSignalsPlugin` (respond to Godot signals in Bevy)
+  - `GodotTypedSignalsPlugin::<T>` (respond to Godot signals in Bevy)
   - `GodotCollisionsPlugin` (detect collisions in Bevy)
   - `GodotInputEventPlugin` (handle input from Godot)
   - `BevyInputBridgePlugin` (use Bevy's input API)
@@ -121,8 +120,8 @@ Examples are structured as workspace members with separate Rust crates. Each exa
 
 **Transform Synchronization**: Automatic synchronization between Bevy `Transform` components and Godot node transforms. You can select for this synchronization to be disabled, just sync Bevy Transforms to Godot Transforms, or sync bi-directionally.
 
-**Signal Integration**: Godot signals become Bevy events via `MessageReader<GodotSignal>`, enabling ECS systems to
-respond to UI interactions and game events.
+**Signal Integration**: Godot signals become typed Bevy messages via `GodotTypedSignalsPlugin::<T>` and `MessageReader<T>`,
+enabling ECS systems to respond to UI interactions and game events.
 
 **Node Queries**: Query Godot nodes directly from Bevy systems using `Query<&mut GodotNodeHandle>` and cast to specific Godot types.
 

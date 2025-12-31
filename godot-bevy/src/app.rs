@@ -4,7 +4,6 @@ use crate::plugins::{
     core::{PhysicsDelta, PhysicsUpdate},
     input::InputEventReader,
     scene_tree::SceneTreeMessageReader,
-    signals::{GodotSignalReader, GodotSignalSender},
 };
 use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
@@ -65,14 +64,6 @@ impl BevyApp {
         scene_tree_watcher.set_name("SceneTreeWatcher");
         self.base_mut().add_child(&scene_tree_watcher);
         app.insert_non_send_resource(SceneTreeMessageReader(receiver));
-    }
-
-    fn register_signal_system(&mut self, app: &mut App) {
-        let (sender, receiver) = channel();
-        // Create channel for Godot signals and insert as resources
-        // Signals are connected directly using closures in the signals module
-        app.insert_non_send_resource(GodotSignalSender(sender));
-        app.insert_non_send_resource(GodotSignalReader(receiver));
     }
 
     fn register_input_event_watcher(&mut self, app: &mut App) {
@@ -228,12 +219,6 @@ impl INode for BevyApp {
             .contains_resource::<Messages<CollisionMessage>>()
         {
             self.register_collision_watcher(&mut app);
-        }
-
-        // Signal plugin check
-        use crate::plugins::signals::GodotSignal;
-        if app.world().contains_resource::<Messages<GodotSignal>>() {
-            self.register_signal_system(&mut app);
         }
 
         // Input event plugin check - check for KeyboardInput as a marker

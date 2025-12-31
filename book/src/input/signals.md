@@ -11,7 +11,6 @@ This page focuses on the typed signals API (recommended). A legacy API remains a
 - [Passing Context (Node, Entity, Arguments)](#passing-context-node-entity-arguments)
 - [Deferred Connections](#deferred-connections)
 - [Attaching signals to Godot scenes](#attaching-signals-to-godot-scenes)
-- [Untyped Legacy API (Deprecated)](#untyped-legacy-api-deprecated)
 
 ## Quick Start
 
@@ -39,11 +38,9 @@ fn build_app(app: &mut App) {
 fn connect_button(
     buttons: Query<&GodotNodeHandle, With<Button>>,
     typed: TypedGodotSignals<StartGameRequested>,
-    mut godot: GodotAccess,
 ) {
     for handle in &buttons {
         typed.connect_map(
-            &mut godot,
             *handle,
             "pressed",
             None,
@@ -80,13 +77,11 @@ fn connect_menu(
     menu: Query<(&GodotNodeHandle, &MenuTag)>,
     toggle: TypedGodotSignals<ToggleFullscreen>,
     quit: TypedGodotSignals<QuitRequested>,
-    mut godot: GodotAccess,
 ) {
     for (button, tag) in &menu {
         match tag {
             MenuTag::Fullscreen => {
                 toggle.connect_map(
-                    &mut godot,
                     *button,
                     "pressed",
                     None,
@@ -95,7 +90,6 @@ fn connect_menu(
             }
             MenuTag::Quit => {
                 quit.connect_map(
-                    &mut godot,
                     *button,
                     "pressed",
                     None,
@@ -115,7 +109,7 @@ The mapper closure receives:
 - `node_handle: GodotNodeHandle`: emitting node handle (use it later with `GodotAccess`)
 - `entity: Option<Entity>`: Bevy entity if you passed `Some(entity)` to `connect_map`
 
-Important: the mapper runs inside the Godot signal callback. Do not call Godot APIs in the mapper; resolve the `node_handle` in a system with `GodotAccess` on the main thread. See [Thread Safety and Godot APIs](../threading/index.md).
+Important: the mapper runs inside the Godot signal callback. Do not call Godot APIs in the mapper; resolve the `node_handle` in a system with `GodotAccess` on the main thread. Connections are queued and applied on the main thread; connections made during a frame take effect on the next frame. If you need same-frame connection, use `connect_map_immediate` with a `GodotAccess` parameter. See [Thread Safety and Godot APIs](../threading/index.md).
 
 Example adding the entity:
 
@@ -126,11 +120,9 @@ struct AreaExited(Entity);
 fn connect_area(
     q: Query<(Entity, &GodotNodeHandle), With<Area2D>>,
     typed: TypedGodotSignals<AreaExited>,
-    mut godot: GodotAccess,
 ) {
     for (entity, area) in &q {
         typed.connect_map(
-            &mut godot,
             *area,
             "body_exited",
             Some(entity),
@@ -208,28 +200,6 @@ impl Command for SpawnPickup {
                 ),
             );
         }
-    }
-}
-```
-
-## Untyped Legacy API (Deprecated)
-
-The legacy API (`GodotSignals`, `GodotSignal`, `connect_godot_signal`) remains available but is deprecated. Prefer the typed API above. Minimal usage for migration:
-
-```rust
-fn connect_legacy(
-    q: Query<&GodotNodeHandle, With<Button>>,
-    legacy: GodotSignals,
-    mut godot: GodotAccess,
-) {
-    for handle in &q {
-        legacy.connect(&mut godot, *handle, "pressed");
-    }
-}
-
-fn read_legacy(mut ev: MessageReader<GodotSignal>) {
-    for s in ev.read() {
-        if s.name == "pressed" { /* ... */ }
     }
 }
 ```

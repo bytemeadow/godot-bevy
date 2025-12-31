@@ -120,7 +120,6 @@ struct QuitRequested {
 
 fn connect_buttons(
     mut menu_assets: ResMut<MenuAssets>,
-    mut godot: GodotAccess,
     // Typed bridges for precise events
     typed_start: TypedGodotSignals<StartGameRequested>,
     typed_fullscreen: TypedGodotSignals<ToggleFullscreenRequested>,
@@ -134,7 +133,6 @@ fn connect_buttons(
     {
         if let Some(start_handle) = menu_assets.start_button {
             typed_start.connect_map(
-                &mut godot,
                 start_handle,
                 "pressed",
                 None,
@@ -144,7 +142,6 @@ fn connect_buttons(
 
         if let Some(fullscreen_handle) = menu_assets.fullscreen_button {
             typed_fullscreen.connect_map(
-                &mut godot,
                 fullscreen_handle,
                 "pressed",
                 None,
@@ -154,7 +151,6 @@ fn connect_buttons(
 
         if let Some(quit_handle) = menu_assets.quit_button {
             typed_quit.connect_map(
-                &mut godot,
                 quit_handle,
                 "pressed",
                 None,

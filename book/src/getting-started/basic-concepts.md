@@ -176,13 +176,14 @@ fn setup(
 
 ### Reacting to Signals
 ```rust
+#[derive(Message, Debug, Clone)]
+struct ButtonPressed;
+
 fn handle_button_press(
-    mut events: MessageReader<GodotSignal>,
+    mut events: MessageReader<ButtonPressed>,
 ) {
-    for signal in events.read() {
-        if signal.name == "pressed" {
-            // Button was pressed!
-        }
+    for _ in events.read() {
+        // Button was pressed!
     }
 }
 ```
