@@ -9,12 +9,13 @@ use crate::plugins::scene_tree::SceneTreeRef;
 use bevy_app::{App, Plugin, Update};
 use bevy_asset::Assets;
 use bevy_ecs::prelude::Resource;
+use bevy_ecs::schedule::{IntoScheduleConfigs, SystemSet};
 use bevy_ecs::system::{Res, ResMut};
 use bevy_math::{Vec2, Vec3};
 use bevy_time::Time;
 use godot::classes::{AudioStream, AudioStreamPlayer, AudioStreamPlayer2D, AudioStreamPlayer3D};
 use godot::obj::NewAlloc;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use thiserror::Error;
 use tracing::{trace, warn};
 
@@ -23,12 +24,30 @@ use tracing::{trace, warn};
 #[derive(Default)]
 pub struct GodotAudioPlugin;
 
+#[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum AudioSystemSet {
+    CollectCommands,
+    ProcessCommands,
+}
+
 impl Plugin for GodotAudioPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<GodotAudioChannels>()
             .init_resource::<AudioOutput>()
             .add_audio_channel::<MainAudioTrack>()
-            .add_systems(Update, (cleanup_finished_sounds, update_audio_tweens));
+            .configure_sets(
+                Update,
+                AudioSystemSet::ProcessCommands.after(AudioSystemSet::CollectCommands),
+            )
+            .add_systems(
+                Update,
+                process_audio_commands.in_set(AudioSystemSet::ProcessCommands),
+            )
+            .add_systems(
+                Update,
+                (cleanup_finished_sounds, update_audio_tweens)
+                    .after(AudioSystemSet::ProcessCommands),
+            );
     }
 }
 
@@ -36,7 +55,7 @@ impl Plugin for GodotAudioPlugin {
 #[derive(Resource, Default)]
 pub struct GodotAudioChannels {
     pub(crate) channels: HashMap<ChannelId, ChannelState>,
-    pub(crate) command_queue: Vec<AudioCommand>,
+    pub(crate) command_queue: VecDeque<AudioCommand>,
 }
 
 /// Extension trait for App to add audio channels with automatic system registration
@@ -49,7 +68,10 @@ impl AudioApp for App {
         let channel_id = ChannelId(T::CHANNEL_NAME);
 
         // Auto-register a dedicated system for this channel type
-        self.add_systems(Update, process_channel_commands::<T>);
+        self.add_systems(
+            Update,
+            process_channel_commands::<T>.in_set(AudioSystemSet::CollectCommands),
+        );
 
         self.insert_resource(AudioChannel::<T>::new(channel_id));
 
@@ -66,28 +88,38 @@ impl AudioApp for App {
 /// Dedicated system for processing commands from a specific channel type
 fn process_channel_commands<T: AudioChannelMarker>(
     channel: Res<AudioChannel<T>>,
+    mut audio_channels: ResMut<GodotAudioChannels>,
+) {
+    // Collect commands into the global queue so a single system can apply Godot calls.
+    let mut commands = channel.commands.write();
+    while let Some(command) = commands.pop_front() {
+        audio_channels.command_queue.push_back(command);
+    }
+}
+
+/// System that applies queued audio commands using Godot APIs.
+fn process_audio_commands(
+    mut audio_channels: ResMut<GodotAudioChannels>,
     mut audio_output: ResMut<AudioOutput>,
     mut assets: ResMut<Assets<GodotResource>>,
     mut scene_tree: SceneTreeRef,
     mut godot: GodotAccess,
 ) {
-    // Process all commands from this channel's queue
-    let mut commands = channel.commands.write();
-    while let Some(command) = commands.pop_front() {
+    while let Some(command) = audio_channels.command_queue.pop_front() {
         match command {
             AudioCommand::Play(play_cmd) => {
-                let sound_id =
-                    process_play_command(
-                        play_cmd,
-                        &mut assets,
-                        &mut scene_tree,
-                        &mut audio_output,
-                        &mut godot,
-                    );
-                if sound_id.is_none() {
+                if process_play_command(
+                    &play_cmd,
+                    &mut assets,
+                    &mut scene_tree,
+                    &mut audio_output,
+                    &mut godot,
+                )
+                .is_none()
+                {
                     // Asset not ready, re-queue for next frame
-                    // Note: We need to re-create the command since play_cmd was consumed
-                    warn!("Audio asset not ready, skipping for this frame");
+                    audio_channels.command_queue.push_front(AudioCommand::Play(play_cmd));
+                    warn!("Audio asset not ready, re-queued for next frame");
                     break; // Stop processing this frame to avoid infinite retry loop
                 }
             }
@@ -204,7 +236,7 @@ where
 
 /// Process a play command and return the sound ID if successful
 fn process_play_command(
-    play_cmd: PlayCommand,
+    play_cmd: &PlayCommand,
     assets: &mut Assets<GodotResource>,
     scene_tree: &mut SceneTreeRef,
     output: &mut AudioOutput,
@@ -238,13 +270,13 @@ fn process_play_command(
     initial_settings.volume = initial_volume;
 
     // Create appropriate player based on type
-    let player_handle = match play_cmd.player_type {
+    let player_handle = match &play_cmd.player_type {
         AudioPlayerType::NonPositional => create_audio_player(audio_stream, &initial_settings),
         AudioPlayerType::Spatial2D { position } => {
-            create_audio_player_2d(audio_stream, &initial_settings, position)
+            create_audio_player_2d(audio_stream, &initial_settings, *position)
         }
         AudioPlayerType::Spatial3D { position } => {
-            create_audio_player_3d(audio_stream, &initial_settings, position)
+            create_audio_player_3d(audio_stream, &initial_settings, *position)
         }
     };
 
