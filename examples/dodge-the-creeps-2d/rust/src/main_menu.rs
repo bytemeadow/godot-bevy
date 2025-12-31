@@ -63,7 +63,6 @@ fn init_menu_assets(
     mut menu_assets: ResMut<MenuAssets>,
     mut ui_handles: ResMut<UIHandles>,
     mut scene_tree: SceneTreeRef,
-    _godot: GodotAccess,
 ) {
     let menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap()).unwrap();
 

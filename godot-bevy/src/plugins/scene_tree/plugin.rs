@@ -328,7 +328,7 @@ fn find_node_by_name(parent: &Gd<Node>, name: &str) -> Option<Gd<Node>> {
     None
 }
 
-fn connect_scene_tree(mut scene_tree: SceneTreeRef, _godot: GodotAccess) {
+fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
     let mut scene_tree_gd = scene_tree.get();
     let root = scene_tree_gd.get_root().unwrap();
 

@@ -73,7 +73,6 @@ fn reset_menu_assets(mut menu_assets: ResMut<MenuAssets>) {
 fn init_menu_assets(
     mut menu_assets: ResMut<MenuAssets>,
     mut scene_tree: SceneTreeRef,
-    _godot: GodotAccess,
 ) {
     // Try to find menu nodes, but handle failure gracefully
     if let Some(root) = scene_tree.get().get_root() {
