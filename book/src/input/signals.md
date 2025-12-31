@@ -92,8 +92,10 @@ fn connect_menu(
 The mapper closure receives:
 
 - `args: &[Variant]`: raw Godot arguments (clone if you need detailed parsing)
-- `node: &GodotNodeHandle`: emitting node; clone into your event if useful
+- `node: &GodotNodeHandle`: emitting node; you can read ID-related data (like `node.instance_id()`), but do not call `get/try_get` in the mapper
 - `entity: Option<Entity>`: Bevy entity if you passed `Some(entity)` to `connect_map`
+
+Important: the mapper runs inside the Godot signal callback. Do not call Godot APIs or `GodotNodeHandle::get/try_get` in the mapper. Cloning the handle to obtain `&mut` is not safe and defeats the thread-safety model; send `InstanceId` or `Entity` in your message and resolve it in a `#[main_thread_system]`. See [Thread Safety and Godot APIs](../threading/index.md).
 
 Example adding the entity:
 

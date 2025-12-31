@@ -154,6 +154,13 @@ Understanding how data flows between Godot and Bevy is crucial:
 - Use Bevy's plugins and crates
 - Don't reinvent what already exists
 
+### 5. The Godot Boundary (Main Thread Only)
+- Any call into Godot (via `GodotNodeHandle::get/try_get`, `Gd<T>`, `Input::singleton`, etc.) must run on the main thread
+- Systems that call Godot APIs are forced onto the main thread and run sequentially, so keep them small and push heavy work to parallel systems
+- Bevy schedules by component type, not instance ID: any system with `Query<&mut GodotNodeHandle>` conflicts with any other system that also uses `&mut GodotNodeHandle`, even if you intend to work on different nodes
+- Treat `GodotNodeHandle` as an ID outside the main thread; resolve to `Gd<T>` only inside a `#[main_thread_system]`
+- See [Thread Safety and Godot APIs](../threading/index.md) for details and patterns
+
 ## Common Patterns
 
 ### Finding Nodes by Name
