@@ -3,7 +3,8 @@
 use crate::interop::{GodotAccess, GodotNodeHandle};
 use crate::plugins::audio::{AudioTween, ChannelId};
 use bevy_ecs::prelude::Resource;
-use godot::classes::{AudioStreamPlayer, AudioStreamPlayer2D, AudioStreamPlayer3D};
+use godot::classes::{AudioStreamPlayer, AudioStreamPlayer2D, AudioStreamPlayer3D, Node};
+use godot::obj::Gd;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
@@ -118,6 +119,77 @@ impl AudioOutput {
     }
 }
 
+pub(crate) enum AudioPlayer {
+    Stream(Gd<AudioStreamPlayer>),
+    Stream2D(Gd<AudioStreamPlayer2D>),
+    Stream3D(Gd<AudioStreamPlayer3D>),
+}
+
+impl AudioPlayer {
+    pub(crate) fn set_volume_db(&mut self, volume_db: f32) {
+        match self {
+            AudioPlayer::Stream(player) => player.set_volume_db(volume_db),
+            AudioPlayer::Stream2D(player) => player.set_volume_db(volume_db),
+            AudioPlayer::Stream3D(player) => player.set_volume_db(volume_db),
+        }
+    }
+
+    pub(crate) fn set_pitch_scale(&mut self, pitch: f32) {
+        match self {
+            AudioPlayer::Stream(player) => player.set_pitch_scale(pitch),
+            AudioPlayer::Stream2D(player) => player.set_pitch_scale(pitch),
+            AudioPlayer::Stream3D(player) => player.set_pitch_scale(pitch),
+        }
+    }
+
+    pub(crate) fn set_stream_paused(&mut self, paused: bool) {
+        match self {
+            AudioPlayer::Stream(player) => player.set_stream_paused(paused),
+            AudioPlayer::Stream2D(player) => player.set_stream_paused(paused),
+            AudioPlayer::Stream3D(player) => player.set_stream_paused(paused),
+        }
+    }
+
+    pub(crate) fn stop(&mut self) {
+        match self {
+            AudioPlayer::Stream(player) => player.stop(),
+            AudioPlayer::Stream2D(player) => player.stop(),
+            AudioPlayer::Stream3D(player) => player.stop(),
+        }
+    }
+
+    pub(crate) fn is_playing(&mut self) -> bool {
+        match self {
+            AudioPlayer::Stream(player) => player.is_playing(),
+            AudioPlayer::Stream2D(player) => player.is_playing(),
+            AudioPlayer::Stream3D(player) => player.is_playing(),
+        }
+    }
+
+    pub(crate) fn into_node(self) -> Gd<Node> {
+        match self {
+            AudioPlayer::Stream(player) => player.upcast(),
+            AudioPlayer::Stream2D(player) => player.upcast(),
+            AudioPlayer::Stream3D(player) => player.upcast(),
+        }
+    }
+}
+
+pub(crate) fn try_get_audio_player(
+    godot: &mut GodotAccess,
+    handle: GodotNodeHandle,
+) -> Option<AudioPlayer> {
+    if let Some(player) = godot.try_get::<AudioStreamPlayer>(handle) {
+        Some(AudioPlayer::Stream(player))
+    } else if let Some(player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
+        Some(AudioPlayer::Stream2D(player))
+    } else if let Some(player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
+        Some(AudioPlayer::Stream3D(player))
+    } else {
+        None
+    }
+}
+
 // ===== HELPER FUNCTIONS FOR DIRECT AUDIO CONTROL =====
 
 /// Convert linear volume (0.0-1.0) to decibels for Godot
@@ -131,63 +203,41 @@ fn volume_to_db(volume: f32) -> f32 {
 
 fn set_audio_player_volume(godot: &mut GodotAccess, handle: GodotNodeHandle, volume: f32) {
     let volume_db = volume_to_db(volume);
-    if let Some(mut player) = godot.try_get::<AudioStreamPlayer>(handle) {
-        player.set_volume_db(volume_db);
-    } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
-        player.set_volume_db(volume_db);
-    } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
+    if let Some(mut player) = try_get_audio_player(godot, handle) {
         player.set_volume_db(volume_db);
     }
 }
 
 fn set_audio_player_pitch(godot: &mut GodotAccess, handle: GodotNodeHandle, pitch: f32) {
-    if let Some(mut player) = godot.try_get::<AudioStreamPlayer>(handle) {
-        player.set_pitch_scale(pitch);
-    } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
-        player.set_pitch_scale(pitch);
-    } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
+    if let Some(mut player) = try_get_audio_player(godot, handle) {
         player.set_pitch_scale(pitch);
     }
 }
 
 fn pause_audio_player(godot: &mut GodotAccess, handle: GodotNodeHandle) {
-    if let Some(mut player) = godot.try_get::<AudioStreamPlayer>(handle) {
-        player.set_stream_paused(true);
-    } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
-        player.set_stream_paused(true);
-    } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
+    if let Some(mut player) = try_get_audio_player(godot, handle) {
         player.set_stream_paused(true);
     }
 }
 
 fn resume_audio_player(godot: &mut GodotAccess, handle: GodotNodeHandle) {
-    if let Some(mut player) = godot.try_get::<AudioStreamPlayer>(handle) {
-        player.set_stream_paused(false);
-    } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
-        player.set_stream_paused(false);
-    } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
+    if let Some(mut player) = try_get_audio_player(godot, handle) {
         player.set_stream_paused(false);
     }
 }
 
-fn stop_and_free_audio_player(godot: &mut GodotAccess, handle: GodotNodeHandle) {
-    // First stop the audio player
-    if let Some(mut player) = godot.try_get::<AudioStreamPlayer>(handle) {
-        player.stop();
-    } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
-        player.stop();
-    } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
-        player.stop();
-    }
+pub(crate) fn stop_and_free_audio_player(godot: &mut GodotAccess, handle: GodotNodeHandle) {
+    let Some(mut player) = try_get_audio_player(godot, handle) else {
+        return;
+    };
 
-    // Then remove from scene tree and free the node
-    if let Some(mut node) = godot.try_get::<godot::classes::Node>(handle) {
-        if let Some(mut parent) = node.get_parent() {
-            parent.remove_child(&node);
-        }
-        node.queue_free();
-        trace!("Removed and freed audio node from scene tree");
+    player.stop();
+    let mut node = player.into_node();
+    if let Some(mut parent) = node.get_parent() {
+        parent.remove_child(&node);
     }
+    node.queue_free();
+    trace!("Removed and freed audio node from scene tree");
 }
 
 impl ActiveTween {

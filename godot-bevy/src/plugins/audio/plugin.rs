@@ -5,6 +5,9 @@ use crate::plugins::audio::{
     ActiveTween, AudioChannel, AudioChannelMarker, AudioCommand, AudioOutput, AudioPlayerType,
     AudioSettings, ChannelId, ChannelState, MainAudioTrack, PlayCommand, SoundId, TweenType,
 };
+use crate::plugins::audio::output::{
+    AudioPlayer, stop_and_free_audio_player, try_get_audio_player,
+};
 use crate::plugins::scene_tree::SceneTreeRef;
 use bevy_app::{App, Plugin, Update};
 use bevy_asset::Assets;
@@ -41,12 +44,7 @@ impl Plugin for GodotAudioPlugin {
             )
             .add_systems(
                 Update,
-                process_audio_commands.in_set(AudioSystemSet::ProcessCommands),
-            )
-            .add_systems(
-                Update,
-                (cleanup_finished_sounds, update_audio_tweens)
-                    .after(AudioSystemSet::ProcessCommands),
+                audio_main_thread.in_set(AudioSystemSet::ProcessCommands),
             );
     }
 }
@@ -97,14 +95,25 @@ fn process_channel_commands<T: AudioChannelMarker>(
     }
 }
 
+#[derive(Default)]
+struct PendingSoundOps {
+    volume: Option<f32>,
+    pitch: Option<f32>,
+    paused: Option<bool>,
+}
+
 /// System that applies queued audio commands using Godot APIs.
-fn process_audio_commands(
+fn audio_main_thread(
     mut audio_channels: ResMut<GodotAudioChannels>,
     mut audio_output: ResMut<AudioOutput>,
     mut assets: ResMut<Assets<GodotResource>>,
     mut scene_tree: SceneTreeRef,
+    time: Res<Time>,
     mut godot: GodotAccess,
 ) {
+    let mut pending_ops: HashMap<SoundId, PendingSoundOps> = HashMap::new();
+    let mut pending_stops: Vec<(SoundId, GodotNodeHandle)> = Vec::new();
+
     while let Some(command) = audio_channels.command_queue.pop_front() {
         match command {
             AudioCommand::Play(play_cmd) => {
@@ -124,12 +133,7 @@ fn process_audio_commands(
                 }
             }
             AudioCommand::Stop(channel_id, tween) => {
-                let sound_ids: Vec<SoundId> = audio_output
-                    .sound_to_channel
-                    .iter()
-                    .filter(|(_, ch)| **ch == channel_id)
-                    .map(|(sound_id, _)| *sound_id)
-                    .collect();
+                let sound_ids = collect_channel_sound_ids(&audio_output, channel_id);
 
                 if let Some(tween) = tween {
                     // Implement fade-out tweening with real current volumes
@@ -151,53 +155,43 @@ fn process_audio_commands(
                 } else {
                     // Immediate stop
                     for sound_id in sound_ids {
-                        audio_output.stop_sound(sound_id, &mut godot);
+                        schedule_stop_sound(
+                            &mut audio_output,
+                            &mut pending_ops,
+                            &mut pending_stops,
+                            sound_id,
+                        );
                     }
                 }
                 trace!("Processed stop command for channel: {:?}", channel_id);
             }
             AudioCommand::Pause(channel_id, _tween) => {
-                apply_to_channel_sounds(
-                    &mut audio_output,
-                    channel_id,
-                    &mut godot,
-                    |output, sound_id, godot| {
-                        output.pause_sound(sound_id, godot);
-                    },
-                );
+                let sound_ids = collect_channel_sound_ids(&audio_output, channel_id);
+                for sound_id in sound_ids {
+                    pending_ops.entry(sound_id).or_default().paused = Some(true);
+                }
                 trace!("Paused channel: {:?}", channel_id);
             }
             AudioCommand::Resume(channel_id, _tween) => {
-                apply_to_channel_sounds(
-                    &mut audio_output,
-                    channel_id,
-                    &mut godot,
-                    |output, sound_id, godot| {
-                        output.resume_sound(sound_id, godot);
-                    },
-                );
+                let sound_ids = collect_channel_sound_ids(&audio_output, channel_id);
+                for sound_id in sound_ids {
+                    pending_ops.entry(sound_id).or_default().paused = Some(false);
+                }
                 trace!("Resumed channel: {:?}", channel_id);
             }
             AudioCommand::SetVolume(channel_id, volume, _tween) => {
-                apply_to_channel_sounds(
-                    &mut audio_output,
-                    channel_id,
-                    &mut godot,
-                    |output, sound_id, godot| {
-                        output.set_sound_volume(sound_id, volume, godot);
-                    },
-                );
+                let sound_ids = collect_channel_sound_ids(&audio_output, channel_id);
+                for sound_id in sound_ids {
+                    audio_output.current_volumes.insert(sound_id, volume);
+                    pending_ops.entry(sound_id).or_default().volume = Some(volume);
+                }
                 trace!("Set volume to {} for channel: {:?}", volume, channel_id);
             }
             AudioCommand::SetPitch(channel_id, pitch, _tween) => {
-                apply_to_channel_sounds(
-                    &mut audio_output,
-                    channel_id,
-                    &mut godot,
-                    |output, sound_id, godot| {
-                        output.set_sound_pitch(sound_id, pitch, godot);
-                    },
-                );
+                let sound_ids = collect_channel_sound_ids(&audio_output, channel_id);
+                for sound_id in sound_ids {
+                    pending_ops.entry(sound_id).or_default().pitch = Some(pitch);
+                }
                 trace!("Set pitch to {} for channel: {:?}", pitch, channel_id);
             }
             AudioCommand::SetPanning(_channel_id, _panning, _tween) => {
@@ -205,32 +199,148 @@ fn process_audio_commands(
                 warn!("Panning not yet implemented for individual sounds");
             }
             AudioCommand::StopSound(sound_id, _tween) => {
-                audio_output.stop_sound(sound_id, &mut godot);
+                schedule_stop_sound(
+                    &mut audio_output,
+                    &mut pending_ops,
+                    &mut pending_stops,
+                    sound_id,
+                );
                 trace!("Stopped sound: {:?}", sound_id);
             }
         }
     }
+
+    let delta = time.delta();
+    let mut completed_tweens = Vec::new();
+    let mut sounds_to_stop = Vec::new();
+    let mut volume_updates = Vec::new();
+    let mut pitch_updates = Vec::new();
+
+    // First pass: update tweens and collect parameter changes
+    for (&sound_id, tween) in audio_output.active_tweens.iter_mut() {
+        let current_value = tween.update(delta);
+
+        match tween.tween_type {
+            TweenType::Volume | TweenType::FadeOut => {
+                volume_updates.push((sound_id, current_value));
+            }
+            TweenType::Pitch => {
+                pitch_updates.push((sound_id, current_value));
+            }
+        }
+
+        if tween.is_complete() {
+            completed_tweens.push(sound_id);
+
+            // If this was a fade-out, mark sound for removal
+            if matches!(tween.tween_type, TweenType::FadeOut) {
+                sounds_to_stop.push(sound_id);
+            }
+        }
+    }
+
+    for (sound_id, volume) in volume_updates {
+        if audio_output.playing_sounds.contains_key(&sound_id) {
+            audio_output.current_volumes.insert(sound_id, volume);
+            pending_ops.entry(sound_id).or_default().volume = Some(volume);
+        }
+    }
+
+    for (sound_id, pitch) in pitch_updates {
+        if audio_output.playing_sounds.contains_key(&sound_id) {
+            pending_ops.entry(sound_id).or_default().pitch = Some(pitch);
+        }
+    }
+
+    for sound_id in completed_tweens {
+        audio_output.active_tweens.remove(&sound_id);
+        trace!("Completed tween for sound: {:?}", sound_id);
+    }
+
+    for sound_id in sounds_to_stop {
+        schedule_stop_sound(
+            &mut audio_output,
+            &mut pending_ops,
+            &mut pending_stops,
+            sound_id,
+        );
+        trace!("Stopped sound after fade-out: {:?}", sound_id);
+    }
+
+    for (sound_id, handle) in pending_stops {
+        stop_and_free_audio_player(&mut godot, handle);
+        trace!("Stopped sound: {:?}", sound_id);
+    }
+
+    let playing_sounds: Vec<(SoundId, GodotNodeHandle)> = audio_output
+        .playing_sounds
+        .iter()
+        .map(|(sound_id, handle)| (*sound_id, *handle))
+        .collect();
+
+    let mut finished_sounds = Vec::new();
+    for (sound_id, handle) in playing_sounds {
+        let Some(mut player) = try_get_audio_player(&mut godot, handle) else {
+            finished_sounds.push(sound_id);
+            continue;
+        };
+
+        if let Some(ops) = pending_ops.get(&sound_id) {
+            apply_pending_ops(&mut player, ops);
+        }
+
+        let is_playing = player.is_playing();
+        if !is_playing {
+            let mut node = player.into_node();
+            if let Some(mut parent) = node.get_parent() {
+                parent.remove_child(&node);
+            }
+            node.queue_free();
+            finished_sounds.push(sound_id);
+        }
+    }
+
+    for sound_id in finished_sounds {
+        audio_output.playing_sounds.remove(&sound_id);
+        audio_output.sound_to_channel.remove(&sound_id);
+        audio_output.active_tweens.remove(&sound_id);
+        audio_output.current_volumes.remove(&sound_id);
+        trace!("Cleaned up finished sound: {:?}", sound_id);
+    }
 }
 
-/// Helper function to apply an operation to all sounds in a channel
-fn apply_to_channel_sounds<F>(
-    output: &mut AudioOutput,
-    channel_id: ChannelId,
-    godot: &mut GodotAccess,
-    mut operation: F,
-)
-where
-    F: FnMut(&mut AudioOutput, SoundId, &mut GodotAccess),
-{
-    let sound_ids: Vec<SoundId> = output
+fn collect_channel_sound_ids(output: &AudioOutput, channel_id: ChannelId) -> Vec<SoundId> {
+    output
         .sound_to_channel
         .iter()
         .filter(|(_, ch)| **ch == channel_id)
         .map(|(sound_id, _)| *sound_id)
-        .collect();
+        .collect()
+}
 
-    for sound_id in sound_ids {
-        operation(output, sound_id, godot);
+fn schedule_stop_sound(
+    output: &mut AudioOutput,
+    pending_ops: &mut HashMap<SoundId, PendingSoundOps>,
+    pending_stops: &mut Vec<(SoundId, GodotNodeHandle)>,
+    sound_id: SoundId,
+) {
+    if let Some(handle) = output.playing_sounds.remove(&sound_id) {
+        output.sound_to_channel.remove(&sound_id);
+        output.current_volumes.remove(&sound_id);
+        pending_ops.remove(&sound_id);
+        pending_stops.push((sound_id, handle));
+    }
+}
+
+fn apply_pending_ops(player: &mut AudioPlayer, ops: &PendingSoundOps) {
+    if let Some(volume) = ops.volume {
+        player.set_volume_db(volume_to_db(volume));
+    }
+    if let Some(pitch) = ops.pitch {
+        player.set_pitch_scale(pitch);
+    }
+    if let Some(paused) = ops.paused {
+        player.set_stream_paused(paused);
     }
 }
 
@@ -415,132 +525,6 @@ fn start_audio_playback(godot: &mut GodotAccess, handle: GodotNodeHandle) {
         player.play();
     } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
         player.play();
-    }
-}
-
-/// System that cleans up finished sounds
-fn cleanup_finished_sounds(mut audio_output: ResMut<AudioOutput>, mut godot: GodotAccess) {
-    let mut finished_sounds = Vec::new();
-
-    for (&sound_id, &handle) in audio_output.playing_sounds.iter() {
-        let is_playing = if let Some(player) = godot.try_get::<AudioStreamPlayer>(handle) {
-            player.is_playing()
-        } else if let Some(player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
-            player.is_playing()
-        } else if let Some(player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
-            player.is_playing()
-        } else {
-            false // Player was freed
-        };
-
-        if !is_playing {
-            finished_sounds.push(sound_id);
-        }
-    }
-
-    for sound_id in finished_sounds {
-        // First, remove the node from the scene tree and free it
-        if let Some(handle) = audio_output.playing_sounds.get(&sound_id).copied() {
-            remove_and_free_audio_node(&mut godot, handle);
-        }
-
-        // Then clean up our tracking
-        audio_output.playing_sounds.remove(&sound_id);
-        audio_output.sound_to_channel.remove(&sound_id);
-        audio_output.active_tweens.remove(&sound_id);
-        audio_output.current_volumes.remove(&sound_id); // Clean up volume tracking
-        trace!("Cleaned up finished sound: {:?}", sound_id);
-    }
-}
-
-/// Helper function to remove an audio node from the scene tree and free it
-fn remove_and_free_audio_node(godot: &mut GodotAccess, handle: GodotNodeHandle) {
-    if let Some(mut node) = godot.try_get::<godot::classes::Node>(handle) {
-        // Remove from parent and queue for deletion
-        if let Some(mut parent) = node.get_parent() {
-            parent.remove_child(&node);
-        }
-        node.queue_free();
-        trace!("Removed and freed audio node from scene tree");
-    }
-}
-
-/// System that updates active audio tweens
-fn update_audio_tweens(
-    mut audio_output: ResMut<AudioOutput>,
-    time: Res<Time>,
-    mut godot: GodotAccess,
-) {
-    let delta = time.delta();
-    let mut completed_tweens = Vec::new();
-    let mut sounds_to_stop = Vec::new();
-    let mut volume_updates = Vec::new();
-    let mut pitch_updates = Vec::new();
-
-    // First pass: update tweens and collect parameter changes
-    for (&sound_id, tween) in audio_output.active_tweens.iter_mut() {
-        let current_value = tween.update(delta);
-
-        match tween.tween_type {
-            TweenType::Volume | TweenType::FadeOut => {
-                volume_updates.push((sound_id, current_value));
-            }
-            TweenType::Pitch => {
-                pitch_updates.push((sound_id, current_value));
-            }
-        }
-
-        // Check if tween is complete
-        if tween.is_complete() {
-            completed_tweens.push(sound_id);
-
-            // If this was a fade-out, mark sound for removal
-            if matches!(tween.tween_type, TweenType::FadeOut) {
-                sounds_to_stop.push(sound_id);
-            }
-        }
-    }
-
-    // Second pass: apply parameter changes to audio players
-    for (sound_id, volume) in volume_updates {
-        if let Some(handle) = audio_output.playing_sounds.get(&sound_id).copied() {
-            let volume_db = volume_to_db(volume);
-
-            if let Some(mut player) = godot.try_get::<AudioStreamPlayer>(handle) {
-                player.set_volume_db(volume_db);
-            } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
-                player.set_volume_db(volume_db);
-            } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
-                player.set_volume_db(volume_db);
-            }
-
-            // Track current volume for accurate fade-outs
-            audio_output.current_volumes.insert(sound_id, volume);
-        }
-    }
-
-    for (sound_id, pitch) in pitch_updates {
-        if let Some(handle) = audio_output.playing_sounds.get(&sound_id).copied() {
-            if let Some(mut player) = godot.try_get::<AudioStreamPlayer>(handle) {
-                player.set_pitch_scale(pitch);
-            } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
-                player.set_pitch_scale(pitch);
-            } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
-                player.set_pitch_scale(pitch);
-            }
-        }
-    }
-
-    // Remove completed tweens
-    for sound_id in completed_tweens {
-        audio_output.active_tweens.remove(&sound_id);
-        trace!("Completed tween for sound: {:?}", sound_id);
-    }
-
-    // Stop sounds that finished fading out
-    for sound_id in sounds_to_stop {
-        audio_output.stop_sound(sound_id, &mut godot);
-        trace!("Stopped sound after fade-out: {:?}", sound_id);
     }
 }
 
