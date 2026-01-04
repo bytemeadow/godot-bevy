@@ -7,13 +7,15 @@ use bevy_ecs::{
     component::Component,
     entity::Entity,
     message::{Message, MessageReader, MessageWriter, message_update_system},
+    prelude::Resource,
     schedule::IntoScheduleConfigs,
-    system::{NonSendMut, Query, Res},
+    system::{Query, Res},
 };
 use bevy_reflect::Reflect;
 use godot::obj::InstanceId;
 use godot::prelude::*;
 use std::collections::HashMap;
+use std::sync::Mutex;
 use std::sync::mpsc::Receiver;
 use tracing::trace;
 
@@ -29,8 +31,16 @@ pub const AREA_EXITED: &str = "area_exited";
 /// All collision signals that indicate collision start
 pub const COLLISION_START_SIGNALS: &[&str] = &[BODY_ENTERED, AREA_ENTERED];
 
-#[doc(hidden)]
-pub struct CollisionMessageReader(pub Receiver<CollisionMessage>);
+/// Resource for receiving collision messages from Godot.
+/// Wrapped in Mutex to be Send+Sync, allowing it to be a regular Bevy Resource.
+#[derive(Resource)]
+pub struct CollisionMessageReader(pub Mutex<Receiver<CollisionMessage>>);
+
+impl CollisionMessageReader {
+    pub fn new(receiver: Receiver<CollisionMessage>) -> Self {
+        Self(Mutex::new(receiver))
+    }
+}
 
 #[derive(Debug, Message)]
 pub struct CollisionMessage {
@@ -121,10 +131,11 @@ fn update_godot_collisions(
 }
 
 fn write_godot_collision_events(
-    events: NonSendMut<CollisionMessageReader>,
+    events: Res<CollisionMessageReader>,
     mut message_writer: MessageWriter<CollisionMessage>,
 ) {
-    message_writer.write_batch(events.0.try_iter());
+    let receiver = events.0.lock().unwrap_or_else(|e| e.into_inner());
+    message_writer.write_batch(receiver.try_iter());
 }
 
 #[cfg(test)]

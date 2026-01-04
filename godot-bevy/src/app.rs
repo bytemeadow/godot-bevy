@@ -63,7 +63,7 @@ impl BevyApp {
         scene_tree_watcher.bind_mut().notification_channel = Some(sender);
         scene_tree_watcher.set_name("SceneTreeWatcher");
         self.base_mut().add_child(&scene_tree_watcher);
-        app.insert_non_send_resource(SceneTreeMessageReader(receiver));
+        app.insert_resource(SceneTreeMessageReader::new(receiver));
     }
 
     fn register_input_event_watcher(&mut self, app: &mut App) {
@@ -86,7 +86,7 @@ impl BevyApp {
         collision_watcher.bind_mut().notification_channel = Some(sender);
         collision_watcher.set_name("CollisionWatcher");
         self.base_mut().add_child(&collision_watcher);
-        app.insert_non_send_resource(CollisionMessageReader(receiver));
+        app.insert_resource(CollisionMessageReader::new(receiver));
     }
 
     fn register_optimized_scene_tree_watcher(&mut self) {

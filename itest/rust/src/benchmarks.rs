@@ -380,7 +380,7 @@ fn setup_scene_tree_benchmark_app() -> (App, mpsc::Sender<SceneTreeMessage>) {
     app.add_plugins(GodotSceneTreePlugin::default());
 
     // Replace the message reader with our test channel
-    app.insert_non_send_resource(SceneTreeMessageReader(receiver));
+    app.insert_resource(SceneTreeMessageReader::new(receiver));
 
     (app, sender)
 }

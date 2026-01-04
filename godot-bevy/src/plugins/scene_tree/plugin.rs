@@ -29,6 +29,7 @@ use godot::{
 };
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::sync::Mutex;
 use tracing::{debug, trace, warn};
 
 /// A resource that maintains an O(1) lookup from Godot `InstanceId` to Bevy `Entity`.
@@ -499,14 +500,23 @@ impl From<Vec<String>> for Groups {
     }
 }
 
-#[doc(hidden)]
-pub struct SceneTreeMessageReader(pub std::sync::mpsc::Receiver<SceneTreeMessage>);
+/// Resource for receiving scene tree messages from Godot.
+/// Wrapped in Mutex to be Send+Sync, allowing it to be a regular Bevy Resource.
+#[derive(Resource)]
+pub struct SceneTreeMessageReader(pub Mutex<std::sync::mpsc::Receiver<SceneTreeMessage>>);
+
+impl SceneTreeMessageReader {
+    pub fn new(receiver: std::sync::mpsc::Receiver<SceneTreeMessage>) -> Self {
+        Self(Mutex::new(receiver))
+    }
+}
 
 fn write_scene_tree_messages(
-    message_reader: NonSendMut<SceneTreeMessageReader>,
+    message_reader: Res<SceneTreeMessageReader>,
     mut message_writer: MessageWriter<SceneTreeMessage>,
 ) {
-    message_writer.write_batch(message_reader.0.try_iter());
+    let receiver = message_reader.0.lock().unwrap_or_else(|e| e.into_inner());
+    message_writer.write_batch(receiver.try_iter());
 }
 
 /// Marks an entity so it is not despawned when its corresponding Godot Node is freed, breaking
