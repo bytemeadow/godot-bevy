@@ -11,7 +11,6 @@ This page focuses on the typed signals API (recommended). A legacy API remains a
 - [Passing Context (Node, Entity, Arguments)](#passing-context-node-entity-arguments)
 - [Deferred Connections](#deferred-connections)
 - [Attaching signals to Godot scenes](#attaching-signals-to-godot-scenes)
-- [Untyped Legacy API (Deprecated)](#untyped-legacy-api-deprecated)
 
 ## Quick Start
 
@@ -37,11 +36,16 @@ fn build_app(app: &mut App) {
 
 ```rust
 fn connect_button(
-    mut buttons: Query<&mut GodotNodeHandle, With<Button>>, 
+    buttons: Query<&GodotNodeHandle, With<Button>>,
     typed: TypedGodotSignals<StartGameRequested>,
 ) {
-    for mut handle in &mut buttons {
-        typed.connect_map(&mut handle, "pressed", None, |_args, _node, _ent| Some(StartGameRequested));
+    for handle in &buttons {
+        typed.connect_map(
+            *handle,
+            "pressed",
+            None,
+            |_args, _node_handle, _ent| Some(StartGameRequested),
+        );
     }
 }
 ```
@@ -70,17 +74,27 @@ fn setup(app: &mut App) {
 }
 
 fn connect_menu(
-    mut menu: Query<(&mut GodotNodeHandle, &MenuTag)>,
+    menu: Query<(&GodotNodeHandle, &MenuTag)>,
     toggle: TypedGodotSignals<ToggleFullscreen>,
     quit: TypedGodotSignals<QuitRequested>,
 ) {
-    for (mut button, tag) in &mut menu {
+    for (button, tag) in &menu {
         match tag {
             MenuTag::Fullscreen => {
-                toggle.connect_map(&mut button, "pressed", None, |_a, _n, _e| Some(ToggleFullscreen));
+                toggle.connect_map(
+                    *button,
+                    "pressed",
+                    None,
+                    |_a, _node_handle, _e| Some(ToggleFullscreen),
+                );
             }
             MenuTag::Quit => {
-                quit.connect_map(&mut button, "pressed", None, |_a, n, _e| Some(QuitRequested { source: n.clone() }));
+                quit.connect_map(
+                    *button,
+                    "pressed",
+                    None,
+                    |_a, node_handle, _e| Some(QuitRequested { source: node_handle }),
+                );
             }
         }
     }
@@ -92,10 +106,10 @@ fn connect_menu(
 The mapper closure receives:
 
 - `args: &[Variant]`: raw Godot arguments (clone if you need detailed parsing)
-- `node: &GodotNodeHandle`: emitting node; you can read ID-related data (like `node.instance_id()`), but do not call `get/try_get` in the mapper
+- `node_handle: GodotNodeHandle`: emitting node handle (use it later with `GodotAccess`)
 - `entity: Option<Entity>`: Bevy entity if you passed `Some(entity)` to `connect_map`
 
-Important: the mapper runs inside the Godot signal callback. Do not call Godot APIs or `GodotNodeHandle::get/try_get` in the mapper. Cloning the handle to obtain `&mut` is not safe and defeats the thread-safety model; send `InstanceId` or `Entity` in your message and resolve it in a `#[main_thread_system]`. See [Thread Safety and Godot APIs](../threading/index.md).
+Important: the mapper runs inside the Godot signal callback. Do not call Godot APIs in the mapper; resolve the `node_handle` in a system with `GodotAccess` on the main thread. Connections are queued and applied on the main thread; connections made during a frame take effect on the next frame. If you need same-frame connection, use `connect_map_immediate` with a `GodotAccess` parameter. See [Thread Safety and Godot APIs](../threading/index.md).
 
 Example adding the entity:
 
@@ -104,11 +118,16 @@ Example adding the entity:
 struct AreaExited(Entity);
 
 fn connect_area(
-    mut q: Query<(Entity, &mut GodotNodeHandle), With<Area2D>>, 
+    q: Query<(Entity, &GodotNodeHandle), With<Area2D>>,
     typed: TypedGodotSignals<AreaExited>,
 ) {
-    for (entity, mut area) in &mut q {
-        typed.connect_map(&mut area, "body_exited", Some(entity), |_a, _n, e| Some(AreaExited(e.unwrap())));
+    for (entity, area) in &q {
+        typed.connect_map(
+            *area,
+            "body_exited",
+            Some(entity),
+            |_a, _node_handle, e| Some(AreaExited(e.unwrap())),
+        );
     }
 }
 ```
@@ -129,7 +148,10 @@ fn spawn_area(mut commands: Commands) {
     commands.spawn((
         MyArea,
         // Defer until GodotNodeHandle is available on this entity
-        TypedDeferredSignalConnections::<BodyEntered>::with_connection("body_entered", |_a, _n, e| Some(BodyEntered(e.unwrap()))),
+        TypedDeferredSignalConnections::<BodyEntered>::with_connection(
+            "body_entered",
+            |_a, _node_handle, e| Some(BodyEntered(e.unwrap())),
+        ),
     ));
 }
 ```
@@ -147,7 +169,7 @@ The method arguments are similar to other typed signal constructors such as `con
 * `mapper` - Closure that maps signal arguments to your typed message.
   * The closure receives three arguments: `args`, `node_handle`, and `entity`:
     - `args: &[Variant]`: raw Godot arguments (clone if you need detailed parsing).
-    - `node_handle: &GodotNodeHandle`: emitting node; clone into your event if useful.
+    - `node_handle: GodotNodeHandle`: emitting node handle.
     - `entity: Option<Entity>`: Bevy entity the GodotScene component is attached to (Always Some).
   * The closure returns an optional Bevy Message, or None to not send the message.
 
@@ -171,29 +193,13 @@ impl Command for SpawnPickup {
                     .with_signal_connection(
                         "Area2D",
                         "area_entered",
-                        |_args, _handle, _entity| {
+                        |_args, _node_handle, _entity| {
                             // Pickup "area_entered" signal mapped
                             Some(PickupAreaEntered)
                         },
                 ),
             );
         }
-    }
-}
-```
-
-## Untyped Legacy API (Deprecated)
-
-The legacy API (`GodotSignals`, `GodotSignal`, `connect_godot_signal`) remains available but is deprecated. Prefer the typed API above. Minimal usage for migration:
-
-```rust
-fn connect_legacy(mut q: Query<&mut GodotNodeHandle, With<Button>>, legacy: GodotSignals) {
-    for mut handle in &mut q { legacy.connect(&mut handle, "pressed"); }
-}
-
-fn read_legacy(mut ev: MessageReader<GodotSignal>) {
-    for s in ev.read() {
-        if s.name == "pressed" { /* ... */ }
     }
 }
 ```

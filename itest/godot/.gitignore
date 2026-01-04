@@ -5,5 +5,9 @@
 # CI-generated library directory
 lib/
 
+# Generated gdextension file (created by run-tests.sh / run-benches.sh)
+itest.gdextension
+itest.gdextension.uid
+
 # Editor
 .DS_Store

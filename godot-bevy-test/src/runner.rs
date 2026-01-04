@@ -65,6 +65,17 @@ impl TestRunnerImpl {
     pub fn run_all_tests(&mut self, scene_tree: Gd<Node>) {
         println!("\n{FMT_CYAN_BOLD}Run{FMT_END} godot-bevy async integration tests...");
 
+        // Print build mode info
+        let rust_debug = cfg!(debug_assertions);
+        println!(
+            "  Rust build: {}",
+            if rust_debug {
+                format!("{FMT_YELLOW}debug{FMT_END}")
+            } else {
+                format!("{FMT_GREEN}release{FMT_END}")
+            }
+        );
+
         let tests = self.collect_tests();
 
         if tests.focus_run {
@@ -87,9 +98,18 @@ impl TestRunnerImpl {
     pub fn run_all_benchmarks(&mut self, _scene_tree: Gd<Node>) {
         println!("\n\n{FMT_CYAN_BOLD}Run{FMT_END} godot-bevy benchmarks...");
 
-        // Check for debug builds and warn
+        // Print build mode info and warn about debug builds
         let rust_debug = cfg!(debug_assertions);
         let godot_debug = godot::classes::Os::singleton().is_debug_build();
+
+        println!(
+            "  Rust build: {}",
+            if rust_debug {
+                format!("{FMT_YELLOW}debug{FMT_END}")
+            } else {
+                format!("{FMT_GREEN}release{FMT_END}")
+            }
+        );
 
         if rust_debug || godot_debug {
             print!("  {FMT_YELLOW}Warning: ");

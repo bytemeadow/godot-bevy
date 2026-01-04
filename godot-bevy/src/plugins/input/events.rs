@@ -6,16 +6,20 @@ use bevy_ecs::{
 };
 use bevy_math::Vec2;
 use bevy_reflect::Reflect;
+#[cfg(debug_assertions)]
 use godot::{
     builtin::VarDictionary,
+    classes::{Engine, Object, SceneTree},
+    prelude::ToGodot,
+};
+use godot::{
     classes::{
-        Engine, InputEvent as GodotInputEvent, InputEventJoypadButton, InputEventJoypadMotion,
+        InputEvent as GodotInputEvent, InputEventJoypadButton, InputEventJoypadMotion,
         InputEventKey, InputEventMouseButton, InputEventMouseMotion, InputEventPanGesture,
-        InputEventScreenTouch, Object, SceneTree,
+        InputEventScreenTouch,
     },
     global::Key,
     obj::{EngineEnum, Gd, Singleton},
-    prelude::ToGodot,
 };
 use tracing::trace;
 
@@ -312,27 +316,32 @@ fn check_action_events(
     input_event: &Gd<GodotInputEvent>,
     action_events: &mut MessageWriter<ActionInput>,
 ) {
-    // Try to get the OptimizedBulkOperations node for bulk optimization
-    let bulk_ops = (|| {
-        let engine = Engine::singleton();
-        let scene_tree = engine
-            .get_main_loop()
-            .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())?;
-        let root = scene_tree.get_root()?;
-        root.get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
-            .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
-            .map(|n: godot::prelude::Gd<godot::classes::Node>| n.upcast::<Object>())
-    })();
+    // In debug builds, bulk GDScript calls can be faster due to Rust FFI overhead.
+    // In release builds, individual FFI calls are faster (~20% improvement).
+    #[cfg(debug_assertions)]
+    {
+        // Try to get the OptimizedBulkOperations node for bulk optimization
+        let bulk_ops = (|| {
+            let engine = Engine::singleton();
+            let scene_tree = engine
+                .get_main_loop()
+                .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())?;
+            let root = scene_tree.get_root()?;
+            root.get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
+                .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
+                .map(|n: godot::prelude::Gd<godot::classes::Node>| n.upcast::<Object>())
+        })();
 
-    if let Some(bulk_ops_node) = bulk_ops {
-        check_action_events_bulk(input_event, action_events, bulk_ops_node);
-        return;
+        if let Some(bulk_ops_node) = bulk_ops {
+            check_action_events_bulk(input_event, action_events, bulk_ops_node);
+            return;
+        }
     }
 
-    // Fallback to individual FFI calls
     check_action_events_individual(input_event, action_events);
 }
 
+#[cfg(debug_assertions)]
 fn check_action_events_bulk(
     input_event: &Gd<GodotInputEvent>,
     action_events: &mut MessageWriter<ActionInput>,

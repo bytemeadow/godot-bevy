@@ -176,13 +176,14 @@ fn setup(
 
 ### Reacting to Signals
 ```rust
+#[derive(Message, Debug, Clone)]
+struct ButtonPressed;
+
 fn handle_button_press(
-    mut events: MessageReader<GodotSignal>,
+    mut events: MessageReader<ButtonPressed>,
 ) {
-    for signal in events.read() {
-        if signal.name == "pressed" {
-            // Button was pressed!
-        }
+    for _ in events.read() {
+        // Button was pressed!
     }
 }
 ```
@@ -227,7 +228,7 @@ fn spawn_enemy(
 ) {
     commands.spawn((
         GodotScene::from_handle(enemy_scene.0.clone())
-            .with_parent(enemy_spawner.into_inner().clone()),
+            .with_parent(enemy_spawner.into_inner().id()),
         Enemy { health: 100 },
         Transform::default(),
     ));

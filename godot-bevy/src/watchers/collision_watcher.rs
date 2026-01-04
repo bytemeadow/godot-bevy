@@ -37,8 +37,8 @@ impl CollisionWatcher {
         if let Some(channel) = self.notification_channel.as_ref() {
             let _ = channel.send(CollisionMessage {
                 event_type,
-                origin: GodotNodeHandle::from_instance_id(origin_node.instance_id()),
-                target: GodotNodeHandle::from_instance_id(colliding_body.instance_id()),
+                origin: GodotNodeHandle::from(origin_node.instance_id()),
+                target: GodotNodeHandle::from(colliding_body.instance_id()),
             });
         }
     }

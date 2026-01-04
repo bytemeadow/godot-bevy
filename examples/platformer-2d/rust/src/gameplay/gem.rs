@@ -43,16 +43,16 @@ impl Plugin for GemPlugin {
 ///
 /// This system only handles collision detection and event firing,
 /// allowing it to run independently of gem counting logic.
-#[main_thread_system]
 fn detect_gem_player_collision(
-    mut gems: Query<(Entity, &mut GodotNodeHandle, &Collisions), With<Gem>>,
+    gems: Query<(Entity, &GodotNodeHandle, &Collisions), With<Gem>>,
     players: Query<Entity, With<Player>>,
     mut gem_collected_events: MessageWriter<GemCollectedMessage>,
+    mut godot: GodotAccess,
 ) {
-    for (gem_entity, mut handle, collisions) in gems.iter_mut() {
+    for (gem_entity, handle, collisions) in gems.iter() {
         for &player_entity in collisions.recent_collisions() {
             if players.get(player_entity).is_ok()
-                && let Some(mut area) = handle.try_get::<Area2D>()
+                && let Some(mut area) = godot.try_get::<Area2D>(*handle)
             {
                 // Remove the gem from the scene
                 area.queue_free();

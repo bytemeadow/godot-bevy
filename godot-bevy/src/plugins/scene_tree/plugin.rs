@@ -3,12 +3,11 @@ use super::node_type_checking_generated::{
     remove_comprehensive_node_type_markers,
 };
 use crate::plugins::core::SceneTreeComponentRegistry;
-use crate::prelude::{GodotScene, main_thread_system};
+use crate::prelude::GodotScene;
 use crate::{
-    interop::GodotNodeHandle,
+    interop::{GodotAccess, GodotNodeHandle},
     plugins::collisions::{
-        AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED, COLLISION_START_SIGNALS,
-        CollisionMessageType, Collisions,
+        AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED, CollisionMessageType, Collisions,
     },
 };
 use bevy_app::{App, First, Plugin, PreStartup};
@@ -71,6 +70,18 @@ impl NodeEntityIndex {
     #[inline]
     pub fn contains(&self, instance_id: InstanceId) -> bool {
         self.index.contains_key(&instance_id)
+    }
+
+    /// Look up the Bevy `Entity` for a Godot `GodotNodeHandle`.
+    #[inline]
+    pub fn get_handle(&self, handle: GodotNodeHandle) -> Option<Entity> {
+        self.get(handle.instance_id())
+    }
+
+    /// Check if an entity exists for the given `GodotNodeHandle`.
+    #[inline]
+    pub fn contains_handle(&self, handle: GodotNodeHandle) -> bool {
+        self.contains(handle.instance_id())
     }
 
     /// Returns the number of entries in the index.
@@ -199,13 +210,13 @@ impl Default for SceneTreeRefImpl {
     }
 }
 
-#[main_thread_system]
 fn initialize_scene_tree(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
-    mut entities: Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
+    mut entities: Query<(&GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
     component_registry: Res<SceneTreeComponentRegistry>,
     mut node_index: ResMut<NodeEntityIndex>,
+    mut godot: GodotAccess,
 ) {
     let root = scene_tree.get().get_root().unwrap();
 
@@ -228,19 +239,49 @@ fn initialize_scene_tree(
             .get("node_types")
             .unwrap()
             .to::<godot::builtin::PackedStringArray>();
+        let node_names = result_dict
+            .get("node_names")
+            .map(|value| value.to::<godot::builtin::PackedStringArray>());
+        let parent_ids = result_dict
+            .get("parent_ids")
+            .map(|value| value.to::<godot::builtin::PackedInt64Array>());
+        let collision_masks = result_dict
+            .get("collision_masks")
+            .map(|value| value.to::<godot::builtin::PackedInt64Array>());
 
         let mut messages = Vec::new();
         let len = instance_ids.len().min(node_types.len());
         for i in 0..len {
             if let (Some(id), Some(type_gstring)) = (instance_ids.get(i), node_types.get(i)) {
                 let type_str = type_gstring.to_string();
+                let node_name = node_names
+                    .as_ref()
+                    .and_then(|names| names.get(i))
+                    .map(|name| name.to_string());
+                let parent_id = parent_ids
+                    .as_ref()
+                    .and_then(|ids| ids.get(i))
+                    .and_then(|parent_id| {
+                        if parent_id > 0 {
+                            Some(InstanceId::from_i64(parent_id))
+                        } else {
+                            None
+                        }
+                    });
+                let collision_mask = collision_masks
+                    .as_ref()
+                    .and_then(|masks| masks.get(i))
+                    .and_then(|mask| u8::try_from(mask).ok());
 
                 messages.push(SceneTreeMessage {
-                    node: GodotNodeHandle::from_instance_id(godot::prelude::InstanceId::from_i64(
+                    node_id: GodotNodeHandle::from(godot::prelude::InstanceId::from_i64(
                         id,
                     )),
                     message_type: SceneTreeMessageType::NodeAdded,
                     node_type: Some(type_str),
+                    node_name,
+                    parent_id,
+                    collision_mask,
                 });
             }
         }
@@ -259,15 +300,19 @@ fn initialize_scene_tree(
         &mut entities,
         &component_registry,
         &mut node_index,
+        &mut godot,
     );
 }
 
 fn traverse_fallback(node: Gd<Node>) -> Vec<SceneTreeMessage> {
     fn traverse_recursive(node: Gd<Node>, messages: &mut Vec<SceneTreeMessage>) {
         messages.push(SceneTreeMessage {
-            node: GodotNodeHandle::from_instance_id(node.instance_id()),
+            node_id: GodotNodeHandle::from(node.instance_id()),
             message_type: SceneTreeMessageType::NodeAdded,
             node_type: None, // No type optimization available
+            node_name: None,
+            parent_id: None,
+            collision_mask: None,
         });
 
         for child in node.get_children().iter_shared() {
@@ -282,9 +327,12 @@ fn traverse_fallback(node: Gd<Node>) -> Vec<SceneTreeMessage> {
 
 #[derive(Debug, Clone, Message)]
 pub struct SceneTreeMessage {
-    pub node: GodotNodeHandle,
+    pub node_id: GodotNodeHandle,
     pub message_type: SceneTreeMessageType,
     pub node_type: Option<String>, // Pre-analyzed node type from GDScript watcher
+    pub node_name: Option<String>,
+    pub parent_id: Option<InstanceId>,
+    pub collision_mask: Option<u8>,
 }
 
 #[derive(Copy, Clone, Debug, GodotConvert)]
@@ -293,6 +341,32 @@ pub enum SceneTreeMessageType {
     NodeAdded,
     NodeRemoved,
     NodeRenamed,
+}
+
+const COLLISION_MASK_BODY_ENTERED: u8 = 1 << 0;
+const COLLISION_MASK_BODY_EXITED: u8 = 1 << 1;
+const COLLISION_MASK_AREA_ENTERED: u8 = 1 << 2;
+const COLLISION_MASK_AREA_EXITED: u8 = 1 << 3;
+
+fn collision_mask_from_node(node: &mut Node) -> u8 {
+    let mut mask = 0;
+    if node.has_signal(BODY_ENTERED) {
+        mask |= COLLISION_MASK_BODY_ENTERED;
+    }
+    if node.has_signal(BODY_EXITED) {
+        mask |= COLLISION_MASK_BODY_EXITED;
+    }
+    if node.has_signal(AREA_ENTERED) {
+        mask |= COLLISION_MASK_AREA_ENTERED;
+    }
+    if node.has_signal(AREA_EXITED) {
+        mask |= COLLISION_MASK_AREA_EXITED;
+    }
+    mask
+}
+
+fn collision_mask_has(mask: u8, flag: u8) -> bool {
+    mask & flag != 0
 }
 
 /// Helper function to recursively search for a node by name
@@ -315,7 +389,6 @@ fn find_node_by_name(parent: &Gd<Node>, name: &str) -> Option<Gd<Node>> {
     None
 }
 
-#[main_thread_system]
 fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
     let mut scene_tree_gd = scene_tree.get();
     let root = scene_tree_gd.get_root().unwrap();
@@ -424,9 +497,10 @@ fn create_scene_tree_entity(
     commands: &mut Commands,
     messages: impl IntoIterator<Item = SceneTreeMessage>,
     scene_tree: &mut SceneTreeRef,
-    entities: &mut Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
+    entities: &mut Query<(&GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
     component_registry: &SceneTreeComponentRegistry,
     node_index: &mut NodeEntityIndex,
+    godot: &mut GodotAccess,
 ) {
     // Build local mapping with protection info (only needed during this function)
     let mut ent_mapping = entities
@@ -451,13 +525,22 @@ fn create_scene_tree_entity(
     for message in messages.into_iter() {
         trace!(target: "godot_scene_tree_messages", message = ?message);
 
-        let mut node = message.node.clone();
-        let ent = ent_mapping.get(&node.instance_id()).cloned();
+        let SceneTreeMessage {
+            node_id,
+            message_type,
+            node_type,
+            node_name,
+            parent_id,
+            collision_mask,
+        } = message;
+        let instance_id = node_id.instance_id();
+        let node_handle = node_id;
+        let ent = ent_mapping.get(&instance_id).cloned();
 
-        match message.message_type {
+        match message_type {
             SceneTreeMessageType::NodeAdded => {
                 // Skip nodes that have been freed before we process them (can happen in tests)
-                if !node.instance_id().lookup_validity() {
+                if !instance_id.lookup_validity() {
                     continue;
                 }
 
@@ -467,98 +550,106 @@ fn create_scene_tree_entity(
                     commands.spawn_empty()
                 };
 
-                ent.insert(GodotNodeHandle::clone(&node))
-                    .insert(Name::from(node.get::<Node>().get_name().to_string()));
+                let mut node_accessor = godot.node(node_handle);
+                let mut node = node_accessor.get::<Node>();
+
+                let node_name = node_name.unwrap_or_else(|| node.get_name().to_string());
+                ent.insert(node_id).insert(Name::from(node_name));
 
                 // Add node type marker components - use optimized version if available
-                if let Some(ref node_type_str) = message.node_type {
+                if let Some(ref node_type_str) = node_type {
                     // Use pre-analyzed type from GDScript watcher (much faster)
                     add_node_type_markers_from_string(&mut ent, node_type_str);
                 } else {
                     // Fallback to comprehensive analysis with FFI calls
-                    add_comprehensive_node_type_markers(&mut ent, &mut node);
+                    add_comprehensive_node_type_markers(&mut ent, &mut node_accessor);
                 }
-
-                let mut node = node.get::<Node>();
 
                 // Check if the node is a collision body (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.)
                 // These nodes typically have collision detection capabilities
                 // Only connect if CollisionWatcher exists (i.e., GodotCollisionsPlugin was added)
+                let collision_mask = collision_mask.or_else(|| {
+                    collision_watcher
+                        .as_ref()
+                        .map(|_| collision_mask_from_node(&mut node))
+                });
+
                 if let Some(ref collision_watcher) = collision_watcher {
-                    let is_collision_body = COLLISION_START_SIGNALS
-                        .iter()
-                        .any(|&signal| node.has_signal(signal));
+                    if let Some(mask) = collision_mask {
+                        let is_collision_body = collision_mask_has(mask, COLLISION_MASK_BODY_ENTERED)
+                            || collision_mask_has(mask, COLLISION_MASK_AREA_ENTERED);
 
-                    if is_collision_body {
-                        debug!(target: "godot_scene_tree_collisions",
-                               node_id = node.instance_id().to_string(),
-                               "is collision body");
+                        if is_collision_body {
+                            debug!(target: "godot_scene_tree_collisions",
+                                   node_id = instance_id.to_string(),
+                                   "is collision body");
 
-                        let node_clone = node.clone();
+                            let node_clone = node.clone();
 
-                        if node.has_signal(BODY_ENTERED) {
-                            node.connect(
-                                BODY_ENTERED,
-                                &collision_watcher.callable("collision_event").bind(&[
-                                    node_clone.to_variant(),
-                                    CollisionMessageType::Started.to_variant(),
-                                ]),
-                            );
+                            if collision_mask_has(mask, COLLISION_MASK_BODY_ENTERED) {
+                                node.connect(
+                                    BODY_ENTERED,
+                                    &collision_watcher.callable("collision_event").bind(&[
+                                        node_clone.to_variant(),
+                                        CollisionMessageType::Started.to_variant(),
+                                    ]),
+                                );
+                            }
+
+                            if collision_mask_has(mask, COLLISION_MASK_BODY_EXITED) {
+                                node.connect(
+                                    BODY_EXITED,
+                                    &collision_watcher.callable("collision_event").bind(&[
+                                        node_clone.to_variant(),
+                                        CollisionMessageType::Ended.to_variant(),
+                                    ]),
+                                );
+                            }
+
+                            if collision_mask_has(mask, COLLISION_MASK_AREA_ENTERED) {
+                                node.connect(
+                                    AREA_ENTERED,
+                                    &collision_watcher.callable("collision_event").bind(&[
+                                        node_clone.to_variant(),
+                                        CollisionMessageType::Started.to_variant(),
+                                    ]),
+                                );
+                            }
+
+                            if collision_mask_has(mask, COLLISION_MASK_AREA_EXITED) {
+                                node.connect(
+                                    AREA_EXITED,
+                                    &collision_watcher.callable("collision_event").bind(&[
+                                        node_clone.to_variant(),
+                                        CollisionMessageType::Ended.to_variant(),
+                                    ]),
+                                );
+                            }
+
+                            // Add Collisions component to track collision state
+                            ent.insert(Collisions::default());
                         }
-
-                        if node.has_signal(BODY_EXITED) {
-                            node.connect(
-                                BODY_EXITED,
-                                &collision_watcher.callable("collision_event").bind(&[
-                                    node_clone.to_variant(),
-                                    CollisionMessageType::Ended.to_variant(),
-                                ]),
-                            );
-                        }
-
-                        if node.has_signal(AREA_ENTERED) {
-                            node.connect(
-                                AREA_ENTERED,
-                                &collision_watcher.callable("collision_event").bind(&[
-                                    node_clone.to_variant(),
-                                    CollisionMessageType::Started.to_variant(),
-                                ]),
-                            );
-                        }
-
-                        if node.has_signal(AREA_EXITED) {
-                            node.connect(
-                                AREA_EXITED,
-                                &collision_watcher.callable("collision_event").bind(&[
-                                    node_clone.to_variant(),
-                                    CollisionMessageType::Ended.to_variant(),
-                                ]),
-                            );
-                        }
-
-                        // Add Collisions component to track collision state
-                        ent.insert(Collisions::default());
                     }
                 }
 
                 ent.insert(Groups::from(&node));
 
                 // Add all components registered by plugins
-                component_registry.add_to_entity(&mut ent, &message.node);
+                component_registry.add_to_entity(&mut ent, &mut node_accessor);
+                drop(node_accessor);
 
                 let ent = ent.id();
-                let instance_id = node.instance_id();
                 ent_mapping.insert(instance_id, (ent, None));
                 node_index.insert(instance_id, ent);
 
                 // Try to add any registered bundles for this node type
-                super::autosync::try_add_bundles_for_node(commands, ent, &message.node);
+                super::autosync::try_add_bundles_for_node(commands, ent, godot, node_handle);
 
                 // Add GodotChildOf relationship to mirror Godot's scene tree hierarchy
-                if node.instance_id() != scene_root.instance_id()
-                    && let Some(parent) = node.get_parent()
+                let parent_id = parent_id.or_else(|| node.get_parent().map(|parent| parent.instance_id()));
+                if instance_id != scene_root.instance_id()
+                    && let Some(parent_id) = parent_id
                 {
-                    let parent_id = parent.instance_id();
                     if let Some((parent_entity, _)) = ent_mapping.get(&parent_id) {
                         commands
                             .entity(ent)
@@ -576,8 +667,8 @@ fn create_scene_tree_entity(
                     // During reparenting, the node is temporarily removed from old parent
                     // but still exists in the scene tree (has a parent)
                     // We need to try_get because the node handle might be invalid if freed
-                    let is_reparenting = node
-                        .try_get::<Node>()
+                    let is_reparenting = godot
+                        .try_get::<Node>(node_handle)
                         .map(|godot_node| godot_node.get_parent().is_some())
                         .unwrap_or(false);
 
@@ -592,9 +683,8 @@ fn create_scene_tree_entity(
                         if !protected {
                             commands.entity(ent).despawn();
                         } else {
-                            _strip_godot_components(commands, ent, &node);
+                            _strip_godot_components(commands, ent, godot, node_handle);
                         }
-                        let instance_id = node.instance_id();
                         ent_mapping.remove(&instance_id);
                         node_index.remove(instance_id);
                     }
@@ -605,9 +695,10 @@ fn create_scene_tree_entity(
             }
             SceneTreeMessageType::NodeRenamed => {
                 if let Some((ent, _)) = ent {
-                    commands
-                        .entity(ent)
-                        .insert(Name::from(node.get::<Node>().get_name().to_string()));
+                    let name = node_name.unwrap_or_else(|| {
+                        godot.get::<Node>(node_handle).get_name().to_string()
+                    });
+                    commands.entity(ent).insert(Name::from(name));
                 } else {
                     trace!(target: "godot_scene_tree_messages", "Entity for renamed node was already despawned");
                 }
@@ -616,7 +707,12 @@ fn create_scene_tree_entity(
     }
 }
 
-fn _strip_godot_components(commands: &mut Commands, ent: Entity, node: &GodotNodeHandle) {
+fn _strip_godot_components(
+    commands: &mut Commands,
+    ent: Entity,
+    godot: &mut GodotAccess,
+    node_handle: GodotNodeHandle,
+) {
     let mut entity_commands = commands.entity(ent);
 
     entity_commands.remove::<GodotNodeHandle>();
@@ -624,18 +720,19 @@ fn _strip_godot_components(commands: &mut Commands, ent: Entity, node: &GodotNod
     entity_commands.remove::<Name>();
     entity_commands.remove::<Groups>();
 
-    remove_comprehensive_node_type_markers(&mut entity_commands, &mut node.clone());
+    let mut node_accessor = godot.node(node_handle);
+    remove_comprehensive_node_type_markers(&mut entity_commands, &mut node_accessor);
 }
 
-#[main_thread_system]
 #[allow(clippy::too_many_arguments)]
 fn read_scene_tree_messages(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
     mut message_reader: MessageReader<SceneTreeMessage>,
-    mut entities: Query<(&mut GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
+    mut entities: Query<(&GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
     component_registry: Res<SceneTreeComponentRegistry>,
     mut node_index: ResMut<NodeEntityIndex>,
+    mut godot: GodotAccess,
 ) {
     create_scene_tree_entity(
         &mut commands,
@@ -644,5 +741,6 @@ fn read_scene_tree_messages(
         &mut entities,
         &component_registry,
         &mut node_index,
+        &mut godot,
     );
 }

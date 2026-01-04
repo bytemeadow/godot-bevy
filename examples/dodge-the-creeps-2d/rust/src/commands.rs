@@ -71,11 +71,11 @@ pub struct UIHandles {
 }
 
 impl UIHandles {
-    pub fn get_handle(&self, element: &UIElement) -> Option<&GodotNodeHandle> {
+    pub fn get_handle(&self, element: &UIElement) -> Option<GodotNodeHandle> {
         match element {
-            UIElement::StartButton => self.start_button.as_ref(),
-            UIElement::ScoreLabel => self.score_label.as_ref(),
-            UIElement::MessageLabel => self.message_label.as_ref(),
+            UIElement::StartButton => self.start_button,
+            UIElement::ScoreLabel => self.score_label,
+            UIElement::MessageLabel => self.message_label,
         }
     }
 }
@@ -166,29 +166,32 @@ impl Plugin for CommandSystemPlugin {
 }
 
 /// Main thread system that processes UI commands
-#[main_thread_system]
-fn process_ui_commands(mut ui_commands: MessageReader<UICommand>, ui_handles: Res<UIHandles>) {
+fn process_ui_commands(
+    mut ui_commands: MessageReader<UICommand>,
+    ui_handles: Res<UIHandles>,
+    mut godot: GodotAccess,
+) {
     use godot::classes::{Button, Label};
 
     for command in ui_commands.read() {
         match command {
             UICommand::SetText { target, text } => {
                 if let Some(handle) = ui_handles.get_handle(target)
-                    && let Some(mut label) = handle.clone().try_get::<Label>()
+                    && let Some(mut label) = godot.try_get::<Label>(handle)
                 {
                     label.set_text(text);
                 }
             }
             UICommand::SetVisible { target, visible } => {
                 if let Some(handle) = ui_handles.get_handle(target)
-                    && let Some(mut button) = handle.clone().try_get::<Button>()
+                    && let Some(mut button) = godot.try_get::<Button>(handle)
                 {
                     button.set_visible(*visible);
                 }
             }
             UICommand::ShowMessage { text } => {
                 if let Some(handle) = ui_handles.get_handle(&UIElement::MessageLabel)
-                    && let Some(mut label) = handle.clone().try_get::<Label>()
+                    && let Some(mut label) = godot.try_get::<Label>(handle)
                 {
                     label.set_text(text);
                 }
@@ -198,34 +201,34 @@ fn process_ui_commands(mut ui_commands: MessageReader<UICommand>, ui_handles: Re
 }
 
 /// Main thread system that processes node commands
-#[main_thread_system]
 fn process_node_commands(
     mut node_commands: MessageReader<NodeCommand>,
-    mut nodes: Query<&mut GodotNodeHandle>,
+    nodes: Query<&GodotNodeHandle>,
     mut commands: Commands,
+    mut godot: GodotAccess,
 ) {
     use godot::classes::{CanvasItem, Node};
 
     for command in node_commands.read() {
         match command {
             NodeCommand::SetVisible { entity, visible } => {
-                if let Ok(mut handle) = nodes.get_mut(*entity)
-                    && let Some(mut canvas_item) = handle.try_get::<CanvasItem>()
+                if let Ok(handle) = nodes.get(*entity)
+                    && let Some(mut canvas_item) = godot.try_get::<CanvasItem>(*handle)
                 {
                     canvas_item.set_visible(*visible);
                 }
             }
             NodeCommand::Destroy { entity } => {
-                if let Ok(mut handle) = nodes.get_mut(*entity)
-                    && let Some(mut node) = handle.try_get::<Node>()
+                if let Ok(handle) = nodes.get(*entity)
+                    && let Some(mut node) = godot.try_get::<Node>(*handle)
                 {
                     node.queue_free();
                 }
                 commands.entity(*entity).despawn();
             }
             NodeCommand::SetPosition { entity, position } => {
-                if let Ok(mut handle) = nodes.get_mut(*entity)
-                    && let Some(mut node) = handle.try_get::<godot::classes::Node2D>()
+                if let Ok(handle) = nodes.get(*entity)
+                    && let Some(mut node) = godot.try_get::<godot::classes::Node2D>(*handle)
                 {
                     node.set_position(*position);
                 }
@@ -235,16 +238,16 @@ fn process_node_commands(
 }
 
 /// Main thread system that processes animation commands
-#[main_thread_system]
 fn process_animation_commands(
     mut animation_commands: MessageReader<AnimationCommand>,
-    mut nodes: Query<&mut GodotNodeHandle>,
+    nodes: Query<&GodotNodeHandle>,
+    mut godot: GodotAccess,
 ) {
     use godot::classes::AnimatedSprite2D;
 
     for command in animation_commands.read() {
-        if let Ok(mut handle) = nodes.get_mut(command.entity())
-            && let Some(mut sprite) = handle.try_get::<AnimatedSprite2D>()
+        if let Ok(handle) = nodes.get(command.entity())
+            && let Some(mut sprite) = godot.try_get::<AnimatedSprite2D>(*handle)
         {
             match command {
                 AnimationCommand::Play { animation, .. } => {
@@ -266,15 +269,15 @@ fn process_animation_commands(
 }
 
 /// Main thread system that syncs visibility state to Godot nodes
-#[main_thread_system]
 fn sync_visibility_state(
-    mut nodes: Query<(&mut GodotNodeHandle, &mut VisibilityState), Changed<VisibilityState>>,
+    mut nodes: Query<(&GodotNodeHandle, &mut VisibilityState), Changed<VisibilityState>>,
+    mut godot: GodotAccess,
 ) {
     use godot::classes::CanvasItem;
 
-    for (mut handle, mut visibility) in nodes.iter_mut() {
+    for (handle, mut visibility) in nodes.iter_mut() {
         if visibility.dirty {
-            if let Some(mut canvas_item) = handle.try_get::<CanvasItem>() {
+            if let Some(mut canvas_item) = godot.try_get::<CanvasItem>(*handle) {
                 canvas_item.set_visible(visibility.visible);
             }
             visibility.dirty = false;
@@ -283,20 +286,20 @@ fn sync_visibility_state(
 }
 
 /// Main thread system that syncs animation state to Godot sprites
-#[main_thread_system]
 fn sync_animation_state(
-    mut nodes: Query<(&mut GodotNodeHandle, &mut AnimationState), Changed<AnimationState>>,
+    mut nodes: Query<(&GodotNodeHandle, &mut AnimationState), Changed<AnimationState>>,
+    mut godot: GodotAccess,
 ) {
     use godot::classes::AnimatedSprite2D;
 
-    for (mut handle, mut anim_state) in nodes.iter_mut() {
+    for (handle, mut anim_state) in nodes.iter_mut() {
         if anim_state.dirty {
             // First try to get the node directly as AnimatedSprite2D
-            if let Some(mut sprite) = handle.try_get::<AnimatedSprite2D>() {
+            if let Some(mut sprite) = godot.try_get::<AnimatedSprite2D>(*handle) {
                 apply_animation_state(&mut sprite, &anim_state);
             }
             // If that fails, try to find AnimatedSprite2D as a child
-            else if let Some(node) = handle.try_get::<godot::classes::Node>() {
+            else if let Some(node) = godot.try_get::<godot::classes::Node>(*handle) {
                 let mut sprite = node.get_node_as::<AnimatedSprite2D>("AnimatedSprite2D");
                 apply_animation_state(&mut sprite, &anim_state);
             }

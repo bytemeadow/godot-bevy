@@ -4,7 +4,6 @@ use crate::plugins::{
     core::{PhysicsDelta, PhysicsUpdate},
     input::InputEventReader,
     scene_tree::SceneTreeMessageReader,
-    signals::{GodotSignalReader, GodotSignalSender},
 };
 use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
@@ -67,14 +66,6 @@ impl BevyApp {
         app.insert_non_send_resource(SceneTreeMessageReader(receiver));
     }
 
-    fn register_signal_system(&mut self, app: &mut App) {
-        let (sender, receiver) = channel();
-        // Create channel for Godot signals and insert as resources
-        // Signals are connected directly using closures in the signals module
-        app.insert_non_send_resource(GodotSignalSender(sender));
-        app.insert_non_send_resource(GodotSignalReader(receiver));
-    }
-
     fn register_input_event_watcher(&mut self, app: &mut App) {
         let (sender, receiver) = channel();
         let mut input_event_watcher = GodotInputWatcher::new_alloc();
@@ -126,6 +117,7 @@ impl BevyApp {
         }
     }
 
+    #[cfg(debug_assertions)]
     fn register_optimized_bulk_operations(&mut self) {
         // Check if OptimizedBulkOperations already exists (e.g., loaded from tscn)
         if self.base().has_node("OptimizedBulkOperations") {
@@ -228,12 +220,6 @@ impl INode for BevyApp {
             .contains_resource::<Messages<CollisionMessage>>()
         {
             self.register_collision_watcher(&mut app);
-        }
-
-        // Signal plugin check
-        use crate::plugins::signals::GodotSignal;
-        if app.world().contains_resource::<Messages<GodotSignal>>() {
-            self.register_signal_system(&mut app);
         }
 
         // Input event plugin check - check for KeyboardInput as a marker

@@ -1,6 +1,9 @@
 pub mod godot_node_handle;
 pub use godot_node_handle::*;
 
+pub mod godot_access;
+pub use godot_access::*;
+
 pub mod godot_resource_handle;
 pub use godot_resource_handle::*;
 
