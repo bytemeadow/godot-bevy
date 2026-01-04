@@ -99,7 +99,7 @@ fn update_godot_collisions(
         .collect();
 
     for (_, _, mut collisions) in entities.iter_mut() {
-        collisions.recent_collisions = vec![];
+        collisions.recent_collisions.clear();
     }
 
     for event in messages.read() {
@@ -280,7 +280,7 @@ mod tests {
         assert_eq!(collisions.recent_collisions().len(), 1);
 
         // Frame 2: clear recent (simulating start of update_godot_collisions)
-        collisions.recent_collisions = vec![];
+        collisions.recent_collisions.clear();
         assert_eq!(collisions.recent_collisions().len(), 0);
         // But colliding_entities should persist
         assert_eq!(collisions.colliding().len(), 1);
