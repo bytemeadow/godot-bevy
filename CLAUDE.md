@@ -191,3 +191,81 @@ return {"ids": ids, "types": types}
 - Performance-critical paths
 - Scene tree operations, transform updates, collision data
 - Any scenario with repeated Variant conversions
+
+### Debug vs Release FFI Performance
+
+**Key Finding**: In **release builds**, individual Rust FFI calls are faster than bulk GDScript operations. In **debug builds**, the opposite is true due to unoptimized Rust FFI overhead.
+
+**Implications:**
+- Bulk GDScript helpers (`OptimizedBulkOperations`) are gated with `#[cfg(debug_assertions)]`
+- Release builds use direct FFI calls for transforms and input checking
+- Debug builds use GDScript bulk operations for faster iteration
+
+**Example from transform sync:**
+```rust
+// In release: direct FFI is ~20% faster
+#[cfg(not(debug_assertions))]
+{
+    pre_update_godot_transforms_individual(entities, &mut godot);
+}
+
+// In debug: GDScript bulk path is faster
+#[cfg(debug_assertions)]
+{
+    if let Some(bulk_ops) = get_bulk_operations_node(&mut godot) {
+        pre_update_godot_transforms_bulk(entities, bulk_ops);
+        return;
+    }
+    pre_update_godot_transforms_individual(entities, &mut godot);
+}
+```
+
+### OptimizedSceneTreeWatcher
+
+The `OptimizedSceneTreeWatcher` (GDScript) pre-analyzes node metadata to avoid expensive FFI calls from Rust. This optimization is valuable in **both** debug and release builds because it runs at the GDScript callback level.
+
+**What it pre-analyzes:**
+- `node_type` - Uses GDScript `is` checks (fast) instead of Rust `try_from_instance_id` (up to 199 FFI calls per node)
+- `node_name` - Avoids `get_name()` FFI call
+- `parent_id` - Avoids `get_parent().instance_id()` FFI calls  
+- `collision_mask` - Avoids 4 `has_signal()` FFI calls
+
+**Performance impact**: ~2x faster for scene tree entity creation compared to fallback FFI path.
+
+## Benchmarking
+
+### Running Benchmarks
+```bash
+cd itest
+./run-benches.sh           # Build and run benchmarks
+./run-benches.sh --skip-build  # Run without rebuilding (for CI)
+```
+
+### Benchmark Philosophy
+
+Benchmarks should test **actual godot-bevy systems**, not raw FFI performance. Testing raw FFI just measures gdext, not our code.
+
+**Good benchmark**: Runs the real `GodotTransformSyncPlugin` systems via `app.world_mut().run_schedule()`
+
+**Bad benchmark**: Manually calls `node.set_position()` in a loop (just tests gdext FFI)
+
+### Current Benchmarks
+
+Located in `itest/rust/src/benchmarks.rs`:
+
+| Benchmark | What it tests |
+|-----------|---------------|
+| `transform_sync_bevy_to_godot_3d` | Real Bevy→Godot sync system (1000 3D nodes) |
+| `transform_sync_godot_to_bevy_3d` | Real Godot→Bevy sync system (1000 3D nodes) |
+| `transform_sync_bevy_to_godot_2d` | Real Bevy→Godot sync system (1000 2D nodes) |
+| `transform_sync_godot_to_bevy_2d` | Real Godot→Bevy sync system (1000 2D nodes) |
+| `transform_sync_roundtrip_3d` | Full frame: PreUpdate → game logic → Last |
+| `transform_sync_roundtrip_2d` | Full frame: PreUpdate → game logic → Last |
+
+### Adding New Benchmarks
+
+When adding benchmarks:
+1. Create a real Bevy `App` with the plugin being tested
+2. Initialize required schedules: `app.init_schedule(PreUpdate)`, `app.init_schedule(Last)`
+3. Run actual schedules: `app.world_mut().run_schedule(Last)`
+4. Don't duplicate system logic - run the real systems so benchmarks stay accurate when code changes
