@@ -506,10 +506,10 @@ impl From<Vec<String>> for Groups {
 /// Resource for receiving scene tree messages from Godot.
 /// Wrapped in Mutex to be Send+Sync, allowing it to be a regular Bevy Resource.
 #[derive(Resource)]
-pub struct SceneTreeMessageReader(pub Mutex<std::sync::mpsc::Receiver<SceneTreeMessage>>);
+pub struct SceneTreeMessageReader(pub Mutex<crossbeam_channel::Receiver<SceneTreeMessage>>);
 
 impl SceneTreeMessageReader {
-    pub fn new(receiver: std::sync::mpsc::Receiver<SceneTreeMessage>) -> Self {
+    pub fn new(receiver: crossbeam_channel::Receiver<SceneTreeMessage>) -> Self {
         Self(Mutex::new(receiver))
     }
 }

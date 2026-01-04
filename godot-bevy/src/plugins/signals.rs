@@ -8,6 +8,7 @@ use bevy_ecs::{
     schedule::IntoScheduleConfigs,
     system::{Commands, Query, Res, SystemParam},
 };
+use crossbeam_channel::Sender;
 use godot::{
     classes::Node,
     obj::Gd,
@@ -16,7 +17,6 @@ use godot::{
 use parking_lot::Mutex;
 use std::fmt::Debug;
 use std::sync::Arc;
-use std::sync::mpsc::Sender;
 use tracing::error;
 
 /// Global, type-erased dispatch for typed signal messages
@@ -38,18 +38,18 @@ impl<T: Message + Send + 'static> TypedDispatch for TypedEnvelope<T> {
 /// Wrapped in Mutex to be Send+Sync, allowing it to be a regular Bevy Resource.
 #[derive(Resource)]
 pub(crate) struct GlobalTypedSignalReceiver(
-    pub Mutex<std::sync::mpsc::Receiver<Box<dyn TypedDispatch>>>,
+    pub Mutex<crossbeam_channel::Receiver<Box<dyn TypedDispatch>>>,
 );
 
 impl GlobalTypedSignalReceiver {
-    pub fn new(receiver: std::sync::mpsc::Receiver<Box<dyn TypedDispatch>>) -> Self {
+    pub fn new(receiver: crossbeam_channel::Receiver<Box<dyn TypedDispatch>>) -> Self {
         Self(Mutex::new(receiver))
     }
 }
 
 #[doc(hidden)]
 #[derive(Resource)]
-pub(crate) struct GlobalTypedSignalSender(pub std::sync::mpsc::Sender<Box<dyn TypedDispatch>>);
+pub(crate) struct GlobalTypedSignalSender(pub crossbeam_channel::Sender<Box<dyn TypedDispatch>>);
 
 #[derive(Resource, Default)]
 struct PendingSignalConnections {
@@ -139,7 +139,7 @@ impl<T: Message + Send + 'static> Plugin for GodotTypedSignalsPlugin<T> {
 
         // Install global typed signal channel and consolidated drain once
         if !app.world().contains_resource::<GlobalTypedSignalSender>() {
-            let (sender, receiver) = std::sync::mpsc::channel::<Box<dyn TypedDispatch>>();
+            let (sender, receiver) = crossbeam_channel::unbounded::<Box<dyn TypedDispatch>>();
             app.world_mut()
                 .insert_resource(GlobalTypedSignalSender(sender));
             app.world_mut()

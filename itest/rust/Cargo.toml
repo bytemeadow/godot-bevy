@@ -20,3 +20,4 @@ bevy = { version = "0.17", default-features = false, features = [
   "bevy_asset",
   "multi_threaded",
 ] }
+crossbeam-channel = "0.5"

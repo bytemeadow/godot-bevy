@@ -1,7 +1,7 @@
+use crossbeam_channel::Sender;
 use godot::classes::Node;
 use godot::obj::Gd;
 use godot::prelude::*;
-use std::sync::mpsc::Sender;
 
 use crate::{
     interop::GodotNodeHandle,

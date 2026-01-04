@@ -12,11 +12,11 @@ use bevy_ecs::{
     system::{Query, Res},
 };
 use bevy_reflect::Reflect;
+use crossbeam_channel::Receiver;
 use godot::obj::InstanceId;
 use godot::prelude::*;
 use parking_lot::Mutex;
 use std::collections::HashMap;
-use std::sync::mpsc::Receiver;
 use tracing::trace;
 
 #[derive(Default)]

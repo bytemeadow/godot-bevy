@@ -444,4 +444,4 @@ pub enum InputEventType {
 }
 
 #[doc(hidden)]
-pub struct InputEventReader(pub std::sync::mpsc::Receiver<(InputEventType, Gd<GodotInputEvent>)>);
+pub struct InputEventReader(pub crossbeam_channel::Receiver<(InputEventType, Gd<GodotInputEvent>)>);

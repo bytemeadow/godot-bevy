@@ -10,9 +10,9 @@ use crate::watchers::input_watcher::GodotInputWatcher;
 use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
 use bevy_app::{App, PluginsState};
 use bevy_ecs::message::Messages;
+use crossbeam_channel::unbounded;
 use godot::prelude::*;
 use std::sync::OnceLock;
-use std::sync::mpsc::channel;
 
 // Stores the client's entrypoint (the function they decorated with the `#[bevy_app]` macro) at runtime
 pub static BEVY_INIT_FUNC: OnceLock<Box<dyn Fn(&mut App) + Send + Sync>> = OnceLock::new();
@@ -58,7 +58,7 @@ impl BevyApp {
             return;
         }
 
-        let (sender, receiver) = channel();
+        let (sender, receiver) = unbounded();
         let mut scene_tree_watcher = SceneTreeWatcher::new_alloc();
         scene_tree_watcher.bind_mut().notification_channel = Some(sender);
         scene_tree_watcher.set_name("SceneTreeWatcher");
@@ -67,7 +67,7 @@ impl BevyApp {
     }
 
     fn register_input_event_watcher(&mut self, app: &mut App) {
-        let (sender, receiver) = channel();
+        let (sender, receiver) = unbounded();
         let mut input_event_watcher = GodotInputWatcher::new_alloc();
         input_event_watcher.bind_mut().notification_channel = Some(sender);
         input_event_watcher.set_name("InputEventWatcher");
@@ -81,7 +81,7 @@ impl BevyApp {
             return;
         }
 
-        let (sender, receiver) = channel();
+        let (sender, receiver) = unbounded();
         let mut collision_watcher = CollisionWatcher::new_alloc();
         collision_watcher.bind_mut().notification_channel = Some(sender);
         collision_watcher.set_name("CollisionWatcher");

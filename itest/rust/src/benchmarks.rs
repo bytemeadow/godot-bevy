@@ -3,6 +3,7 @@
 //! These benchmarks test the actual godot-bevy systems rather than raw FFI overhead.
 //! They measure real-world performance of syncing transforms between Bevy and Godot.
 
+use crossbeam_channel as mpsc;
 use godot::classes::{Area3D, Engine, Node, Node2D, Node3D, SceneTree};
 use godot::obj::NewAlloc;
 use godot::prelude::*;
@@ -20,7 +21,6 @@ use godot_bevy::plugins::transforms::{
 };
 use godot_bevy::watchers::collision_watcher::CollisionWatcher;
 use godot_bevy_test::bench;
-use std::sync::mpsc;
 
 // =============================================================================
 // Transform Sync Benchmarks
@@ -375,7 +375,7 @@ fn setup_scene_tree_benchmark_app() -> (App, mpsc::Sender<SceneTreeMessage>) {
 
     // Create a channel for injecting messages BEFORE adding the plugin
     // (plugin will try to init its own receiver, but we'll override it)
-    let (sender, receiver) = mpsc::channel::<SceneTreeMessage>();
+    let (sender, receiver) = mpsc::unbounded::<SceneTreeMessage>();
 
     // Add the scene tree plugin
     app.add_plugins(GodotSceneTreePlugin::default());
