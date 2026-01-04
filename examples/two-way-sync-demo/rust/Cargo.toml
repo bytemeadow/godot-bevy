@@ -14,4 +14,4 @@ name = "two-way-sync-demo"
 godot-bevy = { path = "../../../godot-bevy" }
 bevy = { version = "0.17", default-features = false }
 godot = "0.4"
-which = "8"
+cargo-godot-lib.workspace = true

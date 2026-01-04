@@ -16,5 +16,5 @@ fastrand = { version = "2.3.0" }
 godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }
 leafwing-input-manager = "0.18.0"
-which = "8"
 bevy_enhanced_input = "0.19.1"
+cargo-godot-lib.workspace = true

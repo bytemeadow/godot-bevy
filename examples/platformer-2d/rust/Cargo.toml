@@ -16,4 +16,4 @@ bevy_asset_loader = "0.24"
 fastrand = { version = "2.3.0" }
 godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }
-which = "8"
+cargo-godot-lib.workspace = true

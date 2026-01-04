@@ -280,9 +280,9 @@ dependencies = [
  "avian3d",
  "bevy",
  "bevy_asset_loader",
+ "cargo-godot-lib",
  "godot",
  "godot-bevy",
- "which 8.0.0",
 ]
 
 [[package]]
@@ -1510,6 +1510,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "camino"
+version = "1.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e629a66d692cb9ff1a1c664e41771b3dcaf961985a9774c0eb0bd1b51cf60a48"
+dependencies = [
+ "serde_core",
+]
+
+[[package]]
+name = "cargo-godot-lib"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adf9979a6be7cce00c67d64af6daacf047ad2c57a4c30646436d37d87cc297be"
+dependencies = [
+ "anyhow",
+ "cargo_metadata",
+ "pathdiff",
+ "which 8.0.0",
+]
+
+[[package]]
+name = "cargo-platform"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87a0c0e6148f11f01f32650a2ea02d532b2ad4e81d8bd41e6e565b5adc5e6082"
+dependencies = [
+ "serde",
+ "serde_core",
+]
+
+[[package]]
+name = "cargo_metadata"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef987d17b0a113becdd19d3d0022d04d7ef41f9efe4f3fb63ac44ba61df3ade9"
+dependencies = [
+ "camino",
+ "cargo-platform",
+ "semver",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "cast"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1962,10 +2007,10 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_asset_loader",
+ "cargo-godot-lib",
  "fastrand",
  "godot",
  "godot-bevy",
- "which 8.0.0",
 ]
 
 [[package]]
@@ -2811,11 +2856,11 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_enhanced_input",
+ "cargo-godot-lib",
  "fastrand",
  "godot",
  "godot-bevy",
  "leafwing-input-manager",
- "which 8.0.0",
 ]
 
 [[package]]
@@ -3731,16 +3776,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e91099d4268b0e11973f036e885d652fb0b21fedcf69738c627f94db6a44f42"
 
 [[package]]
+name = "pathdiff"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
+
+[[package]]
 name = "perf-test"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "cargo-godot-lib",
  "fastrand",
  "godot",
  "godot-bevy",
  "tracing",
  "tracing-tracy",
- "which 7.0.3",
 ]
 
 [[package]]
@@ -3792,10 +3843,10 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_asset_loader",
+ "cargo-godot-lib",
  "fastrand",
  "godot",
  "godot-bevy",
- "which 8.0.0",
 ]
 
 [[package]]
@@ -4247,6 +4298,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16c2f82143577edb4921b71ede051dac62ca3c16084e918bf7b40c96ae10eb33"
 
 [[package]]
+name = "semver"
+version = "1.0.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
+dependencies = [
+ "serde",
+ "serde_core",
+]
+
+[[package]]
 name = "send_wrapper"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4338,9 +4399,9 @@ name = "simple-node2d-movement-example"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "cargo-godot-lib",
  "godot",
  "godot-bevy",
- "which 7.0.3",
 ]
 
 [[package]]
@@ -4546,10 +4607,10 @@ name = "timing-test"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "cargo-godot-lib",
  "fastrand",
  "godot",
  "godot-bevy",
- "which 8.0.0",
 ]
 
 [[package]]
@@ -4740,9 +4801,9 @@ name = "two-way-sync-example"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "cargo-godot-lib",
  "godot",
  "godot-bevy",
- "which 8.0.0",
 ]
 
 [[package]]

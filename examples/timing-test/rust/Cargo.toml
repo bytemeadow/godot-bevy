@@ -15,4 +15,4 @@ bevy = { version = "0.17", default-features = false, features = ["bevy_log"] }
 fastrand = { version = "2.3.0" }
 godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }
-which = "8"
+cargo-godot-lib.workspace = true

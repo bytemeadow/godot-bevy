@@ -16,7 +16,6 @@ bevy = { version = "0.17", default-features = false, features = ["bevy_asset", "
 fastrand = "2.3.0"
 godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }
-which = "7.0.3"
 tracing = "0.1"
 tracing-tracy = { version = "0.11.4", default-features = false, features = [
     "enable",
@@ -24,6 +23,7 @@ tracing-tracy = { version = "0.11.4", default-features = false, features = [
     "ondemand",
     "broadcast", # announce presence
 ], optional = true }
+cargo-godot-lib.workspace = true
 
 [features]
 # You can also profile this example!
