@@ -10,16 +10,31 @@ RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
-echo -e "${CYAN}Building godot-bevy-itest (release)...${NC}"
+# Parse arguments
+SKIP_BUILD=false
 
-# Build the Rust library in release mode for accurate benchmarks
-cd "$(dirname "$0")/rust"
-cargo build --release
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --skip-build)
+            SKIP_BUILD=true
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
 
-cd ..
+cd "$(dirname "$0")"
+
+if [ "$SKIP_BUILD" = false ]; then
+    echo -e "${CYAN}Building godot-bevy-itest (release)...${NC}"
+    cd rust
+    cargo build --release
+    cd ..
+fi
 
 # Generate .gdextension file pointing to release build
-# This ensures Godot loads the release library regardless of editor/runtime mode
 cat > godot/itest.gdextension << EOF
 [configuration]
 entry_symbol = "godot_bevy_itest"
