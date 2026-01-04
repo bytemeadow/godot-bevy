@@ -33,8 +33,18 @@ impl<T: Message + Send + 'static> TypedDispatch for TypedEnvelope<T> {
     }
 }
 
-#[doc(hidden)]
-pub(crate) struct GlobalTypedSignalReceiver(pub std::sync::mpsc::Receiver<Box<dyn TypedDispatch>>);
+/// Resource for receiving typed signal dispatches.
+/// Wrapped in Mutex to be Send+Sync, allowing it to be a regular Bevy Resource.
+#[derive(Resource)]
+pub(crate) struct GlobalTypedSignalReceiver(
+    pub Mutex<std::sync::mpsc::Receiver<Box<dyn TypedDispatch>>>,
+);
+
+impl GlobalTypedSignalReceiver {
+    pub fn new(receiver: std::sync::mpsc::Receiver<Box<dyn TypedDispatch>>) -> Self {
+        Self(Mutex::new(receiver))
+    }
+}
 
 #[doc(hidden)]
 #[derive(Resource)]
@@ -151,7 +161,7 @@ impl<T: Message + Send + 'static> Plugin for GodotTypedSignalsPlugin<T> {
             app.world_mut()
                 .insert_resource(GlobalTypedSignalSender(sender));
             app.world_mut()
-                .insert_non_send_resource(GlobalTypedSignalReceiver(receiver));
+                .insert_resource(GlobalTypedSignalReceiver::new(receiver));
 
             // One consolidated drain for all typed messages
             app.add_systems(
@@ -172,8 +182,9 @@ impl<T: Message + Send + 'static> Plugin for GodotTypedSignalsPlugin<T> {
 fn drain_global_typed_signals(world: &mut bevy_ecs::world::World) {
     // Collect first to avoid overlapping mutable borrows of `world`
     let mut pending: Vec<Box<dyn TypedDispatch>> = Vec::new();
-    if let Some(receiver) = world.get_non_send_resource_mut::<GlobalTypedSignalReceiver>() {
-        pending.extend(receiver.0.try_iter());
+    if let Some(receiver) = world.get_resource::<GlobalTypedSignalReceiver>() {
+        let guard = receiver.0.lock().unwrap_or_else(|e| e.into_inner());
+        pending.extend(guard.try_iter());
     }
     for dispatch in pending.drain(..) {
         dispatch.write_into_world(world);
