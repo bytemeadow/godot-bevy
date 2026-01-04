@@ -3,7 +3,7 @@
 //! These benchmarks test the actual godot-bevy systems rather than raw FFI overhead.
 //! They measure real-world performance of syncing transforms between Bevy and Godot.
 
-use godot::classes::{Engine, Node, Node2D, Node3D, SceneTree};
+use godot::classes::{Area3D, Engine, Node, Node2D, Node3D, SceneTree};
 use godot::obj::NewAlloc;
 use godot::prelude::*;
 use godot_bevy::bevy_app::{App, First, Last, PreUpdate};
@@ -18,6 +18,7 @@ use godot_bevy::plugins::scene_tree::{
 use godot_bevy::plugins::transforms::{
     GodotTransformSyncPlugin, GodotTransformSyncPluginExt, TransformSyncMetadata, TransformSyncMode,
 };
+use godot_bevy::watchers::collision_watcher::CollisionWatcher;
 use godot_bevy_test::bench;
 use std::sync::mpsc;
 
@@ -461,6 +462,158 @@ fn scene_tree_process_node_added_fallback() -> i32 {
     for mut node in nodes {
         node.queue_free();
     }
+
+    result
+}
+
+// =============================================================================
+// Scene Tree Collision Body Benchmarks
+// =============================================================================
+// These benchmarks measure the performance of processing scene tree messages
+// for collision bodies (Area3D nodes), which require connecting collision signals.
+
+const COLLISION_BODY_COUNT: usize = 100;
+
+// Collision mask constants (must match the ones in scene_tree/plugin.rs)
+const COLLISION_MASK_BODY_ENTERED: u8 = 1 << 0;
+const COLLISION_MASK_BODY_EXITED: u8 = 1 << 1;
+const COLLISION_MASK_AREA_ENTERED: u8 = 1 << 2;
+const COLLISION_MASK_AREA_EXITED: u8 = 1 << 3;
+
+/// Creates Area3D nodes for collision body benchmarking.
+/// These nodes have collision signals that need to be connected.
+fn create_collision_body_nodes() -> Vec<Gd<Node>> {
+    let scene_tree = get_scene_tree();
+    let root = scene_tree.get_root().expect("Root should exist");
+
+    let mut nodes: Vec<Gd<Node>> = Vec::with_capacity(COLLISION_BODY_COUNT);
+
+    for i in 0..COLLISION_BODY_COUNT {
+        let mut area = Area3D::new_alloc();
+        area.set_name(&format!("BenchArea3D_{i}"));
+        root.clone().add_child(&area);
+        nodes.push(area.upcast());
+    }
+
+    nodes
+}
+
+/// Ensures a CollisionWatcher node exists in the scene tree.
+/// Returns the node (creates one if needed).
+fn ensure_collision_watcher() -> Gd<Node> {
+    let scene_tree = get_scene_tree();
+    let root = scene_tree.get_root().expect("Root should exist");
+
+    // Check if CollisionWatcher already exists
+    if let Some(watcher) = root.try_get_node_as::<Node>("CollisionWatcher") {
+        return watcher;
+    }
+
+    // Create a new CollisionWatcher
+    let mut watcher = CollisionWatcher::new_alloc();
+    watcher.set_name("CollisionWatcher");
+    root.clone().add_child(&watcher);
+    watcher.upcast()
+}
+
+/// Creates SceneTreeMessage events for collision body nodes with pre-analyzed collision masks.
+fn create_collision_body_messages(nodes: &[Gd<Node>]) -> Vec<SceneTreeMessage> {
+    let full_mask = COLLISION_MASK_BODY_ENTERED
+        | COLLISION_MASK_BODY_EXITED
+        | COLLISION_MASK_AREA_ENTERED
+        | COLLISION_MASK_AREA_EXITED;
+
+    nodes
+        .iter()
+        .map(|node| SceneTreeMessage {
+            node_id: GodotNodeHandle::from(node.instance_id()),
+            message_type: SceneTreeMessageType::NodeAdded,
+            node_type: Some("Area3D".to_string()),
+            node_name: Some(node.get_name().to_string()),
+            parent_id: node.get_parent().map(|p| p.instance_id()),
+            collision_mask: Some(full_mask),
+            groups: Some(vec![]),
+        })
+        .collect()
+}
+
+/// Benchmark: Process collision body NodeAdded messages (optimized path)
+///
+/// This measures the performance of processing Area3D nodes with collision
+/// signal connection using the optimized GDScript bulk operations path.
+/// Each Area3D has 4 collision signals that get connected.
+#[bench(repeat = 3)]
+fn scene_tree_process_collision_bodies_optimized() -> i32 {
+    let (mut app, sender) = setup_scene_tree_benchmark_app();
+    let nodes = create_collision_body_nodes();
+
+    // Ensure CollisionWatcher exists so signals get connected
+    let watcher = ensure_collision_watcher();
+
+    // Create messages with pre-analyzed collision masks (optimized path)
+    let messages = create_collision_body_messages(&nodes);
+
+    for msg in messages {
+        sender.send(msg).expect("Send should succeed");
+    }
+
+    app.world_mut().run_schedule(First);
+
+    let node_index = app.world().resource::<NodeEntityIndex>();
+    let result = node_index.len() as i32;
+
+    for mut node in nodes {
+        node.queue_free();
+    }
+
+    // Clean up watcher
+    watcher.clone().free();
+
+    result
+}
+
+/// Benchmark: Process collision body NodeAdded messages (fallback path)
+///
+/// This measures the performance when collision masks are NOT pre-analyzed,
+/// forcing the system to detect collision signals via FFI calls and connect
+/// them individually.
+#[bench(repeat = 3)]
+fn scene_tree_process_collision_bodies_fallback() -> i32 {
+    let (mut app, sender) = setup_scene_tree_benchmark_app();
+    let nodes = create_collision_body_nodes();
+
+    // Ensure CollisionWatcher exists so signals get connected
+    let watcher = ensure_collision_watcher();
+
+    // Create messages WITHOUT pre-analyzed collision masks (fallback path)
+    let messages: Vec<SceneTreeMessage> = nodes
+        .iter()
+        .map(|node| SceneTreeMessage {
+            node_id: GodotNodeHandle::from(node.instance_id()),
+            message_type: SceneTreeMessageType::NodeAdded,
+            node_type: None,
+            node_name: None,
+            parent_id: None,
+            collision_mask: None, // Force FFI-based collision mask detection
+            groups: None,
+        })
+        .collect();
+
+    for msg in messages {
+        sender.send(msg).expect("Send should succeed");
+    }
+
+    app.world_mut().run_schedule(First);
+
+    let node_index = app.world().resource::<NodeEntityIndex>();
+    let result = node_index.len() as i32;
+
+    for mut node in nodes {
+        node.queue_free();
+    }
+
+    // Clean up watcher
+    watcher.clone().free();
 
     result
 }

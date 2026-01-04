@@ -555,6 +555,10 @@ fn create_scene_tree_entity(
             find_node_by_name(&scene_root.clone().upcast(), "CollisionWatcher")
         });
 
+    // Collect collision bodies for batched signal connection
+    // Tuple: (instance_id as i64, collision_mask as u8)
+    let mut pending_collision_bodies: Vec<(i64, u8)> = Vec::new();
+
     for message in messages.into_iter() {
         trace!(target: "godot_scene_tree_messages", message = ?message);
 
@@ -608,7 +612,8 @@ fn create_scene_tree_entity(
                         .map(|_| collision_mask_from_node(&mut node))
                 });
 
-                if let Some(ref collision_watcher) = collision_watcher {
+                // Check if the node is a collision body and collect for batched signal connection
+                if collision_watcher.is_some() {
                     if let Some(mask) = collision_mask {
                         let is_collision_body =
                             collision_mask_has(mask, COLLISION_MASK_BODY_ENTERED)
@@ -619,47 +624,8 @@ fn create_scene_tree_entity(
                                    node_id = instance_id.to_string(),
                                    "is collision body");
 
-                            let node_clone = node.clone();
-
-                            if collision_mask_has(mask, COLLISION_MASK_BODY_ENTERED) {
-                                node.connect(
-                                    BODY_ENTERED,
-                                    &collision_watcher.callable("collision_event").bind(&[
-                                        node_clone.to_variant(),
-                                        CollisionMessageType::Started.to_variant(),
-                                    ]),
-                                );
-                            }
-
-                            if collision_mask_has(mask, COLLISION_MASK_BODY_EXITED) {
-                                node.connect(
-                                    BODY_EXITED,
-                                    &collision_watcher.callable("collision_event").bind(&[
-                                        node_clone.to_variant(),
-                                        CollisionMessageType::Ended.to_variant(),
-                                    ]),
-                                );
-                            }
-
-                            if collision_mask_has(mask, COLLISION_MASK_AREA_ENTERED) {
-                                node.connect(
-                                    AREA_ENTERED,
-                                    &collision_watcher.callable("collision_event").bind(&[
-                                        node_clone.to_variant(),
-                                        CollisionMessageType::Started.to_variant(),
-                                    ]),
-                                );
-                            }
-
-                            if collision_mask_has(mask, COLLISION_MASK_AREA_EXITED) {
-                                node.connect(
-                                    AREA_EXITED,
-                                    &collision_watcher.callable("collision_event").bind(&[
-                                        node_clone.to_variant(),
-                                        CollisionMessageType::Ended.to_variant(),
-                                    ]),
-                                );
-                            }
+                            // Collect for batched connection
+                            pending_collision_bodies.push((instance_id.to_i64(), mask));
 
                             // Add Collisions component to track collision state
                             ent.insert(Collisions::default());
@@ -744,6 +710,117 @@ fn create_scene_tree_entity(
                 }
             }
         }
+    }
+
+    // Batch connect collision signals if there are any pending
+    if !pending_collision_bodies.is_empty() {
+        if let Some(ref collision_watcher) = collision_watcher {
+            batch_connect_collision_signals(
+                &scene_root,
+                collision_watcher,
+                &pending_collision_bodies,
+            );
+        }
+    }
+}
+
+/// Batch connect collision signals using GDScript bulk operations.
+/// Falls back to individual connections if bulk operations node is not available.
+fn batch_connect_collision_signals(
+    scene_root: &Gd<godot::classes::Window>,
+    collision_watcher: &Gd<Node>,
+    pending_bodies: &[(i64, u8)],
+) {
+    use godot::builtin::PackedInt64Array;
+
+    // Try to find OptimizedBulkOperations node with the required method
+    let bulk_ops = scene_root
+        .get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
+        .or_else(|| scene_root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
+        .filter(|node| node.has_method("bulk_connect_collision_signals"));
+
+    if let Some(mut bulk_ops) = bulk_ops {
+        // Use batched GDScript call
+        let instance_ids: Vec<i64> = pending_bodies.iter().map(|(id, _)| *id).collect();
+        let collision_masks: Vec<i64> = pending_bodies
+            .iter()
+            .map(|(_, mask)| i64::from(*mask))
+            .collect();
+
+        let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
+        let masks_packed = PackedInt64Array::from(collision_masks.as_slice());
+
+        bulk_ops.call(
+            "bulk_connect_collision_signals",
+            &[
+                ids_packed.to_variant(),
+                masks_packed.to_variant(),
+                collision_watcher.to_variant(),
+            ],
+        );
+
+        debug!(target: "godot_scene_tree_collisions",
+               count = pending_bodies.len(),
+               "Batch connected collision signals");
+    } else {
+        // Fallback: connect signals individually
+        for (instance_id, mask) in pending_bodies {
+            let instance_id = InstanceId::from_i64(*instance_id);
+            if !instance_id.lookup_validity() {
+                continue;
+            }
+
+            // Get the node from instance ID
+            let Some(mut node) = Gd::<Node>::try_from_instance_id(instance_id).ok() else {
+                continue;
+            };
+
+            let node_clone = node.clone();
+
+            if collision_mask_has(*mask, COLLISION_MASK_BODY_ENTERED) {
+                node.connect(
+                    BODY_ENTERED,
+                    &collision_watcher.callable("collision_event").bind(&[
+                        node_clone.to_variant(),
+                        CollisionMessageType::Started.to_variant(),
+                    ]),
+                );
+            }
+
+            if collision_mask_has(*mask, COLLISION_MASK_BODY_EXITED) {
+                node.connect(
+                    BODY_EXITED,
+                    &collision_watcher.callable("collision_event").bind(&[
+                        node_clone.to_variant(),
+                        CollisionMessageType::Ended.to_variant(),
+                    ]),
+                );
+            }
+
+            if collision_mask_has(*mask, COLLISION_MASK_AREA_ENTERED) {
+                node.connect(
+                    AREA_ENTERED,
+                    &collision_watcher.callable("collision_event").bind(&[
+                        node_clone.to_variant(),
+                        CollisionMessageType::Started.to_variant(),
+                    ]),
+                );
+            }
+
+            if collision_mask_has(*mask, COLLISION_MASK_AREA_EXITED) {
+                node.connect(
+                    AREA_EXITED,
+                    &collision_watcher.callable("collision_event").bind(&[
+                        node_clone.to_variant(),
+                        CollisionMessageType::Ended.to_variant(),
+                    ]),
+                );
+            }
+        }
+
+        debug!(target: "godot_scene_tree_collisions",
+               count = pending_bodies.len(),
+               "Individually connected collision signals (bulk ops not available)");
     }
 }
 
