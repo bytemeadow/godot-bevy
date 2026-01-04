@@ -10,13 +10,49 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${CYAN}Building godot-bevy-itest...${NC}"
+# Parse arguments
+BUILD_TYPE="debug"
+CARGO_BUILD_FLAGS=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --release)
+            BUILD_TYPE="release"
+            CARGO_BUILD_FLAGS="--release"
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+echo -e "${CYAN}Building godot-bevy-itest ($BUILD_TYPE)...${NC}"
 
 # Build the Rust library
 cd "$(dirname "$0")/rust"
-cargo build
+cargo build $CARGO_BUILD_FLAGS
 
 cd ..
+
+# Generate .gdextension file with correct library paths for the build type
+cat > godot/itest.gdextension << EOF
+[configuration]
+entry_symbol = "godot_bevy_itest"
+compatibility_minimum = 4.2
+
+[libraries]
+linux.debug.x86_64 = "res://../../target/${BUILD_TYPE}/libgodot_bevy_itest.so"
+linux.release.x86_64 = "res://../../target/${BUILD_TYPE}/libgodot_bevy_itest.so"
+windows.debug.x86_64 = "res://../../target/${BUILD_TYPE}/godot_bevy_itest.dll"
+windows.release.x86_64 = "res://../../target/${BUILD_TYPE}/godot_bevy_itest.dll"
+macos.debug = "res://../../target/${BUILD_TYPE}/libgodot_bevy_itest.dylib"
+macos.release = "res://../../target/${BUILD_TYPE}/libgodot_bevy_itest.dylib"
+macos.debug.arm64 = "res://../../target/${BUILD_TYPE}/libgodot_bevy_itest.dylib"
+macos.release.arm64 = "res://../../target/${BUILD_TYPE}/libgodot_bevy_itest.dylib"
+EOF
+
+echo -e "${CYAN}Generated itest.gdextension for ${BUILD_TYPE} build${NC}"
 
 # Check for GODOT4_BIN environment variable
 if [ -z "$GODOT4_BIN" ]; then

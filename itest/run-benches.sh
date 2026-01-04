@@ -10,13 +10,33 @@ RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
-echo -e "${CYAN}Building godot-bevy-itest...${NC}"
+echo -e "${CYAN}Building godot-bevy-itest (release)...${NC}"
 
 # Build the Rust library in release mode for accurate benchmarks
 cd "$(dirname "$0")/rust"
 cargo build --release
 
 cd ..
+
+# Generate .gdextension file pointing to release build
+# This ensures Godot loads the release library regardless of editor/runtime mode
+cat > godot/itest.gdextension << EOF
+[configuration]
+entry_symbol = "godot_bevy_itest"
+compatibility_minimum = 4.2
+
+[libraries]
+linux.debug.x86_64 = "res://../../target/release/libgodot_bevy_itest.so"
+linux.release.x86_64 = "res://../../target/release/libgodot_bevy_itest.so"
+windows.debug.x86_64 = "res://../../target/release/godot_bevy_itest.dll"
+windows.release.x86_64 = "res://../../target/release/godot_bevy_itest.dll"
+macos.debug = "res://../../target/release/libgodot_bevy_itest.dylib"
+macos.release = "res://../../target/release/libgodot_bevy_itest.dylib"
+macos.debug.arm64 = "res://../../target/release/libgodot_bevy_itest.dylib"
+macos.release.arm64 = "res://../../target/release/libgodot_bevy_itest.dylib"
+EOF
+
+echo -e "${CYAN}Generated itest.gdextension for release build${NC}"
 
 # Check for GODOT4_BIN environment variable
 if [ -z "$GODOT4_BIN" ]; then
