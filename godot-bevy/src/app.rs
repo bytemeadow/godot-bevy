@@ -172,6 +172,10 @@ impl INode for BevyApp {
         #[cfg(debug_assertions)]
         self.register_optimized_bulk_operations();
 
+        // Register the optimized scene tree watcher early (before init check)
+        // This allows benchmarks and tools to use the watcher even without a full Bevy app
+        self.register_optimized_scene_tree_watcher();
+
         // If no init function is provided, don't initialize the Bevy app.
         // This allows the node to exist purely for GDScript utility methods (e.g., bulk transforms)
         // while tests create their own BevyApp instances with set_instance_init_func().

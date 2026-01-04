@@ -69,12 +69,7 @@ impl AudioOutput {
     // ===== DIRECT INDIVIDUAL SOUND CONTROL =====
 
     /// Set volume for a specific sound (direct execution)
-    pub fn set_sound_volume(
-        &mut self,
-        sound_id: SoundId,
-        volume: f32,
-        godot: &mut GodotAccess,
-    ) {
+    pub fn set_sound_volume(&mut self, sound_id: SoundId, volume: f32, godot: &mut GodotAccess) {
         let clamped_volume = volume.clamp(0.0, 1.0);
         if let Some(handle) = self.playing_sounds.get(&sound_id).copied() {
             set_audio_player_volume(godot, handle, clamped_volume);

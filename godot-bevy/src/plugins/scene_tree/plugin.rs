@@ -248,6 +248,10 @@ fn initialize_scene_tree(
         let collision_masks = result_dict
             .get("collision_masks")
             .map(|value| value.to::<godot::builtin::PackedInt64Array>());
+        // Groups is optional - only present in v2+ of the addon
+        let groups_array = result_dict
+            .get("groups")
+            .map(|value| value.to::<godot::builtin::VarArray>());
 
         let mut messages = Vec::new();
         let len = instance_ids.len().min(node_types.len());
@@ -258,30 +262,41 @@ fn initialize_scene_tree(
                     .as_ref()
                     .and_then(|names| names.get(i))
                     .map(|name| name.to_string());
-                let parent_id = parent_ids
-                    .as_ref()
-                    .and_then(|ids| ids.get(i))
-                    .and_then(|parent_id| {
-                        if parent_id > 0 {
-                            Some(InstanceId::from_i64(parent_id))
-                        } else {
-                            None
-                        }
-                    });
+                let parent_id =
+                    parent_ids
+                        .as_ref()
+                        .and_then(|ids| ids.get(i))
+                        .and_then(|parent_id| {
+                            if parent_id > 0 {
+                                Some(InstanceId::from_i64(parent_id))
+                            } else {
+                                None
+                            }
+                        });
                 let collision_mask = collision_masks
                     .as_ref()
                     .and_then(|masks| masks.get(i))
                     .and_then(|mask| u8::try_from(mask).ok());
+                // Parse groups if available (v2+ addon)
+                let groups = groups_array.as_ref().and_then(|arr| {
+                    arr.get(i).map(|variant| {
+                        let packed = variant.to::<godot::builtin::PackedStringArray>();
+                        packed
+                            .as_slice()
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect::<Vec<_>>()
+                    })
+                });
 
                 messages.push(SceneTreeMessage {
-                    node_id: GodotNodeHandle::from(godot::prelude::InstanceId::from_i64(
-                        id,
-                    )),
+                    node_id: GodotNodeHandle::from(godot::prelude::InstanceId::from_i64(id)),
                     message_type: SceneTreeMessageType::NodeAdded,
                     node_type: Some(type_str),
                     node_name,
                     parent_id,
                     collision_mask,
+                    groups,
                 });
             }
         }
@@ -313,6 +328,7 @@ fn traverse_fallback(node: Gd<Node>) -> Vec<SceneTreeMessage> {
             node_name: None,
             parent_id: None,
             collision_mask: None,
+            groups: None, // No groups optimization available
         });
 
         for child in node.get_children().iter_shared() {
@@ -333,6 +349,7 @@ pub struct SceneTreeMessage {
     pub node_name: Option<String>,
     pub parent_id: Option<InstanceId>,
     pub collision_mask: Option<u8>,
+    pub groups: Option<Vec<String>>, // Pre-analyzed groups from GDScript watcher (v2+)
 }
 
 #[derive(Copy, Clone, Debug, GodotConvert)]
@@ -476,6 +493,12 @@ impl<T: Inherits<Node>> From<&Gd<T>> for Groups {
     }
 }
 
+impl From<Vec<String>> for Groups {
+    fn from(groups: Vec<String>) -> Self {
+        Groups { groups }
+    }
+}
+
 #[doc(hidden)]
 pub struct SceneTreeMessageReader(pub std::sync::mpsc::Receiver<SceneTreeMessage>);
 
@@ -532,6 +555,7 @@ fn create_scene_tree_entity(
             node_name,
             parent_id,
             collision_mask,
+            groups,
         } = message;
         let instance_id = node_id.instance_id();
         let node_handle = node_id;
@@ -576,8 +600,9 @@ fn create_scene_tree_entity(
 
                 if let Some(ref collision_watcher) = collision_watcher {
                     if let Some(mask) = collision_mask {
-                        let is_collision_body = collision_mask_has(mask, COLLISION_MASK_BODY_ENTERED)
-                            || collision_mask_has(mask, COLLISION_MASK_AREA_ENTERED);
+                        let is_collision_body =
+                            collision_mask_has(mask, COLLISION_MASK_BODY_ENTERED)
+                                || collision_mask_has(mask, COLLISION_MASK_AREA_ENTERED);
 
                         if is_collision_body {
                             debug!(target: "godot_scene_tree_collisions",
@@ -632,7 +657,12 @@ fn create_scene_tree_entity(
                     }
                 }
 
-                ent.insert(Groups::from(&node));
+                // Use pre-analyzed groups from GDScript watcher if available, otherwise fallback to FFI
+                if let Some(groups_vec) = groups {
+                    ent.insert(Groups::from(groups_vec));
+                } else {
+                    ent.insert(Groups::from(&node));
+                }
 
                 // Add all components registered by plugins
                 component_registry.add_to_entity(&mut ent, &mut node_accessor);
@@ -646,7 +676,8 @@ fn create_scene_tree_entity(
                 super::autosync::try_add_bundles_for_node(commands, ent, godot, node_handle);
 
                 // Add GodotChildOf relationship to mirror Godot's scene tree hierarchy
-                let parent_id = parent_id.or_else(|| node.get_parent().map(|parent| parent.instance_id()));
+                let parent_id =
+                    parent_id.or_else(|| node.get_parent().map(|parent| parent.instance_id()));
                 if instance_id != scene_root.instance_id()
                     && let Some(parent_id) = parent_id
                 {
@@ -695,9 +726,8 @@ fn create_scene_tree_entity(
             }
             SceneTreeMessageType::NodeRenamed => {
                 if let Some((ent, _)) = ent {
-                    let name = node_name.unwrap_or_else(|| {
-                        godot.get::<Node>(node_handle).get_name().to_string()
-                    });
+                    let name = node_name
+                        .unwrap_or_else(|| godot.get::<Node>(node_handle).get_name().to_string());
                     commands.entity(ent).insert(Name::from(name));
                 } else {
                     trace!(target: "godot_scene_tree_messages", "Entity for renamed node was already despawned");

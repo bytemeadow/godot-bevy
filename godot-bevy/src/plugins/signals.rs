@@ -14,8 +14,8 @@ use godot::{
     prelude::{Callable, Variant},
 };
 use std::fmt::Debug;
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex};
 use tracing::error;
 
 /// Global, type-erased dispatch for typed signal messages
@@ -148,7 +148,8 @@ impl<T: Message + Send + 'static> Plugin for GodotTypedSignalsPlugin<T> {
         // Install global typed signal channel and consolidated drain once
         if !app.world().contains_resource::<GlobalTypedSignalSender>() {
             let (sender, receiver) = std::sync::mpsc::channel::<Box<dyn TypedDispatch>>();
-            app.world_mut().insert_resource(GlobalTypedSignalSender(sender));
+            app.world_mut()
+                .insert_resource(GlobalTypedSignalSender(sender));
             app.world_mut()
                 .insert_non_send_resource(GlobalTypedSignalReceiver(receiver));
 
@@ -235,9 +236,8 @@ struct PendingTypedSignalConnection<T: Message + Send + 'static> {
     node: GodotNodeHandle,
     signal_name: String,
     source_entity: Option<Entity>,
-    mapper: Box<
-        dyn FnMut(&[Variant], GodotNodeHandle, Option<Entity>) -> Option<T> + Send + 'static,
-    >,
+    mapper:
+        Box<dyn FnMut(&[Variant], GodotNodeHandle, Option<Entity>) -> Option<T> + Send + 'static>,
     sender: Sender<Box<dyn TypedDispatch>>,
 }
 
@@ -268,9 +268,12 @@ fn process_typed_deferred_signal_connections<T: Message + Send + 'static>(
         for conn in deferred.connections.drain(..) {
             let signal = conn.signal_name;
             let mapper = conn.mapper;
-            typed.connect_map(*handle, &signal, Some(entity), move |args, node_handle, ent| {
-                (mapper)(args, node_handle, ent)
-            });
+            typed.connect_map(
+                *handle,
+                &signal,
+                Some(entity),
+                move |args, node_handle, ent| (mapper)(args, node_handle, ent),
+            );
         }
         // Remove marker after wiring all deferred connections
         commands

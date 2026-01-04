@@ -1,6 +1,6 @@
+use crate::interop::GodotNodeHandle;
 use crate::plugins::core::PrePhysicsUpdate;
 use crate::plugins::scene_tree::NodeEntityIndex;
-use crate::interop::GodotNodeHandle;
 use bevy_app::{App, Plugin};
 use bevy_ecs::prelude::ReflectComponent;
 use bevy_ecs::{

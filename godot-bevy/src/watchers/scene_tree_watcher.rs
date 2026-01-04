@@ -43,6 +43,7 @@ impl SceneTreeWatcher {
                 node_name: None,
                 parent_id: None,
                 collision_mask: None,
+                groups: None,
             });
         }
     }
@@ -68,6 +69,7 @@ impl SceneTreeWatcher {
                 node_name: None,
                 parent_id: None,
                 collision_mask: None,
+                groups: None,
             });
         }
     }
@@ -111,6 +113,58 @@ impl SceneTreeWatcher {
                 node_name,
                 parent_id,
                 collision_mask,
+                groups: None,
+            });
+        }
+    }
+
+    #[func]
+    #[allow(clippy::too_many_arguments)] // FFI boundary function - arguments match GDScript call
+    pub fn scene_tree_event_typed_metadata_groups(
+        &self,
+        node: Gd<Node>,
+        message_type: SceneTreeMessageType,
+        node_type: String,
+        node_name: String,
+        parent_id: i64,
+        collision_mask: i64,
+        groups: PackedStringArray,
+    ) {
+        if node.has_meta("_bevy_exclude") {
+            return;
+        }
+
+        let node_type = if node_type.is_empty() {
+            None
+        } else {
+            Some(node_type)
+        };
+        let node_name = if node_name.is_empty() {
+            None
+        } else {
+            Some(node_name)
+        };
+        let parent_id = if parent_id > 0 {
+            Some(InstanceId::from_i64(parent_id))
+        } else {
+            None
+        };
+        let collision_mask = u8::try_from(collision_mask).ok();
+        let groups = groups
+            .as_slice()
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>();
+
+        if let Some(channel) = self.notification_channel.as_ref() {
+            let _ = channel.send(SceneTreeMessage {
+                node_id: GodotNodeHandle::from(node.instance_id()),
+                message_type,
+                node_type,
+                node_name,
+                parent_id,
+                collision_mask,
+                groups: Some(groups),
             });
         }
     }
@@ -140,6 +194,7 @@ impl SceneTreeWatcher {
                 node_name,
                 parent_id: None,
                 collision_mask: None,
+                groups: None,
             });
         }
     }

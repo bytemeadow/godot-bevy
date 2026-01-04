@@ -962,10 +962,7 @@ pub fn remove_comprehensive_node_type_markers(
     remove_universal_node_types_comprehensive(entity_commands, node);
 }
 
-fn check_3d_node_types_comprehensive(
-    entity_commands: &mut EntityCommands,
-    node: &mut GodotNode,
-) {
+fn check_3d_node_types_comprehensive(entity_commands: &mut EntityCommands, node: &mut GodotNode) {
     if node.try_get::<godot::classes::AimModifier3D>().is_some() {
         entity_commands.insert(AimModifier3DMarker);
     }
@@ -1313,10 +1310,7 @@ fn check_3d_node_types_comprehensive(
     }
 }
 
-fn remove_3d_node_types_comprehensive(
-    entity_commands: &mut EntityCommands,
-    _node: &mut GodotNode,
-) {
+fn remove_3d_node_types_comprehensive(entity_commands: &mut EntityCommands, _node: &mut GodotNode) {
     entity_commands
         .remove::<AimModifier3DMarker>()
         .remove::<AnimatableBody3DMarker>()
@@ -1405,10 +1399,7 @@ fn remove_3d_node_types_comprehensive(
         .remove::<OpenXRRenderModelManagerMarker>();
 }
 
-fn check_2d_node_types_comprehensive(
-    entity_commands: &mut EntityCommands,
-    node: &mut GodotNode,
-) {
+fn check_2d_node_types_comprehensive(entity_commands: &mut EntityCommands, node: &mut GodotNode) {
     if node.try_get::<godot::classes::AnimatableBody2D>().is_some() {
         entity_commands.insert(AnimatableBody2DMarker);
     }
@@ -1580,10 +1571,7 @@ fn check_2d_node_types_comprehensive(
     }
 }
 
-fn remove_2d_node_types_comprehensive(
-    entity_commands: &mut EntityCommands,
-    _node: &mut GodotNode,
-) {
+fn remove_2d_node_types_comprehensive(entity_commands: &mut EntityCommands, _node: &mut GodotNode) {
     entity_commands
         .remove::<AnimatableBody2DMarker>()
         .remove::<AnimatedSprite2DMarker>()

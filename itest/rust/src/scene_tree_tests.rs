@@ -331,8 +331,11 @@ fn test_node_handle_validity(ctx: &TestContext) -> godot::task::TaskHandle {
 
         // Find entity and verify handle points to correct node
         let position_match = app.with_world_mut(|world| {
-            let handles: Vec<GodotNodeHandle> =
-                world.query::<&GodotNodeHandle>().iter(world).copied().collect();
+            let handles: Vec<GodotNodeHandle> = world
+                .query::<&GodotNodeHandle>()
+                .iter(world)
+                .copied()
+                .collect();
             let mut system_state: bevy::ecs::system::SystemState<GodotAccess> =
                 bevy::ecs::system::SystemState::new(world);
             let mut godot = system_state.get_mut(world);

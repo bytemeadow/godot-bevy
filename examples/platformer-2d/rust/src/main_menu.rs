@@ -70,10 +70,7 @@ fn reset_menu_assets(mut menu_assets: ResMut<MenuAssets>) {
     menu_assets.signals_connected = false;
 }
 
-fn init_menu_assets(
-    mut menu_assets: ResMut<MenuAssets>,
-    mut scene_tree: SceneTreeRef,
-) {
+fn init_menu_assets(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTreeRef) {
     // Try to find menu nodes, but handle failure gracefully
     if let Some(root) = scene_tree.get().get_root() {
         // Try to create MenuUi - this might fail if nodes aren't ready yet
@@ -150,12 +147,11 @@ fn connect_buttons(
         }
 
         if let Some(quit_handle) = menu_assets.quit_button {
-            typed_quit.connect_map(
-                quit_handle,
-                "pressed",
-                None,
-                |_args, node_handle, _ent| Some(QuitRequested { source: node_handle }),
-            );
+            typed_quit.connect_map(quit_handle, "pressed", None, |_args, node_handle, _ent| {
+                Some(QuitRequested {
+                    source: node_handle,
+                })
+            });
         }
 
         menu_assets.signals_connected = true;

@@ -17,12 +17,7 @@ use tracing::trace;
 use crate::interop::{GodotAccess, GodotNodeHandle};
 
 /// Function type for creating bundles from Godot nodes
-pub type BundleCreatorFn = fn(
-    &mut Commands,
-    Entity,
-    &mut GodotAccess,
-    GodotNodeHandle,
-) -> bool;
+pub type BundleCreatorFn = fn(&mut Commands, Entity, &mut GodotAccess, GodotNodeHandle) -> bool;
 
 /// Registry entry for auto-sync bundles using the inventory crate
 pub struct AutoSyncBundleRegistry {

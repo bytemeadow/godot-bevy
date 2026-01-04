@@ -84,12 +84,9 @@ fn connect_start_button(
     typed: TypedGodotSignals<StartGameRequested>,
 ) {
     if let Some(handle) = menu_assets.start_button {
-        typed.connect_map(
-            handle,
-            "pressed",
-            None,
-            |_args, _node_handle, _ent| Some(StartGameRequested),
-        );
+        typed.connect_map(handle, "pressed", None, |_args, _node_handle, _ent| {
+            Some(StartGameRequested)
+        });
     }
 }
 

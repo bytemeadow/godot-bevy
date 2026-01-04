@@ -353,7 +353,7 @@ pub struct NodeMarker;
 // To regenerate: python scripts/generate_godot_types.py
 
 use bevy_ecs::system::EntityCommands;
-use crate::interop::{{GodotNodeHandle, node_markers::*}};
+use crate::interop::{{GodotNode, node_markers::*}};
 
 /// Adds appropriate marker components to an entity based on the Godot node type.
 /// This function is automatically generated and handles all {len(valid_types)} Godot node types.
@@ -362,7 +362,7 @@ use crate::interop::{{GodotNodeHandle, node_markers::*}};
 /// We check the major branches: 3D, 2D, Control (UI), and Universal (direct Node children)
 pub fn add_comprehensive_node_type_markers(
     entity_commands: &mut EntityCommands,
-    node: &mut GodotNodeHandle,
+    node: &mut GodotNode,
 ) {{
     // All nodes inherit from Node, so add this first
     entity_commands.insert(NodeMarker);
@@ -388,7 +388,7 @@ pub fn add_comprehensive_node_type_markers(
 /// Adds node type markers based on a pre-analyzed type string from GDScript.
 /// This avoids FFI calls by using type information determined on the GDScript side.
 /// This provides significant performance improvements by eliminating multiple
-/// GodotNodeHandle::try_get calls for each node.
+/// GodotNode::try_get calls for each node.
 pub fn add_node_type_markers_from_string(
     entity_commands: &mut EntityCommands,
     node_type: &str,
@@ -407,7 +407,7 @@ pub fn add_node_type_markers_from_string(
 
 pub fn remove_comprehensive_node_type_markers(
     entity_commands: &mut EntityCommands,
-    node: &mut GodotNodeHandle,
+    node: &mut GodotNode,
 ) {{
     // All nodes inherit from Node, so remove this first
     entity_commands.remove::<NodeMarker>();
@@ -692,8 +692,24 @@ func _on_node_added(node: Node):
 	var parent_id = parent and parent.get_instance_id() or 0
 	var collision_mask = _compute_collision_mask(node)
 
+	# Collect groups for this node
+	var node_groups = PackedStringArray()
+	for group in node.get_groups():
+		node_groups.append(group)
+
 	# Forward to Rust watcher with pre-analyzed metadata
-	if rust_watcher.has_method("scene_tree_event_typed_metadata"):
+	# Try newest API first (with groups), then fall back to older APIs
+	if rust_watcher.has_method("scene_tree_event_typed_metadata_groups"):
+		rust_watcher.scene_tree_event_typed_metadata_groups(
+			node,
+			"NodeAdded",
+			node_type,
+			node_name,
+			parent_id,
+			collision_mask,
+			node_groups
+		)
+	elif rust_watcher.has_method("scene_tree_event_typed_metadata"):
 		rust_watcher.scene_tree_event_typed_metadata(
 			node,
 			"NodeAdded",
@@ -893,7 +909,8 @@ func _analyze_node_type(node: Node) -> String:
 		"node_types": PackedStringArray,
 		"node_names": PackedStringArray,
 		"parent_ids": PackedInt64Array,
-		"collision_masks": PackedInt64Array
+		"collision_masks": PackedInt64Array,
+		"groups": Array[PackedStringArray]  # Added in v2 - may not be present in older addons
 	}
 	Used for optimized initial scene tree setup.
 	"""
@@ -902,19 +919,21 @@ func _analyze_node_type(node: Node) -> String:
 	var node_names = PackedStringArray()
 	var parent_ids = PackedInt64Array()
 	var collision_masks = PackedInt64Array()
+	var groups = []  # Array of PackedStringArrays
 	var root = get_tree().get_root()
 	if root:
-		_analyze_node_recursive(root, instance_ids, node_types, node_names, parent_ids, collision_masks)
+		_analyze_node_recursive(root, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)
 
 	return {
 		"instance_ids": instance_ids,
 		"node_types": node_types,
 		"node_names": node_names,
 		"parent_ids": parent_ids,
-		"collision_masks": collision_masks
+		"collision_masks": collision_masks,
+		"groups": groups
 	}
 
-func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_types: PackedStringArray, node_names: PackedStringArray, parent_ids: PackedInt64Array, collision_masks: PackedInt64Array):
+func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_types: PackedStringArray, node_names: PackedStringArray, parent_ids: PackedInt64Array, collision_masks: PackedInt64Array, groups: Array):
 	"""Recursively analyze nodes and collect type information into PackedArrays"""
 	# Check if node is still valid before processing
 	if not is_instance_valid(node):
@@ -932,6 +951,11 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 	var parent_id = parent and parent.get_instance_id() or 0
 	var collision_mask = _compute_collision_mask(node)
 
+	# Collect groups for this node
+	var node_groups = PackedStringArray()
+	for group in node.get_groups():
+		node_groups.append(group)
+
 	# Only append if we have valid data
 	if instance_id != 0 and node_type != "":
 		instance_ids.append(instance_id)
@@ -939,16 +963,17 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 		node_names.append(node_name)
 		parent_ids.append(parent_id)
 		collision_masks.append(collision_mask)
+		groups.append(node_groups)
 
 	# Recursively process children
 	for child in node.get_children():
-		_analyze_node_recursive(child, instance_ids, node_types, node_names, parent_ids, collision_masks)'''
+		_analyze_node_recursive(child, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)'''
 
     def _generate_hierarchy_function_comprehensive(self, name, types):
         """Generate a hierarchy-specific type checking function"""
         content = f"""fn check_{name}_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
-    node: &mut GodotNodeHandle,
+    node: &mut GodotNode,
 ) {{
 """
 
@@ -971,7 +996,7 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 
         content += f"""fn remove_{name}_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
-    _node: &mut GodotNodeHandle,
+    _node: &mut GodotNode,
 ) {{
     entity_commands
 """
@@ -1014,7 +1039,7 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
         """Generate the universal types checking function"""
         content = """fn check_universal_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
-    node: &mut GodotNodeHandle,
+    node: &mut GodotNode,
 ) {
 """
 
@@ -1037,7 +1062,7 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 
         content += """fn remove_universal_node_types_comprehensive(
     entity_commands: &mut EntityCommands,
-    _node: &mut GodotNodeHandle,
+    _node: &mut GodotNode,
 ) {
     entity_commands
 """

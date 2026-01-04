@@ -45,7 +45,7 @@ use godot_bevy_test::bench;
 // Conclusion: GDScript Full is optimal. Hybrid offers <1% improvement.
 // Pure FFI is ~2x slower. The relationship scales linearly.
 
-const ANALYSIS_NODE_COUNT: usize = 20000;
+const ANALYSIS_NODE_COUNT: usize = 500;
 
 /// Helper to create a mix of different node types for realistic benchmarking
 fn create_mixed_nodes() -> Vec<Gd<Node>> {
@@ -73,9 +73,10 @@ fn create_mixed_nodes() -> Vec<Gd<Node>> {
     nodes
 }
 
-/// Helper to find the OptimizedSceneTreeWatcher in the scene tree
-fn get_optimized_watcher() -> Option<Gd<Node>> {
-    use godot::classes::Engine;
+/// Helper to get or create the BenchmarkHelpers node
+/// Dynamically loads the script and instantiates it if not already present
+fn get_benchmark_helpers() -> Option<Gd<Node>> {
+    use godot::classes::{Engine, ResourceLoader};
 
     let scene_tree = Engine::singleton()
         .get_main_loop()
@@ -83,21 +84,43 @@ fn get_optimized_watcher() -> Option<Gd<Node>> {
 
     let root = scene_tree.get_root()?;
 
-    root.try_get_node_as::<Node>("BevyAppSingleton/OptimizedSceneTreeWatcher")
-        .or_else(|| {
-            root.try_get_node_as::<Node>("/root/BevyAppSingleton/OptimizedSceneTreeWatcher")
-        })
+    // Try to find existing BenchmarkHelpers
+    if let Some(helpers) = root
+        .try_get_node_as::<Node>("BevyAppSingleton/BenchmarkHelpers")
+        .or_else(|| root.try_get_node_as::<Node>("/root/BevyAppSingleton/BenchmarkHelpers"))
+    {
+        return Some(helpers);
+    }
+
+    // Not found - dynamically create it
+    let bevy_app = root.try_get_node_as::<Node>("BevyAppSingleton")?;
+
+    // Load the GDScript
+    let script = ResourceLoader::singleton()
+        .load("res://benchmark_helpers.gd")?
+        .try_cast::<godot::classes::Script>()
+        .ok()?;
+
+    // Create a new Node and attach the script
+    let mut helpers = Node::new_alloc();
+    helpers.set_name("BenchmarkHelpers");
+    helpers.set_script(&script);
+
+    // Add to the scene tree
+    bevy_app.clone().add_child(&helpers);
+
+    Some(helpers)
 }
 
 /// Benchmark: GDScript Full - all metadata from GDScript (current approach)
 ///
-/// Calls OptimizedSceneTreeWatcher.benchmark_analyze_nodes_full() which returns:
+/// Calls BenchmarkHelpers.benchmark_analyze_nodes_full() which returns:
 /// instance_ids, node_types, node_names, parent_ids, collision_masks
 #[bench(repeat = 3)]
 fn internal_scene_analysis_gdscript_full() -> i32 {
     let nodes = create_mixed_nodes();
 
-    let result = if let Some(mut watcher) = get_optimized_watcher() {
+    let result = if let Some(mut helpers) = get_benchmark_helpers() {
         // Convert Vec<Gd<Node>> to Godot VarArray
         let mut arr = godot::builtin::VarArray::new();
         for node in nodes.iter() {
@@ -105,7 +128,7 @@ fn internal_scene_analysis_gdscript_full() -> i32 {
         }
 
         // Call the GDScript benchmark method
-        let result = watcher.call("benchmark_analyze_nodes_full", &[arr.to_variant()]);
+        let result = helpers.call("benchmark_analyze_nodes_full", &[arr.to_variant()]);
         let dict = result.to::<godot::builtin::VarDictionary>();
 
         // Read from returned PackedArrays (this is what Rust does after GDScript call)
@@ -151,7 +174,7 @@ fn internal_scene_analysis_gdscript_full() -> i32 {
 
 /// Benchmark: GDScript Type-Only + FFI for rest
 ///
-/// Calls OptimizedSceneTreeWatcher.benchmark_analyze_nodes_type_only() which
+/// Calls BenchmarkHelpers.benchmark_analyze_nodes_type_only() which
 /// returns only instance_ids and node_types. Then Rust gets the rest via FFI.
 #[bench(repeat = 3)]
 fn internal_scene_analysis_gdscript_type_then_ffi() -> i32 {
@@ -162,7 +185,7 @@ fn internal_scene_analysis_gdscript_type_then_ffi() -> i32 {
     let area_entered = StringName::from("area_entered");
     let area_exited = StringName::from("area_exited");
 
-    let result = if let Some(mut watcher) = get_optimized_watcher() {
+    let result = if let Some(mut helpers) = get_benchmark_helpers() {
         // Convert Vec<Gd<Node>> to Godot VarArray
         let mut arr = godot::builtin::VarArray::new();
         for node in nodes.iter() {
@@ -170,7 +193,7 @@ fn internal_scene_analysis_gdscript_type_then_ffi() -> i32 {
         }
 
         // Call the GDScript benchmark method (type only)
-        let result = watcher.call("benchmark_analyze_nodes_type_only", &[arr.to_variant()]);
+        let result = helpers.call("benchmark_analyze_nodes_type_only", &[arr.to_variant()]);
         let dict = result.to::<godot::builtin::VarDictionary>();
 
         let instance_ids = dict
@@ -221,6 +244,75 @@ fn internal_scene_analysis_gdscript_type_then_ffi() -> i32 {
     }
 
     result
+}
+
+/// Benchmark: GDScript Full with Groups - all metadata INCLUDING groups
+///
+/// Tests if adding groups to the bulk GDScript analysis is worthwhile.
+#[bench(repeat = 3)]
+fn internal_scene_analysis_gdscript_full_with_groups() -> i32 {
+    let nodes = create_mixed_nodes();
+
+    let result = if let Some(mut helpers) = get_benchmark_helpers() {
+        let mut arr = godot::builtin::VarArray::new();
+        for node in nodes.iter() {
+            arr.push(&node.to_variant());
+        }
+
+        let result = helpers.call(
+            "benchmark_analyze_nodes_full_with_groups",
+            &[arr.to_variant()],
+        );
+        let dict = result.to::<godot::builtin::VarDictionary>();
+
+        let instance_ids = dict
+            .get("instance_ids")
+            .map(|v| v.to::<godot::builtin::PackedInt64Array>());
+        let node_types = dict
+            .get("node_types")
+            .map(|v| v.to::<godot::builtin::PackedStringArray>());
+        let _groups = dict
+            .get("groups")
+            .map(|v| v.to::<godot::builtin::VarArray>());
+
+        let mut total = 0i32;
+        if let (Some(ids), Some(types)) = (instance_ids, node_types) {
+            for i in 0..ids.len() {
+                let _id = ids.get(i);
+                let _type = types.get(i);
+                total += 1;
+            }
+        }
+        total
+    } else {
+        nodes.len() as i32
+    };
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+/// Benchmark: FFI get_groups only
+///
+/// Measures the cost of calling get_groups() via FFI for each node.
+#[bench(repeat = 3)]
+fn internal_scene_analysis_ffi_groups_only() -> i32 {
+    let nodes = create_mixed_nodes();
+
+    let mut total = 0i32;
+    for node in nodes.iter() {
+        let groups = node.get_groups();
+        total += groups.len() as i32;
+    }
+
+    for node in nodes {
+        node.free();
+    }
+
+    total
 }
 
 /// Benchmark: Pure FFI metadata (no type detection)

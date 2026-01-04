@@ -60,7 +60,10 @@ impl<'w> GodotAccess<'w> {
 
     /// Create a scoped node accessor tied to this main-thread guard.
     pub fn node<'a>(&'a mut self, handle: GodotNodeHandle) -> GodotNode<'a, 'w> {
-        GodotNode { godot: self, handle }
+        GodotNode {
+            godot: self,
+            handle,
+        }
     }
 }
 

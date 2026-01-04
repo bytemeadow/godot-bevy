@@ -1,12 +1,12 @@
 //! Main audio plugin and systems
 use crate::interop::{GodotAccess, GodotNodeHandle};
 use crate::plugins::assets::GodotResource;
+use crate::plugins::audio::output::{
+    AudioPlayer, stop_and_free_audio_player, try_get_audio_player,
+};
 use crate::plugins::audio::{
     ActiveTween, AudioChannel, AudioChannelMarker, AudioCommand, AudioOutput, AudioPlayerType,
     AudioSettings, ChannelId, ChannelState, MainAudioTrack, PlayCommand, SoundId, TweenType,
-};
-use crate::plugins::audio::output::{
-    AudioPlayer, stop_and_free_audio_player, try_get_audio_player,
 };
 use crate::plugins::scene_tree::SceneTreeRef;
 use bevy_app::{App, Plugin, Update};
@@ -127,7 +127,9 @@ fn audio_main_thread(
                 .is_none()
                 {
                     // Asset not ready, re-queue for next frame
-                    audio_channels.command_queue.push_front(AudioCommand::Play(play_cmd));
+                    audio_channels
+                        .command_queue
+                        .push_front(AudioCommand::Play(play_cmd));
                     warn!("Audio asset not ready, re-queued for next frame");
                     break; // Stop processing this frame to avoid infinite retry loop
                 }

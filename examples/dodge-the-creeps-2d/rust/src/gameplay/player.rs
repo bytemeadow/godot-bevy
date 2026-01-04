@@ -13,10 +13,7 @@ use godot::{
     builtin::{StringName, Vector2},
     classes::{Input, Node2D},
 };
-use godot_bevy::{
-    plugins::core::PhysicsDelta,
-    prelude::*,
-};
+use godot_bevy::{plugins::core::PhysicsDelta, prelude::*};
 
 #[derive(AssetCollection, Resource, Debug)]
 pub struct PlayerAssets {

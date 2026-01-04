@@ -53,8 +53,6 @@ func _on_node_added(node: Node):
 		return
 
 	# Check if node is marked to be excluded from scene tree watcher
-	# This is used by godot-bevy-inspector and other tools that add nodes
-	# that shouldn't be tracked as Bevy entities
 	if node.has_meta("_bevy_exclude"):
 		return
 
@@ -65,8 +63,24 @@ func _on_node_added(node: Node):
 	var parent_id = parent and parent.get_instance_id() or 0
 	var collision_mask = _compute_collision_mask(node)
 
+	# Collect groups for this node
+	var node_groups = PackedStringArray()
+	for group in node.get_groups():
+		node_groups.append(group)
+
 	# Forward to Rust watcher with pre-analyzed metadata
-	if rust_watcher.has_method("scene_tree_event_typed_metadata"):
+	# Try newest API first (with groups), then fall back to older APIs
+	if rust_watcher.has_method("scene_tree_event_typed_metadata_groups"):
+		rust_watcher.scene_tree_event_typed_metadata_groups(
+			node,
+			"NodeAdded",
+			node_type,
+			node_name,
+			parent_id,
+			collision_mask,
+			node_groups
+		)
+	elif rust_watcher.has_method("scene_tree_event_typed_metadata"):
 		rust_watcher.scene_tree_event_typed_metadata(
 			node,
 			"NodeAdded",
@@ -346,7 +360,8 @@ func analyze_initial_tree() -> Dictionary:
 		"node_types": PackedStringArray,
 		"node_names": PackedStringArray,
 		"parent_ids": PackedInt64Array,
-		"collision_masks": PackedInt64Array
+		"collision_masks": PackedInt64Array,
+		"groups": Array[PackedStringArray]  # Added in v2 - may not be present in older addons
 	}
 	Used for optimized initial scene tree setup.
 	"""
@@ -355,71 +370,21 @@ func analyze_initial_tree() -> Dictionary:
 	var node_names = PackedStringArray()
 	var parent_ids = PackedInt64Array()
 	var collision_masks = PackedInt64Array()
+	var groups = []  # Array of PackedStringArrays
 	var root = get_tree().get_root()
 	if root:
-		_analyze_node_recursive(root, instance_ids, node_types, node_names, parent_ids, collision_masks)
+		_analyze_node_recursive(root, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)
 
 	return {
 		"instance_ids": instance_ids,
 		"node_types": node_types,
 		"node_names": node_names,
 		"parent_ids": parent_ids,
-		"collision_masks": collision_masks
+		"collision_masks": collision_masks,
+		"groups": groups
 	}
 
-# =============================================================================
-# Benchmark Methods - for comparing different analysis strategies
-# =============================================================================
-
-func benchmark_analyze_nodes_full(nodes: Array[Node]) -> Dictionary:
-	"""
-	Benchmark method: Analyze nodes with ALL metadata (current approach).
-	Returns instance_ids, node_types, node_names, parent_ids, collision_masks.
-	"""
-	var instance_ids = PackedInt64Array()
-	var node_types = PackedStringArray()
-	var node_names = PackedStringArray()
-	var parent_ids = PackedInt64Array()
-	var collision_masks = PackedInt64Array()
-
-	for node in nodes:
-		if not is_instance_valid(node):
-			continue
-		instance_ids.append(node.get_instance_id())
-		node_types.append(_analyze_node_type(node))
-		node_names.append(node.name)
-		var parent = node.get_parent()
-		parent_ids.append(parent.get_instance_id() if parent else 0)
-		collision_masks.append(_compute_collision_mask(node))
-
-	return {
-		"instance_ids": instance_ids,
-		"node_types": node_types,
-		"node_names": node_names,
-		"parent_ids": parent_ids,
-		"collision_masks": collision_masks
-	}
-
-func benchmark_analyze_nodes_type_only(nodes: Array[Node]) -> Dictionary:
-	"""
-	Benchmark method: Analyze nodes with ONLY node_type (hybrid approach).
-	Rust would get the rest (name, parent, collision) via FFI.
-	"""
-	var instance_ids = PackedInt64Array()
-	var node_types = PackedStringArray()
-
-	for node in nodes:
-		if not is_instance_valid(node):
-			continue
-		instance_ids.append(node.get_instance_id())
-		node_types.append(_analyze_node_type(node))
-
-	return {
-		"instance_ids": instance_ids,
-		"node_types": node_types
-	}
-
-func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_types: PackedStringArray, node_names: PackedStringArray, parent_ids: PackedInt64Array, collision_masks: PackedInt64Array):
+func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_types: PackedStringArray, node_names: PackedStringArray, parent_ids: PackedInt64Array, collision_masks: PackedInt64Array, groups: Array):
 	"""Recursively analyze nodes and collect type information into PackedArrays"""
 	# Check if node is still valid before processing
 	if not is_instance_valid(node):
@@ -437,6 +402,11 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 	var parent_id = parent and parent.get_instance_id() or 0
 	var collision_mask = _compute_collision_mask(node)
 
+	# Collect groups for this node
+	var node_groups = PackedStringArray()
+	for group in node.get_groups():
+		node_groups.append(group)
+
 	# Only append if we have valid data
 	if instance_id != 0 and node_type != "":
 		instance_ids.append(instance_id)
@@ -444,7 +414,8 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 		node_names.append(node_name)
 		parent_ids.append(parent_id)
 		collision_masks.append(collision_mask)
+		groups.append(node_groups)
 
 	# Recursively process children
 	for child in node.get_children():
-		_analyze_node_recursive(child, instance_ids, node_types, node_names, parent_ids, collision_masks)
+		_analyze_node_recursive(child, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)
