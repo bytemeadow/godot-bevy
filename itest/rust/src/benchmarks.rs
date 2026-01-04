@@ -1,226 +1,150 @@
-use godot::builtin::PackedInt64Array;
-use godot::classes::Engine;
+//! Benchmarks for godot-bevy systems
+//!
+//! These benchmarks test the actual godot-bevy systems rather than raw FFI overhead.
+//! They measure real-world performance of syncing transforms between Bevy and Godot.
+
+use godot::classes::{Node2D, Node3D};
 use godot::obj::NewAlloc;
 use godot::prelude::*;
+use godot_bevy::bevy_app::{App, Last, PreUpdate};
+use godot_bevy::bevy_math::Vec3;
+use godot_bevy::bevy_transform::components::Transform as BevyTransform;
+use godot_bevy::interop::{GodotMainThread, GodotNodeHandle, Node2DMarker, Node3DMarker};
+use godot_bevy::plugins::transforms::{
+    GodotTransformSyncPlugin, GodotTransformSyncPluginExt, TransformSyncMetadata, TransformSyncMode,
+};
 use godot_bevy_test::bench;
 
 // =============================================================================
-// Scene Tree Benchmarks
+// Transform Sync Benchmarks
 // =============================================================================
-// These benchmarks measure the performance of our scene tree node analysis,
-// comparing the cost of FFI type detection vs GDScript pre-analysis.
+// These benchmarks measure the performance of our transform synchronization
+// systems - the actual code that syncs transforms between Bevy ECS and Godot.
 
-const SCENE_TREE_NODE_COUNT: usize = 1000;
+const NODE_COUNT: usize = 1000;
 
-fn get_bulk_operations_node() -> Gd<Node> {
-    let scene_tree = Engine::singleton()
-        .get_main_loop()
-        .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
-        .expect("Failed to get SceneTree");
-    let root = scene_tree.get_root().expect("Failed to get root node");
+/// Creates a Bevy App configured with transform sync plugin and test entities.
+/// Returns the app and the Godot nodes (to keep them alive).
+fn setup_3d_benchmark_app() -> (App, Vec<Gd<Node3D>>) {
+    let mut app = App::new();
 
-    // Try to find existing node
-    if let Some(node) = root
-        .get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
-        .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
-    {
-        return node;
-    }
+    // Initialize schedules manually (avoid plugin duplication issues)
+    app.init_schedule(PreUpdate);
+    app.init_schedule(Last);
 
-    // Node doesn't exist (e.g., release build where it's not auto-registered)
-    // Create it dynamically for benchmarks
-    let mut bevy_app = root
-        .get_node_or_null("BevyAppSingleton")
-        .or_else(|| root.get_node_or_null("/root/BevyAppSingleton"))
-        .expect("BevyAppSingleton not found - ensure it is configured as an autoload");
+    // Add transform sync plugin
+    app.add_plugins(GodotTransformSyncPlugin::default().with_sync_mode(TransformSyncMode::TwoWay));
 
-    let path = "res://addons/godot-bevy/optimized_bulk_operations.gd";
-    let mut resource_loader = godot::classes::ResourceLoader::singleton();
+    // Insert the GodotMainThread resource (required for GodotAccess)
+    app.insert_non_send_resource(GodotMainThread);
 
-    if let Some(resource) = resource_loader.load(path)
-        && let Ok(mut script) = resource.try_cast::<godot::classes::GDScript>()
-        && let Ok(instance) = script.try_instantiate(&[])
-        && let Ok(mut node) = instance.try_to::<Gd<Node>>()
-    {
-        node.set_name("OptimizedBulkOperations");
-        bevy_app.add_child(&node);
-        node
-    } else {
-        panic!("Failed to create OptimizedBulkOperations node from GDScript");
-    }
-}
+    let mut nodes: Vec<Gd<Node3D>> = Vec::with_capacity(NODE_COUNT);
 
-/// Measures the cost of node type analysis WITHOUT OptimizedSceneTreeWatcher.
-///
-/// This simulates what `create_scene_tree_entity` would do if we didn't have
-/// the GDScript watcher pre-analyzing node types. For each node, Rust would need to:
-/// - get_name() - 1 FFI call
-/// - has_signal() x4 for collision detection - 4 FFI calls
-/// - get_groups() - 1 FFI call
-/// - get_parent() - 1 FFI call
-/// - try_from_instance_id for type detection - up to 199 FFI calls
-///
-/// The type detection uses `Gd::try_from_instance_id` which is the same pattern
-/// as `GodotNode::try_get` in `add_comprehensive_node_type_markers`.
-#[bench(repeat = 3)]
-fn scene_tree_node_analysis_ffi() -> i32 {
-    let mut nodes: Vec<Gd<Node>> = Vec::with_capacity(SCENE_TREE_NODE_COUNT);
-    for i in 0..SCENE_TREE_NODE_COUNT {
-        let mut node: Gd<Node> = match i % 4 {
-            0 => Node3D::new_alloc().upcast(),
-            1 => Node2D::new_alloc().upcast(),
-            2 => godot::classes::Area3D::new_alloc().upcast(),
-            _ => godot::classes::RigidBody3D::new_alloc().upcast(),
-        };
-        node.set_name(&format!("Node_{i}"));
+    for i in 0..NODE_COUNT {
+        let mut node = Node3D::new_alloc();
+        node.set_name(&format!("BenchNode3D_{i}"));
+        node.set_position(Vector3::new(i as f32, 0.0, 0.0));
+
+        let handle = GodotNodeHandle::new(node.clone());
+        let transform = BevyTransform::from_xyz(i as f32, 0.0, 0.0);
+
+        app.world_mut().spawn((
+            handle,
+            transform,
+            TransformSyncMetadata::default(),
+            Node3DMarker,
+        ));
+
         nodes.push(node);
     }
 
-    let mut result = 0i32;
+    (app, nodes)
+}
 
-    for node in &nodes {
-        let instance_id = node.instance_id();
+/// Creates a Bevy App configured for 2D transform sync benchmarking.
+fn setup_2d_benchmark_app() -> (App, Vec<Gd<Node2D>>) {
+    let mut app = App::new();
 
-        // 1. Get node name
-        let name = node.get_name();
-        result += name.len() as i32;
+    // Initialize schedules manually (avoid plugin duplication issues)
+    app.init_schedule(PreUpdate);
+    app.init_schedule(Last);
 
-        // 2. Check collision signals (collision_mask_from_node - 4 FFI calls)
-        if node.has_signal("body_entered") {
-            result += 1;
-        }
-        if node.has_signal("body_exited") {
-            result += 1;
-        }
-        if node.has_signal("area_entered") {
-            result += 1;
-        }
-        if node.has_signal("area_exited") {
-            result += 1;
-        }
+    // Add transform sync plugin
+    app.add_plugins(GodotTransformSyncPlugin::default().with_sync_mode(TransformSyncMode::TwoWay));
+    app.insert_non_send_resource(GodotMainThread);
 
-        // 3. Get groups
-        let groups = node.get_groups();
-        result += groups.len() as i32;
+    let mut nodes: Vec<Gd<Node2D>> = Vec::with_capacity(NODE_COUNT);
 
-        // 4. Get parent for hierarchy
-        if node.get_parent().is_some() {
-            result += 1;
-        }
+    for i in 0..NODE_COUNT {
+        let mut node = Node2D::new_alloc();
+        node.set_name(&format!("BenchNode2D_{i}"));
+        node.set_position(Vector2::new(i as f32, 0.0));
 
-        // 5. Type detection via try_from_instance_id
-        // The real function does up to 199 try_get calls. We simulate a representative subset.
-        if Gd::<Node3D>::try_from_instance_id(instance_id).is_ok() {
-            result += 1;
-            // Check specific 3D types (sample of 20 common types)
-            if Gd::<godot::classes::MeshInstance3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::Camera3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::Area3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::RigidBody3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::StaticBody3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::CharacterBody3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::CollisionShape3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::DirectionalLight3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::OmniLight3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::SpotLight3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::AnimatedSprite3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::Sprite3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::GpuParticles3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::CpuParticles3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::Path3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::PathFollow3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::RayCast3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::ShapeCast3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::Skeleton3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::BoneAttachment3D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-        } else if Gd::<Node2D>::try_from_instance_id(instance_id).is_ok() {
-            result += 1;
-            // Sample of 2D types
-            if Gd::<godot::classes::Sprite2D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::AnimatedSprite2D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::Area2D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::RigidBody2D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::StaticBody2D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::CharacterBody2D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::CollisionShape2D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::Camera2D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::TileMap>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-            if Gd::<godot::classes::Path2D>::try_from_instance_id(instance_id).is_ok() {
-                result += 1;
-            }
-        } else if Gd::<godot::classes::Control>::try_from_instance_id(instance_id).is_ok() {
-            result += 1;
-        }
+        let handle = GodotNodeHandle::new(node.clone());
+        let transform = BevyTransform::from_xyz(i as f32, 0.0, 0.0);
 
-        // Universal types check (always done)
-        if Gd::<godot::classes::Timer>::try_from_instance_id(instance_id).is_ok() {
-            result += 1;
-        }
-        if Gd::<godot::classes::AudioStreamPlayer>::try_from_instance_id(instance_id).is_ok() {
-            result += 1;
-        }
-        if Gd::<godot::classes::CanvasLayer>::try_from_instance_id(instance_id).is_ok() {
-            result += 1;
-        }
+        app.world_mut().spawn((
+            handle,
+            transform,
+            TransformSyncMetadata::default(),
+            Node2DMarker,
+        ));
+
+        nodes.push(node);
     }
+
+    (app, nodes)
+}
+
+// =============================================================================
+// 3D Transform Sync Benchmarks
+// =============================================================================
+
+/// Benchmark: Write transforms from Bevy to Godot (3D) using actual systems
+///
+/// This runs the real post_update_godot_transforms system that syncs
+/// Bevy transform changes to Godot nodes.
+#[bench(repeat = 3)]
+fn transform_sync_bevy_to_godot_3d() -> i32 {
+    let (mut app, nodes) = setup_3d_benchmark_app();
+
+    // Modify all Bevy transforms to trigger change detection
+    let mut query = app.world_mut().query::<&mut BevyTransform>();
+    for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
+        transform.translation = Vec3::new(i as f32 * 2.0, i as f32, 0.0);
+    }
+
+    // Run the Last schedule which contains the sync system
+    app.world_mut().run_schedule(Last);
+
+    let result = nodes.len() as i32;
+
+    // Cleanup
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+/// Benchmark: Read transforms from Godot into Bevy (3D) using actual systems
+///
+/// This runs the real pre_update_godot_transforms system that syncs
+/// Godot node transforms into Bevy.
+#[bench(repeat = 3)]
+fn transform_sync_godot_to_bevy_3d() -> i32 {
+    let (mut app, nodes) = setup_3d_benchmark_app();
+
+    // Modify Godot transforms to simulate physics/animation changes
+    for (i, node) in nodes.iter().enumerate() {
+        let mut node = node.clone();
+        node.set_position(Vector3::new(i as f32 * 2.0, i as f32, 0.0));
+    }
+
+    // Run the PreUpdate schedule which contains the sync system
+    app.world_mut().run_schedule(PreUpdate);
+
+    let result = nodes.len() as i32;
 
     for node in nodes {
         node.free();
@@ -229,44 +153,121 @@ fn scene_tree_node_analysis_ffi() -> i32 {
     result
 }
 
-/// Measures the cost of node type analysis WITH OptimizedSceneTreeWatcher.
-///
-/// This simulates what actually happens: GDScript receives the node in `_on_node_added`,
-/// analyzes it using native `is` type checks (fast in GDScript), and sends pre-analyzed
-/// data to Rust. Rust then just does string matching instead of FFI type detection.
-#[bench(repeat = 3)]
-fn scene_tree_node_analysis_gdscript() -> i32 {
-    let mut nodes: Vec<Gd<Node>> = Vec::with_capacity(SCENE_TREE_NODE_COUNT);
-    let mut instance_ids = Vec::with_capacity(SCENE_TREE_NODE_COUNT);
+// =============================================================================
+// 2D Transform Sync Benchmarks
+// =============================================================================
 
-    for i in 0..SCENE_TREE_NODE_COUNT {
-        let mut node: Gd<Node> = match i % 4 {
-            0 => Node3D::new_alloc().upcast(),
-            1 => Node2D::new_alloc().upcast(),
-            2 => godot::classes::Area3D::new_alloc().upcast(),
-            _ => godot::classes::RigidBody3D::new_alloc().upcast(),
-        };
-        node.set_name(&format!("Node_{i}"));
-        instance_ids.push(node.instance_id().to_i64());
-        nodes.push(node);
+/// Benchmark: Write transforms from Bevy to Godot (2D) using actual systems
+#[bench(repeat = 3)]
+fn transform_sync_bevy_to_godot_2d() -> i32 {
+    let (mut app, nodes) = setup_2d_benchmark_app();
+
+    let mut query = app.world_mut().query::<&mut BevyTransform>();
+    for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
+        transform.translation = Vec3::new(i as f32 * 2.0, i as f32, 0.0);
     }
 
-    let mut bulk_ops = get_bulk_operations_node();
-    let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
+    app.world_mut().run_schedule(Last);
 
-    // Call bulk analysis (simulates what GDScript watcher does)
-    let analysis = bulk_ops
-        .call("bulk_analyze_nodes", &[ids_packed.to_variant()])
-        .to::<godot::builtin::VarDictionary>();
+    let result = nodes.len() as i32;
 
-    let result = if let Some(types) = analysis
-        .get("node_types")
-        .map(|v| v.to::<godot::builtin::PackedStringArray>())
-    {
-        types.len() as i32
-    } else {
-        -1
-    };
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+/// Benchmark: Read transforms from Godot into Bevy (2D) using actual systems
+#[bench(repeat = 3)]
+fn transform_sync_godot_to_bevy_2d() -> i32 {
+    let (mut app, nodes) = setup_2d_benchmark_app();
+
+    for (i, node) in nodes.iter().enumerate() {
+        let mut node = node.clone();
+        node.set_position(Vector2::new(i as f32 * 2.0, i as f32));
+    }
+
+    app.world_mut().run_schedule(PreUpdate);
+
+    let result = nodes.len() as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+// =============================================================================
+// Full Round-Trip Benchmark
+// =============================================================================
+
+/// Benchmark: Complete transform sync cycle (both directions) for 3D
+///
+/// This represents a complete frame's worth of transform synchronization:
+/// 1. PreUpdate: Read Godot transforms into Bevy
+/// 2. Game logic modifies some transforms
+/// 3. PostUpdate: Write Bevy transforms back to Godot
+#[bench(repeat = 3)]
+fn transform_sync_roundtrip_3d() -> i32 {
+    let (mut app, nodes) = setup_3d_benchmark_app();
+
+    // Simulate Godot physics moving nodes
+    for (i, node) in nodes.iter().enumerate() {
+        let mut node = node.clone();
+        node.set_position(Vector3::new(i as f32, (i as f32).sin(), 0.0));
+    }
+
+    // Phase 1: Sync Godot -> Bevy (PreUpdate)
+    app.world_mut().run_schedule(PreUpdate);
+
+    // Phase 2: Simulate game logic modifying transforms
+    let mut query = app.world_mut().query::<&mut BevyTransform>();
+    for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
+        if i % 2 == 0 {
+            transform.translation.y += 10.0;
+        }
+    }
+
+    // Phase 3: Sync Bevy -> Godot (Last)
+    app.world_mut().run_schedule(Last);
+
+    let result = nodes.len() as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+/// Benchmark: Complete transform sync cycle (both directions) for 2D
+#[bench(repeat = 3)]
+fn transform_sync_roundtrip_2d() -> i32 {
+    let (mut app, nodes) = setup_2d_benchmark_app();
+
+    // Simulate Godot physics moving nodes
+    for (i, node) in nodes.iter().enumerate() {
+        let mut node = node.clone();
+        node.set_position(Vector2::new(i as f32, (i as f32).sin()));
+    }
+
+    // Phase 1: Sync Godot -> Bevy (PreUpdate)
+    app.world_mut().run_schedule(PreUpdate);
+
+    // Phase 2: Simulate game logic modifying transforms
+    let mut query = app.world_mut().query::<&mut BevyTransform>();
+    for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
+        if i % 2 == 0 {
+            transform.translation.y += 10.0;
+        }
+    }
+
+    // Phase 3: Sync Bevy -> Godot (Last)
+    app.world_mut().run_schedule(Last);
+
+    let result = nodes.len() as i32;
 
     for node in nodes {
         node.free();
