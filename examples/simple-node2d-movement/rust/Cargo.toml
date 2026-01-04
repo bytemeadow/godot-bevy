@@ -1,5 +1,5 @@
 [package]
-name = "rust-simple-node2d-movement"
+name = "simple-node2d-movement-example"
 version = "0.1.0"
 edition = "2024"
 

@@ -1,5 +1,5 @@
 [package]
-name = "rust-perf-test"
+name = "perf-test"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.82"
@@ -19,10 +19,10 @@ godot-bevy = { path = "../../../godot-bevy" }
 which = "7.0.3"
 tracing = "0.1"
 tracing-tracy = { version = "0.11.4", default-features = false, features = [
-  "enable",
-  "manual-lifetime",
-  "ondemand",
-  "broadcast",       # announce presence
+    "enable",
+    "manual-lifetime",
+    "ondemand",
+    "broadcast", # announce presence
 ], optional = true }
 
 [features]

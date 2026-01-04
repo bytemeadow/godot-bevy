@@ -1,5 +1,5 @@
 [package]
-name = "avian_physics_test"
+name = "avian-physics-example"
 version = "0.1.0"
 edition = "2024"
 
@@ -13,9 +13,9 @@ name = "avian_physics_test"
 [dependencies]
 avian3d = "0.4"
 bevy = { version = "0.17", default-features = false, features = [
-  "bevy_state",
-  "bevy_log",
-  "multi_threaded",
+    "bevy_state",
+    "bevy_log",
+    "multi_threaded",
 ] }
 bevy_asset_loader = "0.24"
 godot = "0.4"
