@@ -117,6 +117,7 @@ impl BevyApp {
         }
     }
 
+    #[cfg(debug_assertions)]
     fn register_optimized_bulk_operations(&mut self) {
         // Check if OptimizedBulkOperations already exists (e.g., loaded from tscn)
         if self.base().has_node("OptimizedBulkOperations") {

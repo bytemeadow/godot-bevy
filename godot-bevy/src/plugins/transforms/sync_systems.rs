@@ -1,19 +1,25 @@
-use crate::interop::{GodotAccess, GodotNodeHandle};
 use crate::interop::node_markers::{Node2DMarker, Node3DMarker};
+use crate::interop::{GodotAccess, GodotNodeHandle};
 use crate::plugins::transforms::{IntoBevyTransform, IntoGodotTransform, IntoGodotTransform2D};
 use bevy_ecs::change_detection::{DetectChanges, Ref};
 use bevy_ecs::entity::Entity;
 use bevy_ecs::query::{AnyOf, Changed};
 use bevy_ecs::system::{Query, SystemChangeTick};
+#[cfg(debug_assertions)]
 use bevy_math::Quat;
 use bevy_transform::components::Transform as BevyTransform;
+#[cfg(debug_assertions)]
 use godot::builtin::{PackedInt64Array, VarDictionary};
-use godot::classes::{Engine, Node, Node2D, Node3D, Object, SceneTree};
+#[cfg(debug_assertions)]
+use godot::classes::{Engine, Node, Object, SceneTree};
+use godot::classes::{Node2D, Node3D};
+#[cfg(debug_assertions)]
 use godot::prelude::{Gd, ToGodot};
 
 use super::change_filter::TransformSyncMetadata;
 
 /// Helper to find the OptimizedBulkOperations node
+#[cfg(debug_assertions)]
 fn get_bulk_operations_node(godot: &mut GodotAccess) -> Option<Gd<Object>> {
     let engine = godot.singleton::<Engine>();
     let scene_tree = engine
@@ -57,6 +63,7 @@ pub fn pre_update_godot_transforms(
     }
 }
 
+#[cfg(debug_assertions)]
 fn pre_update_godot_transforms_bulk(
     mut entities: Query<(
         Entity,
@@ -179,9 +186,7 @@ fn pre_update_godot_transforms_individual(
     )>,
     godot: &mut GodotAccess,
 ) {
-    for (_, mut bevy_transform, reference, mut metadata, (node2d, node3d)) in
-        entities.iter_mut()
-    {
+    for (_, mut bevy_transform, reference, mut metadata, (node2d, node3d)) in entities.iter_mut() {
         let new_bevy_transform = if node2d.is_some() {
             godot
                 .get::<Node2D>(*reference)
@@ -242,6 +247,7 @@ pub fn post_update_godot_transforms(
     }
 }
 
+#[cfg(debug_assertions)]
 fn post_update_godot_transforms_bulk(
     change_tick: SystemChangeTick,
     mut entities: Query<
