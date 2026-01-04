@@ -163,14 +163,14 @@ fn emit_level_loaded_event_when_scene_ready(
             LevelId::Level3 => "/root/Level3",
         };
         for event in scene_tree_events.read() {
-            if let SceneTreeMessageType::NodeAdded = event.message_type {
-                if let Some(node) = godot.try_get::<Node>(event.node_id) {
-                    let node_path = node.get_path().to_string();
-                    if node_path == expected_path {
-                        loaded_events.write(LevelLoadedMessage { level_id });
-                        pending_level.level_id = None;
-                        break;
-                    }
+            if let SceneTreeMessageType::NodeAdded = event.message_type
+                && let Some(node) = godot.try_get::<Node>(event.node_id)
+            {
+                let node_path = node.get_path().to_string();
+                if node_path == expected_path {
+                    loaded_events.write(LevelLoadedMessage { level_id });
+                    pending_level.level_id = None;
+                    break;
                 }
             }
         }
