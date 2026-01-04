@@ -12,11 +12,16 @@ NC='\033[0m' # No Color
 
 # Parse arguments
 SKIP_BUILD=false
+INTERNAL=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --skip-build)
             SKIP_BUILD=true
+            shift
+            ;;
+        --internal)
+            INTERNAL=true
             shift
             ;;
         *)
@@ -30,7 +35,11 @@ cd "$(dirname "$0")"
 if [ "$SKIP_BUILD" = false ]; then
     echo -e "${CYAN}Building godot-bevy-itest (release)...${NC}"
     cd rust
-    cargo build --release
+    if [ "$INTERNAL" = true ]; then
+        cargo build --release --features internal-benchmarks
+    else
+        cargo build --release
+    fi
     cd ..
 fi
 

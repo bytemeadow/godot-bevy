@@ -222,7 +222,7 @@ return {"ids": ids, "types": types}
 
 ### OptimizedSceneTreeWatcher
 
-The `OptimizedSceneTreeWatcher` (GDScript) pre-analyzes node metadata to avoid expensive FFI calls from Rust. This optimization is valuable in **both** debug and release builds because it runs at the GDScript callback level.
+The `OptimizedSceneTreeWatcher` (GDScript) pre-analyzes node metadata to avoid expensive FFI calls from Rust. This optimization is valuable in **both** debug and release builds.
 
 **What it pre-analyzes:**
 - `node_type` - Uses GDScript `is` checks (fast) instead of Rust `try_from_instance_id` (up to 199 FFI calls per node)
@@ -231,6 +231,15 @@ The `OptimizedSceneTreeWatcher` (GDScript) pre-analyzes node metadata to avoid e
 - `collision_mask` - Avoids 4 `has_signal()` FFI calls
 
 **Performance impact**: ~2x faster for scene tree entity creation compared to fallback FFI path.
+
+**Benchmark validation (500 nodes, release build):**
+| Approach | Time |
+|----------|------|
+| GDScript Full (all metadata) | ~203µs |
+| GDScript Type + FFI (hybrid) | ~202µs |
+| Pure FFI (metadata only) | ~381µs |
+
+The current "GDScript Full" approach is optimal. Hybrid (type-only from GDScript) offers <1% improvement, not worth the added complexity. Pure FFI is ~2x slower, confirming bulk GDScript is worthwhile even in release builds for scene tree analysis.
 
 ## Benchmarking
 

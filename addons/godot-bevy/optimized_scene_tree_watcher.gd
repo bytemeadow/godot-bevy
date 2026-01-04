@@ -367,6 +367,58 @@ func analyze_initial_tree() -> Dictionary:
 		"collision_masks": collision_masks
 	}
 
+# =============================================================================
+# Benchmark Methods - for comparing different analysis strategies
+# =============================================================================
+
+func benchmark_analyze_nodes_full(nodes: Array[Node]) -> Dictionary:
+	"""
+	Benchmark method: Analyze nodes with ALL metadata (current approach).
+	Returns instance_ids, node_types, node_names, parent_ids, collision_masks.
+	"""
+	var instance_ids = PackedInt64Array()
+	var node_types = PackedStringArray()
+	var node_names = PackedStringArray()
+	var parent_ids = PackedInt64Array()
+	var collision_masks = PackedInt64Array()
+
+	for node in nodes:
+		if not is_instance_valid(node):
+			continue
+		instance_ids.append(node.get_instance_id())
+		node_types.append(_analyze_node_type(node))
+		node_names.append(node.name)
+		var parent = node.get_parent()
+		parent_ids.append(parent.get_instance_id() if parent else 0)
+		collision_masks.append(_compute_collision_mask(node))
+
+	return {
+		"instance_ids": instance_ids,
+		"node_types": node_types,
+		"node_names": node_names,
+		"parent_ids": parent_ids,
+		"collision_masks": collision_masks
+	}
+
+func benchmark_analyze_nodes_type_only(nodes: Array[Node]) -> Dictionary:
+	"""
+	Benchmark method: Analyze nodes with ONLY node_type (hybrid approach).
+	Rust would get the rest (name, parent, collision) via FFI.
+	"""
+	var instance_ids = PackedInt64Array()
+	var node_types = PackedStringArray()
+
+	for node in nodes:
+		if not is_instance_valid(node):
+			continue
+		instance_ids.append(node.get_instance_id())
+		node_types.append(_analyze_node_type(node))
+
+	return {
+		"instance_ids": instance_ids,
+		"node_types": node_types
+	}
+
 func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_types: PackedStringArray, node_names: PackedStringArray, parent_ids: PackedInt64Array, collision_masks: PackedInt64Array):
 	"""Recursively analyze nodes and collect type information into PackedArrays"""
 	# Check if node is still valid before processing
