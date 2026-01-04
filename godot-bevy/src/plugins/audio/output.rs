@@ -178,10 +178,10 @@ pub(crate) fn try_get_audio_player(
         Some(AudioPlayer::Stream(player))
     } else if let Some(player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
         Some(AudioPlayer::Stream2D(player))
-    } else if let Some(player) = godot.try_get::<AudioStreamPlayer3D>(handle) {
-        Some(AudioPlayer::Stream3D(player))
     } else {
-        None
+        godot
+            .try_get::<AudioStreamPlayer3D>(handle)
+            .map(AudioPlayer::Stream3D)
     }
 }
 

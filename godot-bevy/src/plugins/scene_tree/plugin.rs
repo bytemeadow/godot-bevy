@@ -613,23 +613,22 @@ fn create_scene_tree_entity(
                 });
 
                 // Check if the node is a collision body and collect for batched signal connection
-                if collision_watcher.is_some() {
-                    if let Some(mask) = collision_mask {
-                        let is_collision_body =
-                            collision_mask_has(mask, COLLISION_MASK_BODY_ENTERED)
-                                || collision_mask_has(mask, COLLISION_MASK_AREA_ENTERED);
+                if collision_watcher.is_some()
+                    && let Some(mask) = collision_mask
+                {
+                    let is_collision_body = collision_mask_has(mask, COLLISION_MASK_BODY_ENTERED)
+                        || collision_mask_has(mask, COLLISION_MASK_AREA_ENTERED);
 
-                        if is_collision_body {
-                            debug!(target: "godot_scene_tree_collisions",
-                                   node_id = instance_id.to_string(),
-                                   "is collision body");
+                    if is_collision_body {
+                        debug!(target: "godot_scene_tree_collisions",
+                               node_id = instance_id.to_string(),
+                               "is collision body");
 
-                            // Collect for batched connection
-                            pending_collision_bodies.push((instance_id.to_i64(), mask));
+                        // Collect for batched connection
+                        pending_collision_bodies.push((instance_id.to_i64(), mask));
 
-                            // Add Collisions component to track collision state
-                            ent.insert(Collisions::default());
-                        }
+                        // Add Collisions component to track collision state
+                        ent.insert(Collisions::default());
                     }
                 }
 
@@ -642,7 +641,6 @@ fn create_scene_tree_entity(
 
                 // Add all components registered by plugins
                 component_registry.add_to_entity(&mut ent, &mut node_accessor);
-                drop(node_accessor);
 
                 let ent = ent.id();
                 ent_mapping.insert(instance_id, (ent, None));
@@ -713,14 +711,10 @@ fn create_scene_tree_entity(
     }
 
     // Batch connect collision signals if there are any pending
-    if !pending_collision_bodies.is_empty() {
-        if let Some(ref collision_watcher) = collision_watcher {
-            batch_connect_collision_signals(
-                &scene_root,
-                collision_watcher,
-                &pending_collision_bodies,
-            );
-        }
+    if !pending_collision_bodies.is_empty()
+        && let Some(ref collision_watcher) = collision_watcher
+    {
+        batch_connect_collision_signals(&scene_root, collision_watcher, &pending_collision_bodies);
     }
 }
 
