@@ -21,7 +21,7 @@ use bevy_ecs::{
 };
 use bevy_reflect::Reflect;
 use godot::{
-    builtin::GString,
+    builtin::{GString, StringName},
     classes::{Engine, Node, SceneTree},
     meta::ToGodot,
     obj::{Gd, Inherits, InstanceId, Singleton},
@@ -388,9 +388,9 @@ fn collision_mask_has(mask: u8, flag: u8) -> bool {
 }
 
 /// Helper function to recursively search for a node by name
-fn find_node_by_name(parent: &Gd<Node>, name: &str) -> Option<Gd<Node>> {
-    // Check if this node matches
-    if parent.get_name().to_string() == name {
+fn find_node_by_name(parent: &Gd<Node>, name: &StringName) -> Option<Gd<Node>> {
+    // Check if this node matches - compare StringName directly to avoid allocation
+    if &parent.get_name() == name {
         return Some(parent.clone());
     }
 
@@ -421,7 +421,7 @@ fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
         .or_else(|| {
             // Fallback: search entire tree for any SceneTreeWatcher (for test environments)
             tracing::debug!("Searching entire scene tree for SceneTreeWatcher");
-            find_node_by_name(&root.clone().upcast(), "SceneTreeWatcher")
+            find_node_by_name(&root.clone().upcast(), &StringName::from("SceneTreeWatcher"))
         })
         .unwrap_or_else(|| {
             panic!("SceneTreeWatcher not found. Searched /root/BevyAppSingleton/SceneTreeWatcher, BevyAppSingleton/SceneTreeWatcher, and entire tree.");
@@ -433,7 +433,10 @@ fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
         .or_else(|| root.try_get_node_as::<Node>("BevyAppSingleton/OptimizedSceneTreeWatcher"))
         .or_else(|| {
             // Fallback: search entire tree
-            find_node_by_name(&root.clone().upcast(), "OptimizedSceneTreeWatcher")
+            find_node_by_name(
+                &root.clone().upcast(),
+                &StringName::from("OptimizedSceneTreeWatcher"),
+            )
         });
 
     if optimized_watcher.is_some() {
@@ -552,7 +555,10 @@ fn create_scene_tree_entity(
         .or_else(|| {
             // Fallback: search entire tree for any CollisionWatcher (for test environments)
             tracing::debug!("Searching entire scene tree for CollisionWatcher");
-            find_node_by_name(&scene_root.clone().upcast(), "CollisionWatcher")
+            find_node_by_name(
+                &scene_root.clone().upcast(),
+                &StringName::from("CollisionWatcher"),
+            )
         });
 
     // Collect collision bodies for batched signal connection

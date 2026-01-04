@@ -77,8 +77,10 @@ fn pre_update_godot_transforms_bulk(
     let _span = tracing::info_span!("bulk_read_preparation").entered();
 
     // Collect entity info for 3D and 2D nodes separately
-    let mut entities_3d: Vec<(Entity, i64)> = Vec::new();
-    let mut entities_2d: Vec<(Entity, i64)> = Vec::new();
+    // Pre-allocate with entity count to avoid reallocations
+    let entity_count = entities.iter().len();
+    let mut entities_3d: Vec<(Entity, i64)> = Vec::with_capacity(entity_count);
+    let mut entities_2d: Vec<(Entity, i64)> = Vec::with_capacity(entity_count);
 
     for (entity, _, reference, _, (node2d, node3d)) in entities.iter() {
         let instance_id = reference.instance_id().to_i64();
