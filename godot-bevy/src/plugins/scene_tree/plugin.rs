@@ -27,9 +27,9 @@ use godot::{
     obj::{Gd, Inherits, InstanceId, Singleton},
     prelude::GodotConvert,
 };
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::sync::Mutex;
 use tracing::{debug, trace, warn};
 
 /// A resource that maintains an O(1) lookup from Godot `InstanceId` to Bevy `Entity`.
@@ -518,7 +518,7 @@ fn write_scene_tree_messages(
     message_reader: Res<SceneTreeMessageReader>,
     mut message_writer: MessageWriter<SceneTreeMessage>,
 ) {
-    let receiver = message_reader.0.lock().unwrap_or_else(|e| e.into_inner());
+    let receiver = message_reader.0.lock();
     message_writer.write_batch(receiver.try_iter());
 }
 

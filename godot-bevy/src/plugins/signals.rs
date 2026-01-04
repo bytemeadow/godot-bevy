@@ -13,9 +13,10 @@ use godot::{
     obj::Gd,
     prelude::{Callable, Variant},
 };
+use parking_lot::Mutex;
 use std::fmt::Debug;
+use std::sync::Arc;
 use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex};
 use tracing::error;
 
 /// Global, type-erased dispatch for typed signal messages
@@ -61,19 +62,11 @@ trait PendingSignalConnection: Send {
 
 impl PendingSignalConnections {
     fn push(&self, connection: Box<dyn PendingSignalConnection>) {
-        let mut queue = self
-            .queue
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        queue.push(connection);
+        self.queue.lock().push(connection);
     }
 
     fn drain(&self) -> Vec<Box<dyn PendingSignalConnection>> {
-        let mut queue = self
-            .queue
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        queue.drain(..).collect()
+        self.queue.lock().drain(..).collect()
     }
 }
 
@@ -170,7 +163,7 @@ fn drain_global_typed_signals(world: &mut bevy_ecs::world::World) {
     // Collect first to avoid overlapping mutable borrows of `world`
     let mut pending: Vec<Box<dyn TypedDispatch>> = Vec::new();
     if let Some(receiver) = world.get_resource::<GlobalTypedSignalReceiver>() {
-        let guard = receiver.0.lock().unwrap_or_else(|e| e.into_inner());
+        let guard = receiver.0.lock();
         pending.extend(guard.try_iter());
     }
     for dispatch in pending.drain(..) {

@@ -14,8 +14,8 @@ use bevy_ecs::{
 use bevy_reflect::Reflect;
 use godot::obj::InstanceId;
 use godot::prelude::*;
+use parking_lot::Mutex;
 use std::collections::HashMap;
-use std::sync::Mutex;
 use std::sync::mpsc::Receiver;
 use tracing::trace;
 
@@ -134,7 +134,7 @@ fn write_godot_collision_events(
     events: Res<CollisionMessageReader>,
     mut message_writer: MessageWriter<CollisionMessage>,
 ) {
-    let receiver = events.0.lock().unwrap_or_else(|e| e.into_inner());
+    let receiver = events.0.lock();
     message_writer.write_batch(receiver.try_iter());
 }
 
