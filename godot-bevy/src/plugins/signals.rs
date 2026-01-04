@@ -1,11 +1,11 @@
 use crate::interop::{GodotAccess, GodotNodeHandle};
-use bevy_app::{App, First, Plugin};
+use bevy_app::{App, First, Last, Plugin};
 use bevy_ecs::{
     component::Component,
     entity::Entity,
     message::{Message, message_update_system},
     prelude::Resource,
-    schedule::{IntoScheduleConfigs, SystemSet},
+    schedule::IntoScheduleConfigs,
     system::{Commands, Query, Res, SystemParam},
 };
 use godot::{
@@ -77,23 +77,12 @@ impl PendingSignalConnections {
     }
 }
 
-#[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum SignalConnectionSet {
-    Enqueue,
-    Apply,
-}
-
 fn ensure_signal_connection_queue(app: &mut App) {
     if !app.world().contains_resource::<PendingSignalConnections>() {
         app.init_resource::<PendingSignalConnections>()
-            .configure_sets(
-                First,
-                SignalConnectionSet::Apply.after(SignalConnectionSet::Enqueue),
-            )
-            .add_systems(
-                First,
-                process_pending_signal_connections.in_set(SignalConnectionSet::Apply),
-            );
+            // Process pending connections at end of frame so connections made
+            // during Update are applied same-frame (ready for next frame's signals)
+            .add_systems(Last, process_pending_signal_connections);
     }
 }
 
@@ -170,11 +159,9 @@ impl<T: Message + Send + 'static> Plugin for GodotTypedSignalsPlugin<T> {
             );
         }
 
-        // Per-T deferred connection processor
-        app.add_systems(
-            First,
-            process_typed_deferred_signal_connections::<T>.in_set(SignalConnectionSet::Enqueue),
-        );
+        // Per-T deferred connection processor - runs in First to enqueue connections,
+        // which are then processed at end of frame in Last
+        app.add_systems(First, process_typed_deferred_signal_connections::<T>);
     }
 }
 
@@ -201,8 +188,9 @@ pub struct TypedGodotSignals<'w, T: Message + Send + 'static> {
 }
 
 impl<'w, T: Message + Send + 'static> TypedGodotSignals<'w, T> {
-    /// Queue a Godot signal connection and map it to a typed Bevy Message `T` via `mapper`.
+    /// Connect a Godot signal and map it to a typed Bevy Message `T` via `mapper`.
     /// Multiple connections are supported; each connection sends a `T` when fired.
+    /// Connections are batched and applied at end of frame, ready for next frame's signals.
     pub fn connect_map<F>(
         &self,
         node: GodotNodeHandle,
@@ -219,27 +207,6 @@ impl<'w, T: Message + Send + 'static> TypedGodotSignals<'w, T> {
             mapper: Box::new(mapper),
             sender: self.typed_sender.0.clone(),
         }));
-    }
-
-    /// Connect a Godot signal immediately. Requires main-thread access.
-    pub fn connect_map_immediate<F>(
-        &self,
-        godot: &mut GodotAccess,
-        node: GodotNodeHandle,
-        signal_name: &str,
-        source_entity: Option<Entity>,
-        mapper: F,
-    ) where
-        F: FnMut(&[Variant], GodotNodeHandle, Option<Entity>) -> Option<T> + Send + 'static,
-    {
-        connect_typed_signal(
-            godot,
-            node,
-            signal_name,
-            source_entity,
-            Box::new(mapper),
-            self.typed_sender.0.clone(),
-        );
     }
 }
 
