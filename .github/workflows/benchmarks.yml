@@ -61,11 +61,29 @@ jobs:
         working-directory: itest/rust
         run: cargo build --release
 
+      - name: Copy library to Godot project
+        working-directory: itest
+        run: |
+          TARGET_DIR="$(cargo metadata --format-version 1 --no-deps | jq --raw-output '.target_directory')"
+          mkdir -p godot/lib
+          cp "$TARGET_DIR/release/libgodot_bevy_itest.so" godot/lib/ 2>/dev/null || true
+          echo "Library copied to godot/lib/"
+          ls -la godot/lib/
+
+          # Generate .gdextension pointing to lib/ directory
+          cat > godot/itest.gdextension << 'EOF'
+          [configuration]
+          entry_symbol = "godot_bevy_itest"
+          compatibility_minimum = 4.2
+
+          [libraries]
+          linux.debug.x86_64 = "res://lib/libgodot_bevy_itest.so"
+          linux.release.x86_64 = "res://lib/libgodot_bevy_itest.so"
+          EOF
+
       - name: Import Godot project
         working-directory: itest
         run: |
-          # Generate .gdextension file pointing to release build
-          ./run-benches.sh --skip-build
 
           # Known bug in Godot 4.5.1: Headless import of project with GDExtensions crashes
           # https://github.com/godotengine/godot/issues/111645
@@ -90,7 +108,7 @@ jobs:
           BENCHMARK_JSON: "1"
           BENCHMARK_JSON_PATH: bench-results.json
         run: |
-          ./run-benches.sh --skip-build 2>&1 | tee bench-output.txt
+          godot --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000 2>&1 | tee bench-output.txt
 
           # Extract JSON from output as fallback if file write failed
           if [ ! -f bench-results.json ]; then
