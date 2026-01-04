@@ -3,17 +3,23 @@
 //! These benchmarks test the actual godot-bevy systems rather than raw FFI overhead.
 //! They measure real-world performance of syncing transforms between Bevy and Godot.
 
-use godot::classes::{Node2D, Node3D};
+use godot::classes::{Engine, Node, Node2D, Node3D, SceneTree};
 use godot::obj::NewAlloc;
 use godot::prelude::*;
-use godot_bevy::bevy_app::{App, Last, PreUpdate};
+use godot_bevy::bevy_app::{App, First, Last, PreUpdate};
 use godot_bevy::bevy_math::Vec3;
 use godot_bevy::bevy_transform::components::Transform as BevyTransform;
 use godot_bevy::interop::{GodotMainThread, GodotNodeHandle, Node2DMarker, Node3DMarker};
+use godot_bevy::plugins::core::SceneTreeComponentRegistry;
+use godot_bevy::plugins::scene_tree::{
+    GodotSceneTreePlugin, NodeEntityIndex, SceneTreeMessage, SceneTreeMessageReader,
+    SceneTreeMessageType,
+};
 use godot_bevy::plugins::transforms::{
     GodotTransformSyncPlugin, GodotTransformSyncPluginExt, TransformSyncMetadata, TransformSyncMode,
 };
 use godot_bevy_test::bench;
+use std::sync::mpsc;
 
 // =============================================================================
 // Transform Sync Benchmarks
@@ -271,6 +277,189 @@ fn transform_sync_roundtrip_2d() -> i32 {
 
     for node in nodes {
         node.free();
+    }
+
+    result
+}
+
+// =============================================================================
+// Scene Tree Message Processing Benchmarks
+// =============================================================================
+// These benchmarks measure the performance of processing scene tree messages
+// (NodeAdded events) which is critical for entity creation and component setup.
+
+const SCENE_TREE_NODE_COUNT: usize = 500;
+
+/// Get the Godot scene tree
+fn get_scene_tree() -> Gd<SceneTree> {
+    Engine::singleton()
+        .get_main_loop()
+        .expect("Main loop should exist")
+        .cast::<SceneTree>()
+}
+
+/// Creates a mix of Godot nodes for scene tree benchmarking.
+/// Returns nodes attached to the scene tree (required for scene tree plugin).
+fn create_scene_tree_nodes() -> Vec<Gd<Node>> {
+    let scene_tree = get_scene_tree();
+    let root = scene_tree.get_root().expect("Root should exist");
+
+    let mut nodes: Vec<Gd<Node>> = Vec::with_capacity(SCENE_TREE_NODE_COUNT);
+
+    for i in 0..SCENE_TREE_NODE_COUNT {
+        let node: Gd<Node> = match i % 3 {
+            0 => {
+                let mut n = Node3D::new_alloc();
+                n.set_name(&format!("BenchNode3D_{i}"));
+                n.upcast()
+            }
+            1 => {
+                let mut n = Node2D::new_alloc();
+                n.set_name(&format!("BenchNode2D_{i}"));
+                n.upcast()
+            }
+            _ => {
+                let mut n = Node::new_alloc();
+                n.set_name(&format!("BenchNode_{i}"));
+                n
+            }
+        };
+
+        // Add to scene tree (required for the plugin to work)
+        root.clone().add_child(&node);
+        nodes.push(node);
+    }
+
+    nodes
+}
+
+/// Creates SceneTreeMessage events for a batch of nodes.
+/// Simulates the optimized path with pre-analyzed type information.
+fn create_node_added_messages(nodes: &[Gd<Node>]) -> Vec<SceneTreeMessage> {
+    nodes
+        .iter()
+        .enumerate()
+        .map(|(i, node)| {
+            let node_type = match i % 3 {
+                0 => "Node3D",
+                1 => "Node2D",
+                _ => "Node",
+            };
+
+            SceneTreeMessage {
+                node_id: GodotNodeHandle::from(node.instance_id()),
+                message_type: SceneTreeMessageType::NodeAdded,
+                node_type: Some(node_type.to_string()),
+                node_name: Some(node.get_name().to_string()),
+                parent_id: node.get_parent().map(|p| p.instance_id()),
+                collision_mask: Some(0), // No collision signals
+                groups: Some(vec![]),    // No groups
+            }
+        })
+        .collect()
+}
+
+/// Setup a Bevy App with the scene tree plugin for benchmarking.
+/// Returns the app and an mpsc sender for injecting messages.
+fn setup_scene_tree_benchmark_app() -> (App, mpsc::Sender<SceneTreeMessage>) {
+    let mut app = App::new();
+
+    // Initialize required schedules
+    app.init_schedule(First);
+    app.init_schedule(PreUpdate);
+
+    // Insert required resources (normally added by GodotBaseCorePlugin)
+    app.insert_non_send_resource(GodotMainThread);
+    app.init_resource::<SceneTreeComponentRegistry>();
+
+    // Create a channel for injecting messages BEFORE adding the plugin
+    // (plugin will try to init its own receiver, but we'll override it)
+    let (sender, receiver) = mpsc::channel::<SceneTreeMessage>();
+
+    // Add the scene tree plugin
+    app.add_plugins(GodotSceneTreePlugin::default());
+
+    // Replace the message reader with our test channel
+    app.insert_non_send_resource(SceneTreeMessageReader(receiver));
+
+    (app, sender)
+}
+
+/// Benchmark: Process NodeAdded messages with pre-analyzed types (optimized path)
+///
+/// This measures the performance of the `read_scene_tree_messages` system
+/// processing a batch of NodeAdded events. This is the hot path when nodes
+/// are added to the Godot scene tree at runtime.
+///
+/// The benchmark uses pre-analyzed type information (simulating the optimized
+/// GDScript watcher path) which avoids expensive FFI type detection.
+#[bench(repeat = 3)]
+fn scene_tree_process_node_added_optimized() -> i32 {
+    let (mut app, sender) = setup_scene_tree_benchmark_app();
+    let nodes = create_scene_tree_nodes();
+
+    // Create messages with pre-analyzed types (optimized path)
+    let messages = create_node_added_messages(&nodes);
+
+    // Send all messages through the channel
+    for msg in messages {
+        sender.send(msg).expect("Send should succeed");
+    }
+
+    // Run the First schedule which processes scene tree messages
+    app.world_mut().run_schedule(First);
+
+    // Verify entities were created
+    let node_index = app.world().resource::<NodeEntityIndex>();
+    let result = node_index.len() as i32;
+
+    // Cleanup - remove nodes from scene tree
+    for mut node in nodes {
+        node.queue_free();
+    }
+
+    result
+}
+
+/// Benchmark: Process NodeAdded messages without pre-analyzed types (fallback path)
+///
+/// This measures the performance when type information is NOT pre-analyzed,
+/// forcing the system to detect node types via FFI calls. This is the slower
+/// fallback path used when the optimized GDScript watcher is not available.
+#[bench(repeat = 3)]
+fn scene_tree_process_node_added_fallback() -> i32 {
+    let (mut app, sender) = setup_scene_tree_benchmark_app();
+    let nodes = create_scene_tree_nodes();
+
+    // Create messages WITHOUT pre-analyzed types (fallback path)
+    let messages: Vec<SceneTreeMessage> = nodes
+        .iter()
+        .map(|node| SceneTreeMessage {
+            node_id: GodotNodeHandle::from(node.instance_id()),
+            message_type: SceneTreeMessageType::NodeAdded,
+            node_type: None, // Force FFI-based type detection
+            node_name: None, // Force FFI-based name lookup
+            parent_id: None, // Force FFI-based parent lookup
+            collision_mask: None,
+            groups: None,
+        })
+        .collect();
+
+    // Send all messages through the channel
+    for msg in messages {
+        sender.send(msg).expect("Send should succeed");
+    }
+
+    // Run the First schedule which processes scene tree messages
+    app.world_mut().run_schedule(First);
+
+    // Verify entities were created
+    let node_index = app.world().resource::<NodeEntityIndex>();
+    let result = node_index.len() as i32;
+
+    // Cleanup
+    for mut node in nodes {
+        node.queue_free();
     }
 
     result
