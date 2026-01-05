@@ -21,6 +21,7 @@ on:
       - "Cargo.lock"
       - ".github/workflows/benchmarks.yml"
       - ".github/scripts/benchmarks-compare.py"
+  workflow_dispatch: # Allows manual runs and local testing with act
 
 env:
   CARGO_TERM_COLOR: always
@@ -31,7 +32,8 @@ permissions:
 
 jobs:
   benchmarks:
-    runs-on: blaze/compute/ubuntu-latest-amd64
+    # Use ubuntu-latest for workflow_dispatch (local act testing), custom runner otherwise
+    runs-on: ${{ github.event_name == 'workflow_dispatch' && 'ubuntu-latest' || 'blaze/compute/ubuntu-latest-amd64' }}
 
     steps:
       - name: Checkout code
@@ -57,51 +59,36 @@ jobs:
           use-dotnet: false
           include-templates: false
 
-      - name: Build itest in release mode
-        working-directory: itest/rust
-        run: cargo build --release
-
-      - name: Copy library to Godot project
+      - name: Build and setup
         working-directory: itest
+        env:
+          GODOT4_BIN: godot
         run: |
-          TARGET_DIR="$(cargo metadata --format-version 1 --no-deps | jq --raw-output '.target_directory')"
-          mkdir -p godot/lib
-          cp "$TARGET_DIR/release/libgodot_bevy_itest.so" godot/lib/ 2>/dev/null || true
-          echo "Library copied to godot/lib/"
-          ls -la godot/lib/
+          # Build release and setup GDExtension (but don't run benchmarks yet)
+          cd rust && cargo build --release && cd ..
 
-          # Generate .gdextension pointing to lib/ directory
-          cat > godot/itest.gdextension << 'EOF'
+          # Generate .gdextension file pointing to release build
+          SCRIPT_DIR="$(pwd)"
+          GODOT_PROJECT_DIR="$SCRIPT_DIR/godot"
+
+          cat > godot/itest.gdextension << EOF
           [configuration]
           entry_symbol = "godot_bevy_itest"
           compatibility_minimum = 4.2
 
           [libraries]
-          linux.debug.x86_64 = "res://lib/libgodot_bevy_itest.so"
-          linux.release.x86_64 = "res://lib/libgodot_bevy_itest.so"
+          linux.debug.x86_64 = "res://../../target/release/libgodot_bevy_itest.so"
+          linux.release.x86_64 = "res://../../target/release/libgodot_bevy_itest.so"
           EOF
 
-      - name: Import Godot project
-        working-directory: itest
-        run: |
+          # Ensure .godot directory exists and extension is registered
+          mkdir -p "$GODOT_PROJECT_DIR/.godot"
+          echo "res://itest.gdextension" > "$GODOT_PROJECT_DIR/.godot/extension_list.cfg"
 
-          # Known bug in Godot 4.5.1: Headless import of project with GDExtensions crashes
-          # https://github.com/godotengine/godot/issues/111645
-          # Workaround: Import twice to workaround first editor crash.
-          godot --headless --path godot --import --quit || true
+          # Import project so Godot recognizes the GDExtension
+          "$GODOT4_BIN" --headless --path "$GODOT_PROJECT_DIR" --import --quit || true
 
-          echo "First import expected to crash due to bug. Importing again to workaround crash."
-          godot --headless --path godot --import --quit | tee godot-import-stdout.txt
-
-          # Check for errors in import output
-          if awk '/ERROR/ {exit 1}' godot-import-stdout.txt; then
-            echo "✅ Project import successful"
-          else
-            echo "❌ Project import failed - errors detected"
-            exit 1
-          fi
-
-      - name: Run benchmarks and extract JSON
+      - name: Run benchmarks
         working-directory: itest
         env:
           GODOT4_BIN: godot

@@ -96,7 +96,14 @@ in
     ci-itest.exec = ''
       echo "Running integration tests locally with act..."
       echo "Note: Docker must be running"
-      act workflow_dispatch -W .github/workflows/ci-local.yml --container-architecture linux/amd64 "$@"
+      act workflow_dispatch -W .github/workflows/ci.yml -j integration-tests --container-architecture linux/amd64 "$@"
+    '';
+
+    # Run benchmarks locally using act (Docker required)
+    ci-benches.exec = ''
+      echo "Running benchmarks locally with act..."
+      echo "Note: Docker must be running"
+      act workflow_dispatch -W .github/workflows/benchmarks.yml --container-architecture linux/amd64 "$@"
     '';
 
     # Run just the lint job from CI

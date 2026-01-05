@@ -30,7 +30,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-cd "$(dirname "$0")"
+# Get the script's directory for absolute paths
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GODOT_PROJECT_DIR="$SCRIPT_DIR/godot"
+
+cd "$SCRIPT_DIR"
 
 if [ "$SKIP_BUILD" = false ]; then
     echo -e "${CYAN}Building godot-bevy-itest (release)...${NC}"
@@ -83,6 +87,14 @@ fi
 
 echo -e "${CYAN}Using Godot binary: $GODOT4_BIN${NC}"
 
+# Ensure .godot directory exists and extension is registered
+mkdir -p "$GODOT_PROJECT_DIR/.godot"
+echo "res://itest.gdextension" > "$GODOT_PROJECT_DIR/.godot/extension_list.cfg"
+
+# Import project so Godot recognizes the GDExtension
+echo -e "${CYAN}Importing Godot project...${NC}"
+"$GODOT4_BIN" --headless --path "$GODOT_PROJECT_DIR" --import --quit || true
+
 # Check if debug build
 if cargo metadata --format-version=1 2>/dev/null | grep -q '"profile":"dev"'; then
     echo -e "${YELLOW}Warning: Running with debug build. Use --release for accurate benchmarks.${NC}"
@@ -90,6 +102,6 @@ fi
 
 # Run benchmarks in headless mode with BenchRunner scene
 echo -e "${CYAN}Running benchmarks...${NC}"
-"$GODOT4_BIN" --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000
+"$GODOT4_BIN" --headless --path "$GODOT_PROJECT_DIR" addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000
 
 echo -e "${GREEN}Benchmarks complete!${NC}"
