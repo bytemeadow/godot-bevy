@@ -380,6 +380,232 @@ fn internal_scene_spawn_unbatched() -> i32 {
     result
 }
 
+// =============================================================================
+// Collision Signal Connection Benchmarks
+// =============================================================================
+// These benchmarks compare different approaches for connecting collision signals
+// to Area3D/RigidBody3D nodes. Each collision body needs up to 4 signal connections:
+// - body_entered, body_exited, area_entered, area_exited
+//
+// Approaches tested:
+// 1. Individual FFI: Rust calls node.connect() for each signal (current fallback)
+// 2. Bulk GDScript: Single call to GDScript that connects all signals internally
+//
+// The question: Is the FFI overhead of 4 connect() calls per node significant
+// enough that batching via GDScript is faster?
+
+use godot::classes::{Area3D, Script};
+use godot_bevy::watchers::collision_watcher::CollisionWatcher;
+
+const COLLISION_BODY_COUNT: usize = 100;
+
+// Signal name constants
+const BODY_ENTERED: &str = "body_entered";
+const BODY_EXITED: &str = "body_exited";
+const AREA_ENTERED: &str = "area_entered";
+const AREA_EXITED: &str = "area_exited";
+
+/// Create Area3D nodes for collision benchmarking
+fn create_area3d_nodes() -> Vec<Gd<Area3D>> {
+    let mut nodes: Vec<Gd<Area3D>> = Vec::with_capacity(COLLISION_BODY_COUNT);
+
+    for i in 0..COLLISION_BODY_COUNT {
+        let mut area = Area3D::new_alloc();
+        area.set_name(&format!("BenchArea3D_{i}"));
+        nodes.push(area);
+    }
+
+    nodes
+}
+
+/// Get or create a real CollisionWatcher for benchmarks
+fn get_or_create_collision_watcher() -> Gd<CollisionWatcher> {
+    let root = get_scene_root();
+
+    // Try to find existing CollisionWatcher
+    if let Some(watcher) = root.try_get_node_as::<CollisionWatcher>("BenchCollisionWatcher") {
+        return watcher;
+    }
+
+    // Create a real CollisionWatcher (has collision_event method)
+    let mut watcher = CollisionWatcher::new_alloc();
+    watcher.set_name("BenchCollisionWatcher");
+    root.clone().add_child(&watcher);
+    watcher
+}
+
+/// Get or create the OptimizedBulkOperations node
+fn get_or_create_bulk_operations() -> Option<Gd<Node>> {
+    let root = get_scene_root();
+
+    // Try to find existing
+    if let Some(ops) = root.try_get_node_as::<Node>("BenchBulkOperations") {
+        return Some(ops);
+    }
+
+    // Try to load the GDScript and create the node
+    let script = ResourceLoader::singleton()
+        .load("res://addons/godot-bevy/optimized_bulk_operations.gd")?
+        .try_cast::<Script>()
+        .ok()?;
+
+    let mut ops = Node::new_alloc();
+    ops.set_name("BenchBulkOperations");
+    ops.set_script(&script);
+    root.clone().add_child(&ops);
+
+    // Verify the method exists
+    if ops.has_method("bulk_connect_collision_signals") {
+        Some(ops)
+    } else {
+        ops.queue_free();
+        None
+    }
+}
+
+/// Benchmark: Individual FFI - connect each signal via separate FFI calls
+///
+/// This is the current fallback path when OptimizedBulkOperations is not available.
+/// For each node: 4 connect() calls + callable creation + bind() calls
+#[bench(repeat = 3)]
+fn internal_collision_connect_individual_ffi() -> i32 {
+    let root = get_scene_root();
+    let nodes = create_area3d_nodes();
+    let watcher = get_or_create_collision_watcher();
+
+    // Add nodes to scene tree (required for signal connection)
+    for node in nodes.iter() {
+        root.clone().add_child(node);
+    }
+
+    let body_entered = StringName::from(BODY_ENTERED);
+    let body_exited = StringName::from(BODY_EXITED);
+    let area_entered = StringName::from(AREA_ENTERED);
+    let area_exited = StringName::from(AREA_EXITED);
+
+    // Connect signals individually (simulating current fallback path)
+    for node in nodes.iter() {
+        let mut node = node.clone();
+        let node_variant = node.to_variant();
+
+        // body_entered
+        node.connect(
+            &body_entered,
+            &watcher
+                .callable("collision_event")
+                .bind(&[node_variant.clone(), "Started".to_variant()]),
+        );
+
+        // body_exited
+        node.connect(
+            &body_exited,
+            &watcher
+                .callable("collision_event")
+                .bind(&[node_variant.clone(), "Ended".to_variant()]),
+        );
+
+        // area_entered
+        node.connect(
+            &area_entered,
+            &watcher
+                .callable("collision_event")
+                .bind(&[node_variant.clone(), "Started".to_variant()]),
+        );
+
+        // area_exited
+        node.connect(
+            &area_exited,
+            &watcher
+                .callable("collision_event")
+                .bind(&[node_variant, "Ended".to_variant()]),
+        );
+    }
+
+    let result = nodes.len() as i32;
+
+    // Cleanup
+    for mut node in nodes {
+        node.queue_free();
+    }
+
+    result
+}
+
+/// Benchmark: Bulk GDScript - single call to connect all signals
+///
+/// This uses OptimizedBulkOperations.bulk_connect_collision_signals() which
+/// does all the signal connections within GDScript, avoiding per-signal FFI overhead.
+#[bench(repeat = 3)]
+fn internal_collision_connect_bulk_gdscript() -> i32 {
+    let root = get_scene_root();
+    let nodes = create_area3d_nodes();
+    let watcher = get_or_create_collision_watcher();
+
+    // Add nodes to scene tree
+    for node in nodes.iter() {
+        root.clone().add_child(node);
+    }
+
+    let result = if let Some(mut bulk_ops) = get_or_create_bulk_operations() {
+        // Prepare packed arrays
+        let instance_ids: Vec<i64> = nodes.iter().map(|n| n.instance_id().to_i64()).collect();
+        // Full mask: all 4 signals (bits 0-3)
+        let collision_masks: Vec<i64> = vec![0b1111i64; nodes.len()];
+
+        let ids_packed = godot::builtin::PackedInt64Array::from(instance_ids.as_slice());
+        let masks_packed = godot::builtin::PackedInt64Array::from(collision_masks.as_slice());
+
+        // Single FFI call to connect all signals
+        bulk_ops.call(
+            "bulk_connect_collision_signals",
+            &[
+                ids_packed.to_variant(),
+                masks_packed.to_variant(),
+                watcher.to_variant(),
+            ],
+        );
+
+        nodes.len() as i32
+    } else {
+        // OptimizedBulkOperations not available - skip benchmark
+        godot::prelude::godot_warn!(
+            "[BENCH] OptimizedBulkOperations not found - bulk benchmark skipped"
+        );
+        0
+    };
+
+    // Cleanup
+    for mut node in nodes {
+        node.queue_free();
+    }
+
+    result
+}
+
+/// Benchmark: Baseline - just create nodes and add to tree (no signal connection)
+///
+/// This measures the overhead of node creation and tree insertion,
+/// to isolate the signal connection cost.
+#[bench(repeat = 3)]
+fn internal_collision_baseline_no_signals() -> i32 {
+    let root = get_scene_root();
+    let nodes = create_area3d_nodes();
+
+    // Add nodes to scene tree
+    for node in nodes.iter() {
+        root.clone().add_child(node);
+    }
+
+    let result = nodes.len() as i32;
+
+    // Cleanup
+    for mut node in nodes {
+        node.queue_free();
+    }
+
+    result
+}
+
 /// Benchmark: Cached load - load once, then instantiate per scene
 ///
 /// This simulates the NEW spawn_scene behavior (with caching):
