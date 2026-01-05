@@ -407,7 +407,11 @@ fn scene_tree_process_node_added_optimized() -> i32 {
         sender.send(msg).expect("Send should succeed");
     }
 
-    // Run the First schedule which processes scene tree messages
+    // Run First schedule twice:
+    // 1st run: write_scene_tree_messages writes to buffer B, read_scene_tree_messages
+    //          reads from buffer A (empty), then message_update_system flips buffers
+    // 2nd run: read_scene_tree_messages now reads from buffer A (has messages)
+    app.world_mut().run_schedule(First);
     app.world_mut().run_schedule(First);
 
     // Verify entities were created
@@ -451,7 +455,8 @@ fn scene_tree_process_node_added_fallback() -> i32 {
         sender.send(msg).expect("Send should succeed");
     }
 
-    // Run the First schedule which processes scene tree messages
+    // Run First schedule twice (message_update_system flips buffers after first run)
+    app.world_mut().run_schedule(First);
     app.world_mut().run_schedule(First);
 
     // Verify entities were created
@@ -499,17 +504,23 @@ fn create_collision_body_nodes() -> Vec<Gd<Node>> {
 }
 
 /// Ensures a CollisionWatcher node exists in the scene tree.
-/// Returns the node (creates one if needed).
+/// The plugin looks for CollisionWatcher at:
+/// 1. /root/BevyAppSingleton/CollisionWatcher
+/// 2. BevyAppSingleton/CollisionWatcher
+/// 3. Fallback: recursive search from root
+///
+/// For benchmarks, we add it directly to root and rely on the fallback search.
 fn ensure_collision_watcher() -> Gd<Node> {
     let scene_tree = get_scene_tree();
     let root = scene_tree.get_root().expect("Root should exist");
 
-    // Check if CollisionWatcher already exists
+    // Check if CollisionWatcher already exists (direct child of root)
     if let Some(watcher) = root.try_get_node_as::<Node>("CollisionWatcher") {
         return watcher;
     }
 
-    // Create a new CollisionWatcher
+    // Create a new CollisionWatcher as direct child of root
+    // The plugin's find_node_by_name will find it via recursive search
     let mut watcher = CollisionWatcher::new_alloc();
     watcher.set_name("CollisionWatcher");
     root.clone().add_child(&watcher);
@@ -544,11 +555,19 @@ fn create_collision_body_messages(nodes: &[Gd<Node>]) -> Vec<SceneTreeMessage> {
 /// Each Area3D has 4 collision signals that get connected.
 #[bench(repeat = 3)]
 fn scene_tree_process_collision_bodies_optimized() -> i32 {
+    // Create watcher FIRST, before app setup
+    let watcher = ensure_collision_watcher();
+
     let (mut app, sender) = setup_scene_tree_benchmark_app();
     let nodes = create_collision_body_nodes();
 
-    // Ensure CollisionWatcher exists so signals get connected
-    let watcher = ensure_collision_watcher();
+    // Verify watcher is in tree
+    let scene_tree = get_scene_tree();
+    let root = scene_tree.get_root().expect("Root should exist");
+    let watcher_found = root.try_get_node_as::<Node>("CollisionWatcher").is_some();
+    if !watcher_found {
+        godot::prelude::godot_error!("[BENCH] CollisionWatcher not found in tree!");
+    }
 
     // Create messages with pre-analyzed collision masks (optimized path)
     let messages = create_collision_body_messages(&nodes);
@@ -557,6 +576,8 @@ fn scene_tree_process_collision_bodies_optimized() -> i32 {
         sender.send(msg).expect("Send should succeed");
     }
 
+    // Run First schedule twice (message_update_system flips buffers after first run)
+    app.world_mut().run_schedule(First);
     app.world_mut().run_schedule(First);
 
     let node_index = app.world().resource::<NodeEntityIndex>();
@@ -603,6 +624,8 @@ fn scene_tree_process_collision_bodies_fallback() -> i32 {
         sender.send(msg).expect("Send should succeed");
     }
 
+    // Run First schedule twice (message_update_system flips buffers after first run)
+    app.world_mut().run_schedule(First);
     app.world_mut().run_schedule(First);
 
     let node_index = app.world().resource::<NodeEntityIndex>();

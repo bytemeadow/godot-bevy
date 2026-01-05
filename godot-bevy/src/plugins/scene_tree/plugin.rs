@@ -519,7 +519,8 @@ fn write_scene_tree_messages(
     mut message_writer: MessageWriter<SceneTreeMessage>,
 ) {
     let receiver = message_reader.0.lock();
-    message_writer.write_batch(receiver.try_iter());
+    let messages: Vec<_> = receiver.try_iter().collect();
+    message_writer.write_batch(messages.into_iter());
 }
 
 /// Marks an entity so it is not despawned when its corresponding Godot Node is freed, breaking
@@ -637,7 +638,6 @@ fn create_scene_tree_entity(
                         ent.insert(Collisions::default());
                     }
                 }
-
                 // Use pre-analyzed groups from GDScript watcher if available, otherwise fallback to FFI
                 if let Some(groups_vec) = groups {
                     ent.insert(Groups::from(groups_vec));
@@ -758,10 +758,6 @@ fn batch_connect_collision_signals(
                 collision_watcher.to_variant(),
             ],
         );
-
-        debug!(target: "godot_scene_tree_collisions",
-               count = pending_bodies.len(),
-               "Batch connected collision signals");
     } else {
         // Fallback: connect signals individually
         for (instance_id, mask) in pending_bodies {
@@ -851,9 +847,10 @@ fn read_scene_tree_messages(
     mut node_index: ResMut<NodeEntityIndex>,
     mut godot: GodotAccess,
 ) {
+    let messages: Vec<_> = message_reader.read().cloned().collect();
     create_scene_tree_entity(
         &mut commands,
-        message_reader.read().cloned(),
+        messages.into_iter(),
         &mut scene_tree,
         &mut entities,
         &component_registry,
