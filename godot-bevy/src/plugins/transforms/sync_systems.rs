@@ -1,9 +1,13 @@
+#[cfg(debug_assertions)]
+use crate::interop::BulkOperationsCache;
 use crate::interop::node_markers::{Node2DMarker, Node3DMarker};
 use crate::interop::{GodotAccess, GodotNodeHandle};
 use crate::plugins::transforms::{IntoBevyTransform, IntoGodotTransform, IntoGodotTransform2D};
 use bevy_ecs::change_detection::{DetectChanges, Ref};
 use bevy_ecs::entity::Entity;
 use bevy_ecs::query::{AnyOf, Changed};
+#[cfg(debug_assertions)]
+use bevy_ecs::system::NonSendMut;
 use bevy_ecs::system::{Query, SystemChangeTick};
 #[cfg(debug_assertions)]
 use bevy_math::Quat;
@@ -11,28 +15,35 @@ use bevy_transform::components::Transform as BevyTransform;
 #[cfg(debug_assertions)]
 use godot::builtin::{PackedInt64Array, VarDictionary};
 #[cfg(debug_assertions)]
-use godot::classes::{Engine, Node, Object, SceneTree};
+use godot::classes::Object;
 use godot::classes::{Node2D, Node3D};
 #[cfg(debug_assertions)]
 use godot::prelude::{Gd, ToGodot};
 
 use super::change_filter::TransformSyncMetadata;
 
-/// Helper to find the OptimizedBulkOperations node
 #[cfg(debug_assertions)]
-fn get_bulk_operations_node(godot: &mut GodotAccess) -> Option<Gd<Object>> {
-    let engine = godot.singleton::<Engine>();
-    let scene_tree = engine
-        .get_main_loop()
-        .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())?;
-    let root = scene_tree.get_root()?;
-
-    // Try to find OptimizedBulkOperations as a child of BevyAppSingleton
-    root.get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
-        .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
-        .map(|n: Gd<Node>| n.upcast::<Object>())
+#[tracing::instrument]
+pub fn pre_update_godot_transforms(
+    entities: Query<(
+        Entity,
+        &mut BevyTransform,
+        &GodotNodeHandle,
+        &mut TransformSyncMetadata,
+        AnyOf<(&Node2DMarker, &Node3DMarker)>,
+    )>,
+    mut godot: GodotAccess,
+    bulk_ops_cache: NonSendMut<BulkOperationsCache>,
+) {
+    if let Some(bulk_ops) = bulk_ops_cache.get() {
+        let _bulk_span = tracing::info_span!("using_bulk_read_optimization").entered();
+        pre_update_godot_transforms_bulk(entities, bulk_ops);
+        return;
+    }
+    pre_update_godot_transforms_individual(entities, &mut godot);
 }
 
+#[cfg(not(debug_assertions))]
 #[tracing::instrument]
 pub fn pre_update_godot_transforms(
     entities: Query<(
@@ -44,23 +55,7 @@ pub fn pre_update_godot_transforms(
     )>,
     mut godot: GodotAccess,
 ) {
-    // In debug builds, use bulk optimization (GDScript path) which is faster when Rust FFI
-    // overhead is high. In release builds, use individual FFI calls which are faster due to
-    // optimized Rust FFI and avoiding GDScript interpreter overhead.
-    #[cfg(debug_assertions)]
-    {
-        if let Some(bulk_ops) = get_bulk_operations_node(&mut godot) {
-            let _bulk_span = tracing::info_span!("using_bulk_read_optimization").entered();
-            pre_update_godot_transforms_bulk(entities, bulk_ops);
-            return;
-        }
-        pre_update_godot_transforms_individual(entities, &mut godot);
-    }
-
-    #[cfg(not(debug_assertions))]
-    {
-        pre_update_godot_transforms_individual(entities, &mut godot);
-    }
+    pre_update_godot_transforms_individual(entities, &mut godot);
 }
 
 #[cfg(debug_assertions)]
@@ -216,6 +211,31 @@ fn pre_update_godot_transforms_individual(
     }
 }
 
+#[cfg(debug_assertions)]
+#[tracing::instrument]
+pub fn post_update_godot_transforms(
+    change_tick: SystemChangeTick,
+    entities: Query<
+        (
+            Ref<BevyTransform>,
+            &GodotNodeHandle,
+            &TransformSyncMetadata,
+            AnyOf<(&Node2DMarker, &Node3DMarker)>,
+        ),
+        Changed<BevyTransform>,
+    >,
+    mut godot: GodotAccess,
+    bulk_ops_cache: NonSendMut<BulkOperationsCache>,
+) {
+    if let Some(bulk_ops) = bulk_ops_cache.get() {
+        let _bulk_span = tracing::info_span!("using_bulk_optimization").entered();
+        post_update_godot_transforms_bulk(change_tick, entities, bulk_ops);
+        return;
+    }
+    post_update_godot_transforms_individual(change_tick, entities, &mut godot);
+}
+
+#[cfg(not(debug_assertions))]
 #[tracing::instrument]
 pub fn post_update_godot_transforms(
     change_tick: SystemChangeTick,
@@ -230,23 +250,7 @@ pub fn post_update_godot_transforms(
     >,
     mut godot: GodotAccess,
 ) {
-    // In debug builds, use bulk optimization (GDScript path) which is faster when Rust FFI
-    // overhead is high. In release builds, use individual FFI calls which are faster due to
-    // optimized Rust FFI and avoiding GDScript interpreter overhead.
-    #[cfg(debug_assertions)]
-    {
-        if let Some(bulk_ops) = get_bulk_operations_node(&mut godot) {
-            let _bulk_span = tracing::info_span!("using_bulk_optimization").entered();
-            post_update_godot_transforms_bulk(change_tick, entities, bulk_ops);
-            return;
-        }
-        post_update_godot_transforms_individual(change_tick, entities, &mut godot);
-    }
-
-    #[cfg(not(debug_assertions))]
-    {
-        post_update_godot_transforms_individual(change_tick, entities, &mut godot);
-    }
+    post_update_godot_transforms_individual(change_tick, entities, &mut godot);
 }
 
 #[cfg(debug_assertions)]

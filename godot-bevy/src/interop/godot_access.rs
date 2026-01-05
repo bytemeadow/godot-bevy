@@ -1,5 +1,7 @@
 use bevy_ecs::prelude::Resource;
 use bevy_ecs::system::{NonSendMut, SystemParam};
+#[cfg(debug_assertions)]
+use godot::classes::Object;
 use godot::{
     classes::Node,
     obj::{Gd, Inherits, InstanceId, Singleton},
@@ -10,6 +12,48 @@ use crate::interop::GodotNodeHandle;
 /// Non-send marker resource that pins systems to the main thread.
 #[derive(Resource, Default, Debug)]
 pub struct GodotMainThread;
+
+/// Cached reference to the OptimizedBulkOperations GDScript node.
+///
+/// This cache avoids repeated scene tree lookups every frame when using
+/// bulk FFI operations in debug builds. The cache is populated once during
+/// BevyApp initialization and reused by transform sync and input systems.
+///
+/// This is a NonSend resource because `Gd<Object>` is not thread-safe.
+#[cfg(debug_assertions)]
+#[derive(Default)]
+pub struct BulkOperationsCache {
+    node: Option<Gd<Object>>,
+}
+
+#[cfg(debug_assertions)]
+impl std::fmt::Debug for BulkOperationsCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BulkOperationsCache")
+            .field("available", &self.node.is_some())
+            .finish()
+    }
+}
+
+#[cfg(debug_assertions)]
+impl BulkOperationsCache {
+    /// Create a new cache with the given node reference.
+    pub fn new(node: Gd<Object>) -> Self {
+        Self { node: Some(node) }
+    }
+
+    /// Get the cached bulk operations node, if available.
+    #[inline]
+    pub fn get(&self) -> Option<Gd<Object>> {
+        self.node.clone()
+    }
+
+    /// Check if the cache has a valid node reference.
+    #[inline]
+    pub fn is_available(&self) -> bool {
+        self.node.is_some()
+    }
+}
 
 /// Capability to access Godot APIs on the main thread.
 #[derive(SystemParam)]

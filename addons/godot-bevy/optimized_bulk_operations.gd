@@ -92,24 +92,6 @@ func bulk_get_transforms_2d(instance_ids: PackedInt64Array) -> Dictionary:
 
 
 # =============================================================================
-# Bulk Input Action Checking
-# =============================================================================
-
-func bulk_check_actions(event: InputEvent) -> Dictionary:
-	var actions: PackedStringArray = PackedStringArray()
-	var pressed: Array[bool] = []
-	var strengths: PackedFloat32Array = PackedFloat32Array()
-
-	for action in InputMap.get_actions():
-		if event.is_action(action):
-			actions.append(action)
-			pressed.append(event.is_action_pressed(action))
-			strengths.append(event.get_action_strength(action))
-
-	return {"actions": actions, "pressed": pressed, "strengths": strengths}
-
-
-# =============================================================================
 # Bulk Collision Signal Connections
 # =============================================================================
 

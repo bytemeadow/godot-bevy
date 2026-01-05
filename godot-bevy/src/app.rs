@@ -117,6 +117,8 @@ impl BevyApp {
         }
     }
 
+    /// Register the OptimizedBulkOperations GDScript node as a child.
+    /// This is called early (before app creation) so benchmarks can use it.
     #[cfg(debug_assertions)]
     fn register_optimized_bulk_operations(&mut self) {
         // Check if OptimizedBulkOperations already exists (e.g., loaded from tscn)
@@ -147,6 +149,25 @@ impl BevyApp {
             }
         } else {
             tracing::debug!("OptimizedBulkOperations not available");
+        }
+    }
+
+    /// Cache the OptimizedBulkOperations node reference in the Bevy app.
+    /// This avoids repeated scene tree lookups every frame.
+    #[cfg(debug_assertions)]
+    fn cache_bulk_operations(&self, app: &mut App) {
+        use crate::interop::BulkOperationsCache;
+
+        if let Some(node) = self
+            .base()
+            .get_node_or_null("OptimizedBulkOperations")
+            .map(|n| n.upcast::<godot::classes::Object>())
+        {
+            app.insert_non_send_resource(BulkOperationsCache::new(node));
+            tracing::debug!("Cached OptimizedBulkOperations node reference");
+        } else {
+            // Initialize empty cache so systems don't need to check for resource existence
+            app.init_non_send_resource::<BulkOperationsCache>();
         }
     }
 }
@@ -231,6 +252,10 @@ impl INode for BevyApp {
         if app.world().contains_resource::<Messages<KeyboardInput>>() {
             self.register_input_event_watcher(&mut app);
         }
+
+        // Cache bulk operations node reference for efficient access in debug builds
+        #[cfg(debug_assertions)]
+        self.cache_bulk_operations(&mut app);
 
         // Finalize plugins - PreStartup systems will now find the watchers
         if app.plugins_state() != PluginsState::Cleaned {

@@ -6,17 +6,11 @@ use bevy_ecs::{
 };
 use bevy_math::Vec2;
 use bevy_reflect::Reflect;
-#[cfg(debug_assertions)]
-use godot::{
-    builtin::VarDictionary,
-    classes::{Engine, Object, SceneTree},
-    prelude::ToGodot,
-};
 use godot::{
     classes::{
         InputEvent as GodotInputEvent, InputEventJoypadButton, InputEventJoypadMotion,
         InputEventKey, InputEventMouseButton, InputEventMouseMotion, InputEventPanGesture,
-        InputEventScreenTouch,
+        InputEventScreenTouch, InputMap,
     },
     global::Key,
     obj::{EngineEnum, Gd, Singleton},
@@ -164,13 +158,11 @@ fn write_input_messages(
 
         match event_type {
             InputEventType::Normal => {
-                // Only process ActionInput events from normal input (mapped keys/actions)
-                extract_action_events_only(&input_event, &mut action_events);
-                extract_input_mouse_motion_events(input_event, &mut mouse_motion_events);
+                check_action_events(&input_event, &mut action_events);
+                extract_mouse_motion_events(input_event, &mut mouse_motion_events);
             }
             InputEventType::Unhandled => {
-                // Process raw input events from unhandled input (unmapped keys, mouse, etc.)
-                extract_input_events_no_actions(
+                extract_basic_input_events(
                     input_event,
                     &mut keyboard_events,
                     &mut mouse_button_events,
@@ -184,50 +176,10 @@ fn write_input_messages(
     }
 }
 
-fn extract_action_events_only(
-    input_event: &Gd<GodotInputEvent>,
-    action_messages: &mut MessageWriter<ActionInput>,
-) {
-    // Only process ActionInput events from normal input (mapped keys/actions)
-    // Note: InputEventAction is not emitted by the engine, so we need to check manually
-    check_action_events(input_event, action_messages);
-}
-
-#[allow(clippy::too_many_arguments)]
-fn extract_input_mouse_motion_events(
-    input_event: Gd<GodotInputEvent>,
-    mouse_motion_events: &mut MessageWriter<MouseMotion>,
-) {
-    extract_mouse_motion_events(input_event, mouse_motion_events);
-}
-
-#[allow(clippy::too_many_arguments)]
-fn extract_input_events_no_actions(
-    input_event: Gd<GodotInputEvent>,
-    keyboard_events: &mut MessageWriter<KeyboardInput>,
-    mouse_button_events: &mut MessageWriter<MouseButtonInput>,
-    touch_events: &mut MessageWriter<TouchInput>,
-    gamepad_button_events: &mut MessageWriter<GamepadButtonInput>,
-    gamepad_axis_events: &mut MessageWriter<GamepadAxisInput>,
-    pan_gesture_events: &mut MessageWriter<PanGestureInput>,
-) {
-    extract_basic_input_events(
-        input_event,
-        keyboard_events,
-        mouse_button_events,
-        touch_events,
-        gamepad_button_events,
-        gamepad_axis_events,
-        pan_gesture_events,
-    );
-}
-
-#[allow(clippy::too_many_arguments)]
 fn extract_mouse_motion_events(
     input_event: Gd<GodotInputEvent>,
     mouse_motion_events: &mut MessageWriter<MouseMotion>,
 ) {
-    // Mouse motion - try_cast consumes and returns Err(self) on failure
     if let Ok(mouse_motion_event) = input_event.try_cast::<InputEventMouseMotion>() {
         let position = mouse_motion_event.get_position();
         let relative = mouse_motion_event.get_relative();
@@ -333,91 +285,13 @@ fn check_action_events(
     input_event: &Gd<GodotInputEvent>,
     action_events: &mut MessageWriter<ActionInput>,
 ) {
-    // In debug builds, bulk GDScript calls can be faster due to Rust FFI overhead.
-    // In release builds, individual FFI calls are faster (~20% improvement).
-    #[cfg(debug_assertions)]
-    {
-        // Try to get the OptimizedBulkOperations node for bulk optimization
-        let bulk_ops = (|| {
-            let engine = Engine::singleton();
-            let scene_tree = engine
-                .get_main_loop()
-                .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())?;
-            let root = scene_tree.get_root()?;
-            root.get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
-                .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
-                .map(|n: godot::prelude::Gd<godot::classes::Node>| n.upcast::<Object>())
-        })();
-
-        if let Some(bulk_ops_node) = bulk_ops {
-            check_action_events_bulk(input_event, action_events, bulk_ops_node);
-            return;
-        }
-    }
-
-    check_action_events_individual(input_event, action_events);
-}
-
-#[cfg(debug_assertions)]
-fn check_action_events_bulk(
-    input_event: &Gd<GodotInputEvent>,
-    action_events: &mut MessageWriter<ActionInput>,
-    mut batch_singleton: Gd<Object>,
-) {
-    let result = batch_singleton
-        .call("bulk_check_actions", &[input_event.to_variant()])
-        .to::<VarDictionary>();
-
-    if let (Some(actions), Some(pressed_arr), Some(strengths)) = (
-        result
-            .get("actions")
-            .map(|v| v.to::<godot::builtin::PackedStringArray>()),
-        result
-            .get("pressed")
-            .map(|v| v.to::<godot::builtin::Array<bool>>()),
-        result
-            .get("strengths")
-            .map(|v| v.to::<godot::builtin::PackedFloat32Array>()),
-    ) {
-        for i in 0..actions.len() {
-            if let (Some(action), Some(pressed), Some(strength)) =
-                (actions.get(i), pressed_arr.get(i), strengths.get(i))
-            {
-                let action_str = action.to_string();
-
-                trace!(
-                    "Generated ActionInput: '{}' {} (strength: {:.2})",
-                    action_str,
-                    if pressed { "pressed" } else { "released" },
-                    strength
-                );
-
-                action_events.write(ActionInput {
-                    action: action_str,
-                    pressed,
-                    strength,
-                });
-            }
-        }
-    }
-}
-
-fn check_action_events_individual(
-    input_event: &Gd<GodotInputEvent>,
-    action_events: &mut MessageWriter<ActionInput>,
-) {
-    use godot::classes::InputMap;
-
-    // Get all actions from the InputMap
     let mut input_map = InputMap::singleton();
     let actions = input_map.get_actions();
 
-    // Check each action to see if this input event matches it
     for action_name in actions.iter_shared() {
         if input_event.is_action(&action_name) {
             let pressed = input_event.is_action_pressed(&action_name);
             let strength = input_event.get_action_strength(&action_name);
-
             let action_str = action_name.to_string();
 
             trace!(
