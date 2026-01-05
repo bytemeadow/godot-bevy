@@ -520,7 +520,7 @@ fn write_scene_tree_messages(
 ) {
     let receiver = message_reader.0.lock();
     let messages: Vec<_> = receiver.try_iter().collect();
-    message_writer.write_batch(messages.into_iter());
+    message_writer.write_batch(messages);
 }
 
 /// Marks an entity so it is not despawned when its corresponding Godot Node is freed, breaking
@@ -850,7 +850,7 @@ fn read_scene_tree_messages(
     let messages: Vec<_> = message_reader.read().cloned().collect();
     create_scene_tree_entity(
         &mut commands,
-        messages.into_iter(),
+        messages,
         &mut scene_tree,
         &mut entities,
         &component_registry,
