@@ -75,6 +75,18 @@ fi
 
 echo -e "${CYAN}Using Godot binary: $GODOT4_BIN${NC}"
 
+# Get the script's directory for absolute paths
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GODOT_PROJECT_DIR="$SCRIPT_DIR/godot"
+
+# Ensure .godot directory exists and extension is registered
+mkdir -p "$GODOT_PROJECT_DIR/.godot"
+echo "res://itest.gdextension" > "$GODOT_PROJECT_DIR/.godot/extension_list.cfg"
+
+# Import project so Godot recognizes the GDExtension
+echo -e "${CYAN}Importing Godot project...${NC}"
+"$GODOT4_BIN" --headless --path "$GODOT_PROJECT_DIR" --import --quit || true
+
 # Cross-platform temp directory and exit code file
 # Use GODOT_TEST_EXIT_CODE_PATH if set, otherwise use system temp dir
 if [ -z "$GODOT_TEST_EXIT_CODE_PATH" ]; then
@@ -98,7 +110,7 @@ rm -f "$EXIT_CODE_FILE"
 
 # Run tests in headless mode
 echo -e "${CYAN}Running integration tests...${NC}"
-"$GODOT4_BIN" --headless --path godot --quit-after 5000
+"$GODOT4_BIN" --headless --path "$GODOT_PROJECT_DIR" --quit-after 5000
 
 # Read the exit code from the file written by tests
 if [ -f "$EXIT_CODE_FILE" ]; then
