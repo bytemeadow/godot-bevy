@@ -31,7 +31,7 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
         struct SignalReceived(bool);
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotTypedSignalsPlugin::<TestSignalFired>::default());
+            app.add_plugins(GodotSignalsPlugin::<TestSignalFired>::default());
             app.init_resource::<SignalReceived>();
             // Use observer instead of system with MessageReader
             app.add_observer(
@@ -129,7 +129,7 @@ fn test_multiple_signal_connections(ctx: &TestContext) -> godot::task::TaskHandl
         }
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotTypedSignalsPlugin::<TestSignalFired>::default());
+            app.add_plugins(GodotSignalsPlugin::<TestSignalFired>::default());
             app.init_resource::<SignalCounts>();
             // Use observer instead of system with MessageReader
             app.add_observer(
@@ -254,7 +254,7 @@ fn test_signal_connection_via_system(ctx: &TestContext) -> godot::task::TaskHand
         let button_id = button.instance_id();
 
         let mut app = TestApp::new(&ctx_clone, move |app| {
-            app.add_plugins(GodotTypedSignalsPlugin::<TestSignalFired>::default());
+            app.add_plugins(GodotSignalsPlugin::<TestSignalFired>::default());
             app.init_resource::<SignalReceived>();
             app.init_resource::<ConnectionMade>();
 

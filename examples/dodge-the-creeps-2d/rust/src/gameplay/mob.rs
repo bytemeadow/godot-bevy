@@ -30,7 +30,7 @@ use godot_bevy::{
     interop::GodotNodeHandle,
     prelude::{
         AudioChannel, FindEntityByNameExt, GodotAccess, GodotResource, GodotScene,
-        GodotTypedSignalsPlugin, NodeTreeView,
+        GodotSignalsPlugin, NodeTreeView,
     },
 };
 use std::f32::consts::PI;
@@ -49,8 +49,8 @@ pub struct MobPlugin;
 impl Plugin for MobPlugin {
     fn build(&self, app: &mut App) {
         app
-            // enable typed signal routing for mob screen exit
-            .add_plugins(GodotTypedSignalsPlugin::<MobScreenExited>::default())
+            // enable signal routing for mob screen exit
+            .add_plugins(GodotSignalsPlugin::<MobScreenExited>::default())
             .add_systems(
                 Update,
                 (spawn_mob, new_mob).run_if(in_state(GameState::InGame)),

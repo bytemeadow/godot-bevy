@@ -33,10 +33,10 @@ pub struct MainMenuPlugin;
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuAssets>()
-            // Enable typed signal routing for our menu events
-            .add_plugins(GodotTypedSignalsPlugin::<StartGameRequested>::default())
-            .add_plugins(GodotTypedSignalsPlugin::<ToggleFullscreenRequested>::default())
-            .add_plugins(GodotTypedSignalsPlugin::<QuitRequested>::default())
+            // Enable signal routing for our menu events
+            .add_plugins(GodotSignalsPlugin::<StartGameRequested>::default())
+            .add_plugins(GodotSignalsPlugin::<ToggleFullscreenRequested>::default())
+            .add_plugins(GodotSignalsPlugin::<QuitRequested>::default())
             .add_systems(OnEnter(GameState::MainMenu), reset_menu_assets)
             .add_systems(
                 Update,

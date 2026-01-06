@@ -90,7 +90,7 @@ impl GodotScene {
     /// will be triggered when the signal fires.
     ///
     /// # Requirements
-    /// This method requires [`GodotTypedSignalsPlugin<T>`] to be added to your app for the
+    /// This method requires [`GodotSignalsPlugin<T>`] to be added to your app for the
     /// event type `T` you're using. If the plugin is not added, the signal connections
     /// will be ignored and an error will be logged at runtime.
     ///
@@ -223,8 +223,8 @@ fn spawn_scene(
                 }
             } else {
                 error!(
-                    "GodotScene has signal connections but GodotTypedSignalsPlugin is not added. \
-                     Add GodotTypedSignalsPlugin<YourEventType> to enable signal connections."
+                    "GodotScene has signal connections but GodotSignalsPlugin is not added. \
+                     Add GodotSignalsPlugin<YourEventType> to enable signal connections."
                 );
                 scene.deferred_signal_connections.clear();
             }

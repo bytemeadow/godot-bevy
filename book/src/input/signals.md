@@ -22,11 +22,11 @@ use godot_bevy::prelude::*;
 struct StartGameRequested;
 ```
 
-2) Register the typed signals plugin for your event type:
+2) Register the signals plugin for your event type:
 
 ```rust
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotTypedSignalsPlugin::<StartGameRequested>::default());
+    app.add_plugins(GodotSignalsPlugin::<StartGameRequested>::default());
 }
 ```
 
@@ -74,8 +74,8 @@ Use one plugin per event type. You can map the same Godot signal to multiple typ
 #[derive(Event, Debug, Clone)] struct QuitRequested { source: GodotNodeHandle }
 
 fn setup(app: &mut App) {
-    app.add_plugins(GodotTypedSignalsPlugin::<ToggleFullscreen>::default())
-       .add_plugins(GodotTypedSignalsPlugin::<QuitRequested>::default())
+    app.add_plugins(GodotSignalsPlugin::<ToggleFullscreen>::default())
+       .add_plugins(GodotSignalsPlugin::<QuitRequested>::default())
        .add_observer(on_toggle_fullscreen)
        .add_observer(on_quit);
 }
@@ -161,7 +161,7 @@ When spawning entities before their `GodotNodeHandle` is ready, you can defer co
 #[derive(Event, Debug, Clone, Copy)] struct BodyEntered { entity: Entity }
 
 fn setup(app: &mut App) {
-    app.add_plugins(GodotTypedSignalsPlugin::<BodyEntered>::default())
+    app.add_plugins(GodotSignalsPlugin::<BodyEntered>::default())
        .add_observer(on_body_entered);
 }
 

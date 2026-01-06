@@ -137,7 +137,7 @@ fn connect_signal<T>(
 /// struct ButtonPressed;
 ///
 /// fn setup_app(app: &mut App) {
-///     app.add_plugins(GodotTypedSignalsPlugin::<ButtonPressed>::default());
+///     app.add_plugins(GodotSignalsPlugin::<ButtonPressed>::default());
 ///
 ///     // React to button presses with a global observer
 ///     app.add_observer(|_trigger: Trigger<ButtonPressed>| {
@@ -154,7 +154,7 @@ fn connect_signal<T>(
 ///     });
 /// }
 /// ```
-pub struct GodotTypedSignalsPlugin<T>
+pub struct GodotSignalsPlugin<T>
 where
     T: Event + Clone + Send + 'static,
     for<'a> T::Trigger<'a>: Default,
@@ -162,7 +162,7 @@ where
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T> Default for GodotTypedSignalsPlugin<T>
+impl<T> Default for GodotSignalsPlugin<T>
 where
     T: Event + Clone + Send + 'static,
     for<'a> T::Trigger<'a>: Default,
@@ -174,7 +174,7 @@ where
     }
 }
 
-impl<T> Plugin for GodotTypedSignalsPlugin<T>
+impl<T> Plugin for GodotSignalsPlugin<T>
 where
     T: Event + Clone + Send + 'static,
     for<'a> T::Trigger<'a>: Default,

@@ -28,7 +28,7 @@ impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuAssets>()
             // enable typed signal routing for menu
-            .add_plugins(GodotTypedSignalsPlugin::<StartGameRequested>::default())
+            .add_plugins(GodotSignalsPlugin::<StartGameRequested>::default())
             .add_systems(
                 OnExit(GameState::Loading),
                 (
