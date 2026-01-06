@@ -71,8 +71,8 @@ Typed signals are opt-in per message type using `GodotTypedSignalsPlugin::<T>`.
 - **`GodotCollisionsPlugin`**: Collision detection
 
   - Monitors Area2D/3D and RigidBody2D/3D collision signals
-  - Provides `Collisions` component with entered/exited tracking
-  - Converts Godot collision signals to queryable data
+  - Provides `Collisions` system param for querying collision state
+  - Provides `CollisionStarted` / `CollisionEnded` events (messages + observers)
 
 - **`GodotTypedSignalsPlugin<T>`**: Typed signal bridge
 

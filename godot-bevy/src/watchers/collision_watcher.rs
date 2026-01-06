@@ -5,14 +5,14 @@ use godot::prelude::*;
 
 use crate::{
     interop::GodotNodeHandle,
-    plugins::collisions::{CollisionMessage, CollisionMessageType},
+    plugins::collisions::{CollisionMessageType, RawCollisionMessage},
 };
 
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct CollisionWatcher {
     base: Base<Node>,
-    pub notification_channel: Option<Sender<CollisionMessage>>,
+    pub notification_channel: Option<Sender<RawCollisionMessage>>,
 }
 
 #[godot_api]
@@ -35,7 +35,7 @@ impl CollisionWatcher {
         event_type: CollisionMessageType,
     ) {
         if let Some(channel) = self.notification_channel.as_ref() {
-            let _ = channel.send(CollisionMessage {
+            let _ = channel.send(RawCollisionMessage {
                 event_type,
                 origin: GodotNodeHandle::from(origin_node.instance_id()),
                 target: GodotNodeHandle::from(colliding_body.instance_id()),

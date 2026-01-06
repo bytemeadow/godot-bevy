@@ -22,12 +22,12 @@ fn move_entity(mut query: Query<&mut Transform>) {
 
 ### 2. Direct Godot Physics
 
-Use `GodotNodeHandle` to directly control Godot physics nodes. Perfect for physics-heavy games. This usually means you're calling Godot's move methods to have it handle physics for you.
+Use `GodotNodeHandle` with `GodotAccess` to directly control Godot physics nodes. Perfect for physics-heavy games. This usually means you're calling Godot's move methods to have it handle physics for you.
 
 ```rust
-fn move_character(mut query: Query<&mut GodotNodeHandle>) {
-    for mut handle in query.iter_mut() {
-        let mut body = handle.get::<CharacterBody2D>();
+fn move_character(query: Query<&GodotNodeHandle>, mut godot: GodotAccess) {
+    for handle in query.iter() {
+        let mut body = godot.get::<CharacterBody2D>(*handle);
         body.set_velocity(Vector2::new(100.0, 0.0));
         body.move_and_slide();
     }

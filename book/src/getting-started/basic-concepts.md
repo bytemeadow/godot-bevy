@@ -51,8 +51,9 @@ Components store data on entities. godot-bevy provides several built-in componen
 
 - `GodotNodeHandle` - Reference to the Godot node
 - `Name` - Node name
-- `Collisions` - Collision events
 - `Groups` - Godot node groups
+
+For collision detection, use the `Collisions` system param (see [Plugins](./plugins.md)).
 
 ### Systems
 Systems contain your game logic and run on a schedule:
@@ -155,10 +156,9 @@ Understanding how data flows between Godot and Bevy is crucial:
 - Don't reinvent what already exists
 
 ### 5. The Godot Boundary (Main Thread Only)
-- Any call into Godot (via `GodotNodeHandle::get/try_get`, `Gd<T>`, `Input::singleton`, etc.) must run on the main thread
-- Systems that call Godot APIs are forced onto the main thread and run sequentially, so keep them small and push heavy work to parallel systems
-- Bevy schedules by component type, not instance ID: any system with `Query<&mut GodotNodeHandle>` conflicts with any other system that also uses `&mut GodotNodeHandle`, even if you intend to work on different nodes
-- Treat `GodotNodeHandle` as an ID outside the main thread; resolve to `Gd<T>` only inside a `#[main_thread_system]`
+- Any call into Godot (via `GodotAccess`, `Gd<T>`, `Input::singleton`, etc.) must run on the main thread
+- Systems that include `GodotAccess` are forced onto the main thread and run sequentially, so keep them small and push heavy work to parallel systems
+- Treat `GodotNodeHandle` as an ID; resolve to `Gd<T>` only via `GodotAccess`
 - See [Thread Safety and Godot APIs](../threading/index.md) for details and patterns
 
 ## Common Patterns

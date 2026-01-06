@@ -239,10 +239,10 @@ impl INode for BevyApp {
         }
 
         // Collision plugin check - similar approach
-        use crate::plugins::collisions::CollisionMessage;
+        use crate::plugins::collisions::CollisionStarted;
         if app
             .world()
-            .contains_resource::<Messages<CollisionMessage>>()
+            .contains_resource::<Messages<CollisionStarted>>()
         {
             self.register_collision_watcher(&mut app);
         }

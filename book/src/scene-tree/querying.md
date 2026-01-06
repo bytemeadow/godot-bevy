@@ -10,10 +10,10 @@ Every entity that represents a Godot node gets marker components automatically:
 use godot_bevy::prelude::*;
 
 // Query all Sprite2D entities - no runtime type checking needed!
-fn update_sprites(mut sprites: Query<&mut GodotNodeHandle, With<Sprite2DMarker>>) {
-    for mut handle in sprites.iter_mut() {
+fn update_sprites(sprites: Query<&GodotNodeHandle, With<Sprite2DMarker>>, mut godot: GodotAccess) {
+    for handle in sprites.iter() {
         // We know this is a Sprite2D, so .get() is safe
-        let sprite = handle.get::<Sprite2D>();
+        let sprite = godot.get::<Sprite2D>(*handle);
         // Work with the sprite...
     }
 }
@@ -97,11 +97,12 @@ fn system3(characters: Query<&GodotNodeHandle, With<CharacterBody2DMarker>>) { /
 ```rust
 // Entities that have BOTH a Sprite2D AND a RigidBody2D
 fn physics_sprites(
-    query: Query<&mut GodotNodeHandle, (With<Sprite2DMarker>, With<RigidBody2DMarker>)>
+    query: Query<&GodotNodeHandle, (With<Sprite2DMarker>, With<RigidBody2DMarker>)>,
+    mut godot: GodotAccess,
 ) {
-    for mut handle in query.iter_mut() {
-        let sprite = handle.get::<Sprite2D>();
-        let body = handle.get::<RigidBody2D>();
+    for handle in query.iter() {
+        let sprite = godot.get::<Sprite2D>(*handle);
+        let body = godot.get::<RigidBody2D>(*handle);
         // Work with both components...
     }
 }
@@ -112,11 +113,12 @@ fn physics_sprites(
 ```rust
 // All sprites EXCEPT character bodies (e.g., environmental sprites)
 fn environment_sprites(
-    query: Query<&mut GodotNodeHandle, (With<Sprite2DMarker>, Without<CharacterBody2DMarker>)>
+    query: Query<&GodotNodeHandle, (With<Sprite2DMarker>, Without<CharacterBody2DMarker>)>,
+    mut godot: GodotAccess,
 ) {
-    for mut handle in query.iter_mut() {
+    for handle in query.iter() {
         // These are sprites but not character bodies
-        let sprite = handle.get::<Sprite2D>();
+        let sprite = godot.get::<Sprite2D>(*handle);
         // Work with environmental sprites...
     }
 }
@@ -127,23 +129,24 @@ fn environment_sprites(
 ```rust
 // Handle different audio player types efficiently
 fn update_audio_system(
-    players_1d: Query<&mut GodotNodeHandle, With<AudioStreamPlayerMarker>>,
-    players_2d: Query<&mut GodotNodeHandle, With<AudioStreamPlayer2DMarker>>,
-    players_3d: Query<&mut GodotNodeHandle, With<AudioStreamPlayer3DMarker>>,
+    players_1d: Query<&GodotNodeHandle, With<AudioStreamPlayerMarker>>,
+    players_2d: Query<&GodotNodeHandle, With<AudioStreamPlayer2DMarker>>,
+    players_3d: Query<&GodotNodeHandle, With<AudioStreamPlayer3DMarker>>,
+    mut godot: GodotAccess,
 ) {
     // Process each type separately - no runtime type checking!
-    for mut handle in players_1d.iter_mut() {
-        let player = handle.get::<AudioStreamPlayer>();
+    for handle in players_1d.iter() {
+        let player = godot.get::<AudioStreamPlayer>(*handle);
         // Handle 1D audio...
     }
     
-    for mut handle in players_2d.iter_mut() {
-        let player = handle.get::<AudioStreamPlayer2D>();
+    for handle in players_2d.iter() {
+        let player = godot.get::<AudioStreamPlayer2D>(*handle);
         // Handle 2D spatial audio...
     }
     
-    for mut handle in players_3d.iter_mut() {
-        let player = handle.get::<AudioStreamPlayer3D>();
+    for handle in players_3d.iter() {
+        let player = godot.get::<AudioStreamPlayer3D>(*handle);
         // Handle 3D spatial audio...
     }
 }

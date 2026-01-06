@@ -165,11 +165,12 @@ fn move_player(
 }
 
 fn check_player_death(
-    mut player: Query<(&mut VisibilityState, &Collisions), With<Player>>,
+    mut player: Query<(Entity, &mut VisibilityState), With<Player>>,
+    collisions: Collisions,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
-    if let Ok((mut visibility, collisions)) = player.single_mut() {
-        if collisions.colliding().is_empty() {
+    if let Ok((player_entity, mut visibility)) = player.single_mut() {
+        if collisions.colliding_with(player_entity).is_empty() {
             return;
         }
 

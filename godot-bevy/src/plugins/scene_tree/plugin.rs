@@ -7,7 +7,7 @@ use crate::prelude::GodotScene;
 use crate::{
     interop::{GodotAccess, GodotNodeHandle},
     plugins::collisions::{
-        AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED, CollisionMessageType, Collisions,
+        AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED, CollisionMessageType,
     },
 };
 use bevy_app::{App, First, Plugin, PreStartup};
@@ -633,9 +633,6 @@ fn create_scene_tree_entity(
 
                         // Collect for batched connection
                         pending_collision_bodies.push((instance_id.to_i64(), mask));
-
-                        // Add Collisions component to track collision state
-                        ent.insert(Collisions::default());
                     }
                 }
                 // Use pre-analyzed groups from GDScript watcher if available, otherwise fallback to FFI
