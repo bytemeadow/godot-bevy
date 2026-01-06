@@ -1,7 +1,6 @@
 use crate::gameplay::audio::GameSfxChannel;
 use crate::{GameState, commands::AnimationState};
 use bevy::math::{Vec3Swizzles, vec3};
-use bevy::prelude::Message;
 use bevy::transform::components::Transform;
 use bevy::{
     app::{App, Plugin, Update},
@@ -9,8 +8,9 @@ use bevy::{
     ecs::{
         component::Component,
         entity::Entity,
-        message::MessageReader,
+        event::Event,
         name::Name,
+        observer::On,
         query::Added,
         resource::Resource,
         schedule::IntoScheduleConfigs,
@@ -53,8 +53,10 @@ impl Plugin for MobPlugin {
             .add_plugins(GodotTypedSignalsPlugin::<MobScreenExited>::default())
             .add_systems(
                 Update,
-                (spawn_mob, new_mob, kill_mob).run_if(in_state(GameState::InGame)),
+                (spawn_mob, new_mob).run_if(in_state(GameState::InGame)),
             )
+            // Use observer for mob screen exit
+            .add_observer(on_mob_screen_exited)
             .insert_resource(MobSpawnTimer(Timer::from_seconds(
                 0.5,
                 TimerMode::Repeating,
@@ -171,13 +173,12 @@ fn new_mob(
     }
 }
 
-#[derive(Message, Debug, Clone, Copy)]
+#[derive(Event, Debug, Clone, Copy)]
 struct MobScreenExited {
     entity: Entity,
 }
 
-fn kill_mob(mut commands: Commands, mut events: MessageReader<MobScreenExited>) {
-    for ev in events.read() {
-        commands.entity(ev.entity).despawn();
-    }
+fn on_mob_screen_exited(trigger: On<MobScreenExited>, mut commands: Commands) {
+    let entity = trigger.event().entity;
+    commands.entity(entity).despawn();
 }

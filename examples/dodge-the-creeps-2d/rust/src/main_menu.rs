@@ -1,16 +1,14 @@
-use bevy::prelude::Message;
 use bevy::{
-    app::{App, Plugin, Update},
+    app::{App, Plugin},
     ecs::{
-        message::{MessageReader, MessageWriter},
+        event::Event,
+        message::MessageWriter,
+        observer::On,
         resource::Resource,
         schedule::IntoScheduleConfigs,
         system::{Res, ResMut},
     },
-    state::{
-        condition::in_state,
-        state::{NextState, OnEnter, OnExit},
-    },
+    state::state::{NextState, OnEnter, OnExit},
 };
 use godot_bevy::prelude::*;
 
@@ -38,10 +36,8 @@ impl Plugin for MainMenuPlugin {
                     connect_start_button.after(init_menu_assets),
                 ),
             )
-            .add_systems(
-                Update,
-                listen_for_start_button.run_if(in_state(GameState::MainMenu)),
-            )
+            // Use observer instead of system with MessageReader
+            .add_observer(on_start_game_requested)
             .add_systems(OnExit(GameState::MainMenu), hide_play_button)
             .add_systems(OnEnter(GameState::MainMenu), show_play_button);
     }
@@ -76,25 +72,24 @@ fn init_menu_assets(
     ui_handles.message_label = Some(menu_ui.message_label);
 }
 
-#[derive(Message, Debug, Clone)]
+#[derive(Event, Debug, Clone)]
 struct StartGameRequested;
 
-fn connect_start_button(
-    menu_assets: Res<MenuAssets>,
-    typed: TypedGodotSignals<StartGameRequested>,
-) {
+fn connect_start_button(menu_assets: Res<MenuAssets>, signals: GodotSignals<StartGameRequested>) {
     if let Some(handle) = menu_assets.start_button {
-        typed.connect_map(handle, "pressed", None, |_args, _node_handle, _ent| {
+        signals.connect(handle, "pressed", None, |_args, _node_handle, _ent| {
             Some(StartGameRequested)
         });
     }
 }
 
-fn listen_for_start_button(
-    mut events: MessageReader<StartGameRequested>,
+fn on_start_game_requested(
+    _trigger: On<StartGameRequested>,
     mut app_state: ResMut<NextState<GameState>>,
+    state: Res<bevy::state::state::State<GameState>>,
 ) {
-    for _ in events.read() {
+    // Only respond when in MainMenu state
+    if *state.get() == GameState::MainMenu {
         app_state.set(GameState::Countdown);
     }
 }
