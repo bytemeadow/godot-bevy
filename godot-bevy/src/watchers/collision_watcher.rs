@@ -1,18 +1,18 @@
+use crossbeam_channel::Sender;
 use godot::classes::Node;
 use godot::obj::Gd;
 use godot::prelude::*;
-use std::sync::mpsc::Sender;
 
 use crate::{
     interop::GodotNodeHandle,
-    plugins::collisions::{CollisionMessage, CollisionMessageType},
+    plugins::collisions::{CollisionMessageType, RawCollisionMessage},
 };
 
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct CollisionWatcher {
     base: Base<Node>,
-    pub notification_channel: Option<Sender<CollisionMessage>>,
+    pub notification_channel: Option<Sender<RawCollisionMessage>>,
 }
 
 #[godot_api]
@@ -35,10 +35,10 @@ impl CollisionWatcher {
         event_type: CollisionMessageType,
     ) {
         if let Some(channel) = self.notification_channel.as_ref() {
-            let _ = channel.send(CollisionMessage {
+            let _ = channel.send(RawCollisionMessage {
                 event_type,
-                origin: GodotNodeHandle::from_instance_id(origin_node.instance_id()),
-                target: GodotNodeHandle::from_instance_id(colliding_body.instance_id()),
+                origin: GodotNodeHandle::from(origin_node.instance_id()),
+                target: GodotNodeHandle::from(colliding_body.instance_id()),
             });
         }
     }

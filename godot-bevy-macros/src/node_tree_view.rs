@@ -153,7 +153,7 @@ fn create_direct_path_expr(
                             .ok_or_else(|| godot_bevy::node_tree_view::NodeTreeViewError::NodeNotFound(
                                 #node_path.to_string()
                             ))?;
-                        godot_bevy::interop::GodotNodeHandle::new(node_ref)
+                        godot_bevy::interop::GodotNodeHandle::from_instance_id(node_ref.instance_id())
                     })
             }
         }
@@ -165,7 +165,7 @@ fn create_direct_path_expr(
                     .ok_or_else(|| godot_bevy::node_tree_view::NodeTreeViewError::NodeNotFound(
                         #node_path.to_string()
                     ))?;
-                godot_bevy::interop::GodotNodeHandle::new(node_ref)
+                godot_bevy::interop::GodotNodeHandle::from_instance_id(node_ref.instance_id())
             }
         }
     };
@@ -182,7 +182,7 @@ fn create_pattern_matching_expr(
             {
                 let base_node = &node;
                 godot_bevy::node_tree_view::find_node_by_pattern(base_node, #path_pattern)
-                    .map(|node_ref| godot_bevy::interop::GodotNodeHandle::new(node_ref))
+                    .map(|node_ref| godot_bevy::interop::GodotNodeHandle::from_instance_id(node_ref.instance_id()))
             }
         }
     } else {
@@ -194,7 +194,7 @@ fn create_pattern_matching_expr(
                     .ok_or_else(|| godot_bevy::node_tree_view::NodeTreeViewError::NodeNotFound(
                         pattern.to_string()
                     ))?;
-                godot_bevy::interop::GodotNodeHandle::new(node_ref)
+                godot_bevy::interop::GodotNodeHandle::from_instance_id(node_ref.instance_id())
             }
         }
     };

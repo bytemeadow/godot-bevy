@@ -1,7 +1,7 @@
+use crossbeam_channel::Sender;
 use godot::classes::{InputEvent, Node};
 use godot::obj::Gd;
 use godot::prelude::*;
-use std::sync::mpsc::Sender;
 
 use crate::plugins::input::InputEventType;
 

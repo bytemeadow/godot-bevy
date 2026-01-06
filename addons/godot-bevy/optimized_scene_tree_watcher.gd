@@ -53,16 +53,43 @@ func _on_node_added(node: Node):
 		return
 
 	# Check if node is marked to be excluded from scene tree watcher
-	# This is used by godot-bevy-inspector and other tools that add nodes
-	# that shouldn't be tracked as Bevy entities
 	if node.has_meta("_bevy_exclude"):
 		return
 
 	# Analyze node type on GDScript side - this is much faster than FFI
 	var node_type = _analyze_node_type(node)
+	var node_name = node.name
+	var parent = node.get_parent()
+	var parent_id = parent and parent.get_instance_id() or 0
+	var collision_mask = _compute_collision_mask(node)
 
-	# Forward to Rust watcher with pre-analyzed type - this uses the MPSC sender
-	if rust_watcher.has_method("scene_tree_event_typed"):
+	# Collect groups for this node
+	var node_groups = PackedStringArray()
+	for group in node.get_groups():
+		node_groups.append(group)
+
+	# Forward to Rust watcher with pre-analyzed metadata
+	# Try newest API first (with groups), then fall back to older APIs
+	if rust_watcher.has_method("scene_tree_event_typed_metadata_groups"):
+		rust_watcher.scene_tree_event_typed_metadata_groups(
+			node,
+			"NodeAdded",
+			node_type,
+			node_name,
+			parent_id,
+			collision_mask,
+			node_groups
+		)
+	elif rust_watcher.has_method("scene_tree_event_typed_metadata"):
+		rust_watcher.scene_tree_event_typed_metadata(
+			node,
+			"NodeAdded",
+			node_type,
+			node_name,
+			parent_id,
+			collision_mask
+		)
+	elif rust_watcher.has_method("scene_tree_event_typed"):
 		rust_watcher.scene_tree_event_typed(node, "NodeAdded", node_type)
 	else:
 		# Fallback to regular method if typed method not available
@@ -86,7 +113,23 @@ func _on_node_renamed(node: Node):
 	if not is_instance_valid(node):
 		return
 
-	rust_watcher.scene_tree_event(node, "NodeRenamed")
+	var node_name = node.name
+	if rust_watcher.has_method("scene_tree_event_named"):
+		rust_watcher.scene_tree_event_named(node, "NodeRenamed", node_name)
+	else:
+		rust_watcher.scene_tree_event(node, "NodeRenamed")
+
+func _compute_collision_mask(node: Node) -> int:
+	var mask = 0
+	if node.has_signal("body_entered"):
+		mask |= 1
+	if node.has_signal("body_exited"):
+		mask |= 2
+	if node.has_signal("area_entered"):
+		mask |= 4
+	if node.has_signal("area_exited"):
+		mask |= 8
+	return mask
 
 func _analyze_node_type(node: Node) -> String:
 	"""
@@ -314,22 +357,34 @@ func analyze_initial_tree() -> Dictionary:
 	Returns a Dictionary with PackedArrays for maximum performance:
 	{
 		"instance_ids": PackedInt64Array,
-		"node_types": PackedStringArray
+		"node_types": PackedStringArray,
+		"node_names": PackedStringArray,
+		"parent_ids": PackedInt64Array,
+		"collision_masks": PackedInt64Array,
+		"groups": Array[PackedStringArray]  # Added in v2 - may not be present in older addons
 	}
 	Used for optimized initial scene tree setup.
 	"""
 	var instance_ids = PackedInt64Array()
 	var node_types = PackedStringArray()
+	var node_names = PackedStringArray()
+	var parent_ids = PackedInt64Array()
+	var collision_masks = PackedInt64Array()
+	var groups = []  # Array of PackedStringArrays
 	var root = get_tree().get_root()
 	if root:
-		_analyze_node_recursive(root, instance_ids, node_types)
+		_analyze_node_recursive(root, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)
 
 	return {
 		"instance_ids": instance_ids,
-		"node_types": node_types
+		"node_types": node_types,
+		"node_names": node_names,
+		"parent_ids": parent_ids,
+		"collision_masks": collision_masks,
+		"groups": groups
 	}
 
-func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_types: PackedStringArray):
+func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_types: PackedStringArray, node_names: PackedStringArray, parent_ids: PackedInt64Array, collision_masks: PackedInt64Array, groups: Array):
 	"""Recursively analyze nodes and collect type information into PackedArrays"""
 	# Check if node is still valid before processing
 	if not is_instance_valid(node):
@@ -342,12 +397,25 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 	# Add this node's information with pre-analyzed type
 	var instance_id = node.get_instance_id()
 	var node_type = _analyze_node_type(node)
+	var node_name = node.name
+	var parent = node.get_parent()
+	var parent_id = parent and parent.get_instance_id() or 0
+	var collision_mask = _compute_collision_mask(node)
+
+	# Collect groups for this node
+	var node_groups = PackedStringArray()
+	for group in node.get_groups():
+		node_groups.append(group)
 
 	# Only append if we have valid data
 	if instance_id != 0 and node_type != "":
 		instance_ids.append(instance_id)
 		node_types.append(node_type)
+		node_names.append(node_name)
+		parent_ids.append(parent_id)
+		collision_masks.append(collision_mask)
+		groups.append(node_groups)
 
 	# Recursively process children
 	for child in node.get_children():
-		_analyze_node_recursive(child, instance_ids, node_types)
+		_analyze_node_recursive(child, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)

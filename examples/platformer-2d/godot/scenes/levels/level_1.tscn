@@ -1,11 +1,10 @@
-[gd_scene load_steps=9 format=3 uid="uid://vqvucquny67u"]
+[gd_scene load_steps=8 format=3 uid="uid://vqvucquny67u"]
 
 [ext_resource type="Texture2D" uid="uid://bt22jar36sn81" path="res://assets/art/monochrome_tilemap_transparent.png" id="2_l3e02"]
 [ext_resource type="PackedScene" uid="uid://bdyp538fqygcq" path="res://scenes/ui/hud.tscn" id="3_dxtoi"]
 [ext_resource type="PackedScene" uid="uid://cboi8hec4yf0c" path="res://scenes/sprites/player.tscn" id="3_kr5fw"]
 [ext_resource type="PackedScene" uid="uid://clikcsot5ncta" path="res://scenes/sprites/door.tscn" id="4_hvikv"]
 [ext_resource type="PackedScene" uid="uid://dypev0qrj3e6s" path="res://scenes/sprites/gem.tscn" id="5_lq6yu"]
-[ext_resource type="AudioStream" uid="uid://3rjiyxsmrmwp" path="res://assets/audio/actiontheme-v3.ogg" id="7_4horr"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_6issp"]
 resource_name = "Tilemap"
@@ -591,8 +590,3 @@ position = Vector2(1104, 184)
 
 [node name="Gem9" parent="Gems" instance=ExtResource("5_lq6yu")]
 position = Vector2(1168, 192)
-
-[node name="Music" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("7_4horr")
-volume_db = -8.0
-autoplay = true

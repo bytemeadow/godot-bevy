@@ -1,181 +1,196 @@
 name: ci
 
 on:
-    push:
-        branches: [main, develop]
-        paths-ignore:
-            - "book/**"
-            - "**.md"
-            - ".github/workflows/book.yml"
-            - ".github/workflows/benchmark*.yml"
-            - ".github/workflows/examples.yml"
-    pull_request:
-        branches: [main, develop]
-        paths-ignore:
-            - "book/**"
-            - "**.md"
-            - ".github/workflows/book.yml"
-            - ".github/workflows/benchmark*.yml"
-            - ".github/workflows/examples.yml"
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - "book/**"
+      - "**.md"
+      - ".github/workflows/book.yml"
+      - ".github/workflows/benchmark*.yml"
+      - ".github/workflows/examples.yml"
+  pull_request:
+    branches: [main, develop]
+    paths-ignore:
+      - "book/**"
+      - "**.md"
+      - ".github/workflows/book.yml"
+      - ".github/workflows/benchmark*.yml"
+      - ".github/workflows/examples.yml"
+  workflow_dispatch: # Allows manual runs and local testing with act
 
 env:
-    CARGO_TERM_COLOR: always
-    GODOT_VERSION: "4.5.1"
+  CARGO_TERM_COLOR: always
+  GODOT_VERSION: "4.5.1"
 
 permissions:
-    contents: read
-    issues: write
-    pull-requests: write
+  contents: read
+  issues: write
+  pull-requests: write
 
 concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-    # Fast-fail lint job - runs once on Linux, catches formatting/clippy errors quickly
-    lint:
-        name: lint
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+  # Fast-fail lint job - runs once on Linux, catches formatting/clippy errors quickly
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@stable
-              with:
-                  components: rustfmt, clippy
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
-            - name: Setup Rust cache
-              uses: Swatinem/rust-cache@v2
-              with:
-                  workspaces: . -> target
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
 
-            - name: Cache and install Linux dependencies
-              uses: awalsh128/cache-apt-pkgs-action@latest
-              with:
-                  packages: libasound2-dev libudev-dev pkg-config
-                  version: 1.0
+      - name: Cache and install Linux dependencies
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libasound2-dev libudev-dev pkg-config
+          version: 1.0
 
-            - name: Check formatting
-              run: cargo fmt --all -- --check
+      - name: Check formatting
+        run: cargo fmt --all -- --check
 
-            - name: Run clippy
-              run: cargo clippy --all-targets -- -D warnings
+      - name: Run clippy
+        run: cargo clippy --all-targets -- -D warnings
 
-    # Test job - runs on all platforms after lint passes
-    test:
-        name: test (${{ matrix.platform }})
-        runs-on: ${{ matrix.os }}
-        needs: [lint, changes]
-        if: needs.changes.outputs.library == 'true' || needs.changes.outputs.itest == 'true'
-        strategy:
-            matrix:
-                os:
-                    [
-                        blaze/compute/ubuntu-latest-amd64,
-                        blaze/macos-latest,
-                        windows-latest,
-                    ]
-                include:
-                    - os: blaze/compute/ubuntu-latest-amd64
-                      platform: linux
-                    - os: blaze/macos-latest
-                      platform: macos
-                    - os: windows-latest
-                      platform: windows
+  # Test job - runs on all platforms after lint passes
+  # For workflow_dispatch (local act testing), runs only on ubuntu-latest
+  test:
+    name: test (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    needs: [lint, changes]
+    if: needs.changes.outputs.library == 'true' || needs.changes.outputs.itest == 'true'
+    strategy:
+      matrix:
+        # For workflow_dispatch, use only ubuntu-latest (for act compatibility)
+        # For push/PR, use full matrix with custom runners
+        os: ${{ github.event_name == 'workflow_dispatch' && fromJson('["ubuntu-latest"]') || fromJson('["blaze/compute/ubuntu-latest-amd64", "blaze/macos-latest", "windows-latest"]') }}
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: blaze/compute/ubuntu-latest-amd64
+            platform: linux
+          - os: blaze/macos-latest
+            platform: macos
+          - os: windows-latest
+            platform: windows
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-            - name: Setup Rust cache
-              uses: Swatinem/rust-cache@v2
-              with:
-                  workspaces: . -> target
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
 
-            - name: Cache and install Linux dependencies
-              if: runner.os == 'linux'
-              uses: awalsh128/cache-apt-pkgs-action@latest
-              with:
-                  packages: libasound2-dev libudev-dev pkg-config
-                  version: 1.0
+      - name: Cache and install Linux dependencies
+        if: runner.os == 'linux'
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libasound2-dev libudev-dev pkg-config
+          version: 1.0
 
-            - name: Run unit tests
-              run: cargo test --lib --bins --examples
+      - name: Run unit tests
+        run: cargo test --lib --bins --examples
 
-    # Detect which paths changed to conditionally run downstream jobs
-    changes:
-        name: detect changes
-        runs-on: ubuntu-latest
-        outputs:
-            library: ${{ steps.filter.outputs.library }}
-            itest: ${{ steps.filter.outputs.itest }}
-        steps:
-            - uses: actions/checkout@v4
-            - uses: dorny/paths-filter@v3
-              id: filter
-              with:
-                  filters: |
-                      library:
-                        - 'godot-bevy/**'
-                        - 'godot-bevy-macros/**'
-                        - '.github/workflows/ci.yml'
-                        - 'Cargo.toml'
-                        - 'Cargo.lock'
-                      itest:
-                        - 'itest/**'
-                        - '.github/workflows/ci.yml'
+  # Detect which paths changed to conditionally run downstream jobs
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      library: ${{ steps.manual.outputs.library || steps.filter.outputs.library }}
+      itest: ${{ steps.manual.outputs.itest || steps.filter.outputs.itest }}
+    steps:
+      - uses: actions/checkout@v4
 
-    # Integration tests with Godot runtime
-    integration-tests:
-        name: integration tests
-        runs-on: blaze/macos-latest
-        needs: [lint, changes]
-        if: |
-            needs.changes.outputs.library == 'true' ||
-            needs.changes.outputs.itest == 'true'
+      # For manual triggers (workflow_dispatch), always run all jobs
+      # This enables local testing with act and explicit manual runs
+      - name: Manual trigger - run all
+        id: manual
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "library=true" >> $GITHUB_OUTPUT
+          echo "itest=true" >> $GITHUB_OUTPUT
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+      # For push/PR events, use paths-filter to detect changes
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          filters: |
+            library:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - '.github/workflows/ci.yml'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            itest:
+              - 'itest/**'
+              - '.github/workflows/ci.yml'
 
-            - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@stable
+  # Integration tests with Godot runtime
+  # For local testing with act: act workflow_dispatch -j integration-tests --container-architecture linux/amd64
+  integration-tests:
+    name: integration tests
+    runs-on: ${{ github.event_name == 'workflow_dispatch' && 'ubuntu-latest' || 'blaze/macos-latest' }}
+    needs: [lint, changes]
+    if: |
+      always() &&
+      (github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.library == 'true' ||
+       needs.changes.outputs.itest == 'true')
 
-            - name: Setup Rust cache
-              uses: Swatinem/rust-cache@v2
-              with:
-                  workspaces: |
-                      . -> target
-                      itest/rust -> target
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Install Godot
-              uses: chickensoft-games/setup-godot@v2
-              with:
-                  version: ${{ env.GODOT_VERSION }}
-                  use-dotnet: false
-                  include-templates: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-            - name: Cache Godot imports
-              uses: actions/cache@v4
-              with:
-                  path: itest/godot/.godot
-                  key: ${{ runner.os }}-godot-imports-itest-${{ hashFiles('itest/godot/**/*.import') }}
-                  restore-keys: |
-                      ${{ runner.os }}-godot-imports-itest-
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            itest/rust -> target
 
-            - name: Build integration test library
-              run: cargo build --manifest-path itest/rust/Cargo.toml
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
-            - name: Import Godot project
-              working-directory: itest/godot
-              run: godot --editor --headless --quit || true
+      - name: Install Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+          include-templates: false
 
-            - name: Run integration tests
-              working-directory: itest
-              env:
-                  GODOT4_BIN: godot
-              run: ./run-tests.sh
+      - name: Cache Godot imports
+        uses: actions/cache@v4
+        with:
+          path: itest/godot/.godot
+          key: ${{ runner.os }}-godot-imports-itest-${{ hashFiles('itest/godot/**/*.import') }}
+          restore-keys: |
+            ${{ runner.os }}-godot-imports-itest-
+
+      - name: Run integration tests
+        working-directory: itest
+        env:
+          GODOT4_BIN: godot
+        run: ./run-tests.sh

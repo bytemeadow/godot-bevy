@@ -1,69 +1,69 @@
-use crate::interop::GodotNodeHandle;
+#[cfg(debug_assertions)]
+use crate::interop::BulkOperationsCache;
 use crate::interop::node_markers::{Node2DMarker, Node3DMarker};
+use crate::interop::{GodotAccess, GodotNodeHandle};
 use crate::plugins::transforms::{IntoBevyTransform, IntoGodotTransform, IntoGodotTransform2D};
-use crate::prelude::main_thread_system;
 use bevy_ecs::change_detection::{DetectChanges, Ref};
 use bevy_ecs::entity::Entity;
 use bevy_ecs::query::{AnyOf, Changed};
+#[cfg(debug_assertions)]
+use bevy_ecs::system::NonSendMut;
 use bevy_ecs::system::{Query, SystemChangeTick};
+#[cfg(debug_assertions)]
 use bevy_math::Quat;
 use bevy_transform::components::Transform as BevyTransform;
+#[cfg(debug_assertions)]
 use godot::builtin::{PackedInt64Array, VarDictionary};
-use godot::classes::{Engine, Node, Node2D, Node3D, Object, SceneTree};
-use godot::obj::Singleton;
+#[cfg(debug_assertions)]
+use godot::classes::Object;
+use godot::classes::{Node2D, Node3D};
+#[cfg(debug_assertions)]
 use godot::prelude::{Gd, ToGodot};
 
 use super::change_filter::TransformSyncMetadata;
 
-/// Helper to find the OptimizedBulkOperations node
-fn get_bulk_operations_node() -> Option<Gd<Object>> {
-    let engine = Engine::singleton();
-    let scene_tree = engine
-        .get_main_loop()
-        .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())?;
-    let root = scene_tree.get_root()?;
-
-    // Try to find OptimizedBulkOperations as a child of BevyAppSingleton
-    root.get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
-        .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
-        .map(|n: Gd<Node>| n.upcast::<Object>())
-}
-
-#[main_thread_system]
+#[cfg(debug_assertions)]
 #[tracing::instrument]
 pub fn pre_update_godot_transforms(
     entities: Query<(
         Entity,
         &mut BevyTransform,
-        &mut GodotNodeHandle,
+        &GodotNodeHandle,
         &mut TransformSyncMetadata,
         AnyOf<(&Node2DMarker, &Node3DMarker)>,
     )>,
+    mut godot: GodotAccess,
+    bulk_ops_cache: NonSendMut<BulkOperationsCache>,
 ) {
-    // In debug builds, use bulk optimization (GDScript path) which is faster when Rust FFI
-    // overhead is high. In release builds, use individual FFI calls which are faster due to
-    // optimized Rust FFI and avoiding GDScript interpreter overhead.
-    #[cfg(debug_assertions)]
-    {
-        if let Some(bulk_ops) = get_bulk_operations_node() {
-            let _bulk_span = tracing::info_span!("using_bulk_read_optimization").entered();
-            pre_update_godot_transforms_bulk(entities, bulk_ops);
-            return;
-        }
-        pre_update_godot_transforms_individual(entities);
+    if let Some(bulk_ops) = bulk_ops_cache.get() {
+        let _bulk_span = tracing::info_span!("using_bulk_read_optimization").entered();
+        pre_update_godot_transforms_bulk(entities, bulk_ops);
+        return;
     }
-
-    #[cfg(not(debug_assertions))]
-    {
-        pre_update_godot_transforms_individual(entities);
-    }
+    pre_update_godot_transforms_individual(entities, &mut godot);
 }
 
+#[cfg(not(debug_assertions))]
+#[tracing::instrument]
+pub fn pre_update_godot_transforms(
+    entities: Query<(
+        Entity,
+        &mut BevyTransform,
+        &GodotNodeHandle,
+        &mut TransformSyncMetadata,
+        AnyOf<(&Node2DMarker, &Node3DMarker)>,
+    )>,
+    mut godot: GodotAccess,
+) {
+    pre_update_godot_transforms_individual(entities, &mut godot);
+}
+
+#[cfg(debug_assertions)]
 fn pre_update_godot_transforms_bulk(
     mut entities: Query<(
         Entity,
         &mut BevyTransform,
-        &mut GodotNodeHandle,
+        &GodotNodeHandle,
         &mut TransformSyncMetadata,
         AnyOf<(&Node2DMarker, &Node3DMarker)>,
     )>,
@@ -72,8 +72,10 @@ fn pre_update_godot_transforms_bulk(
     let _span = tracing::info_span!("bulk_read_preparation").entered();
 
     // Collect entity info for 3D and 2D nodes separately
-    let mut entities_3d: Vec<(Entity, i64)> = Vec::new();
-    let mut entities_2d: Vec<(Entity, i64)> = Vec::new();
+    // Pre-allocate with entity count to avoid reallocations
+    let entity_count = entities.iter().len();
+    let mut entities_3d: Vec<(Entity, i64)> = Vec::with_capacity(entity_count);
+    let mut entities_2d: Vec<(Entity, i64)> = Vec::with_capacity(entity_count);
 
     for (entity, _, reference, _, (node2d, node3d)) in entities.iter() {
         let instance_id = reference.instance_id().to_i64();
@@ -175,22 +177,21 @@ fn pre_update_godot_transforms_individual(
     mut entities: Query<(
         Entity,
         &mut BevyTransform,
-        &mut GodotNodeHandle,
+        &GodotNodeHandle,
         &mut TransformSyncMetadata,
         AnyOf<(&Node2DMarker, &Node3DMarker)>,
     )>,
+    godot: &mut GodotAccess,
 ) {
-    for (_, mut bevy_transform, mut reference, mut metadata, (node2d, node3d)) in
-        entities.iter_mut()
-    {
+    for (_, mut bevy_transform, reference, mut metadata, (node2d, node3d)) in entities.iter_mut() {
         let new_bevy_transform = if node2d.is_some() {
-            reference
-                .get::<Node2D>()
+            godot
+                .get::<Node2D>(*reference)
                 .get_transform()
                 .to_bevy_transform()
         } else if node3d.is_some() {
-            reference
-                .get::<Node3D>()
+            godot
+                .get::<Node3D>(*reference)
                 .get_transform()
                 .to_bevy_transform()
         } else {
@@ -210,45 +211,55 @@ fn pre_update_godot_transforms_individual(
     }
 }
 
-#[main_thread_system]
+#[cfg(debug_assertions)]
 #[tracing::instrument]
 pub fn post_update_godot_transforms(
     change_tick: SystemChangeTick,
     entities: Query<
         (
             Ref<BevyTransform>,
-            &mut GodotNodeHandle,
+            &GodotNodeHandle,
             &TransformSyncMetadata,
             AnyOf<(&Node2DMarker, &Node3DMarker)>,
         ),
         Changed<BevyTransform>,
     >,
+    mut godot: GodotAccess,
+    bulk_ops_cache: NonSendMut<BulkOperationsCache>,
 ) {
-    // In debug builds, use bulk optimization (GDScript path) which is faster when Rust FFI
-    // overhead is high. In release builds, use individual FFI calls which are faster due to
-    // optimized Rust FFI and avoiding GDScript interpreter overhead.
-    #[cfg(debug_assertions)]
-    {
-        if let Some(bulk_ops) = get_bulk_operations_node() {
-            let _bulk_span = tracing::info_span!("using_bulk_optimization").entered();
-            post_update_godot_transforms_bulk(change_tick, entities, bulk_ops);
-            return;
-        }
-        post_update_godot_transforms_individual(change_tick, entities);
+    if let Some(bulk_ops) = bulk_ops_cache.get() {
+        let _bulk_span = tracing::info_span!("using_bulk_optimization").entered();
+        post_update_godot_transforms_bulk(change_tick, entities, bulk_ops);
+        return;
     }
-
-    #[cfg(not(debug_assertions))]
-    {
-        post_update_godot_transforms_individual(change_tick, entities);
-    }
+    post_update_godot_transforms_individual(change_tick, entities, &mut godot);
 }
 
+#[cfg(not(debug_assertions))]
+#[tracing::instrument]
+pub fn post_update_godot_transforms(
+    change_tick: SystemChangeTick,
+    entities: Query<
+        (
+            Ref<BevyTransform>,
+            &GodotNodeHandle,
+            &TransformSyncMetadata,
+            AnyOf<(&Node2DMarker, &Node3DMarker)>,
+        ),
+        Changed<BevyTransform>,
+    >,
+    mut godot: GodotAccess,
+) {
+    post_update_godot_transforms_individual(change_tick, entities, &mut godot);
+}
+
+#[cfg(debug_assertions)]
 fn post_update_godot_transforms_bulk(
     change_tick: SystemChangeTick,
     mut entities: Query<
         (
             Ref<BevyTransform>,
-            &mut GodotNodeHandle,
+            &GodotNodeHandle,
             &TransformSyncMetadata,
             AnyOf<(&Node2DMarker, &Node3DMarker)>,
         ),
@@ -390,15 +401,16 @@ fn post_update_godot_transforms_individual(
     mut entities: Query<
         (
             Ref<BevyTransform>,
-            &mut GodotNodeHandle,
+            &GodotNodeHandle,
             &TransformSyncMetadata,
             AnyOf<(&Node2DMarker, &Node3DMarker)>,
         ),
         Changed<BevyTransform>,
     >,
+    godot: &mut GodotAccess,
 ) {
     // Original individual FFI approach
-    for (transform_ref, mut reference, metadata, (node2d, node3d)) in entities.iter_mut() {
+    for (transform_ref, reference, metadata, (node2d, node3d)) in entities.iter_mut() {
         // Check if we have sync information for this entity
         if let Some(sync_tick) = metadata.last_sync_tick
             && !transform_ref
@@ -411,11 +423,11 @@ fn post_update_godot_transforms_individual(
 
         if node2d.is_some() {
             let _span = tracing::info_span!("individual_ffi_call_2d").entered();
-            let mut obj = reference.get::<Node2D>();
+            let mut obj = godot.get::<Node2D>(*reference);
             obj.set_transform(transform_ref.to_godot_transform_2d());
         } else if node3d.is_some() {
             let _span = tracing::info_span!("individual_ffi_call_3d").entered();
-            let mut obj = reference.get::<Node3D>();
+            let mut obj = godot.get::<Node3D>(*reference);
             obj.set_transform(transform_ref.to_godot_transform());
         }
     }

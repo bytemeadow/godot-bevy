@@ -34,10 +34,9 @@ impl Plugin for GodotTransformSyncPlugin {
     fn build(&self, app: &mut App) {
         // Register Transform component with custom initialization that reads from Godot
         app.register_scene_tree_component_with_init::<Transform, _>(|entity, node| {
-            let mut node_handle = node.clone(); // Clone to get mutable access
-            if let Some(node3d) = node_handle.try_get::<Node3D>() {
+            if let Some(node3d) = node.try_get::<Node3D>() {
                 entity.insert(node3d.get_transform().to_bevy_transform());
-            } else if let Some(node2d) = node_handle.try_get::<Node2D>() {
+            } else if let Some(node2d) = node.try_get::<Node2D>() {
                 entity.insert(node2d.get_transform().to_bevy_transform());
             }
         })

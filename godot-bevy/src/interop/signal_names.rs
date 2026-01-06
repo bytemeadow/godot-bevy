@@ -567,8 +567,8 @@ impl ControlSignals {
     ///
     /// ```text
     /// func _on_mouse_exited():
-    ///     if not Rect2(Vector2(), size).has_point(get_local_mouse_position()):
-    ///         # Not hovering over area.
+    /// if not Rect2(Vector2(), size).has_point(get_local_mouse_position()):
+    /// # Not hovering over area.
     /// ```
     ///
     pub const MOUSE_EXITED: &'static str = "mouse_exited";
@@ -1356,8 +1356,8 @@ impl RichTextLabelSignals {
     /// # This assumes RichTextLabel's `meta_clicked` signal was connected to
     /// # the function below using the signal connection dialog.
     /// func _richtextlabel_on_meta_clicked(meta):
-    ///     # `meta` is of Variant type, so convert it to a String to avoid script errors at run-time.
-    ///     OS.shell_open(str(meta))
+    /// # `meta` is of Variant type, so convert it to a String to avoid script errors at run-time.
+    /// OS.shell_open(str(meta))
     ///
     /// ```
     /// `
@@ -2034,10 +2034,10 @@ impl WindowSignals {
     ///
     /// ```text
     /// func _ready():
-    ///     get_window().files_dropped.connect(on_files_dropped)
+    /// get_window().files_dropped.connect(on_files_dropped)
     ///
     /// func on_files_dropped(files):
-    ///     print(files)
+    /// print(files)
     /// ```
     ///
     /// **Note:** This signal only works with native windows, i.e. the main window and -derived nodes when `Viewport.gui_embed_subwindows` is disabled in the main viewport.

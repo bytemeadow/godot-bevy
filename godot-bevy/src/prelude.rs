@@ -14,9 +14,9 @@ pub use crate::plugins::{
     },
     collisions::{
         AREA_ENTERED, AREA_EXITED, BODY_ENTERED, BODY_EXITED, COLLISION_START_SIGNALS,
-        CollisionMessage, CollisionMessageType, Collisions, GodotCollisionsPlugin,
+        CollisionEnded, CollisionStarted, Collisions, GodotCollisionsPlugin,
     },
-    core::{FindEntityByNameExt, MainThreadMarker, PhysicsDelta, PhysicsUpdate},
+    core::{FindEntityByNameExt, PhysicsDelta, PhysicsUpdate},
     // Debugger
     debugger::{DebuggerConfig, GodotDebuggerPlugin},
     // Collisions
@@ -31,18 +31,12 @@ pub use crate::plugins::{
         AutoSyncBundleRegistry, GodotChildOf, GodotChildren, GodotSceneTreePlugin, Groups,
         NodeEntityIndex, SceneTreeConfig, SceneTreeRef,
     },
-    signals::{GodotTypedSignalsPlugin, TypedGodotSignals},
+    signals::{DeferredSignalConnections, GodotSignals, GodotSignalsPlugin},
     // Scene tree
     transforms::{
         GodotTransformConfig, GodotTransformSyncPlugin, GodotTransformSyncPluginExt,
         TransformSyncMetadata, TransformSyncMode, add_transform_sync_systems,
     },
-};
-
-// Legacy re-exports (deprecated). Keep available for downstreams while avoiding warnings here.
-#[allow(deprecated)]
-pub use crate::plugins::signals::{
-    GodotSignal, GodotSignals, GodotSignalsPlugin, connect_godot_signal,
 };
 pub use bevy_ecs::prelude as bevy_ecs_prelude;
 pub use godot::prelude as godot_prelude;
