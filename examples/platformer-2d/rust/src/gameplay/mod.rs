@@ -16,20 +16,11 @@ pub mod gem;
 pub mod hud;
 pub mod player;
 
-/// System sets for gameplay operations with better parallelization
-#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-pub enum GameplaySystemSet {
-    /// Input detection systems (can run in parallel)
-    InputDetection,
-    /// State management systems (may have dependencies)
-    StateManagement,
-}
-
-/// Messages for decoupling gameplay systems
-#[derive(Message, Debug)]
+/// Events for decoupling gameplay systems
+#[derive(Event, Debug, Clone)]
 pub struct ResetLevelMessage;
 
-#[derive(Message, Debug)]
+#[derive(Event, Debug, Clone)]
 pub struct ReturnToMainMenuMessage;
 
 pub struct GameplayPlugin;
@@ -41,123 +32,92 @@ impl Plugin for GameplayPlugin {
         app.add_plugins(hud::HudPlugin);
         app.add_plugins(door::DoorPlugin);
 
-        // Add our new messages
-        app.add_message::<ResetLevelMessage>()
-            .add_message::<ReturnToMainMenuMessage>();
+        // Add observers for reset and return to menu
+        app.add_observer(on_reset_level)
+            .add_observer(on_return_to_menu);
 
         app.add_systems(
             Update,
-            (
-                // Input detection systems can run in parallel
-                (detect_reset_level_input, detect_return_to_menu_input)
-                    .in_set(GameplaySystemSet::InputDetection),
-                // State management systems run after input detection
-                (handle_reset_level_events, handle_return_to_menu_events)
-                    .in_set(GameplaySystemSet::StateManagement),
-            )
-                .chain()
+            (detect_reset_level_input, detect_return_to_menu_input)
                 .run_if(in_state(GameState::InGame)),
         );
     }
 }
 
-/// System that detects reset level input and fires events
-///
-/// Runs in InputDetection set and can execute in parallel with other input systems.
-/// Only reads input and writes events, enabling better parallelization.
-fn detect_reset_level_input(
-    mut reset_events: MessageWriter<ResetLevelMessage>,
-    mut godot: GodotAccess,
-) {
+/// System that detects reset level input and triggers observer
+fn detect_reset_level_input(mut commands: Commands, mut godot: GodotAccess) {
     let input = godot.singleton::<Input>();
 
     if input.is_action_just_pressed("reset_level") {
         info!("Reset level input detected");
-        reset_events.write(ResetLevelMessage);
+        commands.trigger(ResetLevelMessage);
     }
 }
 
-/// System that detects return to menu input and fires events
-///
-/// Runs in InputDetection set and can execute in parallel with other input systems.
-/// Only reads input and writes events, enabling better parallelization.
-fn detect_return_to_menu_input(
-    mut menu_events: MessageWriter<ReturnToMainMenuMessage>,
-    mut godot: GodotAccess,
-) {
+/// System that detects return to menu input and triggers observer
+fn detect_return_to_menu_input(mut commands: Commands, mut godot: GodotAccess) {
     let input = godot.singleton::<Input>();
 
     if input.is_action_just_pressed("return_to_main_menu") {
         info!("Return to main menu input detected");
-        menu_events.write(ReturnToMainMenuMessage);
+        commands.trigger(ReturnToMainMenuMessage);
     }
 }
 
-/// System that handles reset level events
-///
-/// Runs in StateManagement set after input detection. Handles all the state
-/// changes and scene management needed for level reset.
-fn handle_reset_level_events(
-    mut reset_events: MessageReader<ResetLevelMessage>,
+/// Observer that handles reset level events
+fn on_reset_level(
+    _trigger: On<ResetLevelMessage>,
     mut gems_collected: ResMut<GemsCollected>,
     mut scene_events: MessageWriter<SceneOperationMessage>,
     mut hud_handles: ResMut<HudHandles>,
     current_level: Res<CurrentLevel>,
-    mut level_loaded_events: MessageWriter<LevelLoadedMessage>,
-    mut hud_update_events: MessageWriter<HudUpdateMessage>,
+    mut commands: Commands,
 ) {
-    for _event in reset_events.read() {
-        info!("Processing level reset");
+    info!("Processing level reset");
 
-        // Reset gems collected
-        gems_collected.0 = 0;
+    // Reset gems collected
+    gems_collected.0 = 0;
 
-        // Clear HUD handles since they'll be invalid after scene reload
-        hud_handles.clear();
+    // Clear HUD handles since they'll be invalid after scene reload
+    hud_handles.clear();
 
-        // Send HUD update with reset gem count
-        hud_update_events.write(HudUpdateMessage::GemsChanged(0));
+    // Send HUD update with reset gem count
+    commands.trigger(HudUpdateMessage::GemsChanged(0));
 
-        // Request scene reload through centralized scene management
-        scene_events.write(SceneOperationMessage::reload());
+    // Request scene reload through centralized scene management
+    scene_events.write(SceneOperationMessage::reload());
 
-        // Emit level loaded event with current level ID
-        if let Some(level_id) = current_level.level_id {
-            level_loaded_events.write(LevelLoadedMessage { level_id });
-        }
+    // Emit level loaded event with current level ID
+    if let Some(level_id) = current_level.level_id {
+        commands.trigger(LevelLoadedMessage { level_id });
     }
 }
 
-/// System that handles return to main menu events
-///
-/// Runs in StateManagement set after input detection. Handles all the state
-/// changes and scene transitions needed to return to the main menu.
-fn handle_return_to_menu_events(
-    mut menu_events: MessageReader<ReturnToMainMenuMessage>,
+/// Observer that handles return to main menu events
+fn on_return_to_menu(
+    _trigger: On<ReturnToMainMenuMessage>,
     mut gems_collected: ResMut<GemsCollected>,
     mut scene_events: MessageWriter<SceneOperationMessage>,
     mut hud_handles: ResMut<HudHandles>,
     mut current_level: ResMut<CurrentLevel>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
-    for _event in menu_events.read() {
-        info!("Processing return to main menu");
+    info!("Processing return to main menu");
 
-        // Reset gems collected
-        gems_collected.0 = 0;
+    // Reset gems collected
+    gems_collected.0 = 0;
 
-        // Clear HUD handles since they'll be invalid after scene changes
-        hud_handles.clear();
+    // Clear HUD handles since they'll be invalid after scene changes
+    hud_handles.clear();
 
-        // Clear current level state
-        current_level.clear();
+    // Clear current level state
+    current_level.clear();
 
-        // Change to main menu state
-        next_state.set(GameState::MainMenu);
+    // Change to main menu state
+    next_state.set(GameState::MainMenu);
 
-        // Request scene change through centralized scene management
-        scene_events.write(SceneOperationMessage::change_to_file(
-            "res://scenes/levels/main_menu.tscn",
-        ));
-    }
+    // Request scene change through centralized scene management
+    scene_events.write(SceneOperationMessage::change_to_file(
+        "res://scenes/levels/main_menu.tscn",
+    ));
 }

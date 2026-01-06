@@ -14,7 +14,8 @@ This is `godot-bevy`, a Rust library that bridges Bevy's Entity Component System
 cargo fmt --all
 
 # Lint code (must pass CI)
-cargo clippy --all-targets --all-features
+# Note: Don't use --all-features, it causes API version conflicts
+devenv shell ci-test
 
 # Run tests
 cargo test
@@ -120,12 +121,60 @@ Examples are structured as workspace members with separate Rust crates. Each exa
 
 **Transform Synchronization**: Automatic synchronization between Bevy `Transform` components and Godot node transforms. You can select for this synchronization to be disabled, just sync Bevy Transforms to Godot Transforms, or sync bi-directionally.
 
-**Signal Integration**: Godot signals become typed Bevy messages via `GodotTypedSignalsPlugin::<T>` and `MessageReader<T>`,
-enabling ECS systems to respond to UI interactions and game events.
+**Signal Integration**: Godot signals become typed Bevy events via `GodotTypedSignalsPlugin::<T>` and observers,
+enabling reactive responses to UI interactions and game events. Use `GodotSignals<T>` to connect signals
+and `app.add_observer()` with `On<T>` to handle them.
 
 **Node Queries**: Query Godot nodes directly from Bevy systems using `Query<&mut GodotNodeHandle>` and cast to specific Godot types.
 
 **Asset Loading**: Use Bevy's `AssetServer` to load Godot resources (`Handle<GodotResource>`) which works consistently in development and exported games.
+
+## Messages vs Events/Observers
+
+godot-bevy uses two patterns for event-driven communication:
+
+### Use Observers (`Event` + `On<T>`) for:
+- **Infrequent, reactive events** - button presses, level loaded, game over
+- **Godot signals** - via `GodotTypedSignalsPlugin::<T>`
+- **Collision events** - `CollisionStarted`, `CollisionEnded`
+- **One-shot game events** - gem collected, door entered, player died
+
+```rust
+#[derive(Event, Debug, Clone)]
+struct GemCollected { entity: Entity }
+
+// Trigger the event
+commands.trigger(GemCollected { entity });
+
+// Handle with observer
+app.add_observer(|trigger: On<GemCollected>, mut score: ResMut<Score>| {
+    score.0 += 1;
+});
+```
+
+### Use Messages (`Message` + `MessageReader<T>`) for:
+- **High-frequency events** - input every frame, per-frame state updates
+- **Batch processing** - command queues, bulk operations
+- **Internal infrastructure** - scene tree messages, internal state sync
+
+```rust
+#[derive(Message, Debug, Clone)]
+struct PlayerInput { direction: Vec2 }
+
+// Write messages
+input_writer.write(PlayerInput { direction });
+
+// Read in system
+fn handle_input(mut reader: MessageReader<PlayerInput>) {
+    for input in reader.read() {
+        // Process input
+    }
+}
+```
+
+### Rule of Thumb
+- If it happens **once or rarely** (user action, game event) → **Observer**
+- If it happens **every frame** or needs **batch processing** → **Message**
 
 ## Testing and CI
 

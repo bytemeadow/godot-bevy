@@ -1,9 +1,9 @@
 /*
  * Signal integration tests
  *
- * Tests typed signal connections and message routing:
- * - Signal connections made with connect_map are applied same-frame
- * - Signals fire and produce messages on the next frame
+ * Tests typed signal connections and observer triggering:
+ * - Signal connections made with connect are applied same-frame
+ * - Signals fire and trigger observers on the next frame
  * - Multiple signal connections work correctly
  */
 
@@ -12,13 +12,13 @@ use godot::obj::NewAlloc;
 use godot_bevy::prelude::*;
 use godot_bevy_test::prelude::*;
 
-/// Test message type for signal testing
-#[derive(Message, Debug, Clone)]
+/// Test event type for signal testing
+#[derive(Event, Debug, Clone)]
 struct TestSignalFired {
     source_name: String,
 }
 
-/// Test that connect_map connections are applied same-frame and signals work next frame
+/// Test that connect connections are applied same-frame and signals work next frame
 #[itest(async)]
 fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -31,16 +31,13 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
         struct SignalReceived(bool);
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotTypedSignalsPlugin::<TestSignalFired>::default());
+            app.add_plugins(GodotSignalsPlugin::<TestSignalFired>::default());
             app.init_resource::<SignalReceived>();
-            app.add_systems(
-                Update,
-                |mut reader: MessageReader<TestSignalFired>,
-                 mut received: ResMut<SignalReceived>| {
-                    for msg in reader.read() {
-                        println!("Signal received from: {}", msg.source_name);
-                        received.0 = true;
-                    }
+            // Use observer instead of system with MessageReader
+            app.add_observer(
+                |trigger: On<TestSignalFired>, mut received: ResMut<SignalReceived>| {
+                    println!("Signal received from: {}", trigger.event().source_name);
+                    received.0 = true;
                 },
             );
         })
@@ -71,13 +68,13 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
                 .copied();
 
             if let Some(handle) = handle {
-                // Get TypedGodotSignals and connect
+                // Get GodotSignals and connect
                 let mut system_state: bevy::ecs::system::SystemState<
-                    TypedGodotSignals<TestSignalFired>,
+                    GodotSignals<TestSignalFired>,
                 > = bevy::ecs::system::SystemState::new(world);
                 let signals = system_state.get(world);
 
-                signals.connect_map(handle, "pressed", None, |_args, _handle, _entity| {
+                signals.connect(handle, "pressed", None, |_args, _handle, _entity| {
                     Some(TestSignalFired {
                         source_name: "TestButton".to_string(),
                     })
@@ -105,10 +102,10 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
 
         assert!(
             was_received,
-            "Signal should be received after connect_map (connection applied same-frame)"
+            "Signal should be received after connect (connection applied same-frame)"
         );
 
-        println!("✓ Signal connection works same-frame: connect_map → emit → receive");
+        println!("✓ Signal connection works same-frame: connect → emit → receive");
 
         // Cleanup
         app.cleanup();
@@ -132,18 +129,18 @@ fn test_multiple_signal_connections(ctx: &TestContext) -> godot::task::TaskHandl
         }
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotTypedSignalsPlugin::<TestSignalFired>::default());
+            app.add_plugins(GodotSignalsPlugin::<TestSignalFired>::default());
             app.init_resource::<SignalCounts>();
-            app.add_systems(
-                Update,
-                |mut reader: MessageReader<TestSignalFired>, mut counts: ResMut<SignalCounts>| {
-                    for msg in reader.read() {
-                        match msg.source_name.as_str() {
-                            "Button1" => counts.button1 += 1,
-                            "Button2" => counts.button2 += 1,
-                            _ => {}
-                        }
-                    }
+            // Use observer instead of system with MessageReader
+            app.add_observer(
+                |trigger: On<TestSignalFired>, mut counts: ResMut<SignalCounts>| match trigger
+                    .event()
+                    .source_name
+                    .as_str()
+                {
+                    "Button1" => counts.button1 += 1,
+                    "Button2" => counts.button2 += 1,
+                    _ => {}
                 },
             );
         })
@@ -182,13 +179,12 @@ fn test_multiple_signal_connections(ctx: &TestContext) -> godot::task::TaskHandl
                 .find(|h| h.instance_id() == button2_id)
                 .copied();
 
-            let mut system_state: bevy::ecs::system::SystemState<
-                TypedGodotSignals<TestSignalFired>,
-            > = bevy::ecs::system::SystemState::new(world);
+            let mut system_state: bevy::ecs::system::SystemState<GodotSignals<TestSignalFired>> =
+                bevy::ecs::system::SystemState::new(world);
             let signals = system_state.get(world);
 
             if let Some(handle) = button1_handle {
-                signals.connect_map(handle, "pressed", None, |_args, _handle, _entity| {
+                signals.connect(handle, "pressed", None, |_args, _handle, _entity| {
                     Some(TestSignalFired {
                         source_name: "Button1".to_string(),
                     })
@@ -196,7 +192,7 @@ fn test_multiple_signal_connections(ctx: &TestContext) -> godot::task::TaskHandl
             }
 
             if let Some(handle) = button2_handle {
-                signals.connect_map(handle, "pressed", None, |_args, _handle, _entity| {
+                signals.connect(handle, "pressed", None, |_args, _handle, _entity| {
                     Some(TestSignalFired {
                         source_name: "Button2".to_string(),
                     })
@@ -258,43 +254,37 @@ fn test_signal_connection_via_system(ctx: &TestContext) -> godot::task::TaskHand
         let button_id = button.instance_id();
 
         let mut app = TestApp::new(&ctx_clone, move |app| {
-            app.add_plugins(GodotTypedSignalsPlugin::<TestSignalFired>::default());
+            app.add_plugins(GodotSignalsPlugin::<TestSignalFired>::default());
             app.init_resource::<SignalReceived>();
             app.init_resource::<ConnectionMade>();
 
             // System that connects signal when it finds the button entity
             app.add_systems(
                 Update,
-                (
-                    move |mut connection_made: ResMut<ConnectionMade>,
-                          query: Query<&GodotNodeHandle>,
-                          signals: TypedGodotSignals<TestSignalFired>| {
-                        if !connection_made.0 {
-                            // Look for our test button by instance ID
-                            if let Some(handle) =
-                                query.iter().find(|h| h.instance_id() == button_id).copied()
-                            {
-                                signals.connect_map(
-                                    handle,
-                                    "pressed",
-                                    None,
-                                    |_args, _handle, _entity| {
-                                        Some(TestSignalFired {
-                                            source_name: "SystemTestButton".to_string(),
-                                        })
-                                    },
-                                );
-                                connection_made.0 = true;
-                            }
+                move |mut connection_made: ResMut<ConnectionMade>,
+                      query: Query<&GodotNodeHandle>,
+                      signals: GodotSignals<TestSignalFired>| {
+                    if !connection_made.0 {
+                        // Look for our test button by instance ID
+                        if let Some(handle) =
+                            query.iter().find(|h| h.instance_id() == button_id).copied()
+                        {
+                            signals.connect(handle, "pressed", None, |_args, _handle, _entity| {
+                                Some(TestSignalFired {
+                                    source_name: "SystemTestButton".to_string(),
+                                })
+                            });
+                            connection_made.0 = true;
                         }
-                    },
-                    |mut reader: MessageReader<TestSignalFired>,
-                     mut received: ResMut<SignalReceived>| {
-                        for _ in reader.read() {
-                            received.0 = true;
-                        }
-                    },
-                ),
+                    }
+                },
+            );
+
+            // Use observer instead of system with MessageReader
+            app.add_observer(
+                |_trigger: On<TestSignalFired>, mut received: ResMut<SignalReceived>| {
+                    received.0 = true;
+                },
             );
         })
         .await;
