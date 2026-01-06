@@ -6,11 +6,10 @@ use bevy::{
     app::prelude::*,
     ecs::{
         event::Event,
-        message::MessageWriter,
         observer::On,
         resource::Resource,
         schedule::IntoScheduleConfigs,
-        system::{Res, ResMut},
+        system::{Commands, Res, ResMut},
     },
     log::{debug, info},
     state::{
@@ -163,7 +162,7 @@ fn on_start_game(
     _trigger: On<StartGameRequested>,
     state: Res<bevy::state::state::State<GameState>>,
     mut app_state: ResMut<NextState<GameState>>,
-    mut level_load_events: MessageWriter<LoadLevelMessage>,
+    mut commands: Commands,
 ) {
     // Only respond when in MainMenu state
     if *state.get() != GameState::MainMenu {
@@ -171,7 +170,7 @@ fn on_start_game(
     }
     println!("Start button pressed (typed)");
     app_state.set(GameState::InGame);
-    level_load_events.write(LoadLevelMessage {
+    commands.trigger(LoadLevelMessage {
         level_id: LevelId::Level1,
     });
 }

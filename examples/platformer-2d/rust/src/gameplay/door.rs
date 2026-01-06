@@ -7,13 +7,7 @@ pub struct DoorPlugin;
 
 impl Plugin for DoorPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (
-                // Collision detection runs first and writes events
-                detect_door_collisions,
-            ),
-        );
+        app.add_systems(Update, detect_door_collisions);
     }
 }
 
@@ -25,12 +19,12 @@ fn detect_door_collisions(
     doors: Query<(Entity, &Door)>,
     players: Query<Entity, With<Player>>,
     collisions: Collisions,
-    mut load_level_events: MessageWriter<LoadLevelMessage>,
+    mut commands: Commands,
 ) {
     for (door_entity, door) in doors.iter() {
         for &player_entity in collisions.colliding_with(door_entity) {
             if players.get(player_entity).is_ok() {
-                load_level_events.write(LoadLevelMessage {
+                commands.trigger(LoadLevelMessage {
                     level_id: door.level_id,
                 });
             }

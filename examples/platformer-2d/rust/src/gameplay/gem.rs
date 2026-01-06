@@ -9,7 +9,7 @@ use godot_bevy::prelude::*;
 ///
 /// This event decouples gem collision detection from gem counting,
 /// allowing these systems to run in parallel and improving modularity.
-#[derive(Message, Debug)]
+#[derive(Event, Debug, Clone)]
 #[allow(dead_code)] // Fields provide useful API even if not currently used
 pub struct GemCollectedMessage {
     pub player_entity: Entity,
@@ -24,17 +24,8 @@ pub struct GemPlugin;
 impl Plugin for GemPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<GemsCollected>()
-            .add_message::<GemCollectedMessage>()
-            .add_systems(
-                Update,
-                (
-                    // Collision detection runs first and writes events
-                    detect_gem_player_collision,
-                    // State updates run after and handle events
-                    handle_gem_collected_events,
-                )
-                    .chain(), // Ensure collision detection runs before state updates
-            );
+            .add_observer(on_gem_collected)
+            .add_systems(Update, detect_gem_player_collision);
     }
 }
 
@@ -46,7 +37,7 @@ fn detect_gem_player_collision(
     gems: Query<(Entity, &GodotNodeHandle), With<Gem>>,
     players: Query<Entity, With<Player>>,
     collisions: Collisions,
-    mut gem_collected_events: MessageWriter<GemCollectedMessage>,
+    mut commands: Commands,
     mut godot: GodotAccess,
 ) {
     for (gem_entity, handle) in gems.iter() {
@@ -58,7 +49,7 @@ fn detect_gem_player_collision(
                 area.queue_free();
 
                 // Fire event for gem collection
-                gem_collected_events.write(GemCollectedMessage {
+                commands.trigger(GemCollectedMessage {
                     player_entity,
                     gem_entity,
                 });
@@ -67,22 +58,17 @@ fn detect_gem_player_collision(
     }
 }
 
-/// System that handles gem collected events and updates game state
-///
-/// This system runs after collision detection and can run in parallel
-/// with other event-handling systems that don't modify GemsCollected.
-fn handle_gem_collected_events(
-    mut gem_events: MessageReader<GemCollectedMessage>,
+/// Observer that handles gem collected events and updates game state
+fn on_gem_collected(
+    _trigger: On<GemCollectedMessage>,
     mut gems_collected: ResMut<GemsCollected>,
-    mut sfx_events: MessageWriter<PlaySfxMessage>,
+    mut commands: Commands,
 ) {
-    for _event in gem_events.read() {
-        // Update gem count
-        gems_collected.0 += 1;
+    // Update gem count
+    gems_collected.0 += 1;
 
-        // Trigger sound effect
-        sfx_events.write(PlaySfxMessage::GemCollected);
+    // Trigger sound effect
+    commands.trigger(PlaySfxMessage::GemCollected);
 
-        debug!("Gem collected! Total: {}", gems_collected.0);
-    }
+    debug!("Gem collected! Total: {}", gems_collected.0);
 }

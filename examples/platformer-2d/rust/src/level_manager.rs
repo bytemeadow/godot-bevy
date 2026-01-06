@@ -67,13 +67,13 @@ pub struct PendingLevel {
 }
 
 /// Event fired when a level load is requested
-#[derive(Message)]
+#[derive(Event, Debug, Clone)]
 pub struct LoadLevelMessage {
     pub level_id: LevelId,
 }
 
 /// Event fired when level loading is complete
-#[derive(Message)]
+#[derive(Event, Debug, Clone)]
 pub struct LevelLoadedMessage {
     pub level_id: LevelId,
 }
@@ -85,12 +85,10 @@ impl Plugin for LevelManagerPlugin {
         app.init_resource::<CurrentLevel>()
             .init_resource::<PendingLevel>()
             .init_resource::<LevelLoadingState>()
-            .add_message::<LoadLevelMessage>()
-            .add_message::<LevelLoadedMessage>()
+            .add_observer(on_load_level_request)
             .add_systems(
                 Update,
                 (
-                    handle_level_load_requests,
                     (handle_level_scene_change, ApplyDeferred).chain(),
                     emit_level_loaded_event_when_scene_ready,
                 ),
@@ -98,27 +96,26 @@ impl Plugin for LevelManagerPlugin {
     }
 }
 
-/// System that handles level loading requests - loads the asset
-fn handle_level_load_requests(
+/// Observer that handles level loading requests - loads the asset
+fn on_load_level_request(
+    trigger: On<LoadLevelMessage>,
     mut loading_state: ResMut<LevelLoadingState>,
     mut current_level: ResMut<CurrentLevel>,
-    mut load_events: MessageReader<LoadLevelMessage>,
     asset_server: Res<AssetServer>,
 ) {
-    for event in load_events.read() {
-        info!("Loading level asset: {:?}", event.level_id);
+    let event = trigger.event();
+    info!("Loading level asset: {:?}", event.level_id);
 
-        // Load the level scene through Bevy's asset system
-        let level_handle: Handle<GodotResource> = asset_server.load(event.level_id.scene_path());
+    // Load the level scene through Bevy's asset system
+    let level_handle: Handle<GodotResource> = asset_server.load(event.level_id.scene_path());
 
-        // Track loading state separately from current level
-        loading_state.loading_handle = Some(level_handle);
+    // Track loading state separately from current level
+    loading_state.loading_handle = Some(level_handle);
 
-        // Update current level
-        current_level.set(event.level_id);
+    // Update current level
+    current_level.set(event.level_id);
 
-        info!("Level asset loading started for: {:?}", event.level_id);
-    }
+    info!("Level asset loading started for: {:?}", event.level_id);
 }
 
 /// System that handles actual scene changing once assets are loaded
@@ -153,7 +150,7 @@ fn handle_level_scene_change(
 fn emit_level_loaded_event_when_scene_ready(
     mut pending_level: ResMut<PendingLevel>,
     mut scene_tree_events: MessageReader<SceneTreeMessage>,
-    mut loaded_events: MessageWriter<LevelLoadedMessage>,
+    mut commands: Commands,
     mut godot: GodotAccess,
 ) {
     if let Some(level_id) = pending_level.level_id {
@@ -168,7 +165,7 @@ fn emit_level_loaded_event_when_scene_ready(
             {
                 let node_path = node.get_path().to_string();
                 if node_path == expected_path {
-                    loaded_events.write(LevelLoadedMessage { level_id });
+                    commands.trigger(LevelLoadedMessage { level_id });
                     pending_level.level_id = None;
                     break;
                 }

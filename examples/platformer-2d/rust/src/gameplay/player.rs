@@ -113,7 +113,7 @@ fn apply_player_movement(
     mut input_events: MessageReader<PlayerInputMessage>,
     player: Query<(&GodotNodeHandle, &Speed, &JumpVelocity, &Gravity), With<Player>>,
     physics_delta: Res<PhysicsDelta>,
-    mut sfx_events: MessageWriter<PlaySfxMessage>,
+    mut commands: Commands,
     mut movement_events: MessageWriter<PlayerMovementMessage>,
     mut godot: GodotAccess,
 ) {
@@ -140,7 +140,7 @@ fn apply_player_movement(
             // Handle jumping
             if input_event.jump_pressed && input_event.is_on_floor {
                 velocity.y = jump_velocity.0;
-                sfx_events.write(PlaySfxMessage::PlayerJump);
+                commands.trigger(PlaySfxMessage::PlayerJump);
             }
 
             // Handle horizontal movement
