@@ -51,8 +51,9 @@ Components store data on entities. godot-bevy provides several built-in componen
 
 - `GodotNodeHandle` - Reference to the Godot node
 - `Name` - Node name
-- `Collisions` - Collision events
 - `Groups` - Godot node groups
+
+For collision detection, use the `Collisions` system param (see [Plugins](./plugins.md)).
 
 ### Systems
 Systems contain your game logic and run on a schedule:
