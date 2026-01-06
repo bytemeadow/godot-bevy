@@ -1,46 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use crate::plugins::collisions::Collisions;
     use crate::plugins::scene_tree::Groups;
     use crate::plugins::transforms::{
         GodotTransformConfig, TransformSyncMetadata, TransformSyncMode,
     };
     use bevy_reflect::{Reflect, ReflectRef, TypeRegistry};
-
-    #[test]
-    fn test_collisions_reflection() {
-        // Test type registration
-        let mut registry = TypeRegistry::default();
-        registry.register::<Collisions>();
-
-        // Verify the type is registered
-        assert!(
-            registry
-                .get_type_info(std::any::TypeId::of::<Collisions>())
-                .is_some()
-        );
-
-        // Test reflection capabilities
-        let collisions = Collisions::default();
-        let reflected = collisions.as_reflect();
-
-        // Verify we can get the reflect info
-        let type_info = reflected.get_represented_type_info().unwrap();
-        assert!(type_info.type_path().contains("Collisions"));
-
-        // Test struct reflection
-        if let ReflectRef::Struct(struct_ref) = reflected.reflect_ref() {
-            // Check fields exist
-            assert_eq!(struct_ref.field_len(), 2);
-            assert!(struct_ref.field("colliding_entities").is_some());
-            assert!(struct_ref.field("recent_collisions").is_some());
-        } else {
-            panic!("Expected Struct reflection");
-        }
-
-        // Test cloning via reflection
-        let _cloned = reflected.reflect_clone();
-    }
 
     #[test]
     fn test_groups_reflection() {

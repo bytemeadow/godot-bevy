@@ -3,7 +3,6 @@ use crate::components::Player;
 use crate::gameplay::audio::PlaySfxMessage;
 use bevy::prelude::*;
 use godot::classes::Area2D;
-use godot_bevy::prelude::Collisions;
 use godot_bevy::prelude::*;
 
 /// Event fired when a gem is collected by the player
@@ -44,13 +43,14 @@ impl Plugin for GemPlugin {
 /// This system only handles collision detection and event firing,
 /// allowing it to run independently of gem counting logic.
 fn detect_gem_player_collision(
-    gems: Query<(Entity, &GodotNodeHandle, &Collisions), With<Gem>>,
+    gems: Query<(Entity, &GodotNodeHandle), With<Gem>>,
     players: Query<Entity, With<Player>>,
+    collisions: Collisions,
     mut gem_collected_events: MessageWriter<GemCollectedMessage>,
     mut godot: GodotAccess,
 ) {
-    for (gem_entity, handle, collisions) in gems.iter() {
-        for &player_entity in collisions.recent_collisions() {
+    for (gem_entity, handle) in gems.iter() {
+        for &player_entity in collisions.colliding_with(gem_entity) {
             if players.get(player_entity).is_ok()
                 && let Some(mut area) = godot.try_get::<Area2D>(*handle)
             {

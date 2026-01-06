@@ -1,7 +1,7 @@
 use crate::components::{Door, Player};
 use crate::level_manager::LoadLevelMessage;
 use bevy::prelude::*;
-use godot_bevy::prelude::Collisions;
+use godot_bevy::prelude::*;
 
 pub struct DoorPlugin;
 
@@ -22,12 +22,13 @@ impl Plugin for DoorPlugin {
 /// This system only handles collision detection and event firing,
 /// allowing it to run in parallel with other collision detection systems.
 fn detect_door_collisions(
-    doors: Query<(&Door, &Collisions)>,
+    doors: Query<(Entity, &Door)>,
     players: Query<Entity, With<Player>>,
+    collisions: Collisions,
     mut load_level_events: MessageWriter<LoadLevelMessage>,
 ) {
-    for (door, collisions) in doors.iter() {
-        for &player_entity in collisions.recent_collisions() {
+    for (door_entity, door) in doors.iter() {
+        for &player_entity in collisions.colliding_with(door_entity) {
             if players.get(player_entity).is_ok() {
                 load_level_events.write(LoadLevelMessage {
                     level_id: door.level_id,
