@@ -2452,6 +2452,7 @@ dependencies = [
  "bevy_utils",
  "chrono",
  "criterion",
+ "crossbeam-channel",
  "futures-lite",
  "godot",
  "godot-bevy-macros",
@@ -2470,6 +2471,7 @@ name = "godot-bevy-itest"
 version = "0.0.0"
 dependencies = [
  "bevy",
+ "crossbeam-channel",
  "godot",
  "godot-bevy",
  "godot-bevy-test",

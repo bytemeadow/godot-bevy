@@ -10,13 +10,61 @@ RED='\033[0;31m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
-echo -e "${CYAN}Building godot-bevy-itest...${NC}"
+# Parse arguments
+SKIP_BUILD=false
+INTERNAL=false
 
-# Build the Rust library in release mode for accurate benchmarks
-cd "$(dirname "$0")/rust"
-cargo build --release
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --skip-build)
+            SKIP_BUILD=true
+            shift
+            ;;
+        --internal)
+            INTERNAL=true
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
 
-cd ..
+# Get the script's directory for absolute paths
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GODOT_PROJECT_DIR="$SCRIPT_DIR/godot"
+
+cd "$SCRIPT_DIR"
+
+if [ "$SKIP_BUILD" = false ]; then
+    echo -e "${CYAN}Building godot-bevy-itest (release)...${NC}"
+    cd rust
+    if [ "$INTERNAL" = true ]; then
+        cargo build --release --features internal-benchmarks
+    else
+        cargo build --release
+    fi
+    cd ..
+fi
+
+# Generate .gdextension file pointing to release build
+cat > godot/itest.gdextension << EOF
+[configuration]
+entry_symbol = "godot_bevy_itest"
+compatibility_minimum = 4.2
+
+[libraries]
+linux.debug.x86_64 = "res://../../target/release/libgodot_bevy_itest.so"
+linux.release.x86_64 = "res://../../target/release/libgodot_bevy_itest.so"
+windows.debug.x86_64 = "res://../../target/release/godot_bevy_itest.dll"
+windows.release.x86_64 = "res://../../target/release/godot_bevy_itest.dll"
+macos.debug = "res://../../target/release/libgodot_bevy_itest.dylib"
+macos.release = "res://../../target/release/libgodot_bevy_itest.dylib"
+macos.debug.arm64 = "res://../../target/release/libgodot_bevy_itest.dylib"
+macos.release.arm64 = "res://../../target/release/libgodot_bevy_itest.dylib"
+EOF
+
+echo -e "${CYAN}Generated itest.gdextension for release build${NC}"
 
 # Check for GODOT4_BIN environment variable
 if [ -z "$GODOT4_BIN" ]; then
@@ -39,6 +87,14 @@ fi
 
 echo -e "${CYAN}Using Godot binary: $GODOT4_BIN${NC}"
 
+# Ensure .godot directory exists and extension is registered
+mkdir -p "$GODOT_PROJECT_DIR/.godot"
+echo "res://itest.gdextension" > "$GODOT_PROJECT_DIR/.godot/extension_list.cfg"
+
+# Import project so Godot recognizes the GDExtension
+echo -e "${CYAN}Importing Godot project...${NC}"
+"$GODOT4_BIN" --headless --path "$GODOT_PROJECT_DIR" --import --quit || true
+
 # Check if debug build
 if cargo metadata --format-version=1 2>/dev/null | grep -q '"profile":"dev"'; then
     echo -e "${YELLOW}Warning: Running with debug build. Use --release for accurate benchmarks.${NC}"
@@ -46,6 +102,6 @@ fi
 
 # Run benchmarks in headless mode with BenchRunner scene
 echo -e "${CYAN}Running benchmarks...${NC}"
-"$GODOT4_BIN" --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000
+"$GODOT4_BIN" --headless --path "$GODOT_PROJECT_DIR" addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000
 
 echo -e "${GREEN}Benchmarks complete!${NC}"

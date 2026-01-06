@@ -12,12 +12,8 @@ use bevy_asset_loader::asset_collection::AssetCollection;
 use godot::{
     builtin::{StringName, Vector2},
     classes::{Input, Node2D},
-    obj::Singleton,
 };
-use godot_bevy::{
-    plugins::core::PhysicsDelta,
-    prelude::{main_thread_system, *},
-};
+use godot_bevy::{plugins::core::PhysicsDelta, prelude::*};
 
 #[derive(AssetCollection, Resource, Debug)]
 pub struct PlayerAssets {
@@ -62,16 +58,16 @@ fn spawn_player(mut commands: Commands, assets: Res<PlayerAssets>) {
         .insert(Player { speed: 0.0 });
 }
 
-#[main_thread_system]
 fn player_on_ready(
     mut commands: Commands,
     mut player: Query<
-        (Entity, &mut Player, &mut GodotNodeHandle),
+        (Entity, &mut Player, &GodotNodeHandle),
         (With<Player>, Without<PlayerInitialized>),
     >,
+    mut godot: GodotAccess,
 ) -> Result {
-    if let Ok((entity, mut player_data, mut player)) = player.single_mut() {
-        let player = player.get::<GodotPlayerNode>();
+    if let Ok((entity, mut player_data, player_handle)) = player.single_mut() {
+        let player = godot.get::<GodotPlayerNode>(*player_handle);
         let screen_size = player.get_viewport_rect().size;
         player_data.speed = player.bind().get_speed();
 
@@ -90,22 +86,21 @@ fn player_on_ready(
     Ok(())
 }
 
-#[main_thread_system]
 fn setup_player(
     mut player: Query<(Entity, &mut VisibilityState, &mut Transform), With<Player>>,
-    mut entities: Query<(&Name, &mut GodotNodeHandle), Without<Player>>,
+    entities: Query<(&Name, &GodotNodeHandle), Without<Player>>,
+    mut godot: GodotAccess,
 ) -> Result {
     if let Ok((_entity, mut visibility, mut transform)) = player.single_mut() {
         // Set player visible using command system
         visibility.set_visible(true);
 
         // Still need main thread access for getting start position
-        let start_position = entities
-            .iter_mut()
+        let start_handle = entities
+            .iter()
             .find_entity_by_name("StartPosition")
-            .unwrap()
-            .get::<Node2D>()
-            .get_position();
+            .unwrap();
+        let start_position = godot.get::<Node2D>(*start_handle).get_position();
         transform.translation.x = start_position.x;
         transform.translation.y = start_position.y;
     }
@@ -113,7 +108,6 @@ fn setup_player(
     Ok(())
 }
 
-#[main_thread_system]
 fn move_player(
     mut player: Query<(
         &Player,
@@ -122,24 +116,26 @@ fn move_player(
         &mut AnimationState,
     )>,
     physics_delta: Res<PhysicsDelta>,
+    mut godot: GodotAccess,
 ) -> Result {
     if let Ok((player_data, screen_cache, mut transform, mut anim_state)) = player.single_mut() {
         let mut velocity = Vector2::ZERO;
+        let input = godot.singleton::<Input>();
 
         // Input handling - can be done without Godot API calls by caching input state
-        if Input::singleton().is_action_pressed("move_right") {
+        if input.is_action_pressed("move_right") {
             velocity.x += 1.0;
         }
 
-        if Input::singleton().is_action_pressed("move_left") {
+        if input.is_action_pressed("move_left") {
             velocity.x -= 1.0;
         }
 
-        if Input::singleton().is_action_pressed("move_down") {
+        if input.is_action_pressed("move_down") {
             velocity.y += 1.0;
         }
 
-        if Input::singleton().is_action_pressed("move_up") {
+        if input.is_action_pressed("move_up") {
             velocity.y -= 1.0;
         }
 
@@ -168,7 +164,6 @@ fn move_player(
     Ok(())
 }
 
-#[main_thread_system]
 fn check_player_death(
     mut player: Query<(&mut VisibilityState, &Collisions), With<Player>>,
     mut next_state: ResMut<NextState<GameState>>,

@@ -9,7 +9,7 @@ use godot::global::godot_print;
 use godot_bevy::prelude::godot_prelude::ExtensionLibrary;
 use godot_bevy::prelude::godot_prelude::gdextension;
 use godot_bevy::prelude::{
-    GodotNodeHandle, GodotTransformSyncPlugin, Sprite2DMarker, bevy_app, main_thread_system,
+    GodotAccess, GodotNodeHandle, GodotTransformSyncPlugin, Sprite2DMarker, bevy_app,
 };
 use std::f32::consts::PI;
 
@@ -67,20 +67,17 @@ struct Orbiter {
 struct NodeInitialized;
 
 // This system initializes Sprite2Ds with the required components to allow the orbit_system to manipulate them.
-#[main_thread_system]
 fn orbit_setup(
     // Bevy Commands allow us to modify the state of the world, such as adding components to entities.
     mut commands: Commands,
 
     // Gather all Godot nodes without the `NodeInitialized` component.
     // Also, include the Bevy entity identifier so we can add components to it.
-    mut uninitialized: Query<
-        (Entity, &mut GodotNodeHandle, &Sprite2DMarker),
-        Without<NodeInitialized>,
-    >,
+    uninitialized: Query<(Entity, &GodotNodeHandle, &Sprite2DMarker), Without<NodeInitialized>>,
+    mut godot: GodotAccess,
 ) {
-    for (entity, mut node_handle, _) in uninitialized.iter_mut() {
-        let sprite_node = node_handle.get::<Sprite2D>();
+    for (entity, node_handle, _) in uninitialized.iter() {
+        let sprite_node = godot.get::<Sprite2D>(*node_handle);
         // The GodotNodeHandle allows us to call Godot methods such as `get_name()`.
         godot_print!(
             "Initializing node: {:?}",

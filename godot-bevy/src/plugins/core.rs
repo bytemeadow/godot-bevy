@@ -38,18 +38,13 @@ impl PhysicsDelta {
     }
 }
 
-/// Resource marker to ensure systems accessing Godot APIs run on the main thread
-#[derive(Resource, Default, Debug)]
-pub struct MainThreadMarker;
-
-use crate::interop::GodotNodeHandle;
-use crate::prelude::main_thread_system;
+use crate::interop::{GodotAccess, GodotMainThread, GodotNode, GodotNodeHandle};
 use bevy_ecs::system::EntityCommands;
-use godot::{classes::Node, obj::Gd};
+use godot::classes::Node;
 use tracing::debug;
 
 /// Function that adds a component to an entity with access to the Godot node
-type ComponentInserter = Box<dyn Fn(&mut EntityCommands, &GodotNodeHandle) + Send + Sync>;
+type ComponentInserter = Box<dyn Fn(&mut EntityCommands, &mut GodotNode) + Send + Sync>;
 
 /// Registry for components that should be added to entities spawned from the scene tree
 #[derive(Resource, Default)]
@@ -72,7 +67,7 @@ impl SceneTreeComponentRegistry {
             return;
         }
 
-        let inserter = Box::new(|entity: &mut EntityCommands, _node: &GodotNodeHandle| {
+        let inserter = Box::new(|entity: &mut EntityCommands, _node: &mut GodotNode| {
             entity.insert(C::default());
         });
         self.components.push((type_id, inserter));
@@ -82,7 +77,7 @@ impl SceneTreeComponentRegistry {
     pub fn register_with_init<C, F>(&mut self, init_fn: F)
     where
         C: Component,
-        F: Fn(&mut EntityCommands, &GodotNodeHandle) + Send + Sync + 'static,
+        F: Fn(&mut EntityCommands, &mut GodotNode) + Send + Sync + 'static,
     {
         let type_id = TypeId::of::<C>();
 
@@ -96,7 +91,7 @@ impl SceneTreeComponentRegistry {
     }
 
     /// Add all registered components to an entity
-    pub fn add_to_entity(&self, entity: &mut EntityCommands, node: &GodotNodeHandle) {
+    pub fn add_to_entity(&self, entity: &mut EntityCommands, node: &mut GodotNode) {
         for (_, inserter) in &self.components {
             inserter(entity, node);
         }
@@ -114,7 +109,7 @@ pub trait AppSceneTreeExt {
     fn register_scene_tree_component_with_init<C, F>(&mut self, init_fn: F) -> &mut Self
     where
         C: Component,
-        F: Fn(&mut EntityCommands, &GodotNodeHandle) + Send + Sync + 'static;
+        F: Fn(&mut EntityCommands, &mut GodotNode) + Send + Sync + 'static;
 }
 
 impl AppSceneTreeExt for App {
@@ -141,7 +136,7 @@ impl AppSceneTreeExt for App {
     fn register_scene_tree_component_with_init<C, F>(&mut self, init_fn: F) -> &mut Self
     where
         C: Component,
-        F: Fn(&mut EntityCommands, &GodotNodeHandle) + Send + Sync + 'static,
+        F: Fn(&mut EntityCommands, &mut GodotNode) + Send + Sync + 'static,
     {
         // Get or create the registry
         if !self
@@ -172,7 +167,7 @@ impl Plugin for GodotBaseCorePlugin {
             .add_plugins(bevy_diagnostic::FrameCountPlugin)
             .add_plugins(bevy_diagnostic::DiagnosticsPlugin)
             .init_resource::<PhysicsDelta>()
-            .init_non_send_resource::<MainThreadMarker>()
+            .init_non_send_resource::<GodotMainThread>()
             .init_resource::<SceneTreeComponentRegistry>()
             .add_observer(on_godot_node_handle_removed);
 
@@ -228,13 +223,13 @@ where
 }
 
 /// Observer that automatically frees Godot nodes when GodotNodeHandle components are removed
-#[main_thread_system]
 fn on_godot_node_handle_removed(
     trigger: Trigger<OnRemove, GodotNodeHandle>,
     query: Query<&GodotNodeHandle>,
+    mut godot: GodotAccess,
 ) {
     if let Ok(handle) = query.get(trigger.target())
-        && let Ok(mut node) = Gd::<Node>::try_from_instance_id(handle.instance_id())
+        && let Some(mut node) = godot.try_get::<Node>(*handle)
     {
         debug!(
             "Freeing Godot node with instance_id {:?}",

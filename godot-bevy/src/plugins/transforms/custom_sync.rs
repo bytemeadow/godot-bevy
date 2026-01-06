@@ -75,14 +75,14 @@ macro_rules! add_transform_sync_systems {
 
     (@generate_post_system $app:expr, $name:ident, $bevy_to_godot_query:ty) => {
         $crate::paste::paste! {
+            #[cfg(debug_assertions)]
             #[tracing::instrument]
-            #[$crate::prelude::main_thread_system]
             pub fn [<post_update_godot_transforms_ $name:lower>](
                 change_tick: $crate::bevy_ecs::system::SystemChangeTick,
                 entities: $crate::bevy_ecs::system::Query<
                     (
                         $crate::bevy_ecs::change_detection::Ref<$crate::bevy_transform::components::Transform>,
-                        &mut $crate::interop::GodotNodeHandle,
+                        &$crate::interop::GodotNodeHandle,
                         &$crate::plugins::transforms::TransformSyncMetadata,
                         $crate::bevy_ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
                     ),
@@ -91,49 +91,48 @@ macro_rules! add_transform_sync_systems {
                         $bevy_to_godot_query,
                     ),
                 >,
+                mut godot: $crate::interop::GodotAccess,
+                bulk_ops_cache: $crate::bevy_ecs::system::NonSendMut<$crate::interop::BulkOperationsCache>,
             ) {
-                // In debug builds, use bulk optimization (GDScript path) which is faster when Rust FFI
-                // overhead is high. In release builds, use individual FFI calls which are faster due to
-                // optimized Rust FFI and avoiding GDScript interpreter overhead.
-                #[cfg(debug_assertions)]
-                {
-                    use godot::classes::{Engine, Node, Object, SceneTree};
-                    use godot::obj::Singleton;
-
-                    let bulk_ops = (|| {
-                        let engine = Engine::singleton();
-                        let scene_tree = engine
-                            .get_main_loop()
-                            .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())?;
-                        let root = scene_tree.get_root()?;
-                        root.get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
-                            .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
-                            .map(|n: godot::prelude::Gd<Node>| n.upcast::<Object>())
-                    })();
-
-                    if let Some(bulk_ops_node) = bulk_ops {
-                        [<post_update_godot_transforms_ $name:lower _bulk>](
-                            change_tick,
-                            entities,
-                            bulk_ops_node,
-                        );
-                        return;
-                    }
-                    [<post_update_godot_transforms_ $name:lower _individual>](change_tick, entities);
+                if let Some(bulk_ops_node) = bulk_ops_cache.get() {
+                    [<post_update_godot_transforms_ $name:lower _bulk>](
+                        change_tick,
+                        entities,
+                        bulk_ops_node,
+                    );
+                    return;
                 }
-
-                #[cfg(not(debug_assertions))]
-                {
-                    [<post_update_godot_transforms_ $name:lower _individual>](change_tick, entities);
-                }
+                [<post_update_godot_transforms_ $name:lower _individual>](change_tick, entities, &mut godot);
             }
 
+            #[cfg(not(debug_assertions))]
+            #[tracing::instrument]
+            pub fn [<post_update_godot_transforms_ $name:lower>](
+                change_tick: $crate::bevy_ecs::system::SystemChangeTick,
+                entities: $crate::bevy_ecs::system::Query<
+                    (
+                        $crate::bevy_ecs::change_detection::Ref<$crate::bevy_transform::components::Transform>,
+                        &$crate::interop::GodotNodeHandle,
+                        &$crate::plugins::transforms::TransformSyncMetadata,
+                        $crate::bevy_ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
+                    ),
+                    (
+                        $crate::bevy_ecs::query::Changed<$crate::bevy_transform::components::Transform>,
+                        $bevy_to_godot_query,
+                    ),
+                >,
+                mut godot: $crate::interop::GodotAccess,
+            ) {
+                [<post_update_godot_transforms_ $name:lower _individual>](change_tick, entities, &mut godot);
+            }
+
+            #[cfg(debug_assertions)]
             fn [<post_update_godot_transforms_ $name:lower _bulk>](
                 change_tick: $crate::bevy_ecs::system::SystemChangeTick,
                 mut entities: $crate::bevy_ecs::system::Query<
                     (
                         $crate::bevy_ecs::change_detection::Ref<$crate::bevy_transform::components::Transform>,
-                        &mut $crate::interop::GodotNodeHandle,
+                        &$crate::interop::GodotNodeHandle,
                         &$crate::plugins::transforms::TransformSyncMetadata,
                         $crate::bevy_ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
                     ),
@@ -269,7 +268,7 @@ macro_rules! add_transform_sync_systems {
                 mut entities: $crate::bevy_ecs::system::Query<
                     (
                         $crate::bevy_ecs::change_detection::Ref<$crate::bevy_transform::components::Transform>,
-                        &mut $crate::interop::GodotNodeHandle,
+                        &$crate::interop::GodotNodeHandle,
                         &$crate::plugins::transforms::TransformSyncMetadata,
                         $crate::bevy_ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
                     ),
@@ -278,13 +277,14 @@ macro_rules! add_transform_sync_systems {
                         $bevy_to_godot_query,
                     ),
                 >,
+                godot: &mut $crate::interop::GodotAccess,
             ) {
                 use $crate::plugins::transforms::{IntoGodotTransform, IntoGodotTransform2D};
                 use $crate::bevy_ecs::change_detection::DetectChanges;
                 use godot::classes::{Node2D, Node3D};
 
                 // Original individual FFI approach
-                for (transform_ref, mut reference, metadata, (node2d, node3d)) in entities.iter_mut() {
+                for (transform_ref, reference, metadata, (node2d, node3d)) in entities.iter_mut() {
                     // Check if we have sync information for this entity
                     if let Some(sync_tick) = metadata.last_sync_tick {
                         if !transform_ref
@@ -299,11 +299,11 @@ macro_rules! add_transform_sync_systems {
                     // Handle both 2D and 3D nodes in a single system
                     if node2d.is_some() {
                         let _span = tracing::info_span!("individual_ffi_call_2d", system = stringify!($name)).entered();
-                        let mut obj = reference.get::<Node2D>();
+                        let mut obj = godot.get::<Node2D>(*reference);
                         obj.set_transform(transform_ref.to_godot_transform_2d());
                     } else if node3d.is_some() {
                         let _span = tracing::info_span!("individual_ffi_call_3d", system = stringify!($name)).entered();
-                        let mut obj = reference.get::<Node3D>();
+                        let mut obj = godot.get::<Node3D>(*reference);
                         obj.set_transform(transform_ref.to_godot_transform());
                     }
                 }
@@ -315,61 +315,57 @@ macro_rules! add_transform_sync_systems {
 
     (@generate_pre_system $app:expr, $name:ident, $godot_to_bevy_query:ty) => {
         $crate::paste::paste! {
+            #[cfg(debug_assertions)]
             #[tracing::instrument]
-            #[$crate::prelude::main_thread_system]
             pub fn [<pre_update_godot_transforms_ $name:lower>](
                 entities: $crate::bevy_ecs::system::Query<
                     (
                         $crate::bevy_ecs::entity::Entity,
                         &mut $crate::bevy_transform::components::Transform,
-                        &mut $crate::interop::GodotNodeHandle,
+                        &$crate::interop::GodotNodeHandle,
                         &mut $crate::plugins::transforms::TransformSyncMetadata,
                         $crate::bevy_ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
                     ),
                     $godot_to_bevy_query
                 >,
+                mut godot: $crate::interop::GodotAccess,
+                bulk_ops_cache: $crate::bevy_ecs::system::NonSendMut<$crate::interop::BulkOperationsCache>,
             ) {
-                // In debug builds, use bulk optimization (GDScript path) which is faster when Rust FFI
-                // overhead is high. In release builds, use individual FFI calls which are faster due to
-                // optimized Rust FFI and avoiding GDScript interpreter overhead.
-                #[cfg(debug_assertions)]
-                {
-                    use godot::classes::{Engine, Node, Object, SceneTree};
-                    use godot::obj::Singleton;
-
-                    let bulk_ops = (|| {
-                        let engine = Engine::singleton();
-                        let scene_tree = engine
-                            .get_main_loop()
-                            .and_then(|main_loop| main_loop.try_cast::<SceneTree>().ok())?;
-                        let root = scene_tree.get_root()?;
-                        root.get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
-                            .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
-                            .map(|n: godot::prelude::Gd<Node>| n.upcast::<Object>())
-                    })();
-
-                    if let Some(bulk_ops_node) = bulk_ops {
-                        [<pre_update_godot_transforms_ $name:lower _bulk>](
-                            entities,
-                            bulk_ops_node,
-                        );
-                        return;
-                    }
-                    [<pre_update_godot_transforms_ $name:lower _individual>](entities);
+                if let Some(bulk_ops_node) = bulk_ops_cache.get() {
+                    [<pre_update_godot_transforms_ $name:lower _bulk>](
+                        entities,
+                        bulk_ops_node,
+                    );
+                    return;
                 }
-
-                #[cfg(not(debug_assertions))]
-                {
-                    [<pre_update_godot_transforms_ $name:lower _individual>](entities);
-                }
+                [<pre_update_godot_transforms_ $name:lower _individual>](entities, &mut godot);
             }
 
+            #[cfg(not(debug_assertions))]
+            #[tracing::instrument]
+            pub fn [<pre_update_godot_transforms_ $name:lower>](
+                entities: $crate::bevy_ecs::system::Query<
+                    (
+                        $crate::bevy_ecs::entity::Entity,
+                        &mut $crate::bevy_transform::components::Transform,
+                        &$crate::interop::GodotNodeHandle,
+                        &mut $crate::plugins::transforms::TransformSyncMetadata,
+                        $crate::bevy_ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
+                    ),
+                    $godot_to_bevy_query
+                >,
+                mut godot: $crate::interop::GodotAccess,
+            ) {
+                [<pre_update_godot_transforms_ $name:lower _individual>](entities, &mut godot);
+            }
+
+            #[cfg(debug_assertions)]
             fn [<pre_update_godot_transforms_ $name:lower _bulk>](
                 mut entities: $crate::bevy_ecs::system::Query<
                     (
                         $crate::bevy_ecs::entity::Entity,
                         &mut $crate::bevy_transform::components::Transform,
-                        &mut $crate::interop::GodotNodeHandle,
+                        &$crate::interop::GodotNodeHandle,
                         &mut $crate::plugins::transforms::TransformSyncMetadata,
                         $crate::bevy_ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
                     ),
@@ -489,26 +485,27 @@ macro_rules! add_transform_sync_systems {
                     (
                         $crate::bevy_ecs::entity::Entity,
                         &mut $crate::bevy_transform::components::Transform,
-                        &mut $crate::interop::GodotNodeHandle,
+                        &$crate::interop::GodotNodeHandle,
                         &mut $crate::plugins::transforms::TransformSyncMetadata,
                         $crate::bevy_ecs::query::AnyOf<(&$crate::interop::node_markers::Node2DMarker, &$crate::interop::node_markers::Node3DMarker)>,
                     ),
                     $godot_to_bevy_query
                 >,
+                godot: &mut $crate::interop::GodotAccess,
             ) {
                 use $crate::plugins::transforms::IntoBevyTransform;
                 use $crate::bevy_ecs::change_detection::DetectChanges;
                 use godot::classes::{Node2D, Node3D};
 
-                for (_, mut bevy_transform, mut reference, mut metadata, (node2d, node3d)) in entities.iter_mut() {
+                for (_, mut bevy_transform, reference, mut metadata, (node2d, node3d)) in entities.iter_mut() {
                     let new_bevy_transform = if node2d.is_some() {
-                        reference
-                            .get::<Node2D>()
+                        godot
+                            .get::<Node2D>(*reference)
                             .get_transform()
                             .to_bevy_transform()
                     } else if node3d.is_some() {
-                        reference
-                            .get::<Node3D>()
+                        godot
+                            .get::<Node3D>(*reference)
                             .get_transform()
                             .to_bevy_transform()
                     } else {

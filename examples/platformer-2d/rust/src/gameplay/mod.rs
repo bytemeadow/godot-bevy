@@ -6,7 +6,8 @@ use bevy::prelude::*;
 use bevy::state::condition::in_state;
 use bevy::state::state::NextState;
 use gem::GemsCollected;
-use godot::{classes::Input, obj::Singleton};
+use godot::classes::Input;
+use godot_bevy::prelude::GodotAccess;
 use hud::{HudHandles, HudUpdateMessage};
 
 pub mod audio;
@@ -64,8 +65,11 @@ impl Plugin for GameplayPlugin {
 ///
 /// Runs in InputDetection set and can execute in parallel with other input systems.
 /// Only reads input and writes events, enabling better parallelization.
-fn detect_reset_level_input(mut reset_events: MessageWriter<ResetLevelMessage>) {
-    let input = Input::singleton();
+fn detect_reset_level_input(
+    mut reset_events: MessageWriter<ResetLevelMessage>,
+    mut godot: GodotAccess,
+) {
+    let input = godot.singleton::<Input>();
 
     if input.is_action_just_pressed("reset_level") {
         info!("Reset level input detected");
@@ -77,8 +81,11 @@ fn detect_reset_level_input(mut reset_events: MessageWriter<ResetLevelMessage>) 
 ///
 /// Runs in InputDetection set and can execute in parallel with other input systems.
 /// Only reads input and writes events, enabling better parallelization.
-fn detect_return_to_menu_input(mut menu_events: MessageWriter<ReturnToMainMenuMessage>) {
-    let input = Input::singleton();
+fn detect_return_to_menu_input(
+    mut menu_events: MessageWriter<ReturnToMainMenuMessage>,
+    mut godot: GodotAccess,
+) {
+    let input = godot.singleton::<Input>();
 
     if input.is_action_just_pressed("return_to_main_menu") {
         info!("Return to main menu input detected");

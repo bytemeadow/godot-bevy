@@ -67,26 +67,24 @@ impl Plugin for HudPlugin {
 /// System to set up HUD handles and update displays when a new level is loaded
 ///
 /// Simplified approach that still reduces SceneTreeRef conflicts by batching operations.
-#[main_thread_system]
 fn setup_hud_on_level_loaded(
     mut hud_handles: ResMut<HudHandles>,
     mut events: MessageReader<LevelLoadedMessage>,
     mut scene_tree: SceneTreeRef,
     mut hud_update_events: MessageWriter<HudUpdateMessage>,
     gems_collected: Res<GemsCollected>,
+    mut godot: GodotAccess,
 ) {
     for event in events.read() {
         // Try to get HUD node handles - this is the only SceneTreeRef access in HUD
         let root = scene_tree.get().get_root().unwrap();
-        let mut hud_ui = HudUi::from_node(root).unwrap();
-        hud_handles.current_level_label = Some(hud_ui.current_level_label.clone());
-        hud_handles.gems_label = Some(hud_ui.gems_label.clone());
+        let hud_ui = HudUi::from_node(root).unwrap();
+        hud_handles.current_level_label = Some(hud_ui.current_level_label);
+        hud_handles.gems_label = Some(hud_ui.gems_label);
 
         // Set the current level label immediately
-        hud_ui
-            .current_level_label
-            .get::<Label>()
-            .set_text(event.level_id.display_name());
+        let mut label = godot.get::<Label>(hud_ui.current_level_label);
+        label.set_text(event.level_id.display_name());
 
         // Request HUD gem update via events
         hud_update_events.write(HudUpdateMessage::GemsChanged(gems_collected.0));
@@ -112,19 +110,18 @@ fn generate_hud_update_events(
 ///
 /// This system can run in parallel with other incremental update systems
 /// since it only responds to events and updates UI elements.
-#[main_thread_system]
 fn handle_hud_update_events(
     mut hud_events: MessageReader<HudUpdateMessage>,
     hud_handles: Res<HudHandles>,
+    mut godot: GodotAccess,
 ) {
     for event in hud_events.read() {
         match event {
             HudUpdateMessage::GemsChanged(gem_count) => {
-                if let Some(gems_label) = &hud_handles.gems_label {
-                    let mut label_handle = gems_label.clone();
-                    label_handle
-                        .get::<Label>()
-                        .set_text(&format!("Gems: {gem_count}"));
+                if let Some(handle) = hud_handles.gems_label
+                    && let Some(mut label) = godot.try_get::<Label>(handle)
+                {
+                    label.set_text(&format!("Gems: {gem_count}"));
                 }
             }
         }

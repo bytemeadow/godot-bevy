@@ -36,6 +36,7 @@ in
       python3 # for godot type generation script
       rust-toolchain
       rust-nightly # for web builds (-Zbuild-std requires nightly)
+      act # run GitHub Actions locally
 
       # web export support - pinned to emscripten 3.1.73 for godot-rust compatibility
       # The latest nixpkgs has emscripten 4.x which causes linker errors with godot-rust
@@ -80,6 +81,50 @@ in
   # nightly toolchain paths for web builds
   env.CARGO_NIGHTLY = "${rust-nightly}/bin/cargo";
   env.RUSTC_NIGHTLY = "${rust-nightly}/bin/rustc";
+
+  # devenv scripts - run with `devenv run <script-name>` or just `<script-name>` in devenv shell
+  scripts = {
+    # Run full CI locally using act (Docker required)
+    # Uses workflow_dispatch to trigger standard ubuntu-latest runners
+    ci-test.exec = ''
+      echo "Running CI locally with act..."
+      echo "Note: Docker must be running"
+      act workflow_dispatch -W .github/workflows/ci.yml --container-architecture linux/amd64 "$@"
+    '';
+
+    # Run just integration tests locally (faster, skips lint and unit tests)
+    ci-itest.exec = ''
+      echo "Running integration tests locally with act..."
+      echo "Note: Docker must be running"
+      act workflow_dispatch -W .github/workflows/ci.yml -j integration-tests --container-architecture linux/amd64 "$@"
+    '';
+
+    # Run benchmarks locally using act (Docker required)
+    ci-benches.exec = ''
+      echo "Running benchmarks locally with act..."
+      echo "Note: Docker must be running"
+      act workflow_dispatch -W .github/workflows/benchmarks.yml --container-architecture linux/amd64 "$@"
+    '';
+
+    # Run just the lint job from CI
+    ci-lint.exec = ''
+      echo "Running lint checks..."
+      cargo fmt --all -- --check
+      cargo clippy --all-targets -- -D warnings
+    '';
+
+    # Run integration tests natively (faster than act, requires local Godot)
+    itest.exec = ''
+      echo "Running integration tests..."
+      cd itest && ./run-tests.sh "$@"
+    '';
+
+    # Run benchmarks natively (requires local Godot)
+    bench.exec = ''
+      echo "Running benchmarks..."
+      cd itest && ./run-benches.sh "$@"
+    '';
+  };
 
   files =
     if pkgs.stdenv.isLinux then

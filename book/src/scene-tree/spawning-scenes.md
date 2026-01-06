@@ -109,12 +109,12 @@ See below or the `NodeTreeView` docs for more details.
 Then we can access the tree view in our system like this:
 
 ```rust,ignore
-#[main_thread_system]
 fn new_character_initialize(
-    mut entities: Query<&mut GodotNodeHandle, Added<Character>>,
+    entities: Query<&GodotNodeHandle, Added<Character>>,
+    mut godot: GodotAccess,
 ) {
-    for mut character in entities.iter_mut() {
-        let character = character.get::<RigidBody2D>();
+    for handle in &entities {
+        let character = godot.get::<RigidBody2D>(*handle);
         let character_nodes = CharacterNodes::from_node(character).unwrap();
     }
 }
@@ -187,7 +187,7 @@ fn spawn_character_with_signals(mut commands: Commands, assets: Res<CharacterAss
                     VisibleOnScreenNotifier2DSignals::SCREEN_EXITED,
                     
                     // Closure to turn a Godot signal into a Bevy message:
-                    |_args, _handle, entity| {
+                    |_args, _node_handle, entity| {
                         Some(CharacterScreenExited {
                             entity: entity.expect("entity was provided"),
                         })

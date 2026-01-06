@@ -12,9 +12,10 @@ use godot::classes::ResourceLoader;
 use godot::classes::resource_loader::ThreadLoadStatus;
 use godot::obj::{Gd, Singleton};
 use godot::prelude::Resource as GodotBaseResource;
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use thiserror::Error;
 
 use crate::interop::GodotResourceHandle;
@@ -221,7 +222,7 @@ impl AssetLoader for GodotResourceAssetLoader {
         }
 
         {
-            let mut tracker = LOADING_TRACKER.lock().unwrap();
+            let mut tracker = LOADING_TRACKER.lock();
             tracker.insert(godot_path.clone(), LoadingState::Requested);
         }
 
@@ -243,7 +244,7 @@ impl AssetLoader for GodotResourceAssetLoader {
                     match resource {
                         Some(resource) => {
                             {
-                                let mut tracker = LOADING_TRACKER.lock().unwrap();
+                                let mut tracker = LOADING_TRACKER.lock();
                                 tracker.insert(godot_path.clone(), LoadingState::Ready);
                             }
 
@@ -253,7 +254,7 @@ impl AssetLoader for GodotResourceAssetLoader {
                         None => {
                             // Update tracker
                             {
-                                let mut tracker = LOADING_TRACKER.lock().unwrap();
+                                let mut tracker = LOADING_TRACKER.lock();
                                 tracker.insert(godot_path.clone(), LoadingState::Failed);
                             }
 
@@ -265,7 +266,7 @@ impl AssetLoader for GodotResourceAssetLoader {
                 }
                 ThreadLoadStatus::FAILED => {
                     {
-                        let mut tracker = LOADING_TRACKER.lock().unwrap();
+                        let mut tracker = LOADING_TRACKER.lock();
                         tracker.insert(godot_path.clone(), LoadingState::Failed);
                     }
 
@@ -275,7 +276,7 @@ impl AssetLoader for GodotResourceAssetLoader {
                 }
                 ThreadLoadStatus::INVALID_RESOURCE => {
                     {
-                        let mut tracker = LOADING_TRACKER.lock().unwrap();
+                        let mut tracker = LOADING_TRACKER.lock();
                         tracker.insert(godot_path.clone(), LoadingState::Failed);
                     }
 
@@ -285,7 +286,7 @@ impl AssetLoader for GodotResourceAssetLoader {
                 }
                 _ => {
                     {
-                        let mut tracker = LOADING_TRACKER.lock().unwrap();
+                        let mut tracker = LOADING_TRACKER.lock();
                         tracker.insert(godot_path.clone(), LoadingState::Loading);
                     }
 
@@ -308,7 +309,7 @@ impl AssetLoader for GodotResourceAssetLoader {
         let path_gstring = godot::builtin::GString::from(&godot_path);
 
         {
-            let mut tracker = LOADING_TRACKER.lock().unwrap();
+            let mut tracker = LOADING_TRACKER.lock();
             tracker.insert(godot_path.clone(), LoadingState::Requested);
         }
 
@@ -319,7 +320,7 @@ impl AssetLoader for GodotResourceAssetLoader {
         match resource {
             Some(resource) => {
                 {
-                    let mut tracker = LOADING_TRACKER.lock().unwrap();
+                    let mut tracker = LOADING_TRACKER.lock();
                     tracker.insert(godot_path.clone(), LoadingState::Ready);
                 }
 
@@ -328,7 +329,7 @@ impl AssetLoader for GodotResourceAssetLoader {
             }
             None => {
                 {
-                    let mut tracker = LOADING_TRACKER.lock().unwrap();
+                    let mut tracker = LOADING_TRACKER.lock();
                     tracker.insert(godot_path.clone(), LoadingState::Failed);
                 }
 

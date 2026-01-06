@@ -1,12 +1,12 @@
 use super::scene_tree::SceneTreeRef;
+use crate::interop::{GodotAccess, GodotNodeHandle};
 use crate::plugins::assets::GodotResource;
 use crate::plugins::signals::{
     DeferredSignalConnection, GlobalTypedSignalSender, SignalConnectionSpec,
     TypedDeferredSignalConnections,
 };
+use crate::plugins::transforms::IntoGodotTransform;
 use crate::plugins::transforms::IntoGodotTransform2D;
-use crate::prelude::main_thread_system;
-use crate::{interop::GodotNodeHandle, plugins::transforms::IntoGodotTransform};
 use bevy_app::{App, Plugin, PostUpdate};
 use bevy_asset::{Assets, Handle};
 use bevy_ecs::message::Message;
@@ -18,12 +18,13 @@ use bevy_ecs::{
     system::{Commands, Query, ResMut},
 };
 use bevy_transform::components::Transform;
+use godot::obj::Gd;
 use godot::prelude::Variant;
 use godot::{
     builtin::GString,
     classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader},
-    obj::Singleton,
 };
+use std::collections::HashMap;
 use std::str::FromStr;
 use tracing::error;
 
@@ -100,7 +101,7 @@ impl GodotScene {
     /// * `mapper` - Closure that maps signal arguments to your typed message.
     ///   * The closure receives three arguments: `args`, `node_handle`, and `entity`:
     ///     - `args: &[Variant]`: raw Godot arguments (clone if you need detailed parsing).
-    ///     - `node_handle: &GodotNodeHandle`: emitting node; clone into your event if useful.
+    ///     - `node_handle: GodotNodeHandle`: emitting node handle.
     ///     - `entity: Option<Entity>`: Bevy entity the GodotScene component is attached to (Always Some).
     ///   * The closure returns an optional Bevy Message, or None to not send the message.
     ///
@@ -112,7 +113,7 @@ impl GodotScene {
     ///     GodotScene::from_handle(scene).with_signal_connection::<MyMessage>(
     ///         "VBox/MyButton",
     ///         "pressed",
-    ///         |args, _node, _entity| {
+    ///         |args, _node_id, _entity| {
     ///             Some(MyMessage::from_args(args))
     ///         }
     ///     )
@@ -126,7 +127,7 @@ impl GodotScene {
     ) -> Self
     where
         T: Message + Send + std::fmt::Debug + 'static,
-        F: Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
+        F: Fn(&[Variant], GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
     {
         self.deferred_signal_connections
             .push(Box::new(SignalConnectionSpec {
@@ -141,33 +142,60 @@ impl GodotScene {
     }
 }
 
-#[main_thread_system]
 fn spawn_scene(
     mut commands: Commands,
     mut new_scenes: Query<(&mut GodotScene, Entity, Option<&Transform>), Without<GodotNodeHandle>>,
     mut scene_tree: SceneTreeRef,
     mut assets: ResMut<Assets<GodotResource>>,
     typed_message_sender: Option<NonSend<GlobalTypedSignalSender>>,
+    mut godot: GodotAccess,
 ) {
+    // Build a per-frame cache for path-based scene loading.
+    // This avoids repeated ResourceLoader.load() calls when spawning multiple
+    // instances of the same scene in a single frame (~22x faster).
+    let mut local_cache: HashMap<String, Gd<PackedScene>> = HashMap::new();
+
     for (mut scene, ent, transform) in new_scenes.iter_mut() {
-        let packed_scene = match &scene.resource {
-            GodotSceneResource::Handle(handle) => assets
-                .get_mut(handle)
-                .expect("packed scene to exist in assets")
-                .get()
-                .clone(),
-            GodotSceneResource::Path(path) => ResourceLoader::singleton()
-                .load(&GString::from_str(path).expect("path to be a valid GString"))
-                .expect("packed scene to load"),
+        let packed_scene: Gd<PackedScene> = match &scene.resource {
+            GodotSceneResource::Handle(handle) => {
+                let resource = assets
+                    .get_mut(handle)
+                    .expect("packed scene to exist in assets")
+                    .get()
+                    .clone();
+                match resource.try_cast::<PackedScene>() {
+                    Ok(ps) => ps,
+                    Err(resource) => {
+                        error!("Resource is not a PackedScene: {:?}", resource);
+                        continue;
+                    }
+                }
+            }
+            GodotSceneResource::Path(path) => {
+                // Use cached resource if available, otherwise load and cache
+                if let Some(cached) = local_cache.get(path) {
+                    cached.clone()
+                } else {
+                    let resource = godot
+                        .singleton::<ResourceLoader>()
+                        .load(
+                            &GString::from_str(path.as_str()).expect("path to be a valid GString"),
+                        )
+                        .expect("packed scene to load");
+
+                    match resource.try_cast::<PackedScene>() {
+                        Ok(ps) => {
+                            local_cache.insert(path.clone(), ps.clone());
+                            ps
+                        }
+                        Err(resource) => {
+                            error!("Resource is not a PackedScene: {:?}", resource);
+                            continue;
+                        }
+                    }
+                }
+            }
         };
-
-        let packed_scene_cast = packed_scene.clone().try_cast::<PackedScene>();
-        if packed_scene_cast.is_err() {
-            error!("Resource is not a PackedScene: {:?}", packed_scene);
-            continue;
-        }
-
-        let packed_scene = packed_scene_cast.unwrap();
 
         let instance = match packed_scene.instantiate() {
             Some(instance) => instance,
@@ -204,9 +232,9 @@ fn spawn_scene(
             }
         }
 
-        match &mut scene.parent {
-            Some(parent) => {
-                let mut parent = parent.get::<Node>();
+        match scene.parent {
+            Some(parent_id) => {
+                let mut parent = godot.get::<Node>(parent_id);
                 parent.add_child(&instance);
             }
             None => {

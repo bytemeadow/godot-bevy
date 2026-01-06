@@ -5,19 +5,14 @@ use bevy::{
         message::{MessageReader, MessageWriter},
         resource::Resource,
         schedule::IntoScheduleConfigs,
-        system::ResMut,
+        system::{Res, ResMut},
     },
     state::{
         condition::in_state,
         state::{NextState, OnEnter, OnExit},
     },
 };
-use godot_bevy::{
-    interop::GodotNodeHandle,
-    prelude::{
-        GodotTypedSignalsPlugin, NodeTreeView, SceneTreeRef, TypedGodotSignals, main_thread_system,
-    },
-};
+use godot_bevy::prelude::*;
 
 use crate::{
     GameState,
@@ -64,7 +59,6 @@ pub struct MenuUi {
     pub score_label: GodotNodeHandle,
 }
 
-#[main_thread_system]
 fn init_menu_assets(
     mut menu_assets: ResMut<MenuAssets>,
     mut ui_handles: ResMut<UIHandles>,
@@ -72,29 +66,28 @@ fn init_menu_assets(
 ) {
     let menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap()).unwrap();
 
-    menu_assets.message_label = Some(menu_ui.message_label.clone());
-    menu_assets.start_button = Some(menu_ui.start_button.clone());
-    menu_assets.score_label = Some(menu_ui.score_label.clone());
+    menu_assets.message_label = Some(menu_ui.message_label);
+    menu_assets.start_button = Some(menu_ui.start_button);
+    menu_assets.score_label = Some(menu_ui.score_label);
 
     // Initialize UI handles for command system
-    ui_handles.start_button = Some(menu_ui.start_button.clone());
-    ui_handles.score_label = Some(menu_ui.score_label.clone());
-    ui_handles.message_label = Some(menu_ui.message_label.clone());
+    ui_handles.start_button = Some(menu_ui.start_button);
+    ui_handles.score_label = Some(menu_ui.score_label);
+    ui_handles.message_label = Some(menu_ui.message_label);
 }
 
 #[derive(Message, Debug, Clone)]
 struct StartGameRequested;
 
 fn connect_start_button(
-    mut menu_assets: ResMut<MenuAssets>,
+    menu_assets: Res<MenuAssets>,
     typed: TypedGodotSignals<StartGameRequested>,
 ) {
-    typed.connect_map(
-        menu_assets.start_button.as_mut().unwrap(),
-        "pressed",
-        None,
-        |_args, _node, _ent| Some(StartGameRequested),
-    );
+    if let Some(handle) = menu_assets.start_button {
+        typed.connect_map(handle, "pressed", None, |_args, _node_handle, _ent| {
+            Some(StartGameRequested)
+        });
+    }
 }
 
 fn listen_for_start_button(

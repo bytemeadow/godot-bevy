@@ -1,215 +1,198 @@
 name: benchmarks
 
 on:
-    pull_request:
-        types: [opened, synchronize]
-        paths:
-            - "godot-bevy/**"
-            - "godot-bevy-macros/**"
-            - "itest/**"
-            - "Cargo.toml"
-            - "Cargo.lock"
-            - ".github/workflows/benchmarks.yml"
-            - ".github/scripts/benchmarks-compare.py"
-    push:
-        branches: [main]
-        paths:
-            - "godot-bevy/**"
-            - "godot-bevy-macros/**"
-            - "itest/**"
-            - "Cargo.toml"
-            - "Cargo.lock"
-            - ".github/workflows/benchmarks.yml"
-            - ".github/scripts/benchmarks-compare.py"
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - "godot-bevy/**"
+      - "godot-bevy-macros/**"
+      - "itest/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/benchmarks.yml"
+      - ".github/scripts/benchmarks-compare.py"
+  push:
+    branches: [main]
+    paths:
+      - "godot-bevy/**"
+      - "godot-bevy-macros/**"
+      - "itest/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/benchmarks.yml"
+      - ".github/scripts/benchmarks-compare.py"
+  workflow_dispatch: # Allows manual runs and local testing with act
 
 env:
-    CARGO_TERM_COLOR: always
-    GODOT_VERSION: "4.5.1"
+  CARGO_TERM_COLOR: always
+  GODOT_VERSION: "4.5.1"
 
 permissions:
-    contents: write # Need write to push to gh-benchmarks branch
+  contents: write # Need write to push to gh-benchmarks branch
 
 jobs:
-    benchmarks:
-        runs-on: blaze/compute/ubuntu-latest-amd64
+  benchmarks:
+    # Use ubuntu-latest for workflow_dispatch (local act testing), custom runner otherwise
+    runs-on: ${{ github.event_name == 'workflow_dispatch' && 'ubuntu-latest' || 'blaze/compute/ubuntu-latest-amd64' }}
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Install Rust
-              uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-            - name: Setup Rust cache
-              uses: Swatinem/rust-cache@v2
-              with:
-                  workspaces: . -> target
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
 
-            - name: Install Linux dependencies
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
-            - name: Setup Godot
-              uses: chickensoft-games/setup-godot@v2
-              with:
-                  version: ${{ env.GODOT_VERSION }}
-                  use-dotnet: false
-                  include-templates: false
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+          include-templates: false
 
-            - name: Build itest in release mode
-              working-directory: itest/rust
-              run: cargo build --release
+      - name: Build and setup
+        working-directory: itest
+        env:
+          GODOT4_BIN: godot
+        run: |
+          # Build release and setup GDExtension (but don't run benchmarks yet)
+          cd rust && cargo build --release && cd ..
 
-            - name: Copy library to Godot project
-              working-directory: itest
-              run: |
-                  TARGET_DIR="$(cargo metadata --format-version 1 --no-deps | jq --raw-output '.target_directory')"
-                  if [ ! -e "$TARGET_DIR" ]; then
-                    echo "Cargo target directory not found: $TARGET_DIR"
-                    exit 1
-                  fi
-                  echo "Cargo target directory contents: $TARGET_DIR/release"
-                  ls -lah "$TARGET_DIR/release"
+          # Generate .gdextension file pointing to release build
+          SCRIPT_DIR="$(pwd)"
+          GODOT_PROJECT_DIR="$SCRIPT_DIR/godot"
 
-                  mkdir -p godot/lib
-                  cp "$TARGET_DIR/release/libgodot_bevy_itest.so" godot/lib/ 2>/dev/null || \
-                  cp "$TARGET_DIR/release/godot_bevy_itest.dll" godot/lib/ 2>/dev/null || \
-                  cp "$TARGET_DIR/release/libgodot_bevy_itest.dylib" godot/lib/ 2>/dev/null || true
-                  echo "Godot library directory contents: itest/godot/lib/"
-                  ls -lah godot/lib/
+          cat > godot/itest.gdextension << EOF
+          [configuration]
+          entry_symbol = "godot_bevy_itest"
+          compatibility_minimum = 4.2
 
-                  # Update .gdextension paths
-                  sed -i 's|res://../../target/debug/|res://lib/|g' godot/itest.gdextension
-                  sed -i 's|res://../../target/release/|res://lib/|g' godot/itest.gdextension
+          [libraries]
+          linux.debug.x86_64 = "res://../../target/release/libgodot_bevy_itest.so"
+          linux.release.x86_64 = "res://../../target/release/libgodot_bevy_itest.so"
+          EOF
 
-                  # Print updated .gdextension file
-                  sed 's/^/| /' godot/itest.gdextension
+          # Ensure .godot directory exists and extension is registered
+          mkdir -p "$GODOT_PROJECT_DIR/.godot"
+          echo "res://itest.gdextension" > "$GODOT_PROJECT_DIR/.godot/extension_list.cfg"
 
-            - name: Import Godot project
-              working-directory: itest
-              run: |
-                  # Known bug in Godot 4.5.1: Headless import of project with GDExtensions crashes
-                  # https://github.com/godotengine/godot/issues/111645
-                  # Workaround: Import twice to workaround first editor crash.
-                  godot --headless --path godot --import --quit || true
-                  
-                  echo "First import expected to crash due to bug. Importing again to workaround crash."
-                  godot --headless --path godot --import --quit | tee godot-import-stdout.txt
-                  
-                  # Check for errors in import output
-                  if awk '/ERROR/ {exit 1}' godot-import-stdout.txt; then
-                    echo "✅ Project import successful"
-                  else
-                    echo "❌ Project import failed - errors detected"
-                    exit 1
-                  fi
+          # Import project so Godot recognizes the GDExtension
+          "$GODOT4_BIN" --headless --path "$GODOT_PROJECT_DIR" --import --quit || true
 
-            - name: Run benchmarks and extract JSON
-              working-directory: itest
-              run: |
-                  # Run benchmarks with JSON output enabled
-                  export BENCHMARK_JSON=1
-                  export BENCHMARK_JSON_PATH=bench-results.json
+      - name: Run benchmarks
+        working-directory: itest
+        env:
+          GODOT4_BIN: godot
+          BENCHMARK_JSON: "1"
+          BENCHMARK_JSON_PATH: bench-results.json
+        run: |
+          godot --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000 2>&1 | tee bench-output.txt
 
-                  godot --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 60000 2>&1 | tee bench-output.txt
+          # Extract JSON from output as fallback if file write failed
+          if [ ! -f bench-results.json ]; then
+            sed -n '/===BENCHMARK_JSON_START===/,/===BENCHMARK_JSON_END===/p' bench-output.txt | \
+              sed '1d;$d' > bench-results.json
+          fi
 
-                  # Extract JSON from output as fallback if file write failed
-                  if [ ! -f bench-results.json ]; then
-                    sed -n '/===BENCHMARK_JSON_START===/,/===BENCHMARK_JSON_END===/p' bench-output.txt | \
-                      sed '1d;$d' > bench-results.json
-                  fi
+          # Verify we have valid JSON
+          if ! jq empty bench-results.json 2>/dev/null; then
+            echo "Error: Invalid JSON output"
+            exit 1
+          fi
 
-                  # Verify we have valid JSON
-                  if ! jq empty bench-results.json 2>/dev/null; then
-                    echo "Error: Invalid JSON output"
-                    exit 1
-                  fi
+          echo "✅ Benchmarks complete"
 
-                  echo "✅ Benchmarks complete"
+      - name: Fetch baseline (PR only)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd itest
+          # Try to fetch baseline from gh-benchmarks branch
+          curl -sf https://raw.githubusercontent.com/${{ github.repository }}/gh-benchmarks/baseline.json \
+            > baseline.json 2>/dev/null || echo '{"benchmarks":{}}' > baseline.json
 
-            - name: Fetch baseline (PR only)
-              if: github.event_name == 'pull_request'
-              continue-on-error: true
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  cd itest
-                  # Try to fetch baseline from gh-benchmarks branch
-                  curl -sf https://raw.githubusercontent.com/${{ github.repository }}/gh-benchmarks/baseline.json \
-                    > baseline.json 2>/dev/null || echo '{"benchmarks":{}}' > baseline.json
+      - name: Generate comparison report
+        if: github.event_name == 'pull_request'
+        working-directory: itest
+        run: |
+          # Run comparison - don't fail on regression, just report it
+          python3 "$GITHUB_WORKSPACE/.github/scripts/benchmarks-compare.py" \
+            "$GITHUB_WORKSPACE/itest/baseline.json" \
+            "$GITHUB_WORKSPACE/itest/bench-results.json" \
+            "$GITHUB_WORKSPACE/itest/comparison.json" \
+            || true
 
-            - name: Generate comparison report
-              if: github.event_name == 'pull_request'
-              working-directory: itest
-              run: |
-                  # Run comparison - don't fail on regression, just report it
-                  python3 "$GITHUB_WORKSPACE/.github/scripts/benchmarks-compare.py" \
-                    "$GITHUB_WORKSPACE/itest/baseline.json" \
-                    "$GITHUB_WORKSPACE/itest/bench-results.json" \
-                    "$GITHUB_WORKSPACE/itest/comparison.json" \
-                    || true
+          # Save PR context
+          echo "${{ github.event.pull_request.number }}" > pr_number.txt
+          echo "${{ github.event.pull_request.head.sha }}" > pr_sha.txt
 
-                  # Save PR context
-                  echo "${{ github.event.pull_request.number }}" > pr_number.txt
-                  echo "${{ github.event.pull_request.head.sha }}" > pr_sha.txt
+      - name: Upload benchmark artifacts
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            itest/bench-results.json
+            itest/baseline.json
+            itest/comparison.json
+            itest/pr_number.txt
+            itest/pr_sha.txt
 
-            - name: Upload benchmark artifacts
-              if: github.event_name == 'pull_request'
-              uses: actions/upload-artifact@v4
-              with:
-                  name: benchmark-results
-                  path: |
-                      itest/bench-results.json
-                      itest/baseline.json
-                      itest/comparison.json
-                      itest/pr_number.txt
-                      itest/pr_sha.txt
+      - name: Update baseline (main branch)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Verify benchmark results JSON exists, is valid and non-empty
+          # Check if the file exists
+          if [ ! -f "itest/bench-results.json" ]; then
+            echo "Error: Benchmark results file not found"
+            exit 1
+          fi
+          # Check if the file is non-empty. (3 characters will reject "{}" but allow valid benchmark results)
+          if [ "$(wc -c < itest/bench-results.json)" -le 3 ]; then
+            echo "Error: Benchmark results JSON is empty or invalid"
+            exit 1
+          fi
 
-            - name: Update baseline (main branch)
-              if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  # Verify benchmark results JSON exists, is valid and non-empty
-                  # Check if the file exists
-                  if [ ! -f "itest/bench-results.json" ]; then
-                    echo "Error: Benchmark results file not found"
-                    exit 1
-                  fi
-                  # Check if the file is non-empty. (3 characters will reject "{}" but allow valid benchmark results)
-                  if [ "$(wc -c < itest/bench-results.json)" -le 3 ]; then
-                    echo "Error: Benchmark results JSON is empty or invalid"
-                    exit 1
-                  fi
+          # Configure git
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-                  # Configure git
-                  git config --global user.name "github-actions[bot]"
-                  git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          # Save the benchmark results before switching branches
+          cp itest/bench-results.json /tmp/baseline.json
 
-                  # Save the benchmark results before switching branches
-                  cp itest/bench-results.json /tmp/baseline.json
+          # Stash any local changes before switching branches
+          # This includes the modified .gdextension file
+          git stash push -m "Temporary stash for benchmark workflow" || true
 
-                  # Stash any local changes before switching branches
-                  # This includes the modified .gdextension file
-                  git stash push -m "Temporary stash for benchmark workflow" || true
+          # Fetch or create gh-benchmarks branch
+          git fetch origin gh-benchmarks 2>/dev/null || true
 
-                  # Fetch or create gh-benchmarks branch
-                  git fetch origin gh-benchmarks 2>/dev/null || true
+          if git show-ref --verify --quiet refs/remotes/origin/gh-benchmarks; then
+            git checkout gh-benchmarks
+            git pull origin gh-benchmarks
+          else
+            git checkout --orphan gh-benchmarks
+            git rm -rf . 2>/dev/null || true
+            echo "# Benchmark Baselines" > README.md
+            git add README.md
+            git commit -m "Initialize benchmarks branch"
+          fi
 
-                  if git show-ref --verify --quiet refs/remotes/origin/gh-benchmarks; then
-                    git checkout gh-benchmarks
-                    git pull origin gh-benchmarks
-                  else
-                    git checkout --orphan gh-benchmarks
-                    git rm -rf . 2>/dev/null || true
-                    echo "# Benchmark Baselines" > README.md
-                    git add README.md
-                    git commit -m "Initialize benchmarks branch"
-                  fi
-
-                  # Copy and commit new baseline
-                  cp /tmp/baseline.json baseline.json
-                  git add baseline.json
-                  git commit -m "Update baseline from ${{ github.sha }}" || echo "No changes"
-                  git push origin gh-benchmarks
+          # Copy and commit new baseline
+          cp /tmp/baseline.json baseline.json
+          git add baseline.json
+          git commit -m "Update baseline from ${{ github.sha }}" || echo "No changes"
+          git push origin gh-benchmarks
