@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use godot::classes::Label;
 use godot_bevy::prelude::*;
 
-use crate::gameplay::gem::{GemCollectedMessage, GemsCollected};
+use crate::gameplay::gem::GemsCollected;
 use crate::level_manager::LevelLoadedMessage;
 
 /// Event to request HUD updates
@@ -42,7 +42,6 @@ impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HudHandles>()
             .add_observer(on_level_loaded_setup_hud)
-            .add_observer(on_gem_collected_update_hud)
             .add_observer(on_hud_update);
     }
 }
@@ -70,17 +69,6 @@ fn on_level_loaded_setup_hud(
 
     // Request HUD gem update via events
     commands.trigger(HudUpdateMessage::GemsChanged(gems_collected.0));
-}
-
-/// Observer that updates HUD when gems are collected
-fn on_gem_collected_update_hud(
-    _trigger: On<GemCollectedMessage>,
-    gems_collected: Res<GemsCollected>,
-    mut commands: Commands,
-) {
-    // The gem count was already incremented by the gem collection observer
-    // so we use gems_collected.0 + 1 to get the new count
-    commands.trigger(HudUpdateMessage::GemsChanged(gems_collected.0 + 1));
 }
 
 /// Observer that handles HUD update events
