@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 
 [[bin]]
 path = "../../run_godot.rs"
-name = "simple-node2d-movement"
+name = "simple_node2d_movement_example"
 
 [dependencies]
 godot-bevy = { path = "../../../godot-bevy", default-features = false }

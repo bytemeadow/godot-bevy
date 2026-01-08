@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 
 [[bin]]
 path = "../../run_godot.rs"
-name = "two-way-sync-demo"
+name = "two_way_sync_example"
 
 [dependencies]
 godot-bevy = { path = "../../../godot-bevy" }

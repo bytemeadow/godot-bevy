@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 
 [[bin]]
 path = "../../run_godot.rs"
-name = "platformer_2d"
+name = "platformer_2d_example"
 
 [dependencies]
 bevy = { version = "0.17", default-features = false, features = ["bevy_state", "bevy_asset", "bevy_log"] }

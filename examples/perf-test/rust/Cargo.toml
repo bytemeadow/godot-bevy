@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 
 [[bin]]
 path = "../../run_godot.rs"
-name = "perf-benchmark"
+name = "perf_test"
 
 [dependencies]
 bevy = { version = "0.17", default-features = false, features = ["bevy_asset", "bevy_log"] }

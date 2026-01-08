@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 
 [[bin]]
 path = "../../run_godot.rs"
-name = "timing-test"
+name = "timing_test"
 
 [dependencies]
 bevy = { version = "0.17", default-features = false, features = ["bevy_log"] }

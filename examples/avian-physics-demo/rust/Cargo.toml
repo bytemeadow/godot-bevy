@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 
 [[bin]]
 path = "../../run_godot.rs"
-name = "avian_physics_test"
+name = "avian_physics_example"
 
 [dependencies]
 avian3d = "0.4"
