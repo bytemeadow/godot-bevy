@@ -1,5 +1,5 @@
 [package]
-name = "rust-perf-test"
+name = "perf-test"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.82"
@@ -9,21 +9,21 @@ crate-type = ["cdylib"]
 
 [[bin]]
 path = "../../run_godot.rs"
-name = "perf-benchmark"
+name = "perf_test"
 
 [dependencies]
 bevy = { version = "0.17", default-features = false, features = ["bevy_asset", "bevy_log"] }
 fastrand = "2.3.0"
 godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }
-which = "7.0.3"
 tracing = "0.1"
 tracing-tracy = { version = "0.11.4", default-features = false, features = [
-  "enable",
-  "manual-lifetime",
-  "ondemand",
-  "broadcast",       # announce presence
+    "enable",
+    "manual-lifetime",
+    "ondemand",
+    "broadcast", # announce presence
 ], optional = true }
+cargo-godot-lib.workspace = true
 
 [features]
 # You can also profile this example!
@@ -34,3 +34,4 @@ tracing-tracy = { version = "0.11.4", default-features = false, features = [
 # 3. Build the game with this feature enabled: `cargo build --features trace_tracy`
 # 4. Run the game, either via the Godot Editor or using `cargo run --features trace_tracy`
 trace_tracy = ["dep:tracing-tracy", "godot-bevy/trace_tracy"]
+itest = []

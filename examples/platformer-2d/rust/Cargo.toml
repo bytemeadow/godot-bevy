@@ -1,5 +1,5 @@
 [package]
-name = "rust-platformer-2d"
+name = "platformer-2d-example"
 version = "0.1.0"
 edition = "2024"
 
@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 
 [[bin]]
 path = "../../run_godot.rs"
-name = "platformer_2d"
+name = "platformer_2d_example"
 
 [dependencies]
 bevy = { version = "0.17", default-features = false, features = ["bevy_state", "bevy_asset", "bevy_log"] }
@@ -16,4 +16,7 @@ bevy_asset_loader = "0.24"
 fastrand = { version = "2.3.0" }
 godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }
-which = "8"
+cargo-godot-lib.workspace = true
+
+[features]
+itest = []

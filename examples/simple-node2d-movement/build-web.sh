@@ -124,8 +124,8 @@ echo "=== Building NON-THREADED version ==="
 RUSTFLAGS="-C link-args=-sSIDE_MODULE=2 -C link-args=-O0 -Zlink-native-libraries=no -Cllvm-args=-enable-emscripten-cxx-exceptions=0" \
     $CARGO_CMD build --no-default-features --features web-nothreads -Zbuild-std --target wasm32-unknown-emscripten $RELEASE_FLAG
 
-if [[ -f "$WASM_DIR/rust_simple_node2d_movement.wasm" ]]; then
-    echo "Created: $WASM_DIR/rust_simple_node2d_movement.wasm"
+if [[ -f "$WASM_DIR/simple_node2d_movement_example.wasm" ]]; then
+    echo "Created: $WASM_DIR/simple_node2d_movement_example.wasm"
 else
     echo "ERROR: Non-threaded build failed"
     exit 1
@@ -146,9 +146,9 @@ if [[ "$THREADED" == true ]] || [[ "$SERVE" == false ]]; then
         $CARGO_CMD build --no-default-features --features web -Zbuild-std --target wasm32-unknown-emscripten $RELEASE_FLAG
 
     # Copy to main target dir with .threads.wasm suffix
-    if [[ -f "$THREADED_WASM_DIR/rust_simple_node2d_movement.wasm" ]]; then
-        cp "$THREADED_WASM_DIR/rust_simple_node2d_movement.wasm" "$WASM_DIR/rust_simple_node2d_movement.threads.wasm"
-        echo "Created: $WASM_DIR/rust_simple_node2d_movement.threads.wasm"
+    if [[ -f "$THREADED_WASM_DIR/simple_node2d_movement_example.wasm" ]]; then
+        cp "$THREADED_WASM_DIR/simple_node2d_movement_example.wasm" "$WASM_DIR/simple_node2d_movement_example.threads.wasm"
+        echo "Created: $WASM_DIR/simple_node2d_movement_example.threads.wasm"
     else
         echo "WARNING: Threaded build failed - .wasm not found in $THREADED_WASM_DIR"
     fi
@@ -158,8 +158,8 @@ echo ""
 echo "=== Web build complete! ==="
 echo ""
 echo "Output files:"
-echo "  Threaded:     $WASM_DIR/rust_simple_node2d_movement.threads.wasm"
-echo "  Non-threaded: $WASM_DIR/rust_simple_node2d_movement.wasm"
+echo "  Threaded:     $WASM_DIR/simple_node2d_movement_example.threads.wasm"
+echo "  Non-threaded: $WASM_DIR/simple_node2d_movement_example.wasm"
 
 if [[ "$SERVE" == true ]]; then
     echo ""
