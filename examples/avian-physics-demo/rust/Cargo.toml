@@ -21,3 +21,6 @@ bevy_asset_loader = "0.24"
 godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }
 cargo-godot-lib.workspace = true
+
+[features]
+itest = []

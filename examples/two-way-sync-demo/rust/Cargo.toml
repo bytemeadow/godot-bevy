@@ -15,3 +15,6 @@ godot-bevy = { path = "../../../godot-bevy" }
 bevy = { version = "0.17", default-features = false }
 godot = "0.4"
 cargo-godot-lib.workspace = true
+
+[features]
+itest = []

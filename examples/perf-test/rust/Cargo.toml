@@ -34,3 +34,4 @@ cargo-godot-lib.workspace = true
 # 3. Build the game with this feature enabled: `cargo build --features trace_tracy`
 # 4. Run the game, either via the Godot Editor or using `cargo run --features trace_tracy`
 trace_tracy = ["dep:tracing-tracy", "godot-bevy/trace_tracy"]
+itest = []

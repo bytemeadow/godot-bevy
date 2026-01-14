@@ -17,3 +17,6 @@ fastrand = { version = "2.3.0" }
 godot.workspace = true
 godot-bevy = { path = "../../../godot-bevy" }
 cargo-godot-lib.workspace = true
+
+[features]
+itest = []

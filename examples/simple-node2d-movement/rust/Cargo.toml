@@ -21,3 +21,4 @@ default = ["godot-bevy/default"]
 # Web build features - disable problematic dependencies
 web = ["godot-bevy/experimental-wasm"]
 web-nothreads = ["godot-bevy/experimental-wasm-nothreads"]
+itest = []
