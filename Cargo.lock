@@ -1520,9 +1520,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-godot-lib"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adf9979a6be7cce00c67d64af6daacf047ad2c57a4c30646436d37d87cc297be"
+checksum = "f49b458b1b01acdce50bbd5d6639c9a9ef2922db1a670936cb4953f6671a8196"
 dependencies = [
  "anyhow",
  "cargo_metadata",
