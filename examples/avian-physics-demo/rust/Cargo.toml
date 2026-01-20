@@ -11,13 +11,13 @@ path = "../../run_godot.rs"
 name = "avian_physics_example"
 
 [dependencies]
-avian3d = "0.4"
-bevy = { version = "0.17", default-features = false, features = [
-    "bevy_state",
-    "bevy_log",
-    "multi_threaded",
+avian3d = "0.5"
+bevy = { version = "0.18", default-features = false, features = [
+  "bevy_state",
+  "bevy_log",
+  "multi_threaded",
 ] }
-bevy_asset_loader = "0.24"
+bevy_asset_loader = "0.25"
 godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }
 cargo-godot-lib.workspace = true

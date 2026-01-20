@@ -16,7 +16,7 @@ internal-benchmarks = []
 godot = { workspace = true, features = ["__trace"] }
 godot-bevy = { path = "../../godot-bevy" }
 godot-bevy-test = { path = "../../godot-bevy-test" }
-bevy = { version = "0.17", default-features = false, features = [
+bevy = { version = "0.18", default-features = false, features = [
   "bevy_asset",
   "multi_threaded",
 ] }

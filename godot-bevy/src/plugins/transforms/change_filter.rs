@@ -1,4 +1,5 @@
-use bevy_ecs::component::{Component, Tick};
+use bevy_ecs::change_detection::Tick;
+use bevy_ecs::component::Component;
 use bevy_ecs::prelude::ReflectComponent;
 use bevy_reflect::Reflect;
 

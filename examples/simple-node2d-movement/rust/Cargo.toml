@@ -12,7 +12,7 @@ name = "simple_node2d_movement_example"
 
 [dependencies]
 godot-bevy = { path = "../../../godot-bevy", default-features = false }
-bevy = { version = "0.17", default-features = false }
+bevy = { version = "0.18", default-features = false }
 godot = "0.4"
 cargo-godot-lib.workspace = true
 
