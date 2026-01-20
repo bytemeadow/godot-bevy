@@ -12,7 +12,8 @@
 - [ ] Add/update tests (if needed)
 - [ ] Update examples (if needed)
 - [ ] Run examples
-- [ ] Run `cargo fmt`
+- [ ] Run `cargo fmt --all`
+- [ ] Run `cargo clippy`
 
 ## Related Issues
 

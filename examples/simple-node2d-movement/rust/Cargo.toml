@@ -1,5 +1,5 @@
 [package]
-name = "rust-simple-node2d-movement"
+name = "simple-node2d-movement-example"
 version = "0.1.0"
 edition = "2024"
 
@@ -8,16 +8,17 @@ crate-type = ["cdylib"]
 
 [[bin]]
 path = "../../run_godot.rs"
-name = "simple-node2d-movement"
+name = "simple_node2d_movement_example"
 
 [dependencies]
 godot-bevy = { path = "../../../godot-bevy", default-features = false }
 bevy = { version = "0.17", default-features = false }
 godot = "0.4"
-which = "7.0.3"
+cargo-godot-lib.workspace = true
 
 [features]
 default = ["godot-bevy/default"]
 # Web build features - disable problematic dependencies
 web = ["godot-bevy/experimental-wasm"]
 web-nothreads = ["godot-bevy/experimental-wasm-nothreads"]
+itest = []

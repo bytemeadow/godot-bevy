@@ -205,7 +205,7 @@ jobs:
     name: build simple-node2d-movement (wasm)
     runs-on: ubuntu-latest
     needs: changes
-    if: contains(needs.changes.outputs.examples, 'simple-node2d-movement')
+    if: contains(needs.changes.outputs.examples, 'simple_node2d_movement_example')
 
     steps:
       - name: Checkout code
@@ -257,6 +257,6 @@ jobs:
         with:
           name: simple-node2d-movement-wasm
           path: |
-            target/wasm32-unknown-emscripten/release/rust_simple_node2d_movement.wasm
-            target/wasm32-unknown-emscripten/release/rust_simple_node2d_movement.threads.wasm
+            target/wasm32-unknown-emscripten/release/simple_node2d_movement_example.wasm
+            target/wasm32-unknown-emscripten/release/simple_node2d_movement_example.threads.wasm
           if-no-files-found: error

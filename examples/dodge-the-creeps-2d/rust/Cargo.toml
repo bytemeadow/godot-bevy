@@ -1,5 +1,5 @@
 [package]
-name = "rust"
+name = "dodge-the-creeps-example"
 version = "0.1.0"
 edition = "2024"
 
@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 
 [[bin]]
 path = "../../run_godot.rs"
-name = "dodge_the_creeps"
+name = "dodge_the_creeps_example"
 
 [dependencies]
 bevy = { version = "0.17", default-features = false, features = ["bevy_state", "bevy_asset", "bevy_log"] }
@@ -16,4 +16,7 @@ bevy_asset_loader = "0.24"
 fastrand = { version = "2.3.0" }
 godot.workspace = true
 godot-bevy = { path = "../../../godot-bevy" }
-which = "8"
+cargo-godot-lib.workspace = true
+
+[features]
+itest = []
