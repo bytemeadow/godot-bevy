@@ -2,8 +2,9 @@
 
 use bevy_app::{App, Plugin};
 use bevy_ecs::component::Component;
-use bevy_ecs::observer::Trigger;
-use bevy_ecs::prelude::{Name, OnRemove, Resource};
+use bevy_ecs::lifecycle::Remove;
+use bevy_ecs::observer::On;
+use bevy_ecs::prelude::{Name, Resource};
 use bevy_ecs::schedule::{Schedule, ScheduleLabel};
 use bevy_ecs::system::{Local, Query, SystemParam};
 use std::any::TypeId;
@@ -224,7 +225,7 @@ where
 
 /// Observer that automatically frees Godot nodes when GodotNodeHandle components are removed
 fn on_godot_node_handle_removed(
-    trigger: Trigger<OnRemove, GodotNodeHandle>,
+    trigger: On<Remove, GodotNodeHandle>,
     query: Query<&GodotNodeHandle>,
     mut godot: GodotAccess,
 ) {

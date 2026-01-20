@@ -11,8 +11,8 @@ path = "../../run_godot.rs"
 name = "platformer_2d_example"
 
 [dependencies]
-bevy = { version = "0.17", default-features = false, features = ["bevy_state", "bevy_asset", "bevy_log"] }
-bevy_asset_loader = "0.24"
+bevy = { version = "0.18", default-features = false, features = ["bevy_state", "bevy_asset", "bevy_log"] }
+bevy_asset_loader = "0.25.0"
 fastrand = { version = "2.3.0" }
 godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }

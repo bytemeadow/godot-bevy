@@ -12,7 +12,7 @@ path = "../../run_godot.rs"
 name = "perf_test"
 
 [dependencies]
-bevy = { version = "0.17", default-features = false, features = ["bevy_asset", "bevy_log"] }
+bevy = { version = "0.18", default-features = false, features = ["bevy_asset", "bevy_log"] }
 fastrand = "2.3.0"
 godot = "0.4"
 godot-bevy = { path = "../../../godot-bevy" }

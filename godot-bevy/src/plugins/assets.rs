@@ -2,7 +2,8 @@ use bevy_app::{App, Plugin};
 use bevy_asset::{
     Asset, AssetApp, AssetLoader, AssetMetaCheck, AssetPlugin, LoadContext,
     io::{
-        AssetReader, AssetReaderError, AssetSource, AssetSourceId, PathStream, Reader, VecReader,
+        AssetReader, AssetReaderError, AssetSourceBuilder, AssetSourceId, PathStream, Reader,
+        VecReader,
     },
 };
 use bevy_reflect::TypePath;
@@ -76,19 +77,19 @@ impl Plugin for GodotAssetsPlugin {
         // IMPORTANT: Register custom AssetReader BEFORE setting up AssetPlugin
         app.register_asset_source(
             AssetSourceId::Default,
-            AssetSource::build().with_reader(|| Box::new(GodotAssetReader::new())),
+            AssetSourceBuilder::new(|| Box::new(GodotAssetReader::new())),
         );
         app.register_asset_source(
             AssetSourceId::from("res"),
-            AssetSource::build().with_reader(|| Box::new(GodotAssetReader::new())),
+            AssetSourceBuilder::new(|| Box::new(GodotAssetReader::new())),
         );
         app.register_asset_source(
             AssetSourceId::from("user"),
-            AssetSource::build().with_reader(|| Box::new(GodotAssetReader::new())),
+            AssetSourceBuilder::new(|| Box::new(GodotAssetReader::new())),
         );
         app.register_asset_source(
             AssetSourceId::from("uid"),
-            AssetSource::build().with_reader(|| Box::new(GodotAssetReader::new())),
+            AssetSourceBuilder::new(|| Box::new(GodotAssetReader::new())),
         );
 
         // Configure AssetPlugin to bypass path verification for Godot resources
@@ -198,7 +199,7 @@ static LOADING_TRACKER: once_cell::sync::Lazy<Arc<Mutex<HashMap<String, LoadingS
     once_cell::sync::Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 /// Universal AssetLoader for all Godot resources using async loading
-#[derive(Default)]
+#[derive(Default, TypePath)]
 pub struct GodotResourceAssetLoader;
 
 impl AssetLoader for GodotResourceAssetLoader {
@@ -213,7 +214,7 @@ impl AssetLoader for GodotResourceAssetLoader {
         _settings: &(),
         load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
-        let godot_path = load_context.asset_path().to_string();
+        let godot_path = load_context.path().to_string();
 
         {
             let mut resource_loader = ResourceLoader::singleton();
