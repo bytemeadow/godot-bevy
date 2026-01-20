@@ -906,6 +906,12 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
         "AnimationMixer" => {
             entity_commands.insert(AnimationMixerMarker);
         }
+        "AnimationPlayer" => {
+            entity_commands.insert(AnimationPlayerMarker);
+        }
+        "AnimationTree" => {
+            entity_commands.insert(AnimationTreeMarker);
+        }
         "AudioStreamPlayer" => {
             entity_commands.insert(AudioStreamPlayerMarker);
         }
@@ -1902,6 +1908,12 @@ fn check_universal_node_types_comprehensive(
     if node.try_get::<godot::classes::AnimationMixer>().is_some() {
         entity_commands.insert(AnimationMixerMarker);
     }
+    if node.try_get::<godot::classes::AnimationPlayer>().is_some() {
+        entity_commands.insert(AnimationPlayerMarker);
+    }
+    if node.try_get::<godot::classes::AnimationTree>().is_some() {
+        entity_commands.insert(AnimationTreeMarker);
+    }
     if node
         .try_get::<godot::classes::AudioStreamPlayer>()
         .is_some()
@@ -1962,6 +1974,8 @@ fn remove_universal_node_types_comprehensive(
     _node: &mut GodotNodeHandle,
 ) {
     entity_commands
+        .remove::<AnimationPlayerMarker>()
+        .remove::<AnimationTreeMarker>()
         .remove::<AudioStreamPlayerMarker>()
         .remove::<CanvasItemMarker>()
         .remove::<CanvasLayerMarker>()

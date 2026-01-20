@@ -291,11 +291,13 @@ func _analyze_node_type(node: Node) -> String:
 		return "Control"
 
 	# Check other common node types that inherit directly from Node
+	elif node is AnimationPlayer: return "AnimationPlayer"
 	elif node is Timer: return "Timer"
 	elif node is AudioStreamPlayer: return "AudioStreamPlayer"
 	elif node is HTTPRequest: return "HTTPRequest"
 	elif node is CanvasLayer: return "CanvasLayer"
 	elif node is AnimationMixer: return "AnimationMixer"
+	elif node is AnimationTree: return "AnimationTree"
 	elif node is CanvasItem: return "CanvasItem"
 	elif node is InstancePlaceholder: return "InstancePlaceholder"
 	elif node is MultiplayerSpawner: return "MultiplayerSpawner"
