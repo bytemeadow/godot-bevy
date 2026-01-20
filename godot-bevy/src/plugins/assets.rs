@@ -306,7 +306,7 @@ impl AssetLoader for GodotResourceAssetLoader {
         _settings: &(),
         load_context: &mut LoadContext<'_>,
     ) -> Result<Self::Asset, Self::Error> {
-        let godot_path = load_context.asset_path().to_string();
+        let godot_path = load_context.path().to_string();
         let path_gstring = godot::builtin::GString::from(&godot_path);
 
         {
