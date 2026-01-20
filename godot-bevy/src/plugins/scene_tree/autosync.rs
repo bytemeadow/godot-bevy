@@ -11,13 +11,13 @@
 
 use bevy_app::App;
 use bevy_ecs::{entity::Entity, system::Commands};
-use std::sync::RwLock;
+use std::sync::OnceLock;
 use tracing::trace;
 
-use crate::interop::GodotNodeHandle;
+use crate::interop::{GodotAccess, GodotNodeHandle};
 
 /// Function type for creating bundles from Godot nodes
-pub type BundleCreatorFn = fn(&mut Commands, Entity, &GodotNodeHandle) -> bool;
+pub type BundleCreatorFn = fn(&mut Commands, Entity, &mut GodotAccess, GodotNodeHandle) -> bool;
 
 /// Registry entry for auto-sync bundles using the inventory crate
 pub struct AutoSyncBundleRegistry {
@@ -30,38 +30,38 @@ pub struct AutoSyncBundleRegistry {
 // Collect all auto-sync bundle registrations
 crate::inventory::collect!(AutoSyncBundleRegistry);
 
-// Global registry for fast runtime lookup
-static BUNDLE_REGISTRY: RwLock<Option<Vec<&'static AutoSyncBundleRegistry>>> = RwLock::new(None);
+// Global registry for fast runtime lookup - initialized once, read many times
+static BUNDLE_REGISTRY: OnceLock<Vec<&'static AutoSyncBundleRegistry>> = OnceLock::new();
 
 /// Initialize the global bundle registry
 ///
 /// This function is called automatically by the `GodotPlugin` and will discover
 /// all auto-sync bundle registrations that were generated with `autosync=true`.
 pub fn register_all_autosync_bundles(_app: &mut App) {
-    let mut registry = BUNDLE_REGISTRY.write().unwrap();
-    if registry.is_none() {
+    BUNDLE_REGISTRY.get_or_init(|| {
         let entries: Vec<&'static AutoSyncBundleRegistry> =
             crate::inventory::iter::<AutoSyncBundleRegistry>
                 .into_iter()
                 .collect();
 
         tracing::debug!("Registered {} AutoSyncBundle entries", entries.len());
-        *registry = Some(entries);
-    }
+        entries
+    });
 }
 
 /// Try to add appropriate bundles to an entity based on its Godot node type
 pub fn try_add_bundles_for_node(
     commands: &mut Commands,
     entity: Entity,
-    node_handle: &GodotNodeHandle,
+    godot: &mut GodotAccess,
+    node_handle: GodotNodeHandle,
 ) {
-    let registry = BUNDLE_REGISTRY.read().unwrap();
-    if let Some(entries) = &*registry {
+    // OnceLock::get() returns Option<&T> with no locking overhead after initialization
+    if let Some(entries) = BUNDLE_REGISTRY.get() {
         for entry in entries {
             // Try to create and add the bundle
             // The function will check if the node is the right type and if the bundle is already added
-            if (entry.create_bundle_fn)(commands, entity, node_handle) {
+            if (entry.create_bundle_fn)(commands, entity, godot, node_handle) {
                 trace!(
                     "Added bundle for {} to entity {:?}",
                     entry.godot_class_name, entity

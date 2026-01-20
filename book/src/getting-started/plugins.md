@@ -26,11 +26,12 @@ All other features must be explicitly added as plugins.
     - `GodotAssetsPlugin`: Godot resource loading through Bevy's asset system
     - `GodotTransformSyncPlugin`: Transform synchronization
     - `GodotCollisionsPlugin`: Collision detection
-    - `GodotSignalsPlugin`: Signal to event bridge
     - `BevyInputBridgePlugin`: Bevy input API support
     - `GodotAudioPlugin`: Audio system
     - `GodotPackedScenePlugin`: Runtime scene spawning
     - `GodotBevyLogPlugin`: Unify/improve bevy and godot logging such that `info!`, `debug!`, etc log messages are visible in the Godot Editor
+
+Typed signals are opt-in per message type using `GodotTypedSignalsPlugin::<T>`.
 
 ## Available Plugins
 
@@ -70,13 +71,13 @@ All other features must be explicitly added as plugins.
 - **`GodotCollisionsPlugin`**: Collision detection
 
   - Monitors Area2D/3D and RigidBody2D/3D collision signals
-  - Provides `Collisions` component with entered/exited tracking
-  - Converts Godot collision signals to queryable data
+  - Provides `Collisions` system param for querying collision state
+  - Provides `CollisionStarted` / `CollisionEnded` events (messages + observers)
 
-- **`GodotSignalsPlugin`**: Signal event bridge
+- **`GodotTypedSignalsPlugin<T>`**: Typed signal bridge
 
-  - Converts Godot signals to Bevy events
-  - Use `MessageReader<GodotSignal>` to handle signals
+  - Add one plugin per message type you want to emit
+  - Use `TypedGodotSignals<T>` to connect signals
   - Essential for UI interactions (button clicks, etc.)
 
 - **`GodotInputEventPlugin`**: Raw input events
@@ -177,7 +178,7 @@ fn build_app(app: &mut App) {
             sync_mode: TransformSyncMode::Disabled,  // Use Godot physics
         })
         .add_plugins(GodotCollisionsPlugin)         // Detect collisions
-        .add_plugins(GodotSignalsPlugin)            // Handle signals
+        .add_plugins(GodotTypedSignalsPlugin::<UiSignal>::default()) // Handle signals
         .add_plugins(GodotAudioPlugin);             // Play sounds
 }
 ```
@@ -187,7 +188,7 @@ fn build_app(app: &mut App) {
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotSignalsPlugin)            // Button clicks, etc.
+    app.add_plugins(GodotTypedSignalsPlugin::<UiSignal>::default()) // Button clicks, etc.
         .add_plugins(BevyInputBridgePlugin)        // Keyboard shortcuts
         .add_plugins(GodotAudioPlugin);            // UI sounds
     // Don't need transform sync for UI
@@ -236,7 +237,7 @@ Some plugins automatically include their dependencies:
 1. **Do I want to load Godot resources through Bevy's asset system?** → Add `GodotAssetsPlugin`
 2. **Do I want to move/position nodes from Bevy?** → Add `GodotTransformSyncPlugin`
 3. **Do I want to play sounds and music?** → Add `GodotAudioPlugin`
-4. **Do I want to respond to UI signals?** → Add `GodotSignalsPlugin`
+4. **Do I want to respond to UI signals?** → Add `GodotTypedSignalsPlugin::<YourMessage>`
 5. **Do I want to detect collisions?** → Add `GodotCollisionsPlugin`
 6. **Do I want to handle input?** → Add `BevyInputBridgePlugin` or `GodotInputEventPlugin`
 7. **Do I want to spawn scenes at runtime?** → Add `GodotPackedScenePlugin`

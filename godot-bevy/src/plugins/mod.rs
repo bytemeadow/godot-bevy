@@ -26,7 +26,6 @@ pub use godot_bevy_logger::GodotBevyLogPlugin;
 pub use input::{BevyInputBridgePlugin, GodotInputEventPlugin};
 pub use packed_scene::GodotPackedScenePlugin;
 pub use scene_tree::GodotSceneTreePlugin;
-pub use signals::GodotSignalsPlugin;
 pub use transforms::GodotTransformSyncPlugin;
 
 // Re-export for backwards compatibility
@@ -47,7 +46,6 @@ plugin_group! {
     pub struct GodotDefaultPlugins {
         :GodotAssetsPlugin,
         :GodotCollisionsPlugin,
-        :GodotSignalsPlugin,
         :BevyInputBridgePlugin,
         :GodotAudioPlugin,
         :GodotPackedScenePlugin,

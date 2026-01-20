@@ -2,14 +2,14 @@ use crate::{
     GameState,
     level_manager::{LevelId, LoadLevelMessage},
 };
-use bevy::prelude::Message;
 use bevy::{
     app::prelude::*,
     ecs::{
-        message::{MessageReader, MessageWriter},
+        event::Event,
+        observer::On,
         resource::Resource,
         schedule::IntoScheduleConfigs,
-        system::{Res, ResMut},
+        system::{Commands, Res, ResMut},
     },
     log::{debug, info},
     state::{
@@ -18,7 +18,6 @@ use bevy::{
     },
 };
 use godot::classes::{Button, DisplayServer, display_server::WindowMode};
-use godot::obj::Singleton;
 use godot_bevy::prelude::*;
 
 #[derive(Resource, Default)]
@@ -34,20 +33,23 @@ pub struct MainMenuPlugin;
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuAssets>()
-            // Enable typed signal routing for our menu events
-            .add_plugins(GodotTypedSignalsPlugin::<StartGameRequested>::default())
-            .add_plugins(GodotTypedSignalsPlugin::<ToggleFullscreenRequested>::default())
-            .add_plugins(GodotTypedSignalsPlugin::<QuitRequested>::default())
+            // Enable signal routing for our menu events
+            .add_plugins(GodotSignalsPlugin::<StartGameRequested>::default())
+            .add_plugins(GodotSignalsPlugin::<ToggleFullscreenRequested>::default())
+            .add_plugins(GodotSignalsPlugin::<QuitRequested>::default())
             .add_systems(OnEnter(GameState::MainMenu), reset_menu_assets)
             .add_systems(
                 Update,
                 (
                     init_menu_assets.run_if(menu_not_initialized),
                     connect_buttons.run_if(menu_initialized_but_signals_not_connected),
-                    listen_for_button_press.run_if(menu_is_initialized),
                 )
                     .run_if(in_state(GameState::MainMenu)),
-            );
+            )
+            // Use observers for button press handling
+            .add_observer(on_start_game)
+            .add_observer(on_toggle_fullscreen)
+            .add_observer(on_quit);
     }
 }
 
@@ -71,7 +73,6 @@ fn reset_menu_assets(mut menu_assets: ResMut<MenuAssets>) {
     menu_assets.signals_connected = false;
 }
 
-#[main_thread_system]
 fn init_menu_assets(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTreeRef) {
     // Try to find menu nodes, but handle failure gracefully
     if let Some(root) = scene_tree.get().get_root() {
@@ -79,9 +80,9 @@ fn init_menu_assets(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTr
         match MenuUi::from_node(root) {
             Ok(menu_ui) => {
                 info!("MainMenu: Successfully found menu nodes");
-                menu_assets.start_button = Some(menu_ui.start_button.clone());
-                menu_assets.fullscreen_button = Some(menu_ui.fullscreen_button.clone());
-                menu_assets.quit_button = Some(menu_ui.quit_button.clone());
+                menu_assets.start_button = Some(menu_ui.start_button);
+                menu_assets.fullscreen_button = Some(menu_ui.fullscreen_button);
+                menu_assets.quit_button = Some(menu_ui.quit_button);
                 menu_assets.initialized = true;
             }
             Err(_) => {
@@ -101,18 +102,14 @@ fn menu_initialized_but_signals_not_connected(menu_assets: Res<MenuAssets>) -> b
     menu_assets.initialized && !menu_assets.signals_connected
 }
 
-fn menu_is_initialized(menu_assets: Res<MenuAssets>) -> bool {
-    menu_assets.initialized
-}
-
 // Typed events for menu actions
-#[derive(Message, Debug, Clone)]
+#[derive(Event, Debug, Clone)]
 struct StartGameRequested;
 
-#[derive(Message, Debug, Clone)]
+#[derive(Event, Debug, Clone)]
 struct ToggleFullscreenRequested;
 
-#[derive(Message, Debug, Clone)]
+#[derive(Event, Debug, Clone)]
 struct QuitRequested {
     source: GodotNodeHandle,
 }
@@ -120,9 +117,9 @@ struct QuitRequested {
 fn connect_buttons(
     mut menu_assets: ResMut<MenuAssets>,
     // Typed bridges for precise events
-    typed_start: TypedGodotSignals<StartGameRequested>,
-    typed_fullscreen: TypedGodotSignals<ToggleFullscreenRequested>,
-    typed_quit: TypedGodotSignals<QuitRequested>,
+    signals_start: GodotSignals<StartGameRequested>,
+    signals_fullscreen: GodotSignals<ToggleFullscreenRequested>,
+    signals_quit: GodotSignals<QuitRequested>,
 ) {
     // Check if all buttons are available first
     if menu_assets.start_button.is_some()
@@ -130,21 +127,28 @@ fn connect_buttons(
         && menu_assets.quit_button.is_some()
         && !menu_assets.signals_connected
     {
-        // Get mutable references one at a time to avoid multiple borrows
-        if let Some(start_btn) = menu_assets.start_button.as_mut() {
-            typed_start.connect_map(start_btn, "pressed", None, |_args, _node, _ent| {
-                Some(StartGameRequested)
-            });
+        if let Some(start_handle) = menu_assets.start_button {
+            signals_start.connect(
+                start_handle,
+                "pressed",
+                None,
+                |_args, _node_handle, _ent| Some(StartGameRequested),
+            );
         }
-        if let Some(fullscreen_btn) = menu_assets.fullscreen_button.as_mut() {
-            typed_fullscreen.connect_map(fullscreen_btn, "pressed", None, |_args, _node, _ent| {
-                Some(ToggleFullscreenRequested)
-            });
+
+        if let Some(fullscreen_handle) = menu_assets.fullscreen_button {
+            signals_fullscreen.connect(
+                fullscreen_handle,
+                "pressed",
+                None,
+                |_args, _node_handle, _ent| Some(ToggleFullscreenRequested),
+            );
         }
-        if let Some(quit_btn) = menu_assets.quit_button.as_mut() {
-            typed_quit.connect_map(quit_btn, "pressed", None, |_args, node, _ent| {
+
+        if let Some(quit_handle) = menu_assets.quit_button {
+            signals_quit.connect(quit_handle, "pressed", None, |_args, node_handle, _ent| {
                 Some(QuitRequested {
-                    source: node.clone(),
+                    source: node_handle,
                 })
             });
         }
@@ -154,38 +158,55 @@ fn connect_buttons(
     }
 }
 
-#[main_thread_system]
-fn listen_for_button_press(
-    _menu_assets: Res<MenuAssets>,
-    mut start_ev: MessageReader<StartGameRequested>,
-    mut toggle_ev: MessageReader<ToggleFullscreenRequested>,
-    mut quit_ev: MessageReader<QuitRequested>,
+fn on_start_game(
+    _trigger: On<StartGameRequested>,
+    state: Res<bevy::state::state::State<GameState>>,
     mut app_state: ResMut<NextState<GameState>>,
-    mut level_load_events: MessageWriter<LoadLevelMessage>,
+    mut commands: Commands,
 ) {
-    for _ in start_ev.read() {
-        println!("Start button pressed (typed)");
-        app_state.set(GameState::InGame);
-        level_load_events.write(LoadLevelMessage {
-            level_id: LevelId::Level1,
-        });
+    // Only respond when in MainMenu state
+    if *state.get() != GameState::MainMenu {
+        return;
     }
+    println!("Start button pressed (typed)");
+    app_state.set(GameState::InGame);
+    commands.trigger(LoadLevelMessage {
+        level_id: LevelId::Level1,
+    });
+}
 
-    for _ in toggle_ev.read() {
-        println!("Fullscreen button pressed (typed)");
-        if DisplayServer::singleton().window_get_mode() == WindowMode::FULLSCREEN {
-            DisplayServer::singleton().window_set_mode(WindowMode::WINDOWED);
-        } else if DisplayServer::singleton().window_get_mode() == WindowMode::WINDOWED {
-            DisplayServer::singleton().window_set_mode(WindowMode::FULLSCREEN);
-        }
+fn on_toggle_fullscreen(
+    _trigger: On<ToggleFullscreenRequested>,
+    state: Res<bevy::state::state::State<GameState>>,
+    mut godot: GodotAccess,
+) {
+    // Only respond when in MainMenu state
+    if *state.get() != GameState::MainMenu {
+        return;
     }
+    println!("Fullscreen button pressed (typed)");
+    let mut display_server = godot.singleton::<DisplayServer>();
+    let window_mode = display_server.window_get_mode();
+    if window_mode == WindowMode::FULLSCREEN {
+        display_server.window_set_mode(WindowMode::WINDOWED);
+    } else if window_mode == WindowMode::WINDOWED {
+        display_server.window_set_mode(WindowMode::FULLSCREEN);
+    }
+}
 
-    for ev in quit_ev.read() {
-        println!("Quit button pressed (typed)");
-        if let Some(button) = ev.source.clone().try_get::<Button>()
-            && let Some(mut tree) = button.get_tree()
-        {
-            tree.quit();
-        }
+fn on_quit(
+    trigger: On<QuitRequested>,
+    state: Res<bevy::state::state::State<GameState>>,
+    mut godot: GodotAccess,
+) {
+    // Only respond when in MainMenu state
+    if *state.get() != GameState::MainMenu {
+        return;
+    }
+    println!("Quit button pressed (typed)");
+    if let Some(button) = godot.try_get::<Button>(trigger.event().source)
+        && let Some(mut tree) = button.get_tree()
+    {
+        tree.quit();
     }
 }

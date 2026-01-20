@@ -1,7 +1,6 @@
 use crate::gameplay::audio::GameSfxChannel;
 use crate::{GameState, commands::AnimationState};
 use bevy::math::{Vec3Swizzles, vec3};
-use bevy::prelude::Message;
 use bevy::transform::components::Transform;
 use bevy::{
     app::{App, Plugin, Update},
@@ -9,8 +8,9 @@ use bevy::{
     ecs::{
         component::Component,
         entity::Entity,
-        message::MessageReader,
+        event::Event,
         name::Name,
+        observer::On,
         query::Added,
         resource::Resource,
         schedule::IntoScheduleConfigs,
@@ -29,8 +29,8 @@ use godot_bevy::interop::VisibleOnScreenNotifier2DSignals;
 use godot_bevy::{
     interop::GodotNodeHandle,
     prelude::{
-        AudioChannel, FindEntityByNameExt, GodotResource, GodotScene, GodotTypedSignalsPlugin,
-        NodeTreeView, main_thread_system,
+        AudioChannel, FindEntityByNameExt, GodotAccess, GodotResource, GodotScene,
+        GodotSignalsPlugin, NodeTreeView,
     },
 };
 use std::f32::consts::PI;
@@ -49,12 +49,14 @@ pub struct MobPlugin;
 impl Plugin for MobPlugin {
     fn build(&self, app: &mut App) {
         app
-            // enable typed signal routing for mob screen exit
-            .add_plugins(GodotTypedSignalsPlugin::<MobScreenExited>::default())
+            // enable signal routing for mob screen exit
+            .add_plugins(GodotSignalsPlugin::<MobScreenExited>::default())
             .add_systems(
                 Update,
-                (spawn_mob, new_mob, kill_mob).run_if(in_state(GameState::InGame)),
+                (spawn_mob, new_mob).run_if(in_state(GameState::InGame)),
             )
+            // Use observer for mob screen exit
+            .add_observer(on_mob_screen_exited)
             .insert_resource(MobSpawnTimer(Timer::from_seconds(
                 0.5,
                 TimerMode::Repeating,
@@ -70,13 +72,13 @@ pub struct Mob {
 #[derive(Resource)]
 pub struct MobSpawnTimer(Timer);
 
-#[main_thread_system]
 fn spawn_mob(
     mut commands: Commands,
     time: Res<Time>,
     mut timer: ResMut<MobSpawnTimer>,
-    mut entities: Query<(&Name, &mut GodotNodeHandle)>,
+    entities: Query<(&Name, &GodotNodeHandle)>,
     assets: Res<MobAssets>,
+    mut godot: GodotAccess,
 ) {
     timer.0.tick(time.delta());
     if !timer.0.just_finished() {
@@ -84,12 +86,12 @@ fn spawn_mob(
     }
 
     // Choose a random location on Path2D - still needs main thread access
-    let mut mob_spawn_location = entities
-        .iter_mut()
+    let mob_spawn_handle = entities
+        .iter()
         .find_entity_by_name("MobSpawnLocation")
         .unwrap();
 
-    let mut mob_spawn_location = mob_spawn_location.get::<PathFollow2D>();
+    let mut mob_spawn_location = godot.get::<PathFollow2D>(*mob_spawn_handle);
     mob_spawn_location.set_progress_ratio(fastrand::f32());
 
     // Set the mob's direction perpendicular to the path direction.
@@ -110,7 +112,7 @@ fn spawn_mob(
             GodotScene::from_handle(assets.mob_scn.clone()).with_signal_connection(
                 MobNodes::VISIBILITY_NOTIFIER_PATH,
                 VisibleOnScreenNotifier2DSignals::SCREEN_EXITED,
-                |_args, _handle, entity| {
+                |_args, _node_handle, entity| {
                     Some(MobScreenExited {
                         entity: entity.expect("entity was provided"),
                     })
@@ -129,21 +131,21 @@ pub struct MobNodes {
     _visibility_notifier: GodotNodeHandle,
 }
 
-#[main_thread_system]
 fn new_mob(
-    mut entities: Query<(&Mob, &Transform, &mut GodotNodeHandle, &mut AnimationState), Added<Mob>>,
+    mut entities: Query<(&Mob, &Transform, &GodotNodeHandle, &mut AnimationState), Added<Mob>>,
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
     assets: Res<MobAssets>,
+    mut godot: GodotAccess,
 ) {
-    for (mob_data, transform, mut mob, mut anim_state) in entities.iter_mut() {
-        let mut mob = mob.get::<RigidBody2D>();
+    for (mob_data, transform, mob_handle, mut anim_state) in entities.iter_mut() {
+        let mut mob = godot.get::<RigidBody2D>(*mob_handle);
 
         let velocity = Vector2::new(fastrand::f32() * 100.0 + 150.0, 0.0);
         mob.set_linear_velocity(velocity.rotated(mob_data.direction));
 
-        let mut mob_nodes = MobNodes::from_node(mob).unwrap();
+        let mob_nodes = MobNodes::from_node(mob).unwrap();
 
-        let animated_sprite = mob_nodes.animated_sprite.get::<AnimatedSprite2D>();
+        let animated_sprite = godot.get::<AnimatedSprite2D>(mob_nodes.animated_sprite);
 
         let mob_types = animated_sprite
             .get_sprite_frames()
@@ -171,13 +173,12 @@ fn new_mob(
     }
 }
 
-#[derive(Message, Debug, Clone, Copy)]
+#[derive(Event, Debug, Clone, Copy)]
 struct MobScreenExited {
     entity: Entity,
 }
 
-fn kill_mob(mut commands: Commands, mut events: MessageReader<MobScreenExited>) {
-    for ev in events.read() {
-        commands.entity(ev.entity).despawn();
-    }
+fn on_mob_screen_exited(trigger: On<MobScreenExited>, mut commands: Commands) {
+    let entity = trigger.event().entity;
+    commands.entity(entity).despawn();
 }

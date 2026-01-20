@@ -4,16 +4,15 @@ use crate::plugins::{
     core::{PhysicsDelta, PhysicsUpdate},
     input::InputEventReader,
     scene_tree::SceneTreeMessageReader,
-    signals::{GodotSignalReader, GodotSignalSender},
 };
 use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
 use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
 use bevy_app::{App, PluginsState};
 use bevy_ecs::message::Messages;
+use crossbeam_channel::unbounded;
 use godot::prelude::*;
 use std::sync::OnceLock;
-use std::sync::mpsc::channel;
 
 // Stores the client's entrypoint (the function they decorated with the `#[bevy_app]` macro) at runtime
 pub static BEVY_INIT_FUNC: OnceLock<Box<dyn Fn(&mut App) + Send + Sync>> = OnceLock::new();
@@ -59,24 +58,16 @@ impl BevyApp {
             return;
         }
 
-        let (sender, receiver) = channel();
+        let (sender, receiver) = unbounded();
         let mut scene_tree_watcher = SceneTreeWatcher::new_alloc();
         scene_tree_watcher.bind_mut().notification_channel = Some(sender);
         scene_tree_watcher.set_name("SceneTreeWatcher");
         self.base_mut().add_child(&scene_tree_watcher);
-        app.insert_non_send_resource(SceneTreeMessageReader(receiver));
-    }
-
-    fn register_signal_system(&mut self, app: &mut App) {
-        let (sender, receiver) = channel();
-        // Create channel for Godot signals and insert as resources
-        // Signals are connected directly using closures in the signals module
-        app.insert_non_send_resource(GodotSignalSender(sender));
-        app.insert_non_send_resource(GodotSignalReader(receiver));
+        app.insert_resource(SceneTreeMessageReader::new(receiver));
     }
 
     fn register_input_event_watcher(&mut self, app: &mut App) {
-        let (sender, receiver) = channel();
+        let (sender, receiver) = unbounded();
         let mut input_event_watcher = GodotInputWatcher::new_alloc();
         input_event_watcher.bind_mut().notification_channel = Some(sender);
         input_event_watcher.set_name("InputEventWatcher");
@@ -90,12 +81,12 @@ impl BevyApp {
             return;
         }
 
-        let (sender, receiver) = channel();
+        let (sender, receiver) = unbounded();
         let mut collision_watcher = CollisionWatcher::new_alloc();
         collision_watcher.bind_mut().notification_channel = Some(sender);
         collision_watcher.set_name("CollisionWatcher");
         self.base_mut().add_child(&collision_watcher);
-        app.insert_non_send_resource(CollisionMessageReader(receiver));
+        app.insert_resource(CollisionMessageReader::new(receiver));
     }
 
     fn register_optimized_scene_tree_watcher(&mut self) {
@@ -126,6 +117,9 @@ impl BevyApp {
         }
     }
 
+    /// Register the OptimizedBulkOperations GDScript node as a child.
+    /// This is called early (before app creation) so benchmarks can use it.
+    #[cfg(debug_assertions)]
     fn register_optimized_bulk_operations(&mut self) {
         // Check if OptimizedBulkOperations already exists (e.g., loaded from tscn)
         if self.base().has_node("OptimizedBulkOperations") {
@@ -157,6 +151,25 @@ impl BevyApp {
             tracing::debug!("OptimizedBulkOperations not available");
         }
     }
+
+    /// Cache the OptimizedBulkOperations node reference in the Bevy app.
+    /// This avoids repeated scene tree lookups every frame.
+    #[cfg(debug_assertions)]
+    fn cache_bulk_operations(&self, app: &mut App) {
+        use crate::interop::BulkOperationsCache;
+
+        if let Some(node) = self
+            .base()
+            .get_node_or_null("OptimizedBulkOperations")
+            .map(|n| n.upcast::<godot::classes::Object>())
+        {
+            app.insert_non_send_resource(BulkOperationsCache::new(node));
+            tracing::debug!("Cached OptimizedBulkOperations node reference");
+        } else {
+            // Initialize empty cache so systems don't need to check for resource existence
+            app.init_non_send_resource::<BulkOperationsCache>();
+        }
+    }
 }
 
 #[godot_api]
@@ -179,6 +192,10 @@ impl INode for BevyApp {
         // This is done before the init check so benchmarks can use it without a full Bevy app
         #[cfg(debug_assertions)]
         self.register_optimized_bulk_operations();
+
+        // Register the optimized scene tree watcher early (before init check)
+        // This allows benchmarks and tools to use the watcher even without a full Bevy app
+        self.register_optimized_scene_tree_watcher();
 
         // If no init function is provided, don't initialize the Bevy app.
         // This allows the node to exist purely for GDScript utility methods (e.g., bulk transforms)
@@ -222,18 +239,12 @@ impl INode for BevyApp {
         }
 
         // Collision plugin check - similar approach
-        use crate::plugins::collisions::CollisionMessage;
+        use crate::plugins::collisions::CollisionStarted;
         if app
             .world()
-            .contains_resource::<Messages<CollisionMessage>>()
+            .contains_resource::<Messages<CollisionStarted>>()
         {
             self.register_collision_watcher(&mut app);
-        }
-
-        // Signal plugin check
-        use crate::plugins::signals::GodotSignal;
-        if app.world().contains_resource::<Messages<GodotSignal>>() {
-            self.register_signal_system(&mut app);
         }
 
         // Input event plugin check - check for KeyboardInput as a marker
@@ -241,6 +252,10 @@ impl INode for BevyApp {
         if app.world().contains_resource::<Messages<KeyboardInput>>() {
             self.register_input_event_watcher(&mut app);
         }
+
+        // Cache bulk operations node reference for efficient access in debug builds
+        #[cfg(debug_assertions)]
+        self.cache_bulk_operations(&mut app);
 
         // Finalize plugins - PreStartup systems will now find the watchers
         if app.plugins_state() != PluginsState::Cleaned {

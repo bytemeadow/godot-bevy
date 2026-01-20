@@ -132,10 +132,11 @@ pub struct PlayerNode {
 
 // Query using both the base class marker and your component
 fn update_player_bodies(
-    players: Query<&GodotNodeHandle, (With<CharacterBody2DMarker>, With<Player>)>
+    players: Query<&GodotNodeHandle, (With<CharacterBody2DMarker>, With<Player>)>,
+    mut godot: GodotAccess,
 ) {
     for handle in players.iter() {
-        let mut body = handle.get::<CharacterBody2D>();
+        let mut body = godot.get::<CharacterBody2D>(*handle);
         body.move_and_slide();
     }
 }

@@ -1,15 +1,14 @@
 use super::scene_tree::SceneTreeRef;
+use crate::interop::{GodotAccess, GodotNodeHandle};
 use crate::plugins::assets::GodotResource;
 use crate::plugins::signals::{
-    DeferredSignalConnection, GlobalTypedSignalSender, SignalConnectionSpec,
-    TypedDeferredSignalConnections,
+    DeferredSignalConnectionTrait, DeferredSignalConnections, SignalConnectionSpec, SignalSender,
 };
+use crate::plugins::transforms::IntoGodotTransform;
 use crate::plugins::transforms::IntoGodotTransform2D;
-use crate::prelude::main_thread_system;
-use crate::{interop::GodotNodeHandle, plugins::transforms::IntoGodotTransform};
 use bevy_app::{App, Plugin, PostUpdate};
 use bevy_asset::{Assets, Handle};
-use bevy_ecs::message::Message;
+use bevy_ecs::event::Event;
 use bevy_ecs::system::NonSend;
 use bevy_ecs::{
     component::Component,
@@ -18,12 +17,13 @@ use bevy_ecs::{
     system::{Commands, Query, ResMut},
 };
 use bevy_transform::components::Transform;
+use godot::obj::Gd;
 use godot::prelude::Variant;
 use godot::{
     builtin::GString,
     classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader},
-    obj::Singleton,
 };
+use std::collections::HashMap;
 use std::str::FromStr;
 use tracing::error;
 
@@ -46,7 +46,7 @@ impl Plugin for GodotPackedScenePlugin {
 pub struct GodotScene {
     resource: GodotSceneResource,
     parent: Option<GodotNodeHandle>,
-    deferred_signal_connections: Vec<Box<dyn DeferredSignalConnection>>,
+    deferred_signal_connections: Vec<Box<dyn DeferredSignalConnectionTrait>>,
 }
 
 #[derive(Debug)]
@@ -85,35 +85,36 @@ impl GodotScene {
         self
     }
 
-    /// Connect a typed Godot signal from a child node to a Bevy `Message`.
-    /// The signal will be connected when the scene is spawned.
+    /// Connect a Godot signal from a child node to trigger a Bevy event.
+    /// The signal will be connected when the scene is spawned, and observers
+    /// will be triggered when the signal fires.
     ///
     /// # Requirements
-    /// This method requires [`GodotTypedSignalsPlugin<T>`] to be added to your app for the
-    /// message type `T` you're using. If the plugin is not added, the signal connections
+    /// This method requires [`GodotSignalsPlugin<T>`] to be added to your app for the
+    /// event type `T` you're using. If the plugin is not added, the signal connections
     /// will be ignored and an error will be logged at runtime.
     ///
     /// # Arguments
     /// * `node_path` - Path relative to the scene root (e.g., "VBox/MyButton" or "." for root node).
     ///   Argument supports the same syntax as [Node.get_node](https://docs.godotengine.org/en/stable/classes/class_node.html#class-node-method-get-node).
     /// * `signal_name` - Name of the Godot signal to connect (e.g., "pressed").
-    /// * `mapper` - Closure that maps signal arguments to your typed message.
+    /// * `mapper` - Closure that maps signal arguments to your event type.
     ///   * The closure receives three arguments: `args`, `node_handle`, and `entity`:
     ///     - `args: &[Variant]`: raw Godot arguments (clone if you need detailed parsing).
-    ///     - `node_handle: &GodotNodeHandle`: emitting node; clone into your event if useful.
+    ///     - `node_handle: GodotNodeHandle`: emitting node handle.
     ///     - `entity: Option<Entity>`: Bevy entity the GodotScene component is attached to (Always Some).
-    ///   * The closure returns an optional Bevy Message, or None to not send the message.
+    ///   * The closure returns an optional event, or None to skip triggering.
     ///
     /// # Example
     /// ```ignore
     /// let scene: Handle<GodotResource> = ...;
     /// let entity = world.spawn_empty();
     /// entity.insert(
-    ///     GodotScene::from_handle(scene).with_signal_connection::<MyMessage>(
+    ///     GodotScene::from_handle(scene).with_signal_connection::<MyEvent>(
     ///         "VBox/MyButton",
     ///         "pressed",
-    ///         |args, _node, _entity| {
-    ///             Some(MyMessage::from_args(args))
+    ///         |args, _node_id, _entity| {
+    ///             Some(MyEvent::from_args(args))
     ///         }
     ///     )
     /// );
@@ -125,49 +126,74 @@ impl GodotScene {
         mapper: F,
     ) -> Self
     where
-        T: Message + Send + std::fmt::Debug + 'static,
-        F: Fn(&[Variant], &GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
+        T: Event + Clone + Send + std::fmt::Debug + 'static,
+        for<'a> T::Trigger<'a>: Default,
+        F: Fn(&[Variant], GodotNodeHandle, Option<Entity>) -> Option<T> + Send + Sync + 'static,
     {
         self.deferred_signal_connections
             .push(Box::new(SignalConnectionSpec {
                 node_path: node_path.to_string(),
                 signal_name: signal_name.to_string(),
-                connections: TypedDeferredSignalConnections::<T>::with_connection(
-                    signal_name,
-                    mapper,
-                ),
+                connections: DeferredSignalConnections::<T>::with_connection(signal_name, mapper),
             }));
         self
     }
 }
 
-#[main_thread_system]
 fn spawn_scene(
     mut commands: Commands,
     mut new_scenes: Query<(&mut GodotScene, Entity, Option<&Transform>), Without<GodotNodeHandle>>,
     mut scene_tree: SceneTreeRef,
     mut assets: ResMut<Assets<GodotResource>>,
-    typed_message_sender: Option<NonSend<GlobalTypedSignalSender>>,
+    signal_sender: Option<NonSend<SignalSender>>,
+    mut godot: GodotAccess,
 ) {
+    // Build a per-frame cache for path-based scene loading.
+    // This avoids repeated ResourceLoader.load() calls when spawning multiple
+    // instances of the same scene in a single frame (~22x faster).
+    let mut local_cache: HashMap<String, Gd<PackedScene>> = HashMap::new();
+
     for (mut scene, ent, transform) in new_scenes.iter_mut() {
-        let packed_scene = match &scene.resource {
-            GodotSceneResource::Handle(handle) => assets
-                .get_mut(handle)
-                .expect("packed scene to exist in assets")
-                .get()
-                .clone(),
-            GodotSceneResource::Path(path) => ResourceLoader::singleton()
-                .load(&GString::from_str(path).expect("path to be a valid GString"))
-                .expect("packed scene to load"),
+        let packed_scene: Gd<PackedScene> = match &scene.resource {
+            GodotSceneResource::Handle(handle) => {
+                let resource = assets
+                    .get_mut(handle)
+                    .expect("packed scene to exist in assets")
+                    .get()
+                    .clone();
+                match resource.try_cast::<PackedScene>() {
+                    Ok(ps) => ps,
+                    Err(resource) => {
+                        error!("Resource is not a PackedScene: {:?}", resource);
+                        continue;
+                    }
+                }
+            }
+            GodotSceneResource::Path(path) => {
+                // Use cached resource if available, otherwise load and cache
+                if let Some(cached) = local_cache.get(path) {
+                    cached.clone()
+                } else {
+                    let resource = godot
+                        .singleton::<ResourceLoader>()
+                        .load(
+                            &GString::from_str(path.as_str()).expect("path to be a valid GString"),
+                        )
+                        .expect("packed scene to load");
+
+                    match resource.try_cast::<PackedScene>() {
+                        Ok(ps) => {
+                            local_cache.insert(path.clone(), ps.clone());
+                            ps
+                        }
+                        Err(resource) => {
+                            error!("Resource is not a PackedScene: {:?}", resource);
+                            continue;
+                        }
+                    }
+                }
+            }
         };
-
-        let packed_scene_cast = packed_scene.clone().try_cast::<PackedScene>();
-        if packed_scene_cast.is_err() {
-            error!("Resource is not a PackedScene: {:?}", packed_scene);
-            continue;
-        }
-
-        let packed_scene = packed_scene_cast.unwrap();
 
         let instance = match packed_scene.instantiate() {
             Some(instance) => instance,
@@ -191,22 +217,22 @@ fn spawn_scene(
 
         // Connect signals (only if typed signals plugin is available)
         if !scene.deferred_signal_connections.is_empty() {
-            if let Some(ref sender) = typed_message_sender {
+            if let Some(ref sender) = signal_sender {
                 for deferred_connection in scene.deferred_signal_connections.drain(..) {
                     deferred_connection.connect(&instance, ent, sender);
                 }
             } else {
                 error!(
-                    "GodotScene has signal connections but GodotTypedSignalsPlugin is not added. \
-                     Add GodotTypedSignalsPlugin<YourMessageType> to enable signal connections."
+                    "GodotScene has signal connections but GodotSignalsPlugin is not added. \
+                     Add GodotSignalsPlugin<YourEventType> to enable signal connections."
                 );
                 scene.deferred_signal_connections.clear();
             }
         }
 
-        match &mut scene.parent {
-            Some(parent) => {
-                let mut parent = parent.get::<Node>();
+        match scene.parent {
+            Some(parent_id) => {
+                let mut parent = godot.get::<Node>(parent_id);
                 parent.add_child(&instance);
             }
             None => {

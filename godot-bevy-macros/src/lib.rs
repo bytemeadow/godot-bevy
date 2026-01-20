@@ -8,37 +8,6 @@ use quote::quote;
 use syn::parse::Parser;
 use syn::{DeriveInput, Error, parse_macro_input};
 
-/// Attribute macro that ensures a system runs on the main thread by adding a `NonSend<MainThreadMarker>` parameter.
-/// This is required for systems that need to access Godot APIs.
-#[proc_macro_attribute]
-pub fn main_thread_system(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let mut input_fn = parse_macro_input!(item as syn::ItemFn);
-    let fn_name = &input_fn.sig.ident;
-
-    // Create a unique type alias name for this function
-    let type_alias_name = syn::Ident::new(
-        &format!("__MainThreadSystemMarker_{fn_name}"),
-        fn_name.span(),
-    );
-
-    // Add a NonSend resource parameter that forces main thread execution
-    // Use godot_bevy::bevy_ecs:: so the path resolves for users who only depend on godot-bevy
-    let main_thread_param: syn::FnArg = syn::parse_quote! {
-        _main_thread: godot_bevy::bevy_ecs::system::NonSend<#type_alias_name>
-    };
-    input_fn.sig.inputs.push(main_thread_param);
-
-    // Return the modified function with a unique type alias
-    let expanded = quote! {
-        #[allow(non_camel_case_types)]
-        type #type_alias_name = godot_bevy::plugins::core::MainThreadMarker;
-
-        #input_fn
-    };
-
-    expanded.into()
-}
-
 #[proc_macro_attribute]
 pub fn bevy_app(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as syn::ItemFn);

@@ -41,9 +41,10 @@ When the scene tree is parsed, each Godot node becomes a Bevy entity with these 
 - **`GodotNodeHandle`** - Reference to the Godot node
 - **`Name`** - The node's name from Godot
 - **`Groups`** - The node's group memberships
-- **`Collisions`** - If the node has collision signals
 - **Node type markers** - Components like `ButtonMarker`, `Sprite2DMarker`, etc.
 - **Custom bundles** - Components from `#[derive(BevyBundle)]` are automatically added
+
+For collision detection, use the `Collisions` system param and `CollisionStarted`/`CollisionEnded` events (requires `GodotCollisionsPlugin`).
 
 ## BevyBundle Component Timing
 

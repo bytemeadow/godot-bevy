@@ -1,23 +1,16 @@
-use bevy::prelude::Message;
 use bevy::{
-    app::{App, Plugin, Update},
+    app::{App, Plugin},
     ecs::{
-        message::{MessageReader, MessageWriter},
+        event::Event,
+        message::MessageWriter,
+        observer::On,
         resource::Resource,
         schedule::IntoScheduleConfigs,
-        system::ResMut,
+        system::{Res, ResMut},
     },
-    state::{
-        condition::in_state,
-        state::{NextState, OnEnter, OnExit},
-    },
+    state::state::{NextState, OnEnter, OnExit},
 };
-use godot_bevy::{
-    interop::GodotNodeHandle,
-    prelude::{
-        GodotTypedSignalsPlugin, NodeTreeView, SceneTreeRef, TypedGodotSignals, main_thread_system,
-    },
-};
+use godot_bevy::prelude::*;
 
 use crate::{
     GameState,
@@ -35,7 +28,7 @@ impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuAssets>()
             // enable typed signal routing for menu
-            .add_plugins(GodotTypedSignalsPlugin::<StartGameRequested>::default())
+            .add_plugins(GodotSignalsPlugin::<StartGameRequested>::default())
             .add_systems(
                 OnExit(GameState::Loading),
                 (
@@ -43,10 +36,8 @@ impl Plugin for MainMenuPlugin {
                     connect_start_button.after(init_menu_assets),
                 ),
             )
-            .add_systems(
-                Update,
-                listen_for_start_button.run_if(in_state(GameState::MainMenu)),
-            )
+            // Use observer instead of system with MessageReader
+            .add_observer(on_start_game_requested)
             .add_systems(OnExit(GameState::MainMenu), hide_play_button)
             .add_systems(OnEnter(GameState::MainMenu), show_play_button);
     }
@@ -64,7 +55,6 @@ pub struct MenuUi {
     pub score_label: GodotNodeHandle,
 }
 
-#[main_thread_system]
 fn init_menu_assets(
     mut menu_assets: ResMut<MenuAssets>,
     mut ui_handles: ResMut<UIHandles>,
@@ -72,36 +62,34 @@ fn init_menu_assets(
 ) {
     let menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap()).unwrap();
 
-    menu_assets.message_label = Some(menu_ui.message_label.clone());
-    menu_assets.start_button = Some(menu_ui.start_button.clone());
-    menu_assets.score_label = Some(menu_ui.score_label.clone());
+    menu_assets.message_label = Some(menu_ui.message_label);
+    menu_assets.start_button = Some(menu_ui.start_button);
+    menu_assets.score_label = Some(menu_ui.score_label);
 
     // Initialize UI handles for command system
-    ui_handles.start_button = Some(menu_ui.start_button.clone());
-    ui_handles.score_label = Some(menu_ui.score_label.clone());
-    ui_handles.message_label = Some(menu_ui.message_label.clone());
+    ui_handles.start_button = Some(menu_ui.start_button);
+    ui_handles.score_label = Some(menu_ui.score_label);
+    ui_handles.message_label = Some(menu_ui.message_label);
 }
 
-#[derive(Message, Debug, Clone)]
+#[derive(Event, Debug, Clone)]
 struct StartGameRequested;
 
-fn connect_start_button(
-    mut menu_assets: ResMut<MenuAssets>,
-    typed: TypedGodotSignals<StartGameRequested>,
-) {
-    typed.connect_map(
-        menu_assets.start_button.as_mut().unwrap(),
-        "pressed",
-        None,
-        |_args, _node, _ent| Some(StartGameRequested),
-    );
+fn connect_start_button(menu_assets: Res<MenuAssets>, signals: GodotSignals<StartGameRequested>) {
+    if let Some(handle) = menu_assets.start_button {
+        signals.connect(handle, "pressed", None, |_args, _node_handle, _ent| {
+            Some(StartGameRequested)
+        });
+    }
 }
 
-fn listen_for_start_button(
-    mut events: MessageReader<StartGameRequested>,
+fn on_start_game_requested(
+    _trigger: On<StartGameRequested>,
     mut app_state: ResMut<NextState<GameState>>,
+    state: Res<bevy::state::state::State<GameState>>,
 ) {
-    for _ in events.read() {
+    // Only respond when in MainMenu state
+    if *state.get() == GameState::MainMenu {
         app_state.set(GameState::Countdown);
     }
 }

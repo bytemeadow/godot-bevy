@@ -1,400 +1,642 @@
-use godot::builtin::{
-    Basis, PackedFloat32Array, PackedInt64Array, PackedVector2Array, PackedVector3Array,
-    PackedVector4Array, Quaternion, Transform2D, Transform3D,
-};
-use godot::classes::{Engine, InputEventKey, InputMap};
-use godot::global::Key;
-use godot::obj::{NewAlloc, NewGd};
+//! Benchmarks for godot-bevy systems
+//!
+//! These benchmarks test the actual godot-bevy systems rather than raw FFI overhead.
+//! They measure real-world performance of syncing transforms between Bevy and Godot.
+
+use crossbeam_channel as mpsc;
+use godot::classes::{Area3D, Engine, Node, Node2D, Node3D, SceneTree};
+use godot::obj::NewAlloc;
 use godot::prelude::*;
+use godot_bevy::bevy_app::{App, First, Last, PreUpdate};
+use godot_bevy::bevy_math::Vec3;
+use godot_bevy::bevy_transform::components::Transform as BevyTransform;
+use godot_bevy::interop::{GodotMainThread, GodotNodeHandle, Node2DMarker, Node3DMarker};
+use godot_bevy::plugins::core::SceneTreeComponentRegistry;
+use godot_bevy::plugins::scene_tree::{
+    GodotSceneTreePlugin, NodeEntityIndex, SceneTreeMessage, SceneTreeMessageReader,
+    SceneTreeMessageType,
+};
+use godot_bevy::plugins::transforms::{
+    GodotTransformSyncPlugin, GodotTransformSyncPluginExt, TransformSyncMetadata, TransformSyncMode,
+};
+use godot_bevy::watchers::collision_watcher::CollisionWatcher;
 use godot_bevy_test::bench;
 
-/// Helper to create a Transform3D from position, rotation (quaternion xyzw), and scale
-fn make_transform_3d(pos: Vector3, rot: Vector4, scale: Vector3) -> Transform3D {
-    let quat = Quaternion::new(rot.x, rot.y, rot.z, rot.w);
-    let rotation_basis = Basis::from_quaternion(quat);
-    let basis = Basis::from_cols(
-        rotation_basis.col_a() * scale.x,
-        rotation_basis.col_b() * scale.y,
-        rotation_basis.col_c() * scale.z,
-    );
-    Transform3D { basis, origin: pos }
+// =============================================================================
+// Transform Sync Benchmarks
+// =============================================================================
+// These benchmarks measure the performance of our transform synchronization
+// systems - the actual code that syncs transforms between Bevy ECS and Godot.
+
+const NODE_COUNT: usize = 1000;
+
+/// Creates a Bevy App configured with transform sync plugin and test entities.
+/// Returns the app and the Godot nodes (to keep them alive).
+fn setup_3d_benchmark_app() -> (App, Vec<Gd<Node3D>>) {
+    let mut app = App::new();
+
+    // Initialize schedules manually (avoid plugin duplication issues)
+    app.init_schedule(PreUpdate);
+    app.init_schedule(Last);
+
+    // Add transform sync plugin
+    app.add_plugins(GodotTransformSyncPlugin::default().with_sync_mode(TransformSyncMode::TwoWay));
+
+    // Insert the GodotMainThread resource (required for GodotAccess)
+    app.insert_non_send_resource(GodotMainThread);
+
+    let mut nodes: Vec<Gd<Node3D>> = Vec::with_capacity(NODE_COUNT);
+
+    for i in 0..NODE_COUNT {
+        let mut node = Node3D::new_alloc();
+        node.set_name(&format!("BenchNode3D_{i}"));
+        node.set_position(Vector3::new(i as f32, 0.0, 0.0));
+
+        let handle = GodotNodeHandle::new(node.clone());
+        let transform = BevyTransform::from_xyz(i as f32, 0.0, 0.0);
+
+        app.world_mut().spawn((
+            handle,
+            transform,
+            TransformSyncMetadata::default(),
+            Node3DMarker,
+        ));
+
+        nodes.push(node);
+    }
+
+    (app, nodes)
 }
 
-/// Helper to create a Transform2D from position, rotation (radians), and scale
-fn make_transform_2d(pos: Vector2, rotation: f32, scale: Vector2) -> Transform2D {
-    let cos_rot = rotation.cos();
-    let sin_rot = rotation.sin();
-    let a = Vector2::new(cos_rot * scale.x, sin_rot * scale.x);
-    let b = Vector2::new(-sin_rot * scale.y, cos_rot * scale.y);
-    Transform2D { a, b, origin: pos }
+/// Creates a Bevy App configured for 2D transform sync benchmarking.
+fn setup_2d_benchmark_app() -> (App, Vec<Gd<Node2D>>) {
+    let mut app = App::new();
+
+    // Initialize schedules manually (avoid plugin duplication issues)
+    app.init_schedule(PreUpdate);
+    app.init_schedule(Last);
+
+    // Add transform sync plugin
+    app.add_plugins(GodotTransformSyncPlugin::default().with_sync_mode(TransformSyncMode::TwoWay));
+    app.insert_non_send_resource(GodotMainThread);
+
+    let mut nodes: Vec<Gd<Node2D>> = Vec::with_capacity(NODE_COUNT);
+
+    for i in 0..NODE_COUNT {
+        let mut node = Node2D::new_alloc();
+        node.set_name(&format!("BenchNode2D_{i}"));
+        node.set_position(Vector2::new(i as f32, 0.0));
+
+        let handle = GodotNodeHandle::new(node.clone());
+        let transform = BevyTransform::from_xyz(i as f32, 0.0, 0.0);
+
+        app.world_mut().spawn((
+            handle,
+            transform,
+            TransformSyncMetadata::default(),
+            Node2DMarker,
+        ));
+
+        nodes.push(node);
+    }
+
+    (app, nodes)
 }
 
-const BENCH_ENTITY_COUNT: usize = 20000;
-const BENCH_ACTION_EVENT_COUNT: usize = 100;
+// =============================================================================
+// 3D Transform Sync Benchmarks
+// =============================================================================
 
-fn get_bulk_operations_node() -> Gd<Node> {
-    let scene_tree = Engine::singleton()
+/// Benchmark: Write transforms from Bevy to Godot (3D) using actual systems
+///
+/// This runs the real post_update_godot_transforms system that syncs
+/// Bevy transform changes to Godot nodes.
+#[bench(repeat = 3)]
+fn transform_sync_bevy_to_godot_3d() -> i32 {
+    let (mut app, nodes) = setup_3d_benchmark_app();
+
+    // Modify all Bevy transforms to trigger change detection
+    let mut query = app.world_mut().query::<&mut BevyTransform>();
+    for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
+        transform.translation = Vec3::new(i as f32 * 2.0, i as f32, 0.0);
+    }
+
+    // Run the Last schedule which contains the sync system
+    app.world_mut().run_schedule(Last);
+
+    let result = nodes.len() as i32;
+
+    // Cleanup
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+/// Benchmark: Read transforms from Godot into Bevy (3D) using actual systems
+///
+/// This runs the real pre_update_godot_transforms system that syncs
+/// Godot node transforms into Bevy.
+#[bench(repeat = 3)]
+fn transform_sync_godot_to_bevy_3d() -> i32 {
+    let (mut app, nodes) = setup_3d_benchmark_app();
+
+    // Modify Godot transforms to simulate physics/animation changes
+    for (i, node) in nodes.iter().enumerate() {
+        let mut node = node.clone();
+        node.set_position(Vector3::new(i as f32 * 2.0, i as f32, 0.0));
+    }
+
+    // Run the PreUpdate schedule which contains the sync system
+    app.world_mut().run_schedule(PreUpdate);
+
+    let result = nodes.len() as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+// =============================================================================
+// 2D Transform Sync Benchmarks
+// =============================================================================
+
+/// Benchmark: Write transforms from Bevy to Godot (2D) using actual systems
+#[bench(repeat = 3)]
+fn transform_sync_bevy_to_godot_2d() -> i32 {
+    let (mut app, nodes) = setup_2d_benchmark_app();
+
+    let mut query = app.world_mut().query::<&mut BevyTransform>();
+    for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
+        transform.translation = Vec3::new(i as f32 * 2.0, i as f32, 0.0);
+    }
+
+    app.world_mut().run_schedule(Last);
+
+    let result = nodes.len() as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+/// Benchmark: Read transforms from Godot into Bevy (2D) using actual systems
+#[bench(repeat = 3)]
+fn transform_sync_godot_to_bevy_2d() -> i32 {
+    let (mut app, nodes) = setup_2d_benchmark_app();
+
+    for (i, node) in nodes.iter().enumerate() {
+        let mut node = node.clone();
+        node.set_position(Vector2::new(i as f32 * 2.0, i as f32));
+    }
+
+    app.world_mut().run_schedule(PreUpdate);
+
+    let result = nodes.len() as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+// =============================================================================
+// Full Round-Trip Benchmark
+// =============================================================================
+
+/// Benchmark: Complete transform sync cycle (both directions) for 3D
+///
+/// This represents a complete frame's worth of transform synchronization:
+/// 1. PreUpdate: Read Godot transforms into Bevy
+/// 2. Game logic modifies some transforms
+/// 3. PostUpdate: Write Bevy transforms back to Godot
+#[bench(repeat = 3)]
+fn transform_sync_roundtrip_3d() -> i32 {
+    let (mut app, nodes) = setup_3d_benchmark_app();
+
+    // Simulate Godot physics moving nodes
+    for (i, node) in nodes.iter().enumerate() {
+        let mut node = node.clone();
+        node.set_position(Vector3::new(i as f32, (i as f32).sin(), 0.0));
+    }
+
+    // Phase 1: Sync Godot -> Bevy (PreUpdate)
+    app.world_mut().run_schedule(PreUpdate);
+
+    // Phase 2: Simulate game logic modifying transforms
+    let mut query = app.world_mut().query::<&mut BevyTransform>();
+    for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
+        if i % 2 == 0 {
+            transform.translation.y += 10.0;
+        }
+    }
+
+    // Phase 3: Sync Bevy -> Godot (Last)
+    app.world_mut().run_schedule(Last);
+
+    let result = nodes.len() as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+/// Benchmark: Complete transform sync cycle (both directions) for 2D
+#[bench(repeat = 3)]
+fn transform_sync_roundtrip_2d() -> i32 {
+    let (mut app, nodes) = setup_2d_benchmark_app();
+
+    // Simulate Godot physics moving nodes
+    for (i, node) in nodes.iter().enumerate() {
+        let mut node = node.clone();
+        node.set_position(Vector2::new(i as f32, (i as f32).sin()));
+    }
+
+    // Phase 1: Sync Godot -> Bevy (PreUpdate)
+    app.world_mut().run_schedule(PreUpdate);
+
+    // Phase 2: Simulate game logic modifying transforms
+    let mut query = app.world_mut().query::<&mut BevyTransform>();
+    for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
+        if i % 2 == 0 {
+            transform.translation.y += 10.0;
+        }
+    }
+
+    // Phase 3: Sync Bevy -> Godot (Last)
+    app.world_mut().run_schedule(Last);
+
+    let result = nodes.len() as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+// =============================================================================
+// Scene Tree Message Processing Benchmarks
+// =============================================================================
+// These benchmarks measure the performance of processing scene tree messages
+// (NodeAdded events) which is critical for entity creation and component setup.
+
+const SCENE_TREE_NODE_COUNT: usize = 500;
+
+/// Get the Godot scene tree
+fn get_scene_tree() -> Gd<SceneTree> {
+    Engine::singleton()
         .get_main_loop()
-        .and_then(|l| l.try_cast::<godot::classes::SceneTree>().ok())
-        .expect("Failed to get SceneTree");
-    let root = scene_tree.get_root().expect("Failed to get root node");
-
-    // Try to find existing node
-    if let Some(node) = root
-        .get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
-        .or_else(|| root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
-    {
-        return node;
-    }
-
-    // Node doesn't exist (e.g., release build where it's not auto-registered)
-    // Create it dynamically for benchmarks
-    let mut bevy_app = root
-        .get_node_or_null("BevyAppSingleton")
-        .or_else(|| root.get_node_or_null("/root/BevyAppSingleton"))
-        .expect("BevyAppSingleton not found - ensure it is configured as an autoload");
-
-    let path = "res://addons/godot-bevy/optimized_bulk_operations.gd";
-    let mut resource_loader = godot::classes::ResourceLoader::singleton();
-
-    if let Some(resource) = resource_loader.load(path)
-        && let Ok(mut script) = resource.try_cast::<godot::classes::GDScript>()
-        && let Ok(instance) = script.try_instantiate(&[])
-        && let Ok(mut node) = instance.try_to::<Gd<Node>>()
-    {
-        node.set_name("OptimizedBulkOperations");
-        bevy_app.add_child(&node);
-        node
-    } else {
-        panic!("Failed to create OptimizedBulkOperations node from GDScript");
-    }
+        .expect("Main loop should exist")
+        .cast::<SceneTree>()
 }
 
-/// Measures the cost of updating 3D transforms one-by-one via individual FFI calls
-#[bench(repeat = 3)]
-fn transform_update_individual_3d() -> i32 {
-    let mut nodes = Vec::with_capacity(BENCH_ENTITY_COUNT);
-    for _ in 0..BENCH_ENTITY_COUNT {
-        let mut node = Node3D::new_alloc();
-        node.set_transform(make_transform_3d(
-            Vector3::new(1.0, 2.0, 3.0),
-            Vector4::new(0.0, 0.0, 0.0, 1.0),
-            Vector3::new(1.0, 1.0, 1.0),
-        ));
-        nodes.push(node);
-    }
+/// Creates a mix of Godot nodes for scene tree benchmarking.
+/// Returns nodes attached to the scene tree (required for scene tree plugin).
+fn create_scene_tree_nodes() -> Vec<Gd<Node>> {
+    let scene_tree = get_scene_tree();
+    let root = scene_tree.get_root().expect("Root should exist");
 
-    for node in &mut nodes {
-        node.set_transform(make_transform_3d(
-            Vector3::new(5.0, 6.0, 7.0),
-            Vector4::new(0.0, 0.0, 0.0, 1.0),
-            Vector3::new(1.0, 1.0, 1.0),
-        ));
-    }
+    let mut nodes: Vec<Gd<Node>> = Vec::with_capacity(SCENE_TREE_NODE_COUNT);
 
-    let count = nodes.len() as i32;
-    for node in nodes {
-        node.free();
-    }
-
-    count
-}
-
-/// Measures the cost of updating 3D transforms via bulk PackedArray FFI call
-#[bench(repeat = 3)]
-fn transform_update_bulk_3d() -> i32 {
-    let mut nodes = Vec::with_capacity(BENCH_ENTITY_COUNT);
-    let mut instance_ids = Vec::with_capacity(BENCH_ENTITY_COUNT);
-    for _ in 0..BENCH_ENTITY_COUNT {
-        let mut node = Node3D::new_alloc();
-        node.set_position(Vector3::new(1.0, 2.0, 3.0));
-        instance_ids.push(node.instance_id().to_i64());
-        nodes.push(node);
-    }
-
-    let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
-    let mut bulk_ops = get_bulk_operations_node();
-
-    let positions = vec![Vector3::new(5.0, 6.0, 7.0); BENCH_ENTITY_COUNT];
-    let rotations = vec![Vector4::new(0.0, 0.0, 0.0, 1.0); BENCH_ENTITY_COUNT];
-    let scales = vec![Vector3::new(1.0, 1.0, 1.0); BENCH_ENTITY_COUNT];
-
-    let pos_packed = PackedVector3Array::from(positions.as_slice());
-    let rot_packed = PackedVector4Array::from(rotations.as_slice());
-    let scale_packed = PackedVector3Array::from(scales.as_slice());
-
-    bulk_ops.call(
-        "bulk_update_transforms_3d",
-        &[
-            ids_packed.to_variant(),
-            pos_packed.to_variant(),
-            rot_packed.to_variant(),
-            scale_packed.to_variant(),
-        ],
-    );
-
-    let count = nodes.len() as i32;
-    for node in nodes {
-        node.free();
-    }
-
-    count
-}
-
-/// Measures the cost of updating 2D transforms one-by-one via individual FFI calls
-#[bench(repeat = 3)]
-fn transform_update_individual_2d() -> i32 {
-    let mut nodes = Vec::with_capacity(BENCH_ENTITY_COUNT);
-    for _ in 0..BENCH_ENTITY_COUNT {
-        let mut node = Node2D::new_alloc();
-        node.set_transform(make_transform_2d(
-            Vector2::new(1.0, 2.0),
-            0.0,
-            Vector2::new(1.0, 1.0),
-        ));
-        nodes.push(node);
-    }
-
-    for node in &mut nodes {
-        node.set_transform(make_transform_2d(
-            Vector2::new(5.0, 6.0),
-            0.0,
-            Vector2::new(1.0, 1.0),
-        ));
-    }
-
-    let count = nodes.len() as i32;
-    for node in nodes {
-        node.free();
-    }
-
-    count
-}
-
-/// Measures the cost of updating 2D transforms via bulk PackedArray FFI call
-#[bench(repeat = 3)]
-fn transform_update_bulk_2d() -> i32 {
-    let mut nodes = Vec::with_capacity(BENCH_ENTITY_COUNT);
-    let mut instance_ids = Vec::with_capacity(BENCH_ENTITY_COUNT);
-    for _ in 0..BENCH_ENTITY_COUNT {
-        let mut node = Node2D::new_alloc();
-        node.set_position(Vector2::new(1.0, 2.0));
-        instance_ids.push(node.instance_id().to_i64());
-        nodes.push(node);
-    }
-
-    let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
-    let mut bulk_ops = get_bulk_operations_node();
-
-    let positions = vec![Vector2::new(5.0, 6.0); BENCH_ENTITY_COUNT];
-    let rotations = vec![0.0f32; BENCH_ENTITY_COUNT];
-    let scales = vec![Vector2::new(1.0, 1.0); BENCH_ENTITY_COUNT];
-
-    let pos_packed = PackedVector2Array::from(positions.as_slice());
-    let rot_packed = PackedFloat32Array::from(rotations.as_slice());
-    let scale_packed = PackedVector2Array::from(scales.as_slice());
-
-    bulk_ops.call(
-        "bulk_update_transforms_2d",
-        &[
-            ids_packed.to_variant(),
-            pos_packed.to_variant(),
-            rot_packed.to_variant(),
-            scale_packed.to_variant(),
-        ],
-    );
-
-    let count = nodes.len() as i32;
-    for node in nodes {
-        node.free();
-    }
-
-    count
-}
-
-/// Measures the cost of reading 3D transforms one-by-one via individual FFI calls
-#[bench(repeat = 3)]
-fn transform_read_individual_3d() -> i32 {
-    let mut nodes = Vec::with_capacity(BENCH_ENTITY_COUNT);
-    for i in 0..BENCH_ENTITY_COUNT {
-        let mut node = Node3D::new_alloc();
-        node.set_transform(make_transform_3d(
-            Vector3::new(i as f32, i as f32 * 2.0, i as f32 * 3.0),
-            Vector4::new(0.0, 0.0, 0.0, 1.0),
-            Vector3::new(1.0, 1.0, 1.0),
-        ));
-        nodes.push(node);
-    }
-
-    let mut sum = Vector3::ZERO;
-    for node in &nodes {
-        let transform = node.get_transform();
-        // Use the transform data to prevent optimization
-        sum += transform.origin;
-    }
-
-    let count = nodes.len() as i32;
-    for node in nodes {
-        node.free();
-    }
-
-    (count as f32 + sum.x) as i32
-}
-
-/// Measures the cost of reading 3D transforms via bulk PackedArray FFI call
-#[bench(repeat = 3)]
-fn transform_read_bulk_3d() -> i32 {
-    let mut nodes = Vec::with_capacity(BENCH_ENTITY_COUNT);
-    let mut instance_ids = Vec::with_capacity(BENCH_ENTITY_COUNT);
-    for i in 0..BENCH_ENTITY_COUNT {
-        let mut node = Node3D::new_alloc();
-        node.set_position(Vector3::new(i as f32, i as f32 * 2.0, i as f32 * 3.0));
-        instance_ids.push(node.instance_id().to_i64());
-        nodes.push(node);
-    }
-
-    let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
-    let mut bulk_ops = get_bulk_operations_node();
-
-    let mut sum = Vector3::ZERO;
-    let result = bulk_ops
-        .call("bulk_get_transforms_3d", &[ids_packed.to_variant()])
-        .to::<godot::builtin::VarDictionary>();
-
-    if let Some(positions) = result
-        .get("positions")
-        .map(|v| v.to::<PackedVector3Array>())
-    {
-        for i in 0..positions.len() {
-            if let Some(pos) = positions.get(i) {
-                sum += pos;
+    for i in 0..SCENE_TREE_NODE_COUNT {
+        let node: Gd<Node> = match i % 3 {
+            0 => {
+                let mut n = Node3D::new_alloc();
+                n.set_name(&format!("BenchNode3D_{i}"));
+                n.upcast()
             }
-        }
-    }
+            1 => {
+                let mut n = Node2D::new_alloc();
+                n.set_name(&format!("BenchNode2D_{i}"));
+                n.upcast()
+            }
+            _ => {
+                let mut n = Node::new_alloc();
+                n.set_name(&format!("BenchNode_{i}"));
+                n
+            }
+        };
 
-    let count = nodes.len() as i32;
-    for node in nodes {
-        node.free();
-    }
-
-    (count as f32 + sum.x) as i32
-}
-
-/// Measures the cost of reading 2D transforms one-by-one via individual FFI calls
-#[bench(repeat = 3)]
-fn transform_read_individual_2d() -> i32 {
-    let mut nodes = Vec::with_capacity(BENCH_ENTITY_COUNT);
-    for i in 0..BENCH_ENTITY_COUNT {
-        let mut node = Node2D::new_alloc();
-        node.set_transform(make_transform_2d(
-            Vector2::new(i as f32, i as f32 * 2.0),
-            0.0,
-            Vector2::new(1.0, 1.0),
-        ));
+        // Add to scene tree (required for the plugin to work)
+        root.clone().add_child(&node);
         nodes.push(node);
     }
 
-    let mut sum = Vector2::ZERO;
-    for node in &nodes {
-        let transform = node.get_transform();
-        // Use the transform data to prevent optimization
-        sum += transform.origin;
-    }
-
-    let count = nodes.len() as i32;
-    for node in nodes {
-        node.free();
-    }
-
-    (count as f32 + sum.x) as i32
+    nodes
 }
 
-/// Measures the cost of reading 2D transforms via bulk PackedArray FFI call
-#[bench(repeat = 3)]
-fn transform_read_bulk_2d() -> i32 {
-    let mut nodes = Vec::with_capacity(BENCH_ENTITY_COUNT);
-    let mut instance_ids = Vec::with_capacity(BENCH_ENTITY_COUNT);
-    for i in 0..BENCH_ENTITY_COUNT {
-        let mut node = Node2D::new_alloc();
-        node.set_position(Vector2::new(i as f32, i as f32 * 2.0));
-        instance_ids.push(node.instance_id().to_i64());
-        nodes.push(node);
-    }
+/// Creates SceneTreeMessage events for a batch of nodes.
+/// Simulates the optimized path with pre-analyzed type information.
+fn create_node_added_messages(nodes: &[Gd<Node>]) -> Vec<SceneTreeMessage> {
+    nodes
+        .iter()
+        .enumerate()
+        .map(|(i, node)| {
+            let node_type = match i % 3 {
+                0 => "Node3D",
+                1 => "Node2D",
+                _ => "Node",
+            };
 
-    let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
-    let mut bulk_ops = get_bulk_operations_node();
-
-    let mut sum = Vector2::ZERO;
-    let result = bulk_ops
-        .call("bulk_get_transforms_2d", &[ids_packed.to_variant()])
-        .to::<godot::builtin::VarDictionary>();
-
-    if let Some(positions) = result
-        .get("positions")
-        .map(|v| v.to::<PackedVector2Array>())
-    {
-        for i in 0..positions.len() {
-            if let Some(pos) = positions.get(i) {
-                sum += pos;
+            SceneTreeMessage {
+                node_id: GodotNodeHandle::from(node.instance_id()),
+                message_type: SceneTreeMessageType::NodeAdded,
+                node_type: Some(node_type.to_string()),
+                node_name: Some(node.get_name().to_string()),
+                parent_id: node.get_parent().map(|p| p.instance_id()),
+                collision_mask: Some(0), // No collision signals
+                groups: Some(vec![]),    // No groups
             }
-        }
-    }
-
-    let count = nodes.len() as i32;
-    for node in nodes {
-        node.free();
-    }
-
-    (count as f32 + sum.x) as i32
+        })
+        .collect()
 }
 
-/// Measures the cost of checking input events against actions one-by-one
-#[bench(repeat = 3)]
-fn action_check_individual() -> i32 {
-    let mut key_event = InputEventKey::new_gd();
-    key_event.set_keycode(Key::SPACE);
-    key_event.set_pressed(true);
+/// Setup a Bevy App with the scene tree plugin for benchmarking.
+/// Returns the app and an mpsc sender for injecting messages.
+fn setup_scene_tree_benchmark_app() -> (App, mpsc::Sender<SceneTreeMessage>) {
+    let mut app = App::new();
 
-    let mut input_map = InputMap::singleton();
-    let actions = input_map.get_actions();
-    let action_count = actions.len();
+    // Initialize required schedules
+    app.init_schedule(First);
+    app.init_schedule(PreUpdate);
 
-    let mut match_count = 0;
-    for _ in 0..BENCH_ACTION_EVENT_COUNT {
-        for action_name in actions.iter_shared() {
-            if key_event.is_action(&action_name) {
-                let _pressed = key_event.is_action_pressed(&action_name);
-                let _strength = key_event.get_action_strength(&action_name);
-                match_count += 1;
-            }
-        }
-    }
+    // Insert required resources (normally added by GodotBaseCorePlugin)
+    app.insert_non_send_resource(GodotMainThread);
+    app.init_resource::<SceneTreeComponentRegistry>();
 
-    (action_count + match_count) as i32
+    // Create a channel for injecting messages BEFORE adding the plugin
+    // (plugin will try to init its own receiver, but we'll override it)
+    let (sender, receiver) = mpsc::unbounded::<SceneTreeMessage>();
+
+    // Add the scene tree plugin
+    app.add_plugins(GodotSceneTreePlugin::default());
+
+    // Replace the message reader with our test channel
+    app.insert_resource(SceneTreeMessageReader::new(receiver));
+
+    (app, sender)
 }
 
-/// Measures the cost of checking input events against actions via single FFI call
+/// Benchmark: Process NodeAdded messages with pre-analyzed types (optimized path)
+///
+/// This measures the performance of the `read_scene_tree_messages` system
+/// processing a batch of NodeAdded events. This is the hot path when nodes
+/// are added to the Godot scene tree at runtime.
+///
+/// The benchmark uses pre-analyzed type information (simulating the optimized
+/// GDScript watcher path) which avoids expensive FFI type detection.
 #[bench(repeat = 3)]
-fn action_check_bulk() -> i32 {
-    let mut key_event = InputEventKey::new_gd();
-    key_event.set_keycode(Key::SPACE);
-    key_event.set_pressed(true);
+fn scene_tree_process_node_added_optimized() -> i32 {
+    let (mut app, sender) = setup_scene_tree_benchmark_app();
+    let nodes = create_scene_tree_nodes();
 
-    let mut bulk_ops = get_bulk_operations_node();
-    let mut match_count = 0;
+    // Create messages with pre-analyzed types (optimized path)
+    let messages = create_node_added_messages(&nodes);
 
-    for _ in 0..BENCH_ACTION_EVENT_COUNT {
-        let result = bulk_ops
-            .call("bulk_check_actions", &[key_event.to_variant()])
-            .to::<godot::builtin::VarDictionary>();
-
-        if let Some(actions) = result
-            .get("actions")
-            .map(|v| v.to::<godot::builtin::PackedStringArray>())
-        {
-            match_count += actions.len();
-        }
+    // Send all messages through the channel
+    for msg in messages {
+        sender.send(msg).expect("Send should succeed");
     }
 
-    match_count as i32
+    // Run First schedule twice:
+    // 1st run: write_scene_tree_messages writes to buffer B, read_scene_tree_messages
+    //          reads from buffer A (empty), then message_update_system flips buffers
+    // 2nd run: read_scene_tree_messages now reads from buffer A (has messages)
+    app.world_mut().run_schedule(First);
+    app.world_mut().run_schedule(First);
+
+    // Verify entities were created
+    let node_index = app.world().resource::<NodeEntityIndex>();
+    let result = node_index.len() as i32;
+
+    // Cleanup - remove nodes from scene tree
+    for mut node in nodes {
+        node.queue_free();
+    }
+
+    result
+}
+
+/// Benchmark: Process NodeAdded messages without pre-analyzed types (fallback path)
+///
+/// This measures the performance when type information is NOT pre-analyzed,
+/// forcing the system to detect node types via FFI calls. This is the slower
+/// fallback path used when the optimized GDScript watcher is not available.
+#[bench(repeat = 3)]
+fn scene_tree_process_node_added_fallback() -> i32 {
+    let (mut app, sender) = setup_scene_tree_benchmark_app();
+    let nodes = create_scene_tree_nodes();
+
+    // Create messages WITHOUT pre-analyzed types (fallback path)
+    let messages: Vec<SceneTreeMessage> = nodes
+        .iter()
+        .map(|node| SceneTreeMessage {
+            node_id: GodotNodeHandle::from(node.instance_id()),
+            message_type: SceneTreeMessageType::NodeAdded,
+            node_type: None, // Force FFI-based type detection
+            node_name: None, // Force FFI-based name lookup
+            parent_id: None, // Force FFI-based parent lookup
+            collision_mask: None,
+            groups: None,
+        })
+        .collect();
+
+    // Send all messages through the channel
+    for msg in messages {
+        sender.send(msg).expect("Send should succeed");
+    }
+
+    // Run First schedule twice (message_update_system flips buffers after first run)
+    app.world_mut().run_schedule(First);
+    app.world_mut().run_schedule(First);
+
+    // Verify entities were created
+    let node_index = app.world().resource::<NodeEntityIndex>();
+    let result = node_index.len() as i32;
+
+    // Cleanup
+    for mut node in nodes {
+        node.queue_free();
+    }
+
+    result
+}
+
+// =============================================================================
+// Scene Tree Collision Body Benchmarks
+// =============================================================================
+// These benchmarks measure the performance of processing scene tree messages
+// for collision bodies (Area3D nodes), which require connecting collision signals.
+
+const COLLISION_BODY_COUNT: usize = 100;
+
+// Collision mask constants (must match the ones in scene_tree/plugin.rs)
+const COLLISION_MASK_BODY_ENTERED: u8 = 1 << 0;
+const COLLISION_MASK_BODY_EXITED: u8 = 1 << 1;
+const COLLISION_MASK_AREA_ENTERED: u8 = 1 << 2;
+const COLLISION_MASK_AREA_EXITED: u8 = 1 << 3;
+
+/// Creates Area3D nodes for collision body benchmarking.
+/// These nodes have collision signals that need to be connected.
+fn create_collision_body_nodes() -> Vec<Gd<Node>> {
+    let scene_tree = get_scene_tree();
+    let root = scene_tree.get_root().expect("Root should exist");
+
+    let mut nodes: Vec<Gd<Node>> = Vec::with_capacity(COLLISION_BODY_COUNT);
+
+    for i in 0..COLLISION_BODY_COUNT {
+        let mut area = Area3D::new_alloc();
+        area.set_name(&format!("BenchArea3D_{i}"));
+        root.clone().add_child(&area);
+        nodes.push(area.upcast());
+    }
+
+    nodes
+}
+
+/// Ensures a CollisionWatcher node exists in the scene tree.
+/// The plugin looks for CollisionWatcher at:
+/// 1. /root/BevyAppSingleton/CollisionWatcher
+/// 2. BevyAppSingleton/CollisionWatcher
+/// 3. Fallback: recursive search from root
+///
+/// For benchmarks, we add it directly to root and rely on the fallback search.
+fn ensure_collision_watcher() -> Gd<Node> {
+    let scene_tree = get_scene_tree();
+    let root = scene_tree.get_root().expect("Root should exist");
+
+    // Check if CollisionWatcher already exists (direct child of root)
+    if let Some(watcher) = root.try_get_node_as::<Node>("CollisionWatcher") {
+        return watcher;
+    }
+
+    // Create a new CollisionWatcher as direct child of root
+    // The plugin's find_node_by_name will find it via recursive search
+    let mut watcher = CollisionWatcher::new_alloc();
+    watcher.set_name("CollisionWatcher");
+    root.clone().add_child(&watcher);
+    watcher.upcast()
+}
+
+/// Creates SceneTreeMessage events for collision body nodes with pre-analyzed collision masks.
+fn create_collision_body_messages(nodes: &[Gd<Node>]) -> Vec<SceneTreeMessage> {
+    let full_mask = COLLISION_MASK_BODY_ENTERED
+        | COLLISION_MASK_BODY_EXITED
+        | COLLISION_MASK_AREA_ENTERED
+        | COLLISION_MASK_AREA_EXITED;
+
+    nodes
+        .iter()
+        .map(|node| SceneTreeMessage {
+            node_id: GodotNodeHandle::from(node.instance_id()),
+            message_type: SceneTreeMessageType::NodeAdded,
+            node_type: Some("Area3D".to_string()),
+            node_name: Some(node.get_name().to_string()),
+            parent_id: node.get_parent().map(|p| p.instance_id()),
+            collision_mask: Some(full_mask),
+            groups: Some(vec![]),
+        })
+        .collect()
+}
+
+/// Benchmark: Process collision body NodeAdded messages (optimized path)
+///
+/// This measures the performance of processing Area3D nodes with collision
+/// signal connection using the optimized GDScript bulk operations path.
+/// Each Area3D has 4 collision signals that get connected.
+#[bench(repeat = 3)]
+fn scene_tree_process_collision_bodies_optimized() -> i32 {
+    // Create watcher FIRST, before app setup
+    let watcher = ensure_collision_watcher();
+
+    let (mut app, sender) = setup_scene_tree_benchmark_app();
+    let nodes = create_collision_body_nodes();
+
+    // Verify watcher is in tree
+    let scene_tree = get_scene_tree();
+    let root = scene_tree.get_root().expect("Root should exist");
+    let watcher_found = root.try_get_node_as::<Node>("CollisionWatcher").is_some();
+    if !watcher_found {
+        godot::prelude::godot_error!("[BENCH] CollisionWatcher not found in tree!");
+    }
+
+    // Create messages with pre-analyzed collision masks (optimized path)
+    let messages = create_collision_body_messages(&nodes);
+
+    for msg in messages {
+        sender.send(msg).expect("Send should succeed");
+    }
+
+    // Run First schedule twice (message_update_system flips buffers after first run)
+    app.world_mut().run_schedule(First);
+    app.world_mut().run_schedule(First);
+
+    let node_index = app.world().resource::<NodeEntityIndex>();
+    let result = node_index.len() as i32;
+
+    for mut node in nodes {
+        node.queue_free();
+    }
+
+    // Clean up watcher
+    watcher.clone().free();
+
+    result
+}
+
+/// Benchmark: Process collision body NodeAdded messages (fallback path)
+///
+/// This measures the performance when collision masks are NOT pre-analyzed,
+/// forcing the system to detect collision signals via FFI calls and connect
+/// them individually.
+#[bench(repeat = 3)]
+fn scene_tree_process_collision_bodies_fallback() -> i32 {
+    let (mut app, sender) = setup_scene_tree_benchmark_app();
+    let nodes = create_collision_body_nodes();
+
+    // Ensure CollisionWatcher exists so signals get connected
+    let watcher = ensure_collision_watcher();
+
+    // Create messages WITHOUT pre-analyzed collision masks (fallback path)
+    let messages: Vec<SceneTreeMessage> = nodes
+        .iter()
+        .map(|node| SceneTreeMessage {
+            node_id: GodotNodeHandle::from(node.instance_id()),
+            message_type: SceneTreeMessageType::NodeAdded,
+            node_type: None,
+            node_name: None,
+            parent_id: None,
+            collision_mask: None, // Force FFI-based collision mask detection
+            groups: None,
+        })
+        .collect();
+
+    for msg in messages {
+        sender.send(msg).expect("Send should succeed");
+    }
+
+    // Run First schedule twice (message_update_system flips buffers after first run)
+    app.world_mut().run_schedule(First);
+    app.world_mut().run_schedule(First);
+
+    let node_index = app.world().resource::<NodeEntityIndex>();
+    let result = node_index.len() as i32;
+
+    for mut node in nodes {
+        node.queue_free();
+    }
+
+    // Clean up watcher
+    watcher.clone().free();
+
+    result
 }

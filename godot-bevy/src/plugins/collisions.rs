@@ -1,24 +1,73 @@
+//! Collision detection for godot-bevy.
+//!
+//! This module bridges Godot's collision detection with Bevy's ECS patterns,
+//! providing multiple ways to detect and respond to collisions.
+//!
+//! # Accessing Collisions
+//!
+//! godot-bevy provides a [`Collisions`] system parameter for querying collision state.
+//! This is the primary way to check what entities are currently colliding.
+//!
+//! ```ignore
+//! fn my_system(collisions: Collisions) {
+//!     // Iterate all currently touching pairs
+//!     for (entity_a, entity_b) in collisions.iter() {
+//!         // Handle collision
+//!     }
+//!
+//!     // Check if two specific entities are colliding
+//!     if collisions.contains(player, enemy) {
+//!         // Player is touching enemy
+//!     }
+//!
+//!     // Get all entities colliding with a specific entity
+//!     for other in collisions.colliding_with(player) {
+//!         // other is colliding with player
+//!     }
+//! }
+//! ```
+//!
+//! # Collision Events
+//!
+//! For reacting to collision start/end events, use [`CollisionStarted`] and
+//! [`CollisionEnded`]. These can be read as Messages or observed as Events.
+//!
+//! ## Reading as Messages
+//!
+//! ```ignore
+//! fn handle_hits(mut started: MessageReader<CollisionStarted>) {
+//!     for event in started.read() {
+//!         println!("{:?} started colliding with {:?}", event.0, event.1);
+//!     }
+//! }
+//! ```
+//!
+//! ## Using Observers
+//!
+//! ```ignore
+//! app.add_observer(|trigger: Trigger<CollisionStarted>| {
+//!     let (a, b) = (trigger.event().0, trigger.event().1);
+//!     println!("{a:?} started colliding with {b:?}");
+//! });
+//! ```
+
 use crate::interop::GodotNodeHandle;
 use crate::plugins::core::PrePhysicsUpdate;
 use crate::plugins::scene_tree::NodeEntityIndex;
 use bevy_app::{App, Plugin};
-use bevy_ecs::prelude::ReflectComponent;
 use bevy_ecs::{
-    component::Component,
     entity::Entity,
+    event::Event,
     message::{Message, MessageReader, MessageWriter, message_update_system},
+    prelude::Resource,
     schedule::IntoScheduleConfigs,
-    system::{NonSendMut, Query, Res},
+    system::{Commands, Res, ResMut, SystemParam},
 };
-use bevy_reflect::Reflect;
-use godot::obj::InstanceId;
+use crossbeam_channel::Receiver;
 use godot::prelude::*;
-use std::collections::HashMap;
-use std::sync::mpsc::Receiver;
+use parking_lot::Mutex;
+use std::collections::{HashMap, HashSet};
 use tracing::trace;
-
-#[derive(Default)]
-pub struct GodotCollisionsPlugin;
 
 // Collision signal constants
 pub const BODY_ENTERED: &str = "body_entered";
@@ -29,43 +78,269 @@ pub const AREA_EXITED: &str = "area_exited";
 /// All collision signals that indicate collision start
 pub const COLLISION_START_SIGNALS: &[&str] = &[BODY_ENTERED, AREA_ENTERED];
 
-#[doc(hidden)]
-pub struct CollisionMessageReader(pub Receiver<CollisionMessage>);
+// ============================================================================
+// EVENTS
+// ============================================================================
 
-#[derive(Debug, Message)]
-pub struct CollisionMessage {
+/// Event fired when two entities start colliding.
+///
+/// Can be read as a [`Message`] with [`MessageReader`] or observed with
+/// Bevy's observer system.
+///
+/// # Example
+///
+/// ```ignore
+/// // As a message
+/// fn handle_collision_start(mut events: MessageReader<CollisionStarted>) {
+///     for event in events.read() {
+///         println!("{:?} hit {:?}", event.entity1, event.entity2);
+///     }
+/// }
+///
+/// // As an observer
+/// app.add_observer(|trigger: Trigger<CollisionStarted>| {
+///     let event = trigger.event();
+///     println!("{:?} hit {:?}", event.entity1, event.entity2);
+/// });
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Message, Event)]
+pub struct CollisionStarted {
+    /// The first entity in the collision.
+    pub entity1: Entity,
+    /// The second entity in the collision.
+    pub entity2: Entity,
+}
+
+/// Event fired when two entities stop colliding.
+///
+/// Can be read as a [`Message`] with [`MessageReader`] or observed with
+/// Bevy's observer system.
+///
+/// # Example
+///
+/// ```ignore
+/// // As a message
+/// fn handle_collision_end(mut events: MessageReader<CollisionEnded>) {
+///     for event in events.read() {
+///         println!("{:?} separated from {:?}", event.entity1, event.entity2);
+///     }
+/// }
+///
+/// // As an observer
+/// app.add_observer(|trigger: Trigger<CollisionEnded>| {
+///     let event = trigger.event();
+///     println!("{:?} separated from {:?}", event.entity1, event.entity2);
+/// });
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Message, Event)]
+pub struct CollisionEnded {
+    /// The first entity in the collision.
+    pub entity1: Entity,
+    /// The second entity in the collision.
+    pub entity2: Entity,
+}
+
+// ============================================================================
+// COLLISION STATE RESOURCE
+// ============================================================================
+
+/// Resource that tracks all current collision pairs.
+///
+/// This is automatically updated each frame based on Godot's collision events.
+/// Use the [`Collisions`] system parameter for convenient access.
+#[derive(Resource, Default, Debug)]
+pub struct CollisionState {
+    /// Currently active collision pairs (origin_entity, target_entity)
+    /// We store both directions for O(1) lookup
+    active_pairs: HashSet<(Entity, Entity)>,
+
+    /// Collisions that started this frame
+    started_this_frame: Vec<(Entity, Entity)>,
+
+    /// Collisions that ended this frame
+    ended_this_frame: Vec<(Entity, Entity)>,
+
+    /// Map from entity to all entities it's currently colliding with
+    entity_collisions: HashMap<Entity, Vec<Entity>>,
+}
+
+impl CollisionState {
+    /// Clear per-frame data (called at start of update)
+    fn begin_frame(&mut self) {
+        self.started_this_frame.clear();
+        self.ended_this_frame.clear();
+    }
+
+    /// Record a collision start
+    fn add_collision(&mut self, origin: Entity, target: Entity) {
+        // Normalize pair order for consistent storage
+        let pair = normalize_pair(origin, target);
+
+        if self.active_pairs.insert(pair) {
+            // New collision
+            self.started_this_frame.push(pair);
+
+            // Update entity maps (both directions)
+            self.entity_collisions
+                .entry(origin)
+                .or_default()
+                .push(target);
+            self.entity_collisions
+                .entry(target)
+                .or_default()
+                .push(origin);
+        }
+    }
+
+    /// Record a collision end
+    fn remove_collision(&mut self, origin: Entity, target: Entity) {
+        let pair = normalize_pair(origin, target);
+
+        if self.active_pairs.remove(&pair) {
+            self.ended_this_frame.push(pair);
+
+            // Update entity maps
+            if let Some(collisions) = self.entity_collisions.get_mut(&origin) {
+                collisions.retain(|&e| e != target);
+            }
+            if let Some(collisions) = self.entity_collisions.get_mut(&target) {
+                collisions.retain(|&e| e != origin);
+            }
+        }
+    }
+
+    /// Check if two entities are currently colliding
+    pub fn contains(&self, a: Entity, b: Entity) -> bool {
+        self.active_pairs.contains(&normalize_pair(a, b))
+    }
+
+    /// Get all entities currently colliding with the given entity
+    pub fn colliding_with(&self, entity: Entity) -> &[Entity] {
+        self.entity_collisions
+            .get(&entity)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Iterate over all currently active collision pairs
+    pub fn iter(&self) -> impl Iterator<Item = (Entity, Entity)> + '_ {
+        self.active_pairs.iter().copied()
+    }
+
+    /// Iterate over collision pairs that started this frame
+    pub fn started(&self) -> impl Iterator<Item = (Entity, Entity)> + '_ {
+        self.started_this_frame.iter().copied()
+    }
+
+    /// Iterate over collision pairs that ended this frame
+    pub fn ended(&self) -> impl Iterator<Item = (Entity, Entity)> + '_ {
+        self.ended_this_frame.iter().copied()
+    }
+
+    /// Returns true if there are no active collisions
+    pub fn is_empty(&self) -> bool {
+        self.active_pairs.is_empty()
+    }
+
+    /// Returns the number of active collision pairs
+    pub fn len(&self) -> usize {
+        self.active_pairs.len()
+    }
+}
+
+/// Normalize a pair of entities to a consistent order for storage
+#[inline]
+fn normalize_pair(a: Entity, b: Entity) -> (Entity, Entity) {
+    if a < b { (a, b) } else { (b, a) }
+}
+
+// ============================================================================
+// COLLISIONS SYSTEM PARAM
+// ============================================================================
+
+/// System parameter for querying collision state.
+///
+/// This provides a convenient API for checking collisions in systems.
+///
+/// # Example
+///
+/// ```ignore
+/// fn my_system(collisions: Collisions) {
+///     // Check all active collisions
+///     for (a, b) in collisions.iter() {
+///         println!("{a:?} is colliding with {b:?}");
+///     }
+///
+///     // Check if specific entities are colliding
+///     if collisions.contains(player, enemy) {
+///         // Take damage!
+///     }
+///
+///     // Get everything colliding with player
+///     for &other in collisions.colliding_with(player) {
+///         // Process each collision
+///     }
+/// }
+/// ```
+#[derive(SystemParam)]
+pub struct Collisions<'w> {
+    state: Res<'w, CollisionState>,
+}
+
+impl Collisions<'_> {
+    /// Check if two entities are currently colliding.
+    #[inline]
+    pub fn contains(&self, a: Entity, b: Entity) -> bool {
+        self.state.contains(a, b)
+    }
+
+    /// Get all entities currently colliding with the given entity.
+    #[inline]
+    pub fn colliding_with(&self, entity: Entity) -> &[Entity] {
+        self.state.colliding_with(entity)
+    }
+
+    /// Iterate over all currently active collision pairs.
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = (Entity, Entity)> + '_ {
+        self.state.iter()
+    }
+
+    /// Returns true if there are no active collisions.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.state.is_empty()
+    }
+
+    /// Returns the number of active collision pairs.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.state.len()
+    }
+}
+
+// ============================================================================
+// INTERNAL: GODOT MESSAGE BRIDGE
+// ============================================================================
+
+/// Internal message type for receiving collision events from Godot.
+/// This is not part of the public API - use CollisionStarted/CollisionEnded instead.
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct RawCollisionMessage {
     pub event_type: CollisionMessageType,
     pub origin: GodotNodeHandle,
     pub target: GodotNodeHandle,
 }
 
-impl Plugin for GodotCollisionsPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(
-            PrePhysicsUpdate,
-            (
-                write_godot_collision_events.before(message_update_system),
-                update_godot_collisions,
-            ),
-        )
-        .add_message::<CollisionMessage>();
-    }
-}
+/// Resource for receiving collision messages from Godot.
+/// Wrapped in Mutex to be Send+Sync, allowing it to be a regular Bevy Resource.
+#[derive(Resource)]
+pub struct CollisionMessageReader(pub Mutex<Receiver<RawCollisionMessage>>);
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Component, Default, Reflect)]
-#[reflect(Component)]
-pub struct Collisions {
-    colliding_entities: Vec<Entity>,
-    recent_collisions: Vec<Entity>,
-}
-
-impl Collisions {
-    pub fn colliding(&self) -> &[Entity] {
-        &self.colliding_entities
-    }
-
-    pub fn recent_collisions(&self) -> &[Entity] {
-        &self.recent_collisions
+impl CollisionMessageReader {
+    pub fn new(receiver: Receiver<RawCollisionMessage>) -> Self {
+        Self(Mutex::new(receiver))
     }
 }
 
@@ -77,201 +352,221 @@ pub enum CollisionMessageType {
     Ended,
 }
 
-fn update_godot_collisions(
-    mut messages: MessageReader<CollisionMessage>,
-    mut entities: Query<(Entity, &GodotNodeHandle, &mut Collisions)>,
+// ============================================================================
+// PLUGIN
+// ============================================================================
+
+/// Plugin that enables collision detection between Godot physics bodies and Bevy entities.
+///
+/// This plugin automatically tracks collisions for entities that have collision
+/// signals (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.).
+///
+/// # Usage
+///
+/// Add the plugin to your app:
+///
+/// ```ignore
+/// app.add_plugins(GodotCollisionsPlugin);
+/// ```
+///
+/// Then use the [`Collisions`] system parameter or collision events:
+///
+/// ```ignore
+/// fn detect_hits(
+///     collisions: Collisions,
+///     mut started: MessageReader<CollisionStarted>,
+/// ) {
+///     // Query current state
+///     if collisions.contains(player, enemy) {
+///         // Currently colliding
+///     }
+///
+///     // React to events
+///     for event in started.read() {
+///         // Just started colliding
+///     }
+/// }
+/// ```
+#[derive(Default)]
+pub struct GodotCollisionsPlugin;
+
+impl Plugin for GodotCollisionsPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<CollisionState>()
+            .add_message::<CollisionStarted>()
+            .add_message::<CollisionEnded>()
+            .add_systems(
+                PrePhysicsUpdate,
+                (
+                    process_godot_collisions.before(message_update_system),
+                    trigger_collision_observers.after(process_godot_collisions),
+                ),
+            );
+    }
+}
+
+/// System that processes raw Godot collision events and updates state + messages
+fn process_godot_collisions(
+    events: Option<Res<CollisionMessageReader>>,
+    mut collision_state: ResMut<CollisionState>,
+    mut started_writer: MessageWriter<CollisionStarted>,
+    mut ended_writer: MessageWriter<CollisionEnded>,
     node_index: Res<NodeEntityIndex>,
 ) {
-    // Build collision entity map (only entities with Collisions component)
-    let collisions_by_instance: HashMap<InstanceId, Entity> = entities
-        .iter()
-        .map(|(entity, handle, _)| (handle.instance_id(), entity))
-        .collect();
+    // Clear per-frame data
+    collision_state.begin_frame();
 
-    for (_, _, mut collisions) in entities.iter_mut() {
-        collisions.recent_collisions = vec![];
-    }
+    let Some(events) = events else {
+        return;
+    };
 
-    for event in messages.read() {
-        trace!(target: "godot_collisions_update", event = ?event);
+    let receiver = events.0.lock();
 
-        // Use NodeEntityIndex for O(1) target lookup
-        let target = node_index.get(event.target.instance_id());
-        let origin_entity = collisions_by_instance
-            .get(&event.origin.instance_id())
-            .copied();
+    for event in receiver.try_iter() {
+        trace!(target: "godot_collisions", event = ?event);
 
-        let (target, origin_entity) = match (target, origin_entity) {
-            (Some(target), Some(origin)) => (target, origin),
+        // Look up entities for both nodes
+        let origin_entity = node_index.get(event.origin.instance_id());
+        let target_entity = node_index.get(event.target.instance_id());
+
+        let (origin, target) = match (origin_entity, target_entity) {
+            (Some(o), Some(t)) => (o, t),
             _ => continue,
-        };
-
-        let Ok((_, _, mut collisions)) = entities.get_mut(origin_entity) else {
-            continue;
         };
 
         match event.event_type {
             CollisionMessageType::Started => {
-                collisions.colliding_entities.push(target);
-                collisions.recent_collisions.push(target);
+                collision_state.add_collision(origin, target);
+                started_writer.write(CollisionStarted {
+                    entity1: origin,
+                    entity2: target,
+                });
             }
-            CollisionMessageType::Ended => collisions.colliding_entities.retain(|x| *x != target),
-        };
+            CollisionMessageType::Ended => {
+                collision_state.remove_collision(origin, target);
+                ended_writer.write(CollisionEnded {
+                    entity1: origin,
+                    entity2: target,
+                });
+            }
+        }
     }
 }
 
-fn write_godot_collision_events(
-    events: NonSendMut<CollisionMessageReader>,
-    mut message_writer: MessageWriter<CollisionMessage>,
+/// System that triggers observers for collision events
+fn trigger_collision_observers(
+    mut commands: Commands,
+    mut started_reader: MessageReader<CollisionStarted>,
+    mut ended_reader: MessageReader<CollisionEnded>,
 ) {
-    message_writer.write_batch(events.0.try_iter());
+    for &event in started_reader.read() {
+        commands.trigger(event);
+    }
+    for &event in ended_reader.read() {
+        commands.trigger(event);
+    }
 }
+
+// ============================================================================
+// TESTS
+// ============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_ecs::world::World;
 
-    /// Helper to create a mock InstanceId for testing
-    fn mock_instance_id(id: i64) -> InstanceId {
-        InstanceId::from_i64(id)
-    }
+    #[test]
+    fn test_collision_state_add_remove() {
+        let mut state = CollisionState::default();
+        let e1 = Entity::from_bits(1);
+        let e2 = Entity::from_bits(2);
+        let e3 = Entity::from_bits(3);
 
-    /// Helper to create a mock GodotNodeHandle for testing
-    fn mock_handle(id: i64) -> GodotNodeHandle {
-        GodotNodeHandle::from_instance_id(mock_instance_id(id))
+        // Add collision
+        state.add_collision(e1, e2);
+        assert!(state.contains(e1, e2));
+        assert!(state.contains(e2, e1)); // Symmetric
+        assert!(!state.contains(e1, e3));
+
+        // Check colliding_with
+        assert_eq!(state.colliding_with(e1), &[e2]);
+        assert_eq!(state.colliding_with(e2), &[e1]);
+        assert!(state.colliding_with(e3).is_empty());
+
+        // Check started
+        assert_eq!(state.started_this_frame.len(), 1);
+
+        // Remove collision
+        state.remove_collision(e1, e2);
+        assert!(!state.contains(e1, e2));
+        assert!(state.colliding_with(e1).is_empty());
+
+        // Check ended
+        assert_eq!(state.ended_this_frame.len(), 1);
     }
 
     #[test]
-    fn test_hashmap_lookup_correctness() {
-        // Test that HashMap-based lookup produces correct entity mappings
-        let mut world = World::new();
+    fn test_collision_state_begin_frame() {
+        let mut state = CollisionState::default();
+        let e1 = Entity::from_bits(1);
+        let e2 = Entity::from_bits(2);
 
-        // Spawn entities with mock handles
-        let entity1 = world.spawn(mock_handle(100)).id();
-        let entity2 = world.spawn(mock_handle(200)).id();
-        let entity3 = world.spawn(mock_handle(300)).id();
+        state.add_collision(e1, e2);
+        assert_eq!(state.started_this_frame.len(), 1);
 
-        // Build the HashMap (simulating what update_godot_collisions does)
-        let instance_to_entity: HashMap<InstanceId, Entity> = world
-            .query::<(Entity, &GodotNodeHandle)>()
-            .iter(&world)
-            .map(|(entity, handle)| (handle.instance_id(), entity))
-            .collect();
+        // Begin new frame
+        state.begin_frame();
+        assert!(state.started_this_frame.is_empty());
+        assert!(state.ended_this_frame.is_empty());
 
-        // Verify lookups
-        assert_eq!(
-            instance_to_entity.get(&mock_instance_id(100)),
-            Some(&entity1)
-        );
-        assert_eq!(
-            instance_to_entity.get(&mock_instance_id(200)),
-            Some(&entity2)
-        );
-        assert_eq!(
-            instance_to_entity.get(&mock_instance_id(300)),
-            Some(&entity3)
-        );
-        assert_eq!(instance_to_entity.get(&mock_instance_id(999)), None);
+        // But collision should still be active
+        assert!(state.contains(e1, e2));
     }
 
     #[test]
-    fn test_collisions_component_started() {
-        // Test that collision started events add to colliding_entities
-        let mut collisions = Collisions::default();
-        let target_entity = Entity::from_bits(42);
+    fn test_normalize_pair() {
+        let e1 = Entity::from_bits(1);
+        let e2 = Entity::from_bits(2);
 
-        // Simulate Started event
-        collisions.colliding_entities.push(target_entity);
-        collisions.recent_collisions.push(target_entity);
-
-        assert_eq!(collisions.colliding().len(), 1);
-        assert_eq!(collisions.colliding()[0], target_entity);
-        assert_eq!(collisions.recent_collisions().len(), 1);
+        // Should always return same order regardless of input order
+        assert_eq!(normalize_pair(e1, e2), normalize_pair(e2, e1));
     }
 
     #[test]
-    fn test_collisions_component_ended() {
-        // Test that collision ended events remove from colliding_entities
-        let mut collisions = Collisions::default();
-        let target1 = Entity::from_bits(42);
-        let target2 = Entity::from_bits(43);
+    fn test_collision_state_multiple_collisions() {
+        let mut state = CollisionState::default();
+        let e1 = Entity::from_bits(1);
+        let e2 = Entity::from_bits(2);
+        let e3 = Entity::from_bits(3);
 
-        // Add two collisions
-        collisions.colliding_entities.push(target1);
-        collisions.colliding_entities.push(target2);
+        state.add_collision(e1, e2);
+        state.add_collision(e1, e3);
 
-        // Remove first one (simulate Ended event)
-        collisions.colliding_entities.retain(|x| *x != target1);
+        // e1 collides with both
+        let colliding = state.colliding_with(e1);
+        assert_eq!(colliding.len(), 2);
+        assert!(colliding.contains(&e2));
+        assert!(colliding.contains(&e3));
 
-        assert_eq!(collisions.colliding().len(), 1);
-        assert_eq!(collisions.colliding()[0], target2);
+        // e2 only collides with e1
+        assert_eq!(state.colliding_with(e2), &[e1]);
+
+        // e3 only collides with e1
+        assert_eq!(state.colliding_with(e3), &[e1]);
     }
 
     #[test]
-    fn test_multiple_entities_with_collisions() {
-        // Test that HashMap correctly maps multiple entities with Collisions component
-        let mut world = World::new();
+    fn test_duplicate_collision_ignored() {
+        let mut state = CollisionState::default();
+        let e1 = Entity::from_bits(1);
+        let e2 = Entity::from_bits(2);
 
-        // Spawn entities - some with Collisions, some without
-        let origin1 = world.spawn((mock_handle(100), Collisions::default())).id();
-        let origin2 = world.spawn((mock_handle(200), Collisions::default())).id();
-        let target1 = world.spawn(mock_handle(300)).id();
-        let target2 = world.spawn(mock_handle(400)).id();
+        state.add_collision(e1, e2);
+        state.add_collision(e1, e2); // Duplicate
+        state.add_collision(e2, e1); // Same pair, different order
 
-        // Build collision entity map (only entities with Collisions component)
-        let collisions_by_instance: HashMap<InstanceId, Entity> = world
-            .query::<(Entity, &GodotNodeHandle, &Collisions)>()
-            .iter(&world)
-            .map(|(entity, handle, _)| (handle.instance_id(), entity))
-            .collect();
-
-        // Build all entities map
-        let instance_to_entity: HashMap<InstanceId, Entity> = world
-            .query::<(Entity, &GodotNodeHandle)>()
-            .iter(&world)
-            .map(|(entity, handle)| (handle.instance_id(), entity))
-            .collect();
-
-        // Verify collision entities map
-        assert_eq!(collisions_by_instance.len(), 2);
-        assert_eq!(
-            collisions_by_instance.get(&mock_instance_id(100)),
-            Some(&origin1)
-        );
-        assert_eq!(
-            collisions_by_instance.get(&mock_instance_id(200)),
-            Some(&origin2)
-        );
-        assert_eq!(collisions_by_instance.get(&mock_instance_id(300)), None);
-
-        // Verify all entities map includes targets
-        assert_eq!(instance_to_entity.len(), 4);
-        assert_eq!(
-            instance_to_entity.get(&mock_instance_id(300)),
-            Some(&target1)
-        );
-        assert_eq!(
-            instance_to_entity.get(&mock_instance_id(400)),
-            Some(&target2)
-        );
-    }
-
-    #[test]
-    fn test_recent_collisions_cleared_each_frame() {
-        // Test that recent_collisions is cleared properly
-        let mut collisions = Collisions::default();
-        let target = Entity::from_bits(42);
-
-        // Frame 1: collision starts
-        collisions.colliding_entities.push(target);
-        collisions.recent_collisions.push(target);
-        assert_eq!(collisions.recent_collisions().len(), 1);
-
-        // Frame 2: clear recent (simulating start of update_godot_collisions)
-        collisions.recent_collisions = vec![];
-        assert_eq!(collisions.recent_collisions().len(), 0);
-        // But colliding_entities should persist
-        assert_eq!(collisions.colliding().len(), 1);
+        // Should only have one collision
+        assert_eq!(state.len(), 1);
+        assert_eq!(state.started_this_frame.len(), 1);
     }
 }
