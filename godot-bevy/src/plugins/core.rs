@@ -2,6 +2,7 @@
 
 use bevy_app::{App, Plugin};
 use bevy_ecs::component::Component;
+use bevy_ecs::event::EntityEvent;
 use bevy_ecs::lifecycle::Remove;
 use bevy_ecs::observer::On;
 use bevy_ecs::prelude::{Name, Resource};
@@ -229,7 +230,7 @@ fn on_godot_node_handle_removed(
     query: Query<&GodotNodeHandle>,
     mut godot: GodotAccess,
 ) {
-    if let Ok(handle) = query.get(trigger.target())
+    if let Ok(handle) = query.get(trigger.event_target())
         && let Some(mut node) = godot.try_get::<Node>(*handle)
     {
         debug!(
