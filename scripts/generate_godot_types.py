@@ -334,7 +334,7 @@ pub struct NodeMarker;
                 categories["2d"].append(node_type)
             elif is_descendant_of(node_type, "Control"):
                 categories["control"].append(node_type)
-            elif parent_map.get(node_type) == "Node":
+            elif parent_map.get(node_type) in ("Node", "AnimationMixer"):
                 categories["universal"].append(node_type)
 
         return categories
