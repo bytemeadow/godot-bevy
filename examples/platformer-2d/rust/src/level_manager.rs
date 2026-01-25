@@ -6,6 +6,11 @@ use godot_bevy::prelude::*;
 
 use crate::scene_management::SceneOperationMessage;
 
+/// Event fired when the Godot scene changes.
+/// This demonstrates using `connect_object` to listen to singleton signals.
+#[derive(Event, Debug, Clone)]
+struct SceneChanged;
+
 /// Simple level identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, GodotConvert, Var, Export)]
 #[godot(via = GString)]
@@ -85,7 +90,12 @@ impl Plugin for LevelManagerPlugin {
         app.init_resource::<CurrentLevel>()
             .init_resource::<PendingLevel>()
             .init_resource::<LevelLoadingState>()
+            .init_resource::<SceneTreeSignalConnected>()
+            // Enable signal routing for SceneTree.scene_changed
+            .add_plugins(GodotSignalsPlugin::<SceneChanged>::default())
             .add_observer(on_load_level_request)
+            .add_observer(on_scene_changed)
+            .add_systems(Startup, connect_scene_tree_signal)
             .add_systems(
                 Update,
                 (
@@ -94,6 +104,33 @@ impl Plugin for LevelManagerPlugin {
                 ),
             );
     }
+}
+
+/// Tracks whether we've connected to the SceneTree signal
+#[derive(Resource, Default)]
+struct SceneTreeSignalConnected(bool);
+
+/// Connect to the SceneTree's scene_changed signal.
+/// This demonstrates using `connect_object` for non-entity signals.
+fn connect_scene_tree_signal(
+    mut connected: ResMut<SceneTreeSignalConnected>,
+    signals: GodotSignals<SceneChanged>,
+    mut scene_tree: SceneTreeRef,
+) {
+    if connected.0 {
+        return;
+    }
+
+    let tree = scene_tree.get().clone();
+    signals.connect_object(tree, "scene_changed", |_args| Some(SceneChanged));
+    connected.0 = true;
+
+    info!("Connected to SceneTree.scene_changed signal");
+}
+
+/// Observer that logs when a scene change occurs
+fn on_scene_changed(_trigger: On<SceneChanged>) {
+    info!("Scene changed!");
 }
 
 /// Observer that handles level loading requests - loads the asset
