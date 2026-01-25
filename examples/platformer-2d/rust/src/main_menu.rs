@@ -18,6 +18,7 @@ use bevy::{
     },
 };
 use godot::classes::{Button, DisplayServer, display_server::WindowMode};
+use godot_bevy::interop::signal_names::BaseButtonSignals;
 use godot_bevy::prelude::*;
 
 #[derive(Resource, Default)]
@@ -130,7 +131,7 @@ fn connect_buttons(
         if let Some(start_handle) = menu_assets.start_button {
             signals_start.connect(
                 start_handle,
-                "pressed",
+                BaseButtonSignals::PRESSED,
                 None,
                 |_args, _node_handle, _ent| Some(StartGameRequested),
             );
@@ -139,18 +140,23 @@ fn connect_buttons(
         if let Some(fullscreen_handle) = menu_assets.fullscreen_button {
             signals_fullscreen.connect(
                 fullscreen_handle,
-                "pressed",
+                BaseButtonSignals::PRESSED,
                 None,
                 |_args, _node_handle, _ent| Some(ToggleFullscreenRequested),
             );
         }
 
         if let Some(quit_handle) = menu_assets.quit_button {
-            signals_quit.connect(quit_handle, "pressed", None, |_args, node_handle, _ent| {
-                Some(QuitRequested {
-                    source: node_handle,
-                })
-            });
+            signals_quit.connect(
+                quit_handle,
+                BaseButtonSignals::PRESSED,
+                None,
+                |_args, node_handle, _ent| {
+                    Some(QuitRequested {
+                        source: node_handle,
+                    })
+                },
+            );
         }
 
         menu_assets.signals_connected = true;
