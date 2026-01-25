@@ -297,6 +297,7 @@ where
     /// ```ignore
     /// use bevy::prelude::*;
     /// use godot_bevy::prelude::*;
+    /// use godot_bevy::interop::signal_names::SceneTreeSignals;
     ///
     /// #[derive(Event, Clone)]
     /// struct SceneChanged;
@@ -306,7 +307,7 @@ where
     ///     mut scene_tree: SceneTreeRef,
     /// ) {
     ///     let tree = scene_tree.get().clone();
-    ///     signals.connect_object(tree, "scene_changed", |_args| {
+    ///     signals.connect_object(tree, SceneTreeSignals::SCENE_CHANGED, |_args| {
     ///         Some(SceneChanged)
     ///     });
     /// }

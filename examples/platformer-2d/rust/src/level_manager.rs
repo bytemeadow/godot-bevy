@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use godot::classes::Node;
 use godot::prelude::*;
+use godot_bevy::interop::signal_names::SceneTreeSignals;
 use godot_bevy::plugins::scene_tree::{SceneTreeMessage, SceneTreeMessageType};
 use godot_bevy::prelude::*;
 
@@ -122,7 +123,9 @@ fn connect_scene_tree_signal(
     }
 
     let tree = scene_tree.get().clone();
-    signals.connect_object(tree, "scene_changed", |_args| Some(SceneChanged));
+    signals.connect_object(tree, SceneTreeSignals::SCENE_CHANGED, |_args| {
+        Some(SceneChanged)
+    });
     connected.0 = true;
 
     info!("Connected to SceneTree.scene_changed signal");
