@@ -10,6 +10,7 @@ use bevy::{
     },
     state::state::{NextState, OnEnter, OnExit},
 };
+use godot_bevy::interop::signal_names::BaseButtonSignals;
 use godot_bevy::prelude::*;
 
 use crate::{
@@ -77,9 +78,12 @@ struct StartGameRequested;
 
 fn connect_start_button(menu_assets: Res<MenuAssets>, signals: GodotSignals<StartGameRequested>) {
     if let Some(handle) = menu_assets.start_button {
-        signals.connect(handle, "pressed", None, |_args, _node_handle, _ent| {
-            Some(StartGameRequested)
-        });
+        signals.connect(
+            handle,
+            BaseButtonSignals::PRESSED,
+            None,
+            |_args, _node_handle, _ent| Some(StartGameRequested),
+        );
     }
 }
 

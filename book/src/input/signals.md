@@ -7,8 +7,10 @@ Godot signals are a core communication mechanism in the Godot engine. godot-bevy
 - [Quick Start](#quick-start)
 - [Multiple Signal Events](#multiple-signal-events)
 - [Passing Context (Node, Entity, Arguments)](#passing-context-node-entity-arguments)
+- [Connecting to Non-Entity Objects](#connecting-to-non-entity-objects)
 - [Deferred Connections](#deferred-connections)
 - [Attaching signals to Godot scenes](#attaching-signals-to-godot-scenes)
+- [Signal Name Constants](#signal-name-constants)
 
 ## Quick Start
 
@@ -152,6 +154,55 @@ fn on_area_exited(trigger: On<AreaExited>, mut commands: Commands) {
 }
 ```
 
+## Connecting to Non-Entity Objects
+
+The `connect` method works with `GodotNodeHandle`, which represents nodes tracked as ECS entities. However, some Godot objects like `SceneTree` are not tracked as entities. For these cases, use `connect_object`:
+
+```rust
+use bevy::prelude::*;
+use godot_bevy::prelude::*;
+use godot_bevy::interop::signal_names::SceneTreeSignals;
+
+#[derive(Event, Debug, Clone)]
+struct SceneChanged;
+
+fn setup(app: &mut App) {
+    app.add_plugins(GodotSignalsPlugin::<SceneChanged>::default())
+       .add_systems(Startup, connect_scene_tree)
+       .add_observer(on_scene_changed);
+}
+
+fn connect_scene_tree(
+    signals: GodotSignals<SceneChanged>,
+    mut scene_tree: SceneTreeRef,
+) {
+    let tree = scene_tree.get().clone();
+    signals.connect_object(tree, SceneTreeSignals::SCENE_CHANGED, |_args| {
+        Some(SceneChanged)
+    });
+}
+
+fn on_scene_changed(_trigger: On<SceneChanged>) {
+    println!("Scene changed!");
+}
+```
+
+The `connect_object` method accepts any `Gd<T>` where `T` inherits from `Object`. This is useful for:
+
+- **SceneTree signals** - `scene_changed`, `tree_changed`, `node_added`, etc.
+- **Autoload singletons** - Custom autoloads that emit signals
+- **Non-node objects** - Any Godot object that isn't tracked as an ECS entity
+
+The mapper closure for `connect_object` is simpler than `connect` since there's no associated entity:
+
+```rust
+// connect_object mapper: just args
+|args: &[Variant]| -> Option<MyEvent>
+
+// connect mapper: args, node handle, and optional entity
+|args: &[Variant], node_handle: GodotNodeHandle, entity: Option<Entity>| -> Option<MyEvent>
+```
+
 ## Deferred Connections
 
 When spawning entities before their `GodotNodeHandle` is ready, you can defer connections. Add `DeferredSignalConnections<T>` with a signal-to-event mapper; the `GodotTypedSignalsPlugin<T>` wires it once the handle appears.
@@ -230,3 +281,43 @@ impl Command for SpawnPickup {
 ```
 
 For physics signals (collisions), use the collisions plugin/events instead of raw signals when possible.
+
+## Signal Name Constants
+
+godot-bevy provides auto-generated constants for Godot signal names, offering type-safe, discoverable alternatives to string literals. These are located in `godot_bevy::interop::signal_names`.
+
+```rust
+use godot_bevy::interop::signal_names::{BaseButtonSignals, SceneTreeSignals, Area2DSignals};
+
+// Instead of string literals:
+signals.connect(button, "pressed", None, mapper);
+
+// Use constants:
+signals.connect(button, BaseButtonSignals::PRESSED, None, mapper);
+
+// SceneTree signals
+signals.connect_object(tree, SceneTreeSignals::SCENE_CHANGED, mapper);
+signals.connect_object(tree, SceneTreeSignals::TREE_CHANGED, mapper);
+
+// Area2D signals
+signals.connect(area, Area2DSignals::BODY_ENTERED, Some(entity), mapper);
+signals.connect(area, Area2DSignals::AREA_ENTERED, Some(entity), mapper);
+```
+
+Benefits of using constants:
+
+- **Compile-time validation** - Typos are caught at compile time
+- **IDE autocompletion** - Discover available signals easily
+- **Documentation** - Constants include doc comments explaining when each signal fires
+
+Common signal constant structs:
+
+| Struct | Common Signals |
+|--------|---------------|
+| `BaseButtonSignals` | `PRESSED`, `BUTTON_UP`, `BUTTON_DOWN`, `TOGGLED` |
+| `Area2DSignals` | `BODY_ENTERED`, `BODY_EXITED`, `AREA_ENTERED`, `AREA_EXITED` |
+| `Area3DSignals` | `BODY_ENTERED`, `BODY_EXITED`, `AREA_ENTERED`, `AREA_EXITED` |
+| `SceneTreeSignals` | `SCENE_CHANGED`, `TREE_CHANGED`, `NODE_ADDED`, `NODE_REMOVED` |
+| `AnimationPlayerSignals` | `ANIMATION_FINISHED`, `ANIMATION_STARTED`, `ANIMATION_CHANGED` |
+| `TimerSignals` | `TIMEOUT` |
+| `VisibleOnScreenNotifier2DSignals` | `SCREEN_ENTERED`, `SCREEN_EXITED` |
