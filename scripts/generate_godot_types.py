@@ -1118,26 +1118,6 @@ def generate_gdscript_watcher(
     print(f"✅ Generated GDScript watcher with {len(valid_types)} node types")
 
 
-def verify_plugin_integration(plugin_file: Path) -> None:
-    """Verify that the plugin is set up to use the generated code"""
-    print("🔍 Verifying plugin integration...")
-
-    with open(plugin_file, "r") as f:
-        content = f.read()
-
-    if "add_comprehensive_node_type_markers" in content:
-        print("✅ Plugin is correctly integrated with generated code")
-    else:
-        print("⚠️  Plugin integration needed:")
-        print(
-            "   1. Add: use super::node_type_checking_generated::add_comprehensive_node_type_markers;"
-        )
-        print(
-            "   2. Replace add_node_type_markers calls with add_comprehensive_node_type_markers"
-        )
-        print("   3. This is a one-time setup - future script runs won't need this")
-
-
 def generate_node_markers(
     wasm_excluded_types: Set[str],
     version_gated_types: Dict[str, List[str]],
@@ -1255,9 +1235,6 @@ def main() -> None:
         / "plugins"
         / "scene_tree"
         / "node_type_checking_generated.rs"
-    )
-    plugin_file = (
-        project_root / "godot-bevy" / "src" / "plugins" / "scene_tree" / "plugin.rs"
     )
     gdscript_watcher_file = (
         project_root / "addons" / "godot-bevy" / "optimized_scene_tree_watcher.gd"
@@ -1400,9 +1377,6 @@ def main() -> None:
             signal_names_file,
             project_root,
         )
-
-        # Step 7: Verify plugin integration
-        verify_plugin_integration(plugin_file)
 
         print(textwrap.dedent(f"""
             🎉 Generation complete!
