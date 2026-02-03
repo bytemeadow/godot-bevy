@@ -562,7 +562,12 @@ def generate_signal_names(
     run_cargo_fmt(signal_names_file, project_root)
 
 
-def _generate_hierarchy_function_comprehensive(wasm_excluded_types: set[str], version_gated_types: dict[str, list[str]], name, types):
+def _generate_hierarchy_function_comprehensive(
+    wasm_excluded_types: set[str],
+    version_gated_types: dict[str, list[str]],
+    name,
+    types,
+):
     """Generate a hierarchy-specific type checking function"""
     content = textwrap.dedent(f"""\
         fn check_{name}_node_types_comprehensive(
@@ -952,7 +957,10 @@ class GodotTypeGenerator:
             self.wasm_excluded_types, self.version_gated_types, "2d", categories["2d"]
         )
         content += _generate_hierarchy_function_comprehensive(
-            self.wasm_excluded_types, self.version_gated_types, "control", categories["control"]
+            self.wasm_excluded_types,
+            self.version_gated_types,
+            "control",
+            categories["control"],
         )
         content += self._generate_universal_function_comprehensive(
             categories["universal"]
