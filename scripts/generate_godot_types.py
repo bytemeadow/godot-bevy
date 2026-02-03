@@ -414,6 +414,22 @@ def sanitize_doc_comment(text):
     return text
 
 
+def get_type_cfg_attribute(
+    wasm_excluded_types: set[str],
+    version_gated_types: dict[str, list[str]],
+    node_type: str,
+) -> str:
+    """Get the cfg attribute for a type if it needs version or feature gating."""
+    # Check for WASM-excluded types first
+    if node_type in wasm_excluded_types:
+        return '#[cfg(not(feature = "experimental-wasm"))]\n'
+    # Check for version-gated types
+    for version, types in version_gated_types.items():
+        if node_type in types:
+            return f'#[cfg(feature = "api-{version}")]\n'
+    return ""
+
+
 class GodotTypeGenerator:
     def __init__(self):
         self.project_root = Path(__file__).parent.parent
@@ -595,17 +611,6 @@ class GodotTypeGenerator:
         print(f"✅ Found {len(filtered_types)} node types")
         return filtered_types, parent_map
 
-    def get_type_cfg_attribute(self, node_type):
-        """Get the cfg attribute for a type if it needs version or feature gating."""
-        # Check for WASM-excluded types first
-        if node_type in self.wasm_excluded_types:
-            return '#[cfg(not(feature = "experimental-wasm"))]\n'
-        # Check for version-gated types
-        for version, types in self.version_gated_types.items():
-            if node_type in types:
-                return f'#[cfg(feature = "api-{version}")]\n'
-        return ""
-
     def generate_node_markers(self, node_types):
         """Generate the node_markers.rs file"""
         print("🏷️  Generating node markers...")
@@ -629,7 +634,9 @@ pub struct NodeMarker;
 
         # Generate all markers
         for node_type in node_types:
-            cfg_attr = self.get_type_cfg_attribute(node_type)
+            cfg_attr = get_type_cfg_attribute(
+                self.wasm_excluded_types, self.version_gated_types, node_type
+            )
             if cfg_attr:
                 content += cfg_attr
             content += f"#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]\n"
@@ -800,7 +807,9 @@ pub fn remove_comprehensive_node_type_markers(
             if node_type == "Node3D":
                 continue  # Skip base type
             marker_name = f"{node_type}Marker"
-            cfg_attr = self.get_type_cfg_attribute(node_type)
+            cfg_attr = get_type_cfg_attribute(
+                self.wasm_excluded_types, self.version_gated_types, node_type
+            )
             if cfg_attr:
                 match_arms.append(f"""        {cfg_attr.strip()}
         "{node_type}" => {{
@@ -818,7 +827,9 @@ pub fn remove_comprehensive_node_type_markers(
             if node_type == "Node2D":
                 continue  # Skip base type
             marker_name = f"{node_type}Marker"
-            cfg_attr = self.get_type_cfg_attribute(node_type)
+            cfg_attr = get_type_cfg_attribute(
+                self.wasm_excluded_types, self.version_gated_types, node_type
+            )
             if cfg_attr:
                 match_arms.append(f"""        {cfg_attr.strip()}
         "{node_type}" => {{
@@ -838,7 +849,9 @@ pub fn remove_comprehensive_node_type_markers(
             if node_type == "Control":
                 continue  # Skip base type
             marker_name = f"{node_type}Marker"
-            cfg_attr = self.get_type_cfg_attribute(node_type)
+            cfg_attr = get_type_cfg_attribute(
+                self.wasm_excluded_types, self.version_gated_types, node_type
+            )
             if cfg_attr:
                 match_arms.append(f"""        {cfg_attr.strip()}
         "{node_type}" => {{
@@ -858,7 +871,9 @@ pub fn remove_comprehensive_node_type_markers(
             if node_type in ["Node", "CanvasItem", "Node3D"]:
                 continue  # Skip base types
             marker_name = f"{node_type}Marker"
-            cfg_attr = self.get_type_cfg_attribute(node_type)
+            cfg_attr = get_type_cfg_attribute(
+                self.wasm_excluded_types, self.version_gated_types, node_type
+            )
             if cfg_attr:
                 match_arms.append(f"""        {cfg_attr.strip()}
         "{node_type}" => {{
@@ -1043,7 +1058,9 @@ func _analyze_node_type(node: Node) -> String:
 
         for node_type in sorted(types):
             rust_class_name = fix_godot_class_name_for_rust(node_type)
-            cfg_attr = self.get_type_cfg_attribute(node_type)
+            cfg_attr = get_type_cfg_attribute(
+                self.wasm_excluded_types, self.version_gated_types, node_type
+            )
             if cfg_attr:
                 content += f"""    {cfg_attr.strip()}
     if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
@@ -1070,7 +1087,9 @@ func _analyze_node_type(node: Node) -> String:
         gated_types = {}
 
         for node_type in sorted(types):
-            cfg_attr = self.get_type_cfg_attribute(node_type)
+            cfg_attr = get_type_cfg_attribute(
+                self.wasm_excluded_types, self.version_gated_types, node_type
+            )
             if cfg_attr:
                 version = cfg_attr.strip()
                 if version not in gated_types:
@@ -1109,7 +1128,9 @@ func _analyze_node_type(node: Node) -> String:
 
         for node_type in sorted(types):
             rust_class_name = fix_godot_class_name_for_rust(node_type)
-            cfg_attr = self.get_type_cfg_attribute(node_type)
+            cfg_attr = get_type_cfg_attribute(
+                self.wasm_excluded_types, self.version_gated_types, node_type
+            )
             if cfg_attr:
                 content += f"""    {cfg_attr.strip()}
     if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
@@ -1136,7 +1157,9 @@ func _analyze_node_type(node: Node) -> String:
         gated_types = {}
 
         for node_type in sorted(types):
-            cfg_attr = self.get_type_cfg_attribute(node_type)
+            cfg_attr = get_type_cfg_attribute(
+                self.wasm_excluded_types, self.version_gated_types, node_type
+            )
             if cfg_attr:
                 version = cfg_attr.strip()
                 if version not in gated_types:
@@ -1224,7 +1247,9 @@ func _analyze_node_type(node: Node) -> String:
             signals_struct_name = f"{rust_class_name}Signals"
 
             # Optional: cfg-gate the whole struct/impl if the class is version-gated
-            cfg_attr = self.get_type_cfg_attribute(class_name)
+            cfg_attr = get_type_cfg_attribute(
+                self.wasm_excluded_types, self.version_gated_types, class_name
+            )
             if cfg_attr:
                 content += cfg_attr
 
