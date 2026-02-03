@@ -640,6 +640,12 @@ def _generate_hierarchy_function_comprehensive(
     return content
 
 
+def filter_valid_godot_classes(excluded_classes: set[str | Any], node_types):
+    """Filter out Godot classes that don't exist or aren't available"""
+    # Use the shared excluded_classes set defined in __init__
+    return [t for t in node_types if t not in excluded_classes]
+
+
 class GodotTypeGenerator:
     def __init__(self):
         self.project_root = Path(__file__).parent.parent
@@ -865,7 +871,7 @@ class GodotTypeGenerator:
         print("🔍 Generating type checking code...")
 
         # Filter out invalid Godot classes first to avoid unnecessary work
-        valid_types = self.filter_valid_godot_classes(node_types)
+        valid_types = filter_valid_godot_classes(self.excluded_classes, node_types)
 
         # Categorize only the valid types
         categories = categorize_types_by_hierarchy(valid_types, parent_map)
@@ -972,11 +978,6 @@ class GodotTypeGenerator:
         print(f"✅ Generated type checking for {len(valid_types)} types")
         run_cargo_fmt(self.type_checking_file, self.project_root)
 
-    def filter_valid_godot_classes(self, node_types):
-        """Filter out Godot classes that don't exist or aren't available"""
-        # Use the shared excluded_classes set defined in __init__
-        return [t for t in node_types if t not in self.excluded_classes]
-
     def _generate_string_match_arms(self, categories):
         """Generate match arms for the string-based marker function"""
         match_arms = []
@@ -1080,7 +1081,7 @@ class GodotTypeGenerator:
         print("📜 Generating GDScript optimized scene tree watcher...")
 
         # Filter and categorize types
-        valid_types = self.filter_valid_godot_classes(node_types)
+        valid_types = filter_valid_godot_classes(self.excluded_classes, node_types)
         categories = categorize_types_by_hierarchy(valid_types, parent_map)
 
         content = textwrap.dedent(f'''\
