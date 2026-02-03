@@ -15,6 +15,7 @@ Usage: python scripts/generate_godot_types.py
 import json
 import subprocess
 import sys
+import textwrap
 from collections import defaultdict
 from pathlib import Path
 
@@ -83,6 +84,334 @@ def run_godot_dump_api(api_file):
     except Exception as e:
         print(f"❌ Error generating extension_api.json: {e}")
         sys.exit(1)
+
+
+def _generate_initial_tree_analysis():
+    """Generate method for analyzing the initial scene tree with type info"""
+    return textwrap.dedent('''
+        func analyze_initial_tree() -> Dictionary:
+            """
+            Analyze the entire initial scene tree and return node information with types.
+            Returns a Dictionary with PackedArrays for maximum performance:
+            {
+                "instance_ids": PackedInt64Array,
+                "node_types": PackedStringArray,
+                "node_names": PackedStringArray,
+                "parent_ids": PackedInt64Array,
+                "collision_masks": PackedInt64Array,
+                "groups": Array[PackedStringArray]  # Added in v2 - may not be present in older addons
+            }
+            Used for optimized initial scene tree setup.
+            """
+            var instance_ids = PackedInt64Array()
+            var node_types = PackedStringArray()
+            var node_names = PackedStringArray()
+            var parent_ids = PackedInt64Array()
+            var collision_masks = PackedInt64Array()
+            var groups = []  # Array of PackedStringArrays
+            var root = get_tree().get_root()
+            if root:
+                _analyze_node_recursive(root, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)
+            
+            return {
+                "instance_ids": instance_ids,
+                "node_types": node_types,
+                "node_names": node_names,
+                "parent_ids": parent_ids,
+                "collision_masks": collision_masks,
+                "groups": groups
+            }
+            
+        func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_types: PackedStringArray, node_names: PackedStringArray, parent_ids: PackedInt64Array, collision_masks: PackedInt64Array, groups: Array):
+            """Recursively analyze nodes and collect type information into PackedArrays"""
+            # Check if node is still valid before processing
+            if not is_instance_valid(node):
+                return
+            
+            # Check if node is marked to be excluded from scene tree watcher
+            if node.has_meta("_bevy_exclude"):
+                return
+            
+            # Add this node's information with pre-analyzed type
+            var instance_id = node.get_instance_id()
+            var node_type = _analyze_node_type(node)
+            var node_name = node.name
+            var parent = node.get_parent()
+            var parent_id = parent and parent.get_instance_id() or 0
+            var collision_mask = _compute_collision_mask(node)
+            
+            # Collect groups for this node
+            var node_groups = PackedStringArray()
+            for group in node.get_groups():
+                node_groups.append(group)
+            
+            # Only append if we have valid data
+            if instance_id != 0 and node_type != "":
+                instance_ids.append(instance_id)
+                node_types.append(node_type)
+                node_names.append(node_name)
+                parent_ids.append(parent_id)
+                collision_masks.append(collision_mask)
+                groups.append(node_groups)
+            
+            # Recursively process children
+            for child in node.get_children():
+                _analyze_node_recursive(child, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)
+        ''')
+
+
+def fix_godot_class_name_for_rust(class_name):
+    """Fix Godot class names to match the actual Rust bindings"""
+    # Map class names from extension API to actual Rust struct names
+    name_fixes = {
+        "CPUParticles2D": "CpuParticles2D",
+        "CPUParticles3D": "CpuParticles3D",
+        "GPUParticles2D": "GpuParticles2D",
+        "GPUParticles3D": "GpuParticles3D",
+        "GPUParticlesAttractor3D": "GpuParticlesAttractor3D",
+        "GPUParticlesAttractorBox3D": "GpuParticlesAttractorBox3D",
+        "GPUParticlesAttractorSphere3D": "GpuParticlesAttractorSphere3D",
+        "GPUParticlesAttractorVectorField3D": "GpuParticlesAttractorVectorField3D",
+        "GPUParticlesCollision3D": "GpuParticlesCollision3D",
+        "GPUParticlesCollisionBox3D": "GpuParticlesCollisionBox3D",
+        "GPUParticlesCollisionHeightField3D": "GpuParticlesCollisionHeightField3D",
+        "GPUParticlesCollisionSDF3D": "GpuParticlesCollisionSdf3d",
+        "GPUParticlesCollisionSphere3D": "GpuParticlesCollisionSphere3D",
+        "HTTPRequest": "HttpRequest",
+        "SkeletonIK3D": "SkeletonIk3d",
+        "Generic6DOFJoint3D": "Generic6DofJoint3D",
+        "OpenXRRenderModel": "OpenXrRenderModel",
+        "OpenXRRenderModelManager": "OpenXrRenderModelManager",
+    }
+
+    return name_fixes.get(class_name, class_name)
+
+
+def signal_name_to_const(signal_name):
+    """Convert a signal name to UPPER_SNAKE_CASE constant name"""
+    import re
+
+    # Handle empty or invalid names
+    if not signal_name:
+        return "SIGNAL"
+
+    # Insert underscores before uppercase letters (for camelCase/PascalCase)
+    result = re.sub("([a-z0-9])([A-Z])", r"\1_\2", signal_name)
+
+    # Replace non-alphanumeric characters with underscores
+    result = re.sub(r"[^a-zA-Z0-9_]", "_", result)
+
+    # Convert to uppercase
+    result = result.upper()
+
+    # Collapse multiple underscores
+    result = re.sub(r"_+", "_", result)
+
+    # Strip leading/trailing underscores
+    result = result.strip("_")
+
+    # Ensure it doesn't start with a digit (prepend underscore if needed)
+    if result and result[0].isdigit():
+        result = "_" + result
+
+    # Fallback if empty after processing
+    if not result:
+        result = "SIGNAL"
+
+    return result
+
+
+def _generate_gdscript_type_analysis(categories):
+    """Generate the GDScript node type analysis function"""
+    # Node3D hierarchy (most common in 3D games)
+    lines = [
+        "\t# Check Node3D hierarchy first (most common in 3D games)",
+        "\tif node is Node3D:",
+    ]
+
+    # Add common 3D types first for better performance
+    common_3d = [
+        "MeshInstance3D",
+        "StaticBody3D",
+        "RigidBody3D",
+        "CharacterBody3D",
+        "Area3D",
+        "Camera3D",
+        "DirectionalLight3D",
+        "OmniLight3D",
+        "SpotLight3D",
+        "CollisionShape3D",
+    ]
+
+    for node_type in common_3d:
+        if node_type in categories["3d"]:
+            lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+
+    # Add remaining 3D types
+    for node_type in sorted(categories["3d"]):
+        if node_type not in common_3d:
+            lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+
+    lines.append('\t\treturn "Node3D"')
+    lines.append("")
+
+    # Node2D hierarchy (common in 2D games)
+    lines.append("\t# Check Node2D hierarchy (common in 2D games)")
+    lines.append("\telif node is Node2D:")
+
+    # Add common 2D types first
+    common_2d = [
+        "Sprite2D",
+        "StaticBody2D",
+        "RigidBody2D",
+        "CharacterBody2D",
+        "Area2D",
+        "Camera2D",
+        "CollisionShape2D",
+        "AnimatedSprite2D",
+    ]
+
+    for node_type in common_2d:
+        if node_type in categories["2d"]:
+            lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+
+    # Add remaining 2D types
+    for node_type in sorted(categories["2d"]):
+        if node_type not in common_2d:
+            lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+
+    lines.append('\t\treturn "Node2D"')
+    lines.append("")
+
+    # Control hierarchy (UI elements)
+    lines.append("\t# Check Control hierarchy (UI elements)")
+    lines.append("\telif node is Control:")
+
+    # Add common UI types first
+    common_control = [
+        "Button",
+        "Label",
+        "Panel",
+        "VBoxContainer",
+        "HBoxContainer",
+        "MarginContainer",
+        "ColorRect",
+        "LineEdit",
+        "TextEdit",
+        "CheckBox",
+    ]
+
+    for node_type in common_control:
+        if node_type in categories["control"]:
+            lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+
+    # Add remaining Control types
+    for node_type in sorted(categories["control"]):
+        if node_type not in common_control:
+            lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+
+    lines.append('\t\treturn "Control"')
+    lines.append("")
+
+    # Universal types (direct Node children)
+    lines.append("\t# Check other common node types that inherit directly from Node")
+    common_universal = [
+        "AnimationPlayer",
+        "Timer",
+        "AudioStreamPlayer",
+        "HTTPRequest",
+        "CanvasLayer",
+    ]
+
+    for node_type in common_universal:
+        if node_type in categories["universal"]:
+            lines.append(f'\telif node is {node_type}: return "{node_type}"')
+
+    # Add remaining universal types
+    for node_type in sorted(categories["universal"]):
+        if node_type not in common_universal:
+            lines.append(f'\telif node is {node_type}: return "{node_type}"')
+
+    return "\n".join(lines)
+
+
+def bbcode_to_markdown(text):
+    """Convert Godot BBCode format to Rustdoc-compatible Markdown"""
+    import re
+    from textwrap import dedent
+
+    # Basic inline formatting
+    text = text.replace("[b]", "**").replace("[/b]", "**")
+    text = text.replace("[i]", "*").replace("[/i]", "*")
+    text = text.replace("[code]", "`").replace("[/code]", "`")
+
+    # [member something] -> `something`
+    text = re.sub(r"\[member\s+([^]]+)]", r"`\1`", text)
+
+    # [param something] -> `something`
+    text = re.sub(r"\[param\s+([^]]+)]", r"`\1`", text)
+
+    # [constant something] -> `something`
+    text = re.sub(r"\[constant\s+([^]]+)]", r"`\1`", text)
+
+    # [method something] -> `something()`
+    text = re.sub(r"\[method\s+([^]]+)]", r"`\1()`", text)
+
+    # [signal something] -> `something`
+    text = re.sub(r"\[signal\s+([^]]+)]", r"`\1`", text)
+
+    # [enum something] -> `something`
+    text = re.sub(r"\[enum\s+([^]]+)]", r"`\1`", text)
+
+    # [url=...]...[/url] -> [link text](url)
+    text = re.sub(r"\[url=([^]]+)]([^\[]+)\[/url]", r"[\2](\1)", text)
+
+    # [codeblock]...[/codeblock] -> ```text\n...\n```
+    def codeblock_repl(m):
+        code = m.group(1).strip()
+        # Dedent the code block
+        code = dedent(code)
+        return f"\n```text\n{code}\n```\n"
+
+    text = re.sub(r"\[codeblock](.*?)\[/codeblock]", codeblock_repl, text, flags=re.S)
+
+    # [codeblocks] (with language specified)
+    def codeblocks_repl(m):
+        code = m.group(1).strip()
+        code = dedent(code)
+        return f"\n```gdscript\n{code}\n```\n"
+
+    text = re.sub(
+        r"\[codeblocks](.*?)\[/codeblocks]", codeblocks_repl, text, flags=re.S
+    )
+
+    # Remove any remaining BBCode-style tags that we didn't handle
+    text = re.sub(r"\[/?[a-zA-Z0-9_]+]", "", text)
+
+    return text
+
+
+def sanitize_doc_comment(text):
+    """Sanitize text to be safe for Rustdoc /// comments"""
+    # The main concern is preventing */ or */ sequences that could escape the comment
+    # Also handle other problematic sequences
+
+    # Replace tabs with 4 spaces for consistent formatting
+    text = text.replace("\t", "    ")
+
+    # Replace */ with *\/ to prevent closing block comments
+    text = text.replace("*/", r"*\/")
+
+    # Replace leading /// with \/\/\/ to prevent nested doc comments
+    text = text.replace("///", r"\/\/\/")
+
+    # Ensure we don't have unclosed backticks that would break markdown
+    # Count backticks and add one if odd
+    backtick_count = text.count("`")
+    if backtick_count % 2 != 0:
+        text += "`"
+
+    return text
 
 
 class GodotTypeGenerator:
@@ -452,67 +781,6 @@ pub fn remove_comprehensive_node_type_markers(
         # Use the shared excluded_classes set defined in __init__
         return [t for t in node_types if t not in self.excluded_classes]
 
-    @staticmethod
-    def fix_godot_class_name_for_rust(class_name):
-        """Fix Godot class names to match the actual Rust bindings"""
-        # Map class names from extension API to actual Rust struct names
-        name_fixes = {
-            "CPUParticles2D": "CpuParticles2D",
-            "CPUParticles3D": "CpuParticles3D",
-            "GPUParticles2D": "GpuParticles2D",
-            "GPUParticles3D": "GpuParticles3D",
-            "GPUParticlesAttractor3D": "GpuParticlesAttractor3D",
-            "GPUParticlesAttractorBox3D": "GpuParticlesAttractorBox3D",
-            "GPUParticlesAttractorSphere3D": "GpuParticlesAttractorSphere3D",
-            "GPUParticlesAttractorVectorField3D": "GpuParticlesAttractorVectorField3D",
-            "GPUParticlesCollision3D": "GpuParticlesCollision3D",
-            "GPUParticlesCollisionBox3D": "GpuParticlesCollisionBox3D",
-            "GPUParticlesCollisionHeightField3D": "GpuParticlesCollisionHeightField3D",
-            "GPUParticlesCollisionSDF3D": "GpuParticlesCollisionSdf3d",
-            "GPUParticlesCollisionSphere3D": "GpuParticlesCollisionSphere3D",
-            "HTTPRequest": "HttpRequest",
-            "SkeletonIK3D": "SkeletonIk3d",
-            "Generic6DOFJoint3D": "Generic6DofJoint3D",
-            "OpenXRRenderModel": "OpenXrRenderModel",
-            "OpenXRRenderModelManager": "OpenXrRenderModelManager",
-        }
-
-        return name_fixes.get(class_name, class_name)
-
-    @staticmethod
-    def signal_name_to_const(signal_name):
-        """Convert a signal name to UPPER_SNAKE_CASE constant name"""
-        import re
-
-        # Handle empty or invalid names
-        if not signal_name:
-            return "SIGNAL"
-
-        # Insert underscores before uppercase letters (for camelCase/PascalCase)
-        result = re.sub("([a-z0-9])([A-Z])", r"\1_\2", signal_name)
-
-        # Replace non-alphanumeric characters with underscores
-        result = re.sub(r"[^a-zA-Z0-9_]", "_", result)
-
-        # Convert to uppercase
-        result = result.upper()
-
-        # Collapse multiple underscores
-        result = re.sub(r"_+", "_", result)
-
-        # Strip leading/trailing underscores
-        result = result.strip("_")
-
-        # Ensure it doesn't start with a digit (prepend underscore if needed)
-        if result and result[0].isdigit():
-            result = "_" + result
-
-        # Fallback if empty after processing
-        if not result:
-            result = "SIGNAL"
-
-        return result
-
     def _generate_string_match_arms(self, categories):
         """Generate match arms for the string-based marker function"""
         match_arms = []
@@ -752,206 +1020,18 @@ func _analyze_node_type(node: Node) -> String:
 	Generated from Godot extension API to ensure completeness.
 	"""
 
-{self._generate_gdscript_type_analysis(categories)}
+{_generate_gdscript_type_analysis(categories)}
 
 	# Default fallback
 	return "Node"
 
-{self._generate_initial_tree_analysis()}
+{_generate_initial_tree_analysis()}
 '''
 
         with open(self.gdscript_watcher_file, "w") as f:
             f.write(content)
 
         print(f"✅ Generated GDScript watcher with {len(valid_types)} node types")
-
-    @staticmethod
-    def _generate_gdscript_type_analysis(categories):
-        """Generate the GDScript node type analysis function"""
-        # Node3D hierarchy (most common in 3D games)
-        lines = [
-            "\t# Check Node3D hierarchy first (most common in 3D games)",
-            "\tif node is Node3D:",
-        ]
-
-        # Add common 3D types first for better performance
-        common_3d = [
-            "MeshInstance3D",
-            "StaticBody3D",
-            "RigidBody3D",
-            "CharacterBody3D",
-            "Area3D",
-            "Camera3D",
-            "DirectionalLight3D",
-            "OmniLight3D",
-            "SpotLight3D",
-            "CollisionShape3D",
-        ]
-
-        for node_type in common_3d:
-            if node_type in categories["3d"]:
-                lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
-
-        # Add remaining 3D types
-        for node_type in sorted(categories["3d"]):
-            if node_type not in common_3d:
-                lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
-
-        lines.append('\t\treturn "Node3D"')
-        lines.append("")
-
-        # Node2D hierarchy (common in 2D games)
-        lines.append("\t# Check Node2D hierarchy (common in 2D games)")
-        lines.append("\telif node is Node2D:")
-
-        # Add common 2D types first
-        common_2d = [
-            "Sprite2D",
-            "StaticBody2D",
-            "RigidBody2D",
-            "CharacterBody2D",
-            "Area2D",
-            "Camera2D",
-            "CollisionShape2D",
-            "AnimatedSprite2D",
-        ]
-
-        for node_type in common_2d:
-            if node_type in categories["2d"]:
-                lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
-
-        # Add remaining 2D types
-        for node_type in sorted(categories["2d"]):
-            if node_type not in common_2d:
-                lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
-
-        lines.append('\t\treturn "Node2D"')
-        lines.append("")
-
-        # Control hierarchy (UI elements)
-        lines.append("\t# Check Control hierarchy (UI elements)")
-        lines.append("\telif node is Control:")
-
-        # Add common UI types first
-        common_control = [
-            "Button",
-            "Label",
-            "Panel",
-            "VBoxContainer",
-            "HBoxContainer",
-            "MarginContainer",
-            "ColorRect",
-            "LineEdit",
-            "TextEdit",
-            "CheckBox",
-        ]
-
-        for node_type in common_control:
-            if node_type in categories["control"]:
-                lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
-
-        # Add remaining Control types
-        for node_type in sorted(categories["control"]):
-            if node_type not in common_control:
-                lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
-
-        lines.append('\t\treturn "Control"')
-        lines.append("")
-
-        # Universal types (direct Node children)
-        lines.append(
-            "\t# Check other common node types that inherit directly from Node"
-        )
-        common_universal = [
-            "AnimationPlayer",
-            "Timer",
-            "AudioStreamPlayer",
-            "HTTPRequest",
-            "CanvasLayer",
-        ]
-
-        for node_type in common_universal:
-            if node_type in categories["universal"]:
-                lines.append(f'\telif node is {node_type}: return "{node_type}"')
-
-        # Add remaining universal types
-        for node_type in sorted(categories["universal"]):
-            if node_type not in common_universal:
-                lines.append(f'\telif node is {node_type}: return "{node_type}"')
-
-        return "\n".join(lines)
-
-    @staticmethod
-    def _generate_initial_tree_analysis():
-        """Generate method for analyzing the initial scene tree with type info"""
-        return '''func analyze_initial_tree() -> Dictionary:
-	"""
-	Analyze the entire initial scene tree and return node information with types.
-	Returns a Dictionary with PackedArrays for maximum performance:
-	{
-		"instance_ids": PackedInt64Array,
-		"node_types": PackedStringArray,
-		"node_names": PackedStringArray,
-		"parent_ids": PackedInt64Array,
-		"collision_masks": PackedInt64Array,
-		"groups": Array[PackedStringArray]  # Added in v2 - may not be present in older addons
-	}
-	Used for optimized initial scene tree setup.
-	"""
-	var instance_ids = PackedInt64Array()
-	var node_types = PackedStringArray()
-	var node_names = PackedStringArray()
-	var parent_ids = PackedInt64Array()
-	var collision_masks = PackedInt64Array()
-	var groups = []  # Array of PackedStringArrays
-	var root = get_tree().get_root()
-	if root:
-		_analyze_node_recursive(root, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)
-
-	return {
-		"instance_ids": instance_ids,
-		"node_types": node_types,
-		"node_names": node_names,
-		"parent_ids": parent_ids,
-		"collision_masks": collision_masks,
-		"groups": groups
-	}
-
-func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_types: PackedStringArray, node_names: PackedStringArray, parent_ids: PackedInt64Array, collision_masks: PackedInt64Array, groups: Array):
-	"""Recursively analyze nodes and collect type information into PackedArrays"""
-	# Check if node is still valid before processing
-	if not is_instance_valid(node):
-		return
-
-	# Check if node is marked to be excluded from scene tree watcher
-	if node.has_meta("_bevy_exclude"):
-		return
-
-	# Add this node's information with pre-analyzed type
-	var instance_id = node.get_instance_id()
-	var node_type = _analyze_node_type(node)
-	var node_name = node.name
-	var parent = node.get_parent()
-	var parent_id = parent and parent.get_instance_id() or 0
-	var collision_mask = _compute_collision_mask(node)
-
-	# Collect groups for this node
-	var node_groups = PackedStringArray()
-	for group in node.get_groups():
-		node_groups.append(group)
-
-	# Only append if we have valid data
-	if instance_id != 0 and node_type != "":
-		instance_ids.append(instance_id)
-		node_types.append(node_type)
-		node_names.append(node_name)
-		parent_ids.append(parent_id)
-		collision_masks.append(collision_mask)
-		groups.append(node_groups)
-
-	# Recursively process children
-	for child in node.get_children():
-		_analyze_node_recursive(child, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)'''
 
     def _generate_hierarchy_function_comprehensive(self, name, types):
         """Generate a hierarchy-specific type checking function"""
@@ -962,7 +1042,7 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 """
 
         for node_type in sorted(types):
-            rust_class_name = self.fix_godot_class_name_for_rust(node_type)
+            rust_class_name = fix_godot_class_name_for_rust(node_type)
             cfg_attr = self.get_type_cfg_attribute(node_type)
             if cfg_attr:
                 content += f"""    {cfg_attr.strip()}
@@ -1028,7 +1108,7 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 """
 
         for node_type in sorted(types):
-            rust_class_name = self.fix_godot_class_name_for_rust(node_type)
+            rust_class_name = fix_godot_class_name_for_rust(node_type)
             cfg_attr = self.get_type_cfg_attribute(node_type)
             if cfg_attr:
                 content += f"""    {cfg_attr.strip()}
@@ -1140,7 +1220,7 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 
         # Generate a dedicated *Signals struct and impl block for each class
         for class_name, class_info, signals in classes_with_signals:
-            rust_class_name = self.fix_godot_class_name_for_rust(class_name)
+            rust_class_name = fix_godot_class_name_for_rust(class_name)
             signals_struct_name = f"{rust_class_name}Signals"
 
             # Optional: cfg-gate the whole struct/impl if the class is version-gated
@@ -1161,14 +1241,14 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
             for signal in signals:
                 signal_name = signal["name"]
                 description = signal.get("description", "").strip()
-                const_name = self.signal_name_to_const(signal_name)
+                const_name = signal_name_to_const(signal_name)
 
                 # Add doc comment with description if available
                 if description:
                     # Convert BBCode to Markdown
-                    description = self.bbcode_to_markdown(description)
+                    description = bbcode_to_markdown(description)
                     # Sanitize to prevent escaping doc comments
-                    description = self.sanitize_doc_comment(description)
+                    description = sanitize_doc_comment(description)
 
                     # Format description for Rust doc comments
                     description_lines = description.replace("\r\n", "\n").split("\n")
@@ -1197,87 +1277,6 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
             f"✅ Generated {signal_count} signal constants across {len(classes_with_signals)} classes"
         )
         run_cargo_fmt(self.signal_names_file, self.project_root)
-
-    @staticmethod
-    def bbcode_to_markdown(text):
-        """Convert Godot BBCode format to Rustdoc-compatible Markdown"""
-        import re
-        from textwrap import dedent
-
-        # Basic inline formatting
-        text = text.replace("[b]", "**").replace("[/b]", "**")
-        text = text.replace("[i]", "*").replace("[/i]", "*")
-        text = text.replace("[code]", "`").replace("[/code]", "`")
-
-        # [member something] -> `something`
-        text = re.sub(r"\[member\s+([^]]+)]", r"`\1`", text)
-
-        # [param something] -> `something`
-        text = re.sub(r"\[param\s+([^]]+)]", r"`\1`", text)
-
-        # [constant something] -> `something`
-        text = re.sub(r"\[constant\s+([^]]+)]", r"`\1`", text)
-
-        # [method something] -> `something()`
-        text = re.sub(r"\[method\s+([^]]+)]", r"`\1()`", text)
-
-        # [signal something] -> `something`
-        text = re.sub(r"\[signal\s+([^]]+)]", r"`\1`", text)
-
-        # [enum something] -> `something`
-        text = re.sub(r"\[enum\s+([^]]+)]", r"`\1`", text)
-
-        # [url=...]...[/url] -> [link text](url)
-        text = re.sub(r"\[url=([^]]+)]([^\[]+)\[/url]", r"[\2](\1)", text)
-
-        # [codeblock]...[/codeblock] -> ```text\n...\n```
-        def codeblock_repl(m):
-            code = m.group(1).strip()
-            # Dedent the code block
-            code = dedent(code)
-            return f"\n```text\n{code}\n```\n"
-
-        text = re.sub(
-            r"\[codeblock](.*?)\[/codeblock]", codeblock_repl, text, flags=re.S
-        )
-
-        # [codeblocks] (with language specified)
-        def codeblocks_repl(m):
-            code = m.group(1).strip()
-            code = dedent(code)
-            return f"\n```gdscript\n{code}\n```\n"
-
-        text = re.sub(
-            r"\[codeblocks](.*?)\[/codeblocks]", codeblocks_repl, text, flags=re.S
-        )
-
-        # Remove any remaining BBCode-style tags that we didn't handle
-        text = re.sub(r"\[/?[a-zA-Z0-9_]+]", "", text)
-
-        return text
-
-    @staticmethod
-    def sanitize_doc_comment(text):
-        """Sanitize text to be safe for Rustdoc /// comments"""
-        # The main concern is preventing */ or */ sequences that could escape the comment
-        # Also handle other problematic sequences
-
-        # Replace tabs with 4 spaces for consistent formatting
-        text = text.replace("\t", "    ")
-
-        # Replace */ with *\/ to prevent closing block comments
-        text = text.replace("*/", r"*\/")
-
-        # Replace leading /// with \/\/\/ to prevent nested doc comments
-        text = text.replace("///", r"\/\/\/")
-
-        # Ensure we don't have unclosed backticks that would break markdown
-        # Count backticks and add one if odd
-        backtick_count = text.count("`")
-        if backtick_count % 2 != 0:
-            text += "`"
-
-        return text
 
     def run(self):
         """Run the complete generation pipeline"""
