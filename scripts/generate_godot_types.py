@@ -562,6 +562,79 @@ def generate_signal_names(
     run_cargo_fmt(signal_names_file, project_root)
 
 
+def _generate_hierarchy_function_comprehensive(wasm_excluded_types: set[str], version_gated_types: dict[str, list[str]], name, types):
+    """Generate a hierarchy-specific type checking function"""
+    content = textwrap.dedent(f"""\
+        fn check_{name}_node_types_comprehensive(
+            entity_commands: &mut EntityCommands,
+            node: &mut GodotNode,
+        ) {{
+        """)
+
+    for node_type in sorted(types):
+        rust_class_name = fix_godot_class_name_for_rust(node_type)
+        cfg_attr = get_type_cfg_attribute(
+            wasm_excluded_types, version_gated_types, node_type
+        )
+        if cfg_attr:
+            content += textwrap.dedent(f"""\
+                        {cfg_attr.strip()}
+                    if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
+                        entity_commands.insert({node_type}Marker);
+                    }}
+                """)
+        else:
+            content += textwrap.dedent(f"""\
+                    if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
+                        entity_commands.insert({node_type}Marker);
+                    }}
+                """)
+
+    content += "}\n\n"
+
+    content += textwrap.dedent(f"""\
+        fn remove_{name}_node_types_comprehensive(
+            entity_commands: &mut EntityCommands,
+            _node: &mut GodotNode,
+        ) {{
+            entity_commands
+        """)
+
+    # Separate regular and version-gated types
+    regular_types = []
+    gated_types = {}
+
+    for node_type in sorted(types):
+        cfg_attr = get_type_cfg_attribute(
+            wasm_excluded_types, version_gated_types, node_type
+        )
+        if cfg_attr:
+            version = cfg_attr.strip()
+            if version not in gated_types:
+                gated_types[version] = []
+            gated_types[version].append(node_type)
+        else:
+            regular_types.append(node_type)
+
+    # Generate regular removes in a chain
+    for node_type in regular_types:
+        content += f"        .remove::<{node_type}Marker>()\n"
+
+    # Close the chain with semicolon
+    content += ";\n"
+
+    # Generate version-gated removes separately
+    for version, types_list in gated_types.items():
+        content += f"\n    {version}\n"
+        content += "    entity_commands\n"
+        for node_type in types_list:
+            content += f"        .remove::<{node_type}Marker>()\n"
+        content += ";\n"
+
+    content += "}\n\n"
+    return content
+
+
 class GodotTypeGenerator:
     def __init__(self):
         self.project_root = Path(__file__).parent.parent
@@ -872,14 +945,14 @@ class GodotTypeGenerator:
             """)
 
         # Generate specific checking functions
-        content += self._generate_hierarchy_function_comprehensive(
-            "3d", categories["3d"]
+        content += _generate_hierarchy_function_comprehensive(
+            self.wasm_excluded_types, self.version_gated_types, "3d", categories["3d"]
         )
-        content += self._generate_hierarchy_function_comprehensive(
-            "2d", categories["2d"]
+        content += _generate_hierarchy_function_comprehensive(
+            self.wasm_excluded_types, self.version_gated_types, "2d", categories["2d"]
         )
-        content += self._generate_hierarchy_function_comprehensive(
-            "control", categories["control"]
+        content += _generate_hierarchy_function_comprehensive(
+            self.wasm_excluded_types, self.version_gated_types, "control", categories["control"]
         )
         content += self._generate_universal_function_comprehensive(
             categories["universal"]
@@ -1156,78 +1229,6 @@ class GodotTypeGenerator:
             f.write(content)
 
         print(f"✅ Generated GDScript watcher with {len(valid_types)} node types")
-
-    def _generate_hierarchy_function_comprehensive(self, name, types):
-        """Generate a hierarchy-specific type checking function"""
-        content = textwrap.dedent(f"""\
-            fn check_{name}_node_types_comprehensive(
-                entity_commands: &mut EntityCommands,
-                node: &mut GodotNode,
-            ) {{
-            """)
-
-        for node_type in sorted(types):
-            rust_class_name = fix_godot_class_name_for_rust(node_type)
-            cfg_attr = get_type_cfg_attribute(
-                self.wasm_excluded_types, self.version_gated_types, node_type
-            )
-            if cfg_attr:
-                content += textwrap.dedent(f"""\
-                            {cfg_attr.strip()}
-                        if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
-                            entity_commands.insert({node_type}Marker);
-                        }}
-                    """)
-            else:
-                content += textwrap.dedent(f"""\
-                        if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
-                            entity_commands.insert({node_type}Marker);
-                        }}
-                    """)
-
-        content += "}\n\n"
-
-        content += textwrap.dedent(f"""\
-            fn remove_{name}_node_types_comprehensive(
-                entity_commands: &mut EntityCommands,
-                _node: &mut GodotNode,
-            ) {{
-                entity_commands
-            """)
-
-        # Separate regular and version-gated types
-        regular_types = []
-        gated_types = {}
-
-        for node_type in sorted(types):
-            cfg_attr = get_type_cfg_attribute(
-                self.wasm_excluded_types, self.version_gated_types, node_type
-            )
-            if cfg_attr:
-                version = cfg_attr.strip()
-                if version not in gated_types:
-                    gated_types[version] = []
-                gated_types[version].append(node_type)
-            else:
-                regular_types.append(node_type)
-
-        # Generate regular removes in a chain
-        for node_type in regular_types:
-            content += f"        .remove::<{node_type}Marker>()\n"
-
-        # Close the chain with semicolon
-        content += ";\n"
-
-        # Generate version-gated removes separately
-        for version, types_list in gated_types.items():
-            content += f"\n    {version}\n"
-            content += "    entity_commands\n"
-            for node_type in types_list:
-                content += f"        .remove::<{node_type}Marker>()\n"
-            content += ";\n"
-
-        content += "}\n\n"
-        return content
 
     def _generate_universal_function_comprehensive(self, types):
         """Generate the universal types checking function"""
