@@ -1239,214 +1239,194 @@ def load_and_parse_extension_api(
     return filtered_types, parent_map, classes_by_name
 
 
-class GodotTypeGenerator:
-    def __init__(self):
-        self.project_root = Path(__file__).parent.parent
-        self.api_file = self.project_root / "extension_api.json"
-        self.node_markers_file = (
-            self.project_root / "godot-bevy" / "src" / "interop" / "node_markers.rs"
+def main() -> None:
+    """Run the complete generation pipeline"""
+    print("🎯 Starting Godot type generation pipeline...")
+
+    project_root = Path(__file__).parent.parent
+    api_file = project_root / "extension_api.json"
+    node_markers_file = (
+        project_root / "godot-bevy" / "src" / "interop" / "node_markers.rs"
+    )
+    type_checking_file = (
+        project_root
+        / "godot-bevy"
+        / "src"
+        / "plugins"
+        / "scene_tree"
+        / "node_type_checking_generated.rs"
+    )
+    plugin_file = (
+        project_root / "godot-bevy" / "src" / "plugins" / "scene_tree" / "plugin.rs"
+    )
+    gdscript_watcher_file = (
+        project_root / "addons" / "godot-bevy" / "optimized_scene_tree_watcher.gd"
+    )
+    signal_names_file = (
+        project_root / "godot-bevy" / "src" / "interop" / "signal_names.rs"
+    )
+
+    # Known classes that don't exist in current Godot version or aren't available
+    # Used for filtering both node types and signal generation
+    excluded_classes = {
+        # CSG classes (require special module)
+        "CSGBox3D",
+        "CSGCombiner3D",
+        "CSGCylinder3D",
+        "CSGMesh3D",
+        "CSGPolygon3D",
+        "CSGPrimitive3D",
+        "CSGShape3D",
+        "CSGSphere3D",
+        "CSGTorus3D",
+        # Editor classes
+        "GridMapEditorPlugin",
+        "ScriptCreateDialog",
+        "FileSystemDock",
+        "OpenXRBindingModifierEditor",
+        "OpenXRInteractionProfileEditor",
+        "OpenXRInteractionProfileEditorBase",
+        # XR classes that might not be available
+        "XRAnchor3D",
+        "XRBodyModifier3D",
+        "XRCamera3D",
+        "XRController3D",
+        "XRFaceModifier3D",
+        "XRHandModifier3D",
+        "XRNode3D",
+        "XROrigin3D",
+        # OpenXR classes
+        "OpenXRCompositionLayer",
+        "OpenXRCompositionLayerCylinder",
+        "OpenXRCompositionLayerEquirect",
+        "OpenXRCompositionLayerQuad",
+        "OpenXRHand",
+        "OpenXRVisibilityMask",
+        # Classes that might not be available in all builds
+        "VoxelGI",
+        "LightmapGI",
+        "FogVolume",
+        "WorldEnvironment",
+        # Navigation classes (might be module-specific)
+        "NavigationAgent2D",
+        "NavigationAgent3D",
+        "NavigationLink2D",
+        "NavigationLink3D",
+        "NavigationObstacle2D",
+        "NavigationObstacle3D",
+        "NavigationRegion2D",
+        "NavigationRegion3D",
+        # Other problematic classes
+        "StatusIndicator",
+        # Graph classes (not available in all Godot builds)
+        "GraphEdit",
+        "GraphElement",
+        "GraphFrame",
+        "GraphNode",
+        # Parallax2D is in extension API but not in current Rust bindings
+        "Parallax2D",
+    }
+
+    # Types that require specific Godot API versions
+    # Based on Godot release notes and documentation
+    version_gated_types = {
+        "4-3": [  # Types added in Godot 4.3+
+            "TileMapLayer",  # Replaces old TileMap layers system
+            "AnimationMixer",  # Base class for animation (introduced 4.2, enhanced 4.3)
+            "AudioStreamInteractive",  # Interactive music support
+            "AudioStreamPlaylist",  # Playlist support
+            "AudioStreamSynchronized",  # Synchronized audio streams
+        ],
+        "4-4": [  # Types added in Godot 4.4+
+            "LookAtModifier3D",  # New 3D animation modifier
+            "RetargetModifier3D",  # Animation retargeting
+            "SpringBoneSimulator3D",  # Physics-based animation
+            "SpringBoneCollision3D",  # Spring bone collision base
+            "SpringBoneCollisionCapsule3D",  # Capsule collision for spring bones
+            "SpringBoneCollisionPlane3D",  # Plane collision for spring bones
+            "SpringBoneCollisionSphere3D",  # Sphere collision for spring bones
+        ],
+        # Note: Godot 4.5 didn't add significant new node types
+    }
+
+    # Types that are excluded when building for web/WASM
+    # These types don't exist in the web extension API
+    wasm_excluded_types = {
+        "OpenXRRenderModel",
+        "OpenXRRenderModelManager",
+    }
+
+    try:
+        # Step 1: Generate extension API
+        run_godot_dump_api(api_file)
+
+        # Step 2: Parse API and extract types
+        node_types, parent_map, classes_by_name = load_and_parse_extension_api(api_file)
+
+        # Step 3: Generate node markers
+        generate_node_markers(
+            wasm_excluded_types,
+            version_gated_types,
+            node_markers_file,
+            project_root,
+            node_types,
         )
-        self.signal_names_file = (
-            self.project_root / "godot-bevy" / "src" / "interop" / "signal_names.rs"
-        )
-        self.type_checking_file = (
-            self.project_root
-            / "godot-bevy"
-            / "src"
-            / "plugins"
-            / "scene_tree"
-            / "node_type_checking_generated.rs"
-        )
-        self.plugin_file = (
-            self.project_root
-            / "godot-bevy"
-            / "src"
-            / "plugins"
-            / "scene_tree"
-            / "plugin.rs"
-        )
-        self.gdscript_watcher_file = (
-            self.project_root
-            / "addons"
-            / "godot-bevy"
-            / "optimized_scene_tree_watcher.gd"
-        )
-        self.signal_names_file = (
-            self.project_root / "godot-bevy" / "src" / "interop" / "signal_names.rs"
+
+        # Step 4: Generate type checking code
+        generate_type_checking_code(
+            excluded_classes,
+            wasm_excluded_types,
+            version_gated_types,
+            type_checking_file,
+            project_root,
+            node_types,
+            parent_map,
         )
 
-        # Known classes that don't exist in current Godot version or aren't available
-        # Used for filtering both node types and signal generation
-        self.excluded_classes = {
-            # CSG classes (require special module)
-            "CSGBox3D",
-            "CSGCombiner3D",
-            "CSGCylinder3D",
-            "CSGMesh3D",
-            "CSGPolygon3D",
-            "CSGPrimitive3D",
-            "CSGShape3D",
-            "CSGSphere3D",
-            "CSGTorus3D",
-            # Editor classes
-            "GridMapEditorPlugin",
-            "ScriptCreateDialog",
-            "FileSystemDock",
-            "OpenXRBindingModifierEditor",
-            "OpenXRInteractionProfileEditor",
-            "OpenXRInteractionProfileEditorBase",
-            # XR classes that might not be available
-            "XRAnchor3D",
-            "XRBodyModifier3D",
-            "XRCamera3D",
-            "XRController3D",
-            "XRFaceModifier3D",
-            "XRHandModifier3D",
-            "XRNode3D",
-            "XROrigin3D",
-            # OpenXR classes
-            "OpenXRCompositionLayer",
-            "OpenXRCompositionLayerCylinder",
-            "OpenXRCompositionLayerEquirect",
-            "OpenXRCompositionLayerQuad",
-            "OpenXRHand",
-            "OpenXRVisibilityMask",
-            # Classes that might not be available in all builds
-            "VoxelGI",
-            "LightmapGI",
-            "FogVolume",
-            "WorldEnvironment",
-            # Navigation classes (might be module-specific)
-            "NavigationAgent2D",
-            "NavigationAgent3D",
-            "NavigationLink2D",
-            "NavigationLink3D",
-            "NavigationObstacle2D",
-            "NavigationObstacle3D",
-            "NavigationRegion2D",
-            "NavigationRegion3D",
-            # Other problematic classes
-            "StatusIndicator",
-            # Graph classes (not available in all Godot builds)
-            "GraphEdit",
-            "GraphElement",
-            "GraphFrame",
-            "GraphNode",
-            # Parallax2D is in extension API but not in current Rust bindings
-            "Parallax2D",
-        }
+        # Step 5: Generate optimized GDScript watcher
+        generate_gdscript_watcher(
+            excluded_classes,
+            gdscript_watcher_file,
+            node_types,
+            parent_map,
+        )
 
-        # Types that require specific Godot API versions
-        # Based on Godot release notes and documentation
-        self.version_gated_types = {
-            "4-3": [  # Types added in Godot 4.3+
-                "TileMapLayer",  # Replaces old TileMap layers system
-                "AnimationMixer",  # Base class for animation (introduced 4.2, enhanced 4.3)
-                "AudioStreamInteractive",  # Interactive music support
-                "AudioStreamPlaylist",  # Playlist support
-                "AudioStreamSynchronized",  # Synchronized audio streams
-            ],
-            "4-4": [  # Types added in Godot 4.4+
-                "LookAtModifier3D",  # New 3D animation modifier
-                "RetargetModifier3D",  # Animation retargeting
-                "SpringBoneSimulator3D",  # Physics-based animation
-                "SpringBoneCollision3D",  # Spring bone collision base
-                "SpringBoneCollisionCapsule3D",  # Capsule collision for spring bones
-                "SpringBoneCollisionPlane3D",  # Plane collision for spring bones
-                "SpringBoneCollisionSphere3D",  # Sphere collision for spring bones
-            ],
-            # Note: Godot 4.5 didn't add significant new node types
-        }
+        # Step 6: Generate signal names
+        generate_signal_names(
+            classes_by_name,
+            excluded_classes,
+            wasm_excluded_types,
+            version_gated_types,
+            signal_names_file,
+            project_root,
+        )
 
-        # Types that are excluded when building for web/WASM
-        # These types don't exist in the web extension API
-        self.wasm_excluded_types = {
-            "OpenXRRenderModel",
-            "OpenXRRenderModelManager",
-        }
+        # Step 7: Verify plugin integration
+        verify_plugin_integration(plugin_file)
 
-    def run(self):
-        """Run the complete generation pipeline"""
-        print("🎯 Starting Godot type generation pipeline...")
+        print(textwrap.dedent(f"""
+            🎉 Generation complete!
+            
+            Generated:
+              • {len(node_types)} node marker components
+              • Complete type checking functions
+              • Optimized GDScript scene tree watcher
+              • Signal name constants for all Godot classes
+            
+            Files generated:
+              • {node_markers_file.relative_to(project_root)}
+              • {type_checking_file.relative_to(project_root)}
+              • {gdscript_watcher_file.relative_to(project_root)}
+              • {signal_names_file.relative_to(project_root)}
+            
+            Next steps:
+              • Run 'cargo check' to verify the build
+              • Commit the generated files
+            """))
 
-        try:
-            # Step 1: Generate extension API
-            run_godot_dump_api(self.api_file)
-
-            # Step 2: Parse API and extract types
-            node_types, parent_map, classes_by_name = load_and_parse_extension_api(
-                self.api_file
-            )
-
-            # Step 3: Generate node markers
-            generate_node_markers(
-                self.wasm_excluded_types,
-                self.version_gated_types,
-                self.node_markers_file,
-                self.project_root,
-                node_types,
-            )
-
-            # Step 4: Generate type checking code
-            generate_type_checking_code(
-                self.excluded_classes,
-                self.wasm_excluded_types,
-                self.version_gated_types,
-                self.type_checking_file,
-                self.project_root,
-                node_types,
-                parent_map,
-            )
-
-            # Step 5: Generate optimized GDScript watcher
-            generate_gdscript_watcher(
-                self.excluded_classes,
-                self.gdscript_watcher_file,
-                node_types,
-                parent_map,
-            )
-
-            # Step 6: Generate signal names
-            generate_signal_names(
-                classes_by_name,
-                self.excluded_classes,
-                self.wasm_excluded_types,
-                self.version_gated_types,
-                self.signal_names_file,
-                self.project_root,
-            )
-
-            # Step 7: Verify plugin integration
-            verify_plugin_integration(self.plugin_file)
-
-            print(textwrap.dedent(f"""
-                🎉 Generation complete!
-                
-                Generated:
-                  • {len(node_types)} node marker components
-                  • Complete type checking functions
-                  • Optimized GDScript scene tree watcher
-                  • Signal name constants for all Godot classes
-                
-                Files generated:
-                  • {self.node_markers_file.relative_to(self.project_root)}
-                  • {self.type_checking_file.relative_to(self.project_root)}
-                  • {self.gdscript_watcher_file.relative_to(self.project_root)}
-                  • {self.signal_names_file.relative_to(self.project_root)}
-                
-                Next steps:
-                  • Run 'cargo check' to verify the build
-                  • Commit the generated files
-                """))
-
-        except Exception as e:
-            print(f"❌ Generation failed: {e}")
-            sys.exit(1)
-
-
-def main():
-    generator = GodotTypeGenerator()
-    generator.run()
+    except Exception as e:
+        print(f"❌ Generation failed: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
