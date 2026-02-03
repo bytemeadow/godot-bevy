@@ -18,10 +18,10 @@ import sys
 import textwrap
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Set, Tuple
 
 
-def run_cargo_fmt(file_path, project_root):
+def run_cargo_fmt(file_path: Path, project_root: Path) -> None:
     """Run cargo fmt on a specific file to format the generated Rust code"""
     try:
         # Run cargo fmt on the specific file
@@ -46,7 +46,7 @@ def run_cargo_fmt(file_path, project_root):
         print(f"  ⚠ Could not format {file_path.name}: {e}")
 
 
-def run_godot_dump_api(api_file):
+def run_godot_dump_api(api_file: Path) -> None:
     """Run godot --dump-extension-api-with-docs to generate extension_api.json"""
     print("🚀 Generating extension_api.json from Godot...")
 
@@ -87,7 +87,7 @@ def run_godot_dump_api(api_file):
         sys.exit(1)
 
 
-def _generate_initial_tree_analysis():
+def _generate_initial_tree_analysis() -> str:
     """Generate method for analyzing the initial scene tree with type info"""
     return textwrap.dedent('''
         func analyze_initial_tree() -> Dictionary:
@@ -161,7 +161,7 @@ def _generate_initial_tree_analysis():
         ''')
 
 
-def fix_godot_class_name_for_rust(class_name):
+def fix_godot_class_name_for_rust(class_name: str) -> str:
     """Fix Godot class names to match the actual Rust bindings"""
     # Map class names from extension API to actual Rust struct names
     name_fixes = {
@@ -188,7 +188,7 @@ def fix_godot_class_name_for_rust(class_name):
     return name_fixes.get(class_name, class_name)
 
 
-def signal_name_to_const(signal_name):
+def signal_name_to_const(signal_name: str) -> str:
     """Convert a signal name to UPPER_SNAKE_CASE constant name"""
     import re
 
@@ -222,7 +222,7 @@ def signal_name_to_const(signal_name):
     return result
 
 
-def _generate_gdscript_type_analysis(categories):
+def _generate_gdscript_type_analysis(categories: Dict[str, List[str]]) -> str:
     """Generate the GDScript node type analysis function"""
     # Node3D hierarchy (most common in 3D games)
     lines = [
@@ -336,7 +336,7 @@ def _generate_gdscript_type_analysis(categories):
     return "\n".join(lines)
 
 
-def bbcode_to_markdown(text):
+def bbcode_to_markdown(text: str) -> str:
     """Convert Godot BBCode format to Rustdoc-compatible Markdown"""
     import re
     from textwrap import dedent
@@ -392,7 +392,7 @@ def bbcode_to_markdown(text):
     return text
 
 
-def sanitize_doc_comment(text):
+def sanitize_doc_comment(text: str) -> str:
     """Sanitize text to be safe for Rustdoc /// comments"""
     # The main concern is preventing */ or */ sequences that could escape the comment
     # Also handle other problematic sequences
@@ -415,10 +415,12 @@ def sanitize_doc_comment(text):
     return text
 
 
-def categorize_types_by_hierarchy(node_types, parent_map):
+def categorize_types_by_hierarchy(
+    node_types: List[str], parent_map: Dict[str, str]
+) -> Dict[str, List[str]]:
     """Categorize node types by their inheritance hierarchy"""
 
-    def is_descendant_of(ancestor_node_type, ancestor):
+    def is_descendant_of(ancestor_node_type: str, ancestor: str) -> bool:
         current = ancestor_node_type
         while current in parent_map:
             current = parent_map[current]
@@ -458,13 +460,13 @@ def get_type_cfg_attribute(
 
 
 def generate_signal_names(
-    classes_by_name: dict[Any, Any],
-    excluded_classes: set[str | Any],
-    wasm_excluded_types: set[str],
-    version_gated_types: dict[str, list[str]],
+    classes_by_name: Dict[str, Any],
+    excluded_classes: Set[str],
+    wasm_excluded_types: Set[str],
+    version_gated_types: Dict[str, List[str]],
     signal_names_file: Path,
     project_root: Path,
-):
+) -> None:
     """Generate the signal_names.rs file with signal constants"""
     print("📡 Generating signal names...")
 
@@ -563,11 +565,11 @@ def generate_signal_names(
 
 
 def _generate_hierarchy_function_comprehensive(
-    wasm_excluded_types: set[str],
-    version_gated_types: dict[str, list[str]],
-    name,
-    types,
-):
+    wasm_excluded_types: Set[str],
+    version_gated_types: Dict[str, List[str]],
+    name: str,
+    types: List[str],
+) -> str:
     """Generate a hierarchy-specific type checking function"""
     content = textwrap.dedent(f"""\
         fn check_{name}_node_types_comprehensive(
@@ -640,15 +642,19 @@ def _generate_hierarchy_function_comprehensive(
     return content
 
 
-def filter_valid_godot_classes(excluded_classes: set[str | Any], node_types):
+def filter_valid_godot_classes(
+    excluded_classes: Set[str], node_types: List[str]
+) -> List[str]:
     """Filter out Godot classes that don't exist or aren't available"""
     # Use the shared excluded_classes set defined in __init__
     return [t for t in node_types if t not in excluded_classes]
 
 
 def _generate_string_match_arms(
-    wasm_excluded_types: set[str], version_gated_types: dict[str, list[str]], categories
-):
+    wasm_excluded_types: Set[str],
+    version_gated_types: Dict[str, List[str]],
+    categories: Dict[str, List[str]],
+) -> str:
     """Generate match arms for the string-based marker function"""
     match_arms = []
 
@@ -748,8 +754,10 @@ def _generate_string_match_arms(
 
 
 def _generate_universal_function_comprehensive(
-    wasm_excluded_types: set[str], version_gated_types: dict[str, list[str]], types
-):
+    wasm_excluded_types: Set[str],
+    version_gated_types: Dict[str, List[str]],
+    types: List[str],
+) -> str:
     """Generate the universal types checking function"""
     content = textwrap.dedent("""\
         fn check_universal_node_types_comprehensive(
@@ -821,14 +829,14 @@ def _generate_universal_function_comprehensive(
 
 
 def generate_type_checking_code(
-    excluded_classes: set[str],
-    wasm_excluded_types: set[str],
-    version_gated_types: dict[str, list[str]],
+    excluded_classes: Set[str],
+    wasm_excluded_types: Set[str],
+    version_gated_types: Dict[str, List[str]],
     type_checking_file: Path,
     project_root: Path,
-    node_types,
-    parent_map,
-):
+    node_types: List[str],
+    parent_map: Dict[str, str],
+) -> None:
     """Generate the complete type checking implementation"""
     print("🔍 Generating type checking code...")
 
@@ -942,8 +950,11 @@ def generate_type_checking_code(
 
 
 def generate_gdscript_watcher(
-    excluded_classes: set[str], gdscript_watcher_file: Path, node_types, parent_map
-):
+    excluded_classes: Set[str],
+    gdscript_watcher_file: Path,
+    node_types: List[str],
+    parent_map: Dict[str, str],
+) -> None:
     """Generate the optimized GDScript scene tree watcher with all node types"""
     print("📜 Generating GDScript optimized scene tree watcher...")
 
@@ -1107,7 +1118,7 @@ def generate_gdscript_watcher(
     print(f"✅ Generated GDScript watcher with {len(valid_types)} node types")
 
 
-def verify_plugin_integration(plugin_file: Path):
+def verify_plugin_integration(plugin_file: Path) -> None:
     """Verify that the plugin is set up to use the generated code"""
     print("🔍 Verifying plugin integration...")
 
@@ -1128,12 +1139,12 @@ def verify_plugin_integration(plugin_file: Path):
 
 
 def generate_node_markers(
-    wasm_excluded_types: set[str],
-    version_gated_types: dict[str, list[str]],
+    wasm_excluded_types: Set[str],
+    version_gated_types: Dict[str, List[str]],
     node_markers_file: Path,
     project_root: Path,
-    node_types,
-):
+    node_types: List[str],
+) -> None:
     """Generate the node_markers.rs file"""
     print("🏷️  Generating node markers...")
 
@@ -1173,6 +1184,61 @@ def generate_node_markers(
     run_cargo_fmt(node_markers_file, project_root)
 
 
+def load_and_parse_extension_api(
+    api_file: Path,
+) -> Tuple[List[str], Dict[str, Any], Dict[str, Any]]:
+    """Load and parse the extension API to extract node types"""
+    print("📖 Parsing extension API...")
+
+    if not api_file.exists():
+        raise FileNotFoundError(f"extension_api.json not found at {api_file}")
+
+    with open(api_file) as f:
+        api = json.load(f)
+
+    # Store all classes by name for signal generation
+    classes_by_name: Dict[str, Any] = {
+        class_info["name"]: class_info for class_info in api["classes"]
+    }
+
+    # Build inheritance relationships
+    inheritance_map = defaultdict(list)
+    parent_map: Dict[str, Any] = {}
+
+    for class_info in api["classes"]:
+        name: str = class_info["name"]
+        if "inherits" in class_info:
+            parent = class_info["inherits"]
+            inheritance_map[parent].append(name)
+            parent_map[name] = parent
+
+    # Collect all Node-derived types
+    node_types: set[str] = set()
+
+    def collect_descendants(class_name: str):
+        node_types.add(class_name)
+        for child in inheritance_map.get(class_name, []):
+            collect_descendants(child)
+
+    collect_descendants("Node")
+
+    # Filter out base Node class and editor-only classes
+    excluded_prefixes = ["Editor", "ScriptEditor", "VisualShader"]
+    excluded_types = {"Node", "MissingNode", "ImporterMeshInstance3D"}
+
+    filtered_types = sorted(
+        [
+            t
+            for t in node_types
+            if not any(t.startswith(prefix) for prefix in excluded_prefixes)
+            and t not in excluded_types
+        ]
+    )
+
+    print(f"✅ Found {len(filtered_types)} node types")
+    return filtered_types, parent_map, classes_by_name
+
+
 class GodotTypeGenerator:
     def __init__(self):
         self.project_root = Path(__file__).parent.parent
@@ -1208,9 +1274,6 @@ class GodotTypeGenerator:
         self.signal_names_file = (
             self.project_root / "godot-bevy" / "src" / "interop" / "signal_names.rs"
         )
-
-        # Store all classes by name for signal generation
-        self.classes_by_name = {}
 
         # Known classes that don't exist in current Godot version or aren't available
         # Used for filtering both node types and signal generation
@@ -1302,58 +1365,6 @@ class GodotTypeGenerator:
             "OpenXRRenderModelManager",
         }
 
-    def load_and_parse_extension_api(self, api_file: Path):
-        """Load and parse the extension API to extract node types"""
-        print("📖 Parsing extension API...")
-
-        if not api_file.exists():
-            raise FileNotFoundError(f"extension_api.json not found at {api_file}")
-
-        with open(api_file) as f:
-            api = json.load(f)
-
-        # Store all classes by name for signal generation
-        self.classes_by_name = {
-            class_info["name"]: class_info for class_info in api["classes"]
-        }
-
-        # Build inheritance relationships
-        inheritance_map = defaultdict(list)
-        parent_map = {}
-
-        for class_info in api["classes"]:
-            name = class_info["name"]
-            if "inherits" in class_info:
-                parent = class_info["inherits"]
-                inheritance_map[parent].append(name)
-                parent_map[name] = parent
-
-        # Collect all Node-derived types
-        node_types = set()
-
-        def collect_descendants(class_name):
-            node_types.add(class_name)
-            for child in inheritance_map.get(class_name, []):
-                collect_descendants(child)
-
-        collect_descendants("Node")
-
-        # Filter out base Node class and editor-only classes
-        excluded_prefixes = ["Editor", "ScriptEditor", "VisualShader"]
-        excluded_types = {"Node", "MissingNode", "ImporterMeshInstance3D"}
-
-        filtered_types = sorted(
-            [
-                t
-                for t in node_types
-                if not any(t.startswith(prefix) for prefix in excluded_prefixes)
-                and t not in excluded_types
-            ]
-        )
-
-        print(f"✅ Found {len(filtered_types)} node types")
-        return filtered_types, parent_map
-
     def run(self):
         """Run the complete generation pipeline"""
         print("🎯 Starting Godot type generation pipeline...")
@@ -1363,7 +1374,9 @@ class GodotTypeGenerator:
             run_godot_dump_api(self.api_file)
 
             # Step 2: Parse API and extract types
-            node_types, parent_map = self.load_and_parse_extension_api(self.api_file)
+            node_types, parent_map, classes_by_name = load_and_parse_extension_api(
+                self.api_file
+            )
 
             # Step 3: Generate node markers
             generate_node_markers(
@@ -1395,7 +1408,7 @@ class GodotTypeGenerator:
 
             # Step 6: Generate signal names
             generate_signal_names(
-                self.classes_by_name,
+                classes_by_name,
                 self.excluded_classes,
                 self.wasm_excluded_types,
                 self.version_gated_types,
