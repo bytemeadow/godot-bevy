@@ -19,6 +19,72 @@ from collections import defaultdict
 from pathlib import Path
 
 
+def run_cargo_fmt(file_path, project_root):
+    """Run cargo fmt on a specific file to format the generated Rust code"""
+    try:
+        # Run cargo fmt on the specific file
+        result = subprocess.run(
+            ["cargo", "fmt", "--", str(file_path)],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        if result.returncode == 0:
+            print(f"  ✓ Formatted {file_path.name}")
+        else:
+            print(f"  ⚠ cargo fmt warning for {file_path.name}: {result.stderr}")
+
+    except FileNotFoundError:
+        print(f"  ⚠ cargo fmt not found - skipping formatting for {file_path.name}")
+    except subprocess.TimeoutExpired:
+        print(f"  ⚠ cargo fmt timed out for {file_path.name}")
+    except Exception as e:
+        print(f"  ⚠ Could not format {file_path.name}: {e}")
+
+
+def run_godot_dump_api(api_file):
+    """Run godot --dump-extension-api-with-docs to generate extension_api.json"""
+    print("🚀 Generating extension_api.json from Godot...")
+
+    try:
+        # Try different common Godot executable names
+        godot_commands = ["godot", "godot4", "/usr/local/bin/godot"]
+
+        for cmd in godot_commands:
+            try:
+                result = subprocess.run(
+                    [
+                        cmd,
+                        "--headless",
+                        "--dump-extension-api-with-docs",
+                        str(api_file),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+
+                if result.returncode == 0 and api_file.exists():
+                    print(f"✅ Successfully generated extension_api.json using '{cmd}'")
+                    return
+
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                continue
+
+        # If all commands failed, give helpful error
+        raise RuntimeError(
+            "Could not run Godot to generate extension_api.json.\n"
+            "Please ensure Godot 4 is installed and available in PATH.\n"
+            "You can also manually run: godot --dump-extension-api-with-docs extension_api.json"
+        )
+
+    except Exception as e:
+        print(f"❌ Error generating extension_api.json: {e}")
+        sys.exit(1)
+
+
 class GodotTypeGenerator:
     def __init__(self):
         self.project_root = Path(__file__).parent.parent
@@ -148,71 +214,6 @@ class GodotTypeGenerator:
             "OpenXRRenderModelManager",
         }
 
-    def run_cargo_fmt(self, file_path):
-        """Run cargo fmt on a specific file to format the generated Rust code"""
-        try:
-            # Run cargo fmt on the specific file
-            result = subprocess.run(
-                ["cargo", "fmt", "--", str(file_path)],
-                cwd=self.project_root,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-
-            if result.returncode == 0:
-                print(f"  ✓ Formatted {file_path.name}")
-            else:
-                print(f"  ⚠ cargo fmt warning for {file_path.name}: {result.stderr}")
-
-        except FileNotFoundError:
-            print(f"  ⚠ cargo fmt not found - skipping formatting for {file_path.name}")
-        except subprocess.TimeoutExpired:
-            print(f"  ⚠ cargo fmt timed out for {file_path.name}")
-        except Exception as e:
-            print(f"  ⚠ Could not format {file_path.name}: {e}")
-
-    def run_godot_dump_api(self):
-        """Run godot --dump-extension-api-with-docs to generate extension_api.json"""
-        print("🚀 Generating extension_api.json from Godot...")
-
-        try:
-            # Try different common Godot executable names
-            godot_commands = ["godot", "godot4", "/usr/local/bin/godot"]
-
-            for cmd in godot_commands:
-                try:
-                    result = subprocess.run(
-                        [
-                            cmd,
-                            "--headless",
-                            "--dump-extension-api-with-docs",
-                            str(self.api_file),
-                        ],
-                        capture_output=True,
-                        text=True,
-                        timeout=30,
-                    )
-
-                    if result.returncode == 0 and self.api_file.exists():
-                        print(
-                            f"✅ Successfully generated extension_api.json using '{cmd}'"
-                        )
-                        return
-
-                except (subprocess.TimeoutExpired, FileNotFoundError):
-                    continue
-
-            # If all commands failed, give helpful error
-            raise RuntimeError(
-                "Could not run Godot to generate extension_api.json.\n"
-                "Please ensure Godot 4 is installed and available in PATH.\n"
-                "You can also manually run: godot --dump-extension-api-with-docs extension_api.json"
-            )
-
-        except Exception as e:
-            print(f"❌ Error generating extension_api.json: {e}")
-            sys.exit(1)
 
     def load_and_parse_extension_api(self):
         """Load and parse the extension API to extract node types"""
@@ -311,7 +312,7 @@ pub struct NodeMarker;
             f.write(content)
 
         print(f"✅ Generated {len(node_types)} node markers")
-        self.run_cargo_fmt(self.node_markers_file)
+        run_cargo_fmt(self.node_markers_file, self.project_root)
 
     @staticmethod
     def categorize_types_by_hierarchy(node_types, parent_map):
@@ -445,7 +446,7 @@ pub fn remove_comprehensive_node_type_markers(
             f.write(content)
 
         print(f"✅ Generated type checking for {len(valid_types)} types")
-        self.run_cargo_fmt(self.type_checking_file)
+        run_cargo_fmt(self.type_checking_file, self.project_root)
 
     def filter_valid_godot_classes(self, node_types):
         """Filter out Godot classes that don't exist or aren't available"""
@@ -1212,7 +1213,7 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
         print(
             f"✅ Generated {signal_count} signal constants across {len(classes_with_signals)} classes"
         )
-        self.run_cargo_fmt(self.signal_names_file)
+        run_cargo_fmt(self.signal_names_file, self.project_root)
 
     @staticmethod
     def bbcode_to_markdown(text):
@@ -1301,7 +1302,7 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
 
         try:
             # Step 1: Generate extension API
-            self.run_godot_dump_api()
+            run_godot_dump_api(self.api_file)
 
             # Step 2: Parse API and extract types
             node_types, parent_map = self.load_and_parse_extension_api()
