@@ -33,3 +33,7 @@ extension_api.json
 
 **/rust.gdextension
 **/rust.gdextension.uid
+
+# Ignore Godot generated gdextension api json files
+**/extension_api.json
+godot_extension_api

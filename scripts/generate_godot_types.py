@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Set, Tuple
 
 
 def run_cargo_fmt(file_path: Path, project_root: Path) -> None:
-    """Run cargo fmt on a specific file to format the generated Rust code"""
+    """Run cargo fmt on a specific file to format generated Rust code"""
     try:
         # Run cargo fmt on the specific file
         result = subprocess.run(
@@ -46,13 +46,28 @@ def run_cargo_fmt(file_path: Path, project_root: Path) -> None:
         print(f"  ⚠ Could not format {file_path.name}: {e}")
 
 
-def run_godot_dump_api(api_file: Path) -> None:
+def run_godot_dump_api(destination_file: Path, godot_version: str) -> None:
     """Run godot --dump-extension-api-with-docs to generate extension_api.json"""
     print("🚀 Generating extension_api.json from Godot...")
 
     try:
+        if destination_file.exists():
+            print(f"✅ '{destination_file}' already exists, skipping generation")
+            return
+
+        switch_to_godot_version(godot_version)
+
         # Try different common Godot executable names
-        godot_commands = ["godot", "godot4", "/usr/local/bin/godot"]
+        godot_commands = [
+            "godot",
+            "godot4",
+            "/usr/local/bin/godot",
+            Path.home().joinpath(".local/share/gdenv/bin/godot"),
+        ]
+
+        destination_file.parent.mkdir(parents=True, exist_ok=True)
+
+        godot_output_file = Path("extension_api.json")
 
         for cmd in godot_commands:
             try:
@@ -61,15 +76,18 @@ def run_godot_dump_api(api_file: Path) -> None:
                         cmd,
                         "--headless",
                         "--dump-extension-api-with-docs",
-                        str(api_file),
                     ],
                     capture_output=True,
                     text=True,
                     timeout=30,
                 )
 
-                if result.returncode == 0 and api_file.exists():
-                    print(f"✅ Successfully generated extension_api.json using '{cmd}'")
+                if result.returncode == 0 and godot_output_file.exists():
+                    # Relocate Godot's output file to the destination directory
+                    godot_output_file.rename(destination_file)
+                    print(
+                        f"✅ Successfully generated '{destination_file}' using '{cmd}'"
+                    )
                     return
 
             except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -78,13 +96,31 @@ def run_godot_dump_api(api_file: Path) -> None:
         # If all commands failed, give helpful error
         raise RuntimeError(
             "Could not run Godot to generate extension_api.json.\n"
-            "Please ensure Godot 4 is installed and available in PATH.\n"
-            "You can also manually run: godot --dump-extension-api-with-docs extension_api.json"
+            "Please ensure Godot 4 is installed and available in PATH."
         )
 
     except Exception as e:
-        print(f"❌ Error generating extension_api.json: {e}")
-        sys.exit(1)
+        raise RuntimeError(f"Error generating {destination_file}") from e
+
+
+def switch_to_godot_version(godot_version: str) -> None:
+    try:
+        subprocess.run(
+            [
+                "gdenv",
+                "install",
+                godot_version,
+            ]
+        )
+        subprocess.run(
+            [
+                "gdenv",
+                "use",
+                godot_version,
+            ]
+        )
+    except Exception as e:
+        raise RuntimeError(f"Error switching to Godot version {godot_version}") from e
 
 
 def _generate_initial_tree_analysis() -> str:
@@ -1224,7 +1260,7 @@ def main() -> None:
     print("🎯 Starting Godot type generation pipeline...")
 
     project_root = Path(__file__).parent.parent
-    api_file = project_root / "extension_api.json"
+    extension_api_path = project_root / "godot_extension_api"
     node_markers_file = (
         project_root / "godot-bevy" / "src" / "interop" / "node_markers.rs"
     )
@@ -1335,72 +1371,77 @@ def main() -> None:
 
     try:
         # Step 1: Generate extension API
-        run_godot_dump_api(api_file)
+        # The Godot versions used here are sourced from Godot-Rust's handling of gdextension API differences:
+        # https://github.com/godot-rust/gdext/blob/3f1d543580c1817f1b7fab57a400e82b50085581/godot-bindings/src/import.rs
+        for api_version in ["4.2", "4.2.1", "4.2.2", "4.3", "4.4", "4.5"]:
+            run_godot_dump_api(
+                extension_api_path.joinpath(f"extension_api{api_version}.json"),
+                api_version,
+            )
 
-        # Step 2: Parse API and extract types
-        node_types, parent_map, classes_by_name = load_and_parse_extension_api(api_file)
-
-        # Step 3: Generate node markers
-        generate_node_markers(
-            wasm_excluded_types,
-            version_gated_types,
-            node_markers_file,
-            project_root,
-            node_types,
-        )
-
-        # Step 4: Generate type checking code
-        generate_type_checking_code(
-            excluded_classes,
-            wasm_excluded_types,
-            version_gated_types,
-            type_checking_file,
-            project_root,
-            node_types,
-            parent_map,
-        )
-
-        # Step 5: Generate optimized GDScript watcher
-        generate_gdscript_watcher(
-            excluded_classes,
-            gdscript_watcher_file,
-            node_types,
-            parent_map,
-        )
-
-        # Step 6: Generate signal names
-        generate_signal_names(
-            classes_by_name,
-            excluded_classes,
-            wasm_excluded_types,
-            version_gated_types,
-            signal_names_file,
-            project_root,
-        )
-
-        print(textwrap.dedent(f"""
-            🎉 Generation complete!
-            
-            Generated:
-              • {len(node_types)} node marker components
-              • Complete type checking functions
-              • Optimized GDScript scene tree watcher
-              • Signal name constants for all Godot classes
-            
-            Files generated:
-              • {node_markers_file.relative_to(project_root)}
-              • {type_checking_file.relative_to(project_root)}
-              • {gdscript_watcher_file.relative_to(project_root)}
-              • {signal_names_file.relative_to(project_root)}
-            
-            Next steps:
-              • Run 'cargo check' to verify the build
-              • Commit the generated files
-            """))
+        # # Step 2: Parse API and extract types
+        # node_types, parent_map, classes_by_name = load_and_parse_extension_api(api_file)
+        #
+        # # Step 3: Generate node markers
+        # generate_node_markers(
+        #     wasm_excluded_types,
+        #     version_gated_types,
+        #     node_markers_file,
+        #     project_root,
+        #     node_types,
+        # )
+        #
+        # # Step 4: Generate type checking code
+        # generate_type_checking_code(
+        #     excluded_classes,
+        #     wasm_excluded_types,
+        #     version_gated_types,
+        #     type_checking_file,
+        #     project_root,
+        #     node_types,
+        #     parent_map,
+        # )
+        #
+        # # Step 5: Generate optimized GDScript watcher
+        # generate_gdscript_watcher(
+        #     excluded_classes,
+        #     gdscript_watcher_file,
+        #     node_types,
+        #     parent_map,
+        # )
+        #
+        # # Step 6: Generate signal names
+        # generate_signal_names(
+        #     classes_by_name,
+        #     excluded_classes,
+        #     wasm_excluded_types,
+        #     version_gated_types,
+        #     signal_names_file,
+        #     project_root,
+        # )
+        #
+        # print(textwrap.dedent(f"""
+        #     🎉 Generation complete!
+        #
+        #     Generated:
+        #       • {len(node_types)} node marker components
+        #       • Complete type checking functions
+        #       • Optimized GDScript scene tree watcher
+        #       • Signal name constants for all Godot classes
+        #
+        #     Files generated:
+        #       • {node_markers_file.relative_to(project_root)}
+        #       • {type_checking_file.relative_to(project_root)}
+        #       • {gdscript_watcher_file.relative_to(project_root)}
+        #       • {signal_names_file.relative_to(project_root)}
+        #
+        #     Next steps:
+        #       • Run 'cargo check' to verify the build
+        #       • Commit the generated files
+        #     """))
 
     except Exception as e:
-        print(f"❌ Generation failed: {e}")
-        sys.exit(1)
+        raise RuntimeError("Generation failed") from e
 
 
 if __name__ == "__main__":
