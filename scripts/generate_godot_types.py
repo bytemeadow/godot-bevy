@@ -646,6 +646,107 @@ def filter_valid_godot_classes(excluded_classes: set[str | Any], node_types):
     return [t for t in node_types if t not in excluded_classes]
 
 
+def _generate_string_match_arms(
+    wasm_excluded_types: set[str], version_gated_types: dict[str, list[str]], categories
+):
+    """Generate match arms for the string-based marker function"""
+    match_arms = []
+
+    # Add base types first
+    base_types = [
+        '        "Node3D" => {\n            entity_commands.insert(Node3DMarker);\n        }',
+        '        "Node2D" => {\n            entity_commands.insert(Node2DMarker);\n            entity_commands.insert(CanvasItemMarker);\n        }',
+        '        "Control" => {\n            entity_commands.insert(ControlMarker);\n            entity_commands.insert(CanvasItemMarker);\n        }',
+        '        "CanvasItem" => {\n            entity_commands.insert(CanvasItemMarker);\n        }',
+        '        "Node" => {\n            // NodeMarker already added above\n        }',
+    ]
+    match_arms.extend(base_types)
+
+    # Generate Node3D types (skip base Node3D since it's already handled)
+    for node_type in categories["3d"]:
+        if node_type == "Node3D":
+            continue  # Skip base type
+        marker_name = f"{node_type}Marker"
+        cfg_attr = get_type_cfg_attribute(
+            wasm_excluded_types, version_gated_types, node_type
+        )
+        if cfg_attr:
+            match_arms.append(f"""        {cfg_attr.strip()}
+    "{node_type}" => {{
+        entity_commands.insert(Node3DMarker);
+        entity_commands.insert({marker_name});
+    }}""")
+        else:
+            match_arms.append(f"""        "{node_type}" => {{
+        entity_commands.insert(Node3DMarker);
+        entity_commands.insert({marker_name});
+    }}""")
+
+    # Generate Node2D types (skip base Node2D since it's already handled)
+    for node_type in categories["2d"]:
+        if node_type == "Node2D":
+            continue  # Skip base type
+        marker_name = f"{node_type}Marker"
+        cfg_attr = get_type_cfg_attribute(
+            wasm_excluded_types, version_gated_types, node_type
+        )
+        if cfg_attr:
+            match_arms.append(f"""        {cfg_attr.strip()}
+    "{node_type}" => {{
+        entity_commands.insert(Node2DMarker);
+        entity_commands.insert(CanvasItemMarker);
+        entity_commands.insert({marker_name});
+    }}""")
+        else:
+            match_arms.append(f"""        "{node_type}" => {{
+        entity_commands.insert(Node2DMarker);
+        entity_commands.insert(CanvasItemMarker);
+        entity_commands.insert({marker_name});
+    }}""")
+
+    # Generate Control types (skip base Control since it's already handled)
+    for node_type in categories["control"]:
+        if node_type == "Control":
+            continue  # Skip base type
+        marker_name = f"{node_type}Marker"
+        cfg_attr = get_type_cfg_attribute(
+            wasm_excluded_types, version_gated_types, node_type
+        )
+        if cfg_attr:
+            match_arms.append(f"""        {cfg_attr.strip()}
+    "{node_type}" => {{
+        entity_commands.insert(ControlMarker);
+        entity_commands.insert(CanvasItemMarker);
+        entity_commands.insert({marker_name});
+    }}""")
+        else:
+            match_arms.append(f"""        "{node_type}" => {{
+        entity_commands.insert(ControlMarker);
+        entity_commands.insert(CanvasItemMarker);
+        entity_commands.insert({marker_name});
+    }}""")
+
+    # Generate universal (direct Node) types (skip base Node, Node3D, and CanvasItem since already handled)
+    for node_type in categories["universal"]:
+        if node_type in ["Node", "CanvasItem", "Node3D"]:
+            continue  # Skip base types
+        marker_name = f"{node_type}Marker"
+        cfg_attr = get_type_cfg_attribute(
+            wasm_excluded_types, version_gated_types, node_type
+        )
+        if cfg_attr:
+            match_arms.append(f"""        {cfg_attr.strip()}
+    "{node_type}" => {{
+        entity_commands.insert({marker_name});
+    }}""")
+        else:
+            match_arms.append(f"""        "{node_type}" => {{
+        entity_commands.insert({marker_name});
+    }}""")
+
+    return "\n".join(match_arms)
+
+
 class GodotTypeGenerator:
     def __init__(self):
         self.project_root = Path(__file__).parent.parent
@@ -926,7 +1027,7 @@ class GodotTypeGenerator:
             
                 // Add appropriate markers based on the type string
                 match node_type {{
-            {self._generate_string_match_arms(categories)}
+            {_generate_string_match_arms(self.wasm_excluded_types, self.version_gated_types, categories)}
                     // For any unrecognized type, we already have NodeMarker
                     // This handles custom user types that extend Godot nodes
                     _ => {{}}
@@ -977,104 +1078,6 @@ class GodotTypeGenerator:
 
         print(f"✅ Generated type checking for {len(valid_types)} types")
         run_cargo_fmt(self.type_checking_file, self.project_root)
-
-    def _generate_string_match_arms(self, categories):
-        """Generate match arms for the string-based marker function"""
-        match_arms = []
-
-        # Add base types first
-        base_types = [
-            '        "Node3D" => {\n            entity_commands.insert(Node3DMarker);\n        }',
-            '        "Node2D" => {\n            entity_commands.insert(Node2DMarker);\n            entity_commands.insert(CanvasItemMarker);\n        }',
-            '        "Control" => {\n            entity_commands.insert(ControlMarker);\n            entity_commands.insert(CanvasItemMarker);\n        }',
-            '        "CanvasItem" => {\n            entity_commands.insert(CanvasItemMarker);\n        }',
-            '        "Node" => {\n            // NodeMarker already added above\n        }',
-        ]
-        match_arms.extend(base_types)
-
-        # Generate Node3D types (skip base Node3D since it's already handled)
-        for node_type in categories["3d"]:
-            if node_type == "Node3D":
-                continue  # Skip base type
-            marker_name = f"{node_type}Marker"
-            cfg_attr = get_type_cfg_attribute(
-                self.wasm_excluded_types, self.version_gated_types, node_type
-            )
-            if cfg_attr:
-                match_arms.append(f"""        {cfg_attr.strip()}
-        "{node_type}" => {{
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert({marker_name});
-        }}""")
-            else:
-                match_arms.append(f"""        "{node_type}" => {{
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert({marker_name});
-        }}""")
-
-        # Generate Node2D types (skip base Node2D since it's already handled)
-        for node_type in categories["2d"]:
-            if node_type == "Node2D":
-                continue  # Skip base type
-            marker_name = f"{node_type}Marker"
-            cfg_attr = get_type_cfg_attribute(
-                self.wasm_excluded_types, self.version_gated_types, node_type
-            )
-            if cfg_attr:
-                match_arms.append(f"""        {cfg_attr.strip()}
-        "{node_type}" => {{
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert({marker_name});
-        }}""")
-            else:
-                match_arms.append(f"""        "{node_type}" => {{
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert({marker_name});
-        }}""")
-
-        # Generate Control types (skip base Control since it's already handled)
-        for node_type in categories["control"]:
-            if node_type == "Control":
-                continue  # Skip base type
-            marker_name = f"{node_type}Marker"
-            cfg_attr = get_type_cfg_attribute(
-                self.wasm_excluded_types, self.version_gated_types, node_type
-            )
-            if cfg_attr:
-                match_arms.append(f"""        {cfg_attr.strip()}
-        "{node_type}" => {{
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert({marker_name});
-        }}""")
-            else:
-                match_arms.append(f"""        "{node_type}" => {{
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert({marker_name});
-        }}""")
-
-        # Generate universal (direct Node) types (skip base Node, Node3D, and CanvasItem since already handled)
-        for node_type in categories["universal"]:
-            if node_type in ["Node", "CanvasItem", "Node3D"]:
-                continue  # Skip base types
-            marker_name = f"{node_type}Marker"
-            cfg_attr = get_type_cfg_attribute(
-                self.wasm_excluded_types, self.version_gated_types, node_type
-            )
-            if cfg_attr:
-                match_arms.append(f"""        {cfg_attr.strip()}
-        "{node_type}" => {{
-            entity_commands.insert({marker_name});
-        }}""")
-            else:
-                match_arms.append(f"""        "{node_type}" => {{
-            entity_commands.insert({marker_name});
-        }}""")
-
-        return "\n".join(match_arms)
 
     def generate_gdscript_watcher(self, node_types, parent_map):
         """Generate the optimized GDScript scene tree watcher with all node types"""
