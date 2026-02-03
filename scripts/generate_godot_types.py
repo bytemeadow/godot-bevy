@@ -214,7 +214,6 @@ class GodotTypeGenerator:
             "OpenXRRenderModelManager",
         }
 
-
     def load_and_parse_extension_api(self):
         """Load and parse the extension API to extract node types"""
         print("📖 Parsing extension API...")
@@ -535,20 +534,16 @@ pub fn remove_comprehensive_node_type_markers(
             marker_name = f"{node_type}Marker"
             cfg_attr = self.get_type_cfg_attribute(node_type)
             if cfg_attr:
-                match_arms.append(
-                    f"""        {cfg_attr.strip()}
+                match_arms.append(f"""        {cfg_attr.strip()}
         "{node_type}" => {{
             entity_commands.insert(Node3DMarker);
             entity_commands.insert({marker_name});
-        }}"""
-                )
+        }}""")
             else:
-                match_arms.append(
-                    f"""        "{node_type}" => {{
+                match_arms.append(f"""        "{node_type}" => {{
             entity_commands.insert(Node3DMarker);
             entity_commands.insert({marker_name});
-        }}"""
-                )
+        }}""")
 
         # Generate Node2D types (skip base Node2D since it's already handled)
         for node_type in categories["2d"]:
@@ -557,22 +552,18 @@ pub fn remove_comprehensive_node_type_markers(
             marker_name = f"{node_type}Marker"
             cfg_attr = self.get_type_cfg_attribute(node_type)
             if cfg_attr:
-                match_arms.append(
-                    f"""        {cfg_attr.strip()}
+                match_arms.append(f"""        {cfg_attr.strip()}
         "{node_type}" => {{
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert({marker_name});
-        }}"""
-                )
+        }}""")
             else:
-                match_arms.append(
-                    f"""        "{node_type}" => {{
+                match_arms.append(f"""        "{node_type}" => {{
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert({marker_name});
-        }}"""
-                )
+        }}""")
 
         # Generate Control types (skip base Control since it's already handled)
         for node_type in categories["control"]:
@@ -581,22 +572,18 @@ pub fn remove_comprehensive_node_type_markers(
             marker_name = f"{node_type}Marker"
             cfg_attr = self.get_type_cfg_attribute(node_type)
             if cfg_attr:
-                match_arms.append(
-                    f"""        {cfg_attr.strip()}
+                match_arms.append(f"""        {cfg_attr.strip()}
         "{node_type}" => {{
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert({marker_name});
-        }}"""
-                )
+        }}""")
             else:
-                match_arms.append(
-                    f"""        "{node_type}" => {{
+                match_arms.append(f"""        "{node_type}" => {{
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert({marker_name});
-        }}"""
-                )
+        }}""")
 
         # Generate universal (direct Node) types (skip base Node, Node3D, and CanvasItem since already handled)
         for node_type in categories["universal"]:
@@ -605,18 +592,14 @@ pub fn remove_comprehensive_node_type_markers(
             marker_name = f"{node_type}Marker"
             cfg_attr = self.get_type_cfg_attribute(node_type)
             if cfg_attr:
-                match_arms.append(
-                    f"""        {cfg_attr.strip()}
+                match_arms.append(f"""        {cfg_attr.strip()}
         "{node_type}" => {{
             entity_commands.insert({marker_name});
-        }}"""
-                )
+        }}""")
             else:
-                match_arms.append(
-                    f"""        "{node_type}" => {{
+                match_arms.append(f"""        "{node_type}" => {{
             entity_commands.insert({marker_name});
-        }}"""
-                )
+        }}""")
 
         return "\n".join(match_arms)
 
@@ -1322,8 +1305,7 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
             # Step 7: Verify plugin integration
             self.verify_plugin_integration()
 
-            print(
-                f"""
+            print(f"""
 🎉 Generation complete!
 
 Generated:
@@ -1341,8 +1323,7 @@ Files generated:
 Next steps:
   • Run 'cargo check' to verify the build
   • Commit the generated files
-"""
-            )
+""")
 
         except Exception as e:
             print(f"❌ Generation failed: {e}")
