@@ -12,6 +12,7 @@ This script:
 Usage: python scripts/generate_godot_types.py
 """
 
+import inspect
 import json
 import subprocess
 import textwrap
@@ -20,8 +21,19 @@ from typing import Dict, List, Set
 
 import dacite
 
+from scripts.file_paths import FilePaths
 from scripts.gdextension_api import ExtensionApi, GodotClass
 from scripts.special_cases import SpecialCases
+
+
+def indent_log(message):
+    # Subtract 1 to ignore the current 'indent_log' frame
+    # You might subtract more depending on your entry point
+    depth = len(inspect.stack()) - 1 - 2
+
+    # Create the indentation string (e.g., 2 spaces per level)
+    indent = "    " * depth
+    print(f"{indent}{message}")
 
 
 def run_cargo_fmt(file_path: Path, project_root: Path) -> None:
@@ -37,25 +49,27 @@ def run_cargo_fmt(file_path: Path, project_root: Path) -> None:
         )
 
         if result.returncode == 0:
-            print(f"  ✓ Formatted {file_path.name}")
+            indent_log(f"  ✓ Formatted {file_path.name}")
         else:
-            print(f"  ⚠ cargo fmt warning for {file_path.name}: {result.stderr}")
+            indent_log(f"  ⚠ cargo fmt warning for {file_path.name}: {result.stderr}")
 
     except FileNotFoundError:
-        print(f"  ⚠ cargo fmt not found - skipping formatting for {file_path.name}")
+        indent_log(
+            f"  ⚠ cargo fmt not found - skipping formatting for {file_path.name}"
+        )
     except subprocess.TimeoutExpired:
-        print(f"  ⚠ cargo fmt timed out for {file_path.name}")
+        indent_log(f"  ⚠ cargo fmt timed out for {file_path.name}")
     except Exception as e:
-        print(f"  ⚠ Could not format {file_path.name}: {e}")
+        indent_log(f"  ⚠ Could not format {file_path.name}: {e}")
 
 
 def run_godot_dump_api(destination_file: Path, godot_version: str) -> None:
     """Run godot --dump-extension-api-with-docs to generate extension_api.json"""
-    print("🚀 Generating extension_api.json from Godot...")
+    indent_log("🚀 Generating extension_api.json from Godot...")
 
     try:
         if destination_file.exists():
-            print(f"✅ '{destination_file}' already exists, skipping generation")
+            indent_log(f"✅ '{destination_file}' already exists, skipping generation")
             return
 
         switch_to_godot_version(godot_version)
@@ -88,7 +102,7 @@ def run_godot_dump_api(destination_file: Path, godot_version: str) -> None:
                 if result.returncode == 0 and godot_output_file.exists():
                     # Relocate Godot's output file to the destination directory
                     godot_output_file.rename(destination_file)
-                    print(
+                    indent_log(
                         f"✅ Successfully generated '{destination_file}' using '{cmd}'"
                     )
                     return
@@ -480,7 +494,7 @@ def generate_signal_names(
     api: ExtensionApi,
 ) -> None:
     """Generate the signal_names.rs file with signal constants"""
-    print("📡 Generating signal names...")
+    indent_log("📡 Generating signal names...")
 
     content = textwrap.dedent("""\
         #![allow(dead_code)]
@@ -561,7 +575,7 @@ def generate_signal_names(
     with open(signal_names_file, "w") as f:
         f.write(content)
 
-    print(
+    indent_log(
         f"✅ Generated {signal_count} signal constants across {len(classes_with_signals)} classes"
     )
     run_cargo_fmt(signal_names_file, project_root)
@@ -827,7 +841,7 @@ def generate_type_checking_code(
     api: ExtensionApi,
 ) -> None:
     """Generate the complete type checking implementation"""
-    print("🔍 Generating type checking code...")
+    indent_log("🔍 Generating type checking code...")
 
     node_types = api.classes_descended_from("Node")
     categories = categorize_types_by_hierarchy(node_types, api.parent_map())
@@ -924,7 +938,7 @@ def generate_type_checking_code(
     with open(type_checking_file, "w") as f:
         f.write(content)
 
-    print(f"✅ Generated type checking for {len(node_types)} types")
+    indent_log(f"✅ Generated type checking for {len(node_types)} types")
     run_cargo_fmt(type_checking_file, project_root)
 
 
@@ -933,7 +947,7 @@ def generate_gdscript_watcher(
     api: ExtensionApi,
 ) -> None:
     """Generate the optimized GDScript scene tree watcher with all node types"""
-    print("📜 Generating GDScript optimized scene tree watcher...")
+    indent_log("📜 Generating GDScript optimized scene tree watcher...")
 
     node_types = api.classes_descended_from("Node")
 
@@ -1095,7 +1109,7 @@ def generate_gdscript_watcher(
     with open(gdscript_watcher_file, "w") as f:
         f.write(content)
 
-    print(f"✅ Generated GDScript watcher with {len(node_types)} node types")
+    indent_log(f"✅ Generated GDScript watcher with {len(node_types)} node types")
 
 
 def generate_node_markers(
@@ -1104,7 +1118,7 @@ def generate_node_markers(
     api: ExtensionApi,
 ) -> None:
     """Generate the node_markers.rs file"""
-    print("🏷️  Generating node markers...")
+    indent_log("🏷️  Generating node markers...")
 
     content = textwrap.dedent("""\
         use bevy_ecs::component::Component;
@@ -1133,7 +1147,7 @@ def generate_node_markers(
     with open(node_markers_file, "w") as f:
         f.write(content)
 
-    print(f"✅ Generated {len(node_classes)} node markers")
+    indent_log(f"✅ Generated {len(node_classes)} node markers")
     run_cargo_fmt(node_markers_file, project_root)
 
 
@@ -1141,7 +1155,7 @@ def load_extension_api(
     api_file: Path,
 ) -> ExtensionApi:
     """Load and parse the extension API to extract node types"""
-    print("📖 Parsing extension API...")
+    indent_log("📖 Parsing extension API...")
 
     if not api_file.exists():
         raise FileNotFoundError(f"extension_api.json not found at {api_file}")
@@ -1152,98 +1166,81 @@ def load_extension_api(
     return dacite.from_dict(ExtensionApi, json_object)
 
 
+def generate_for_version(api_version: str) -> None:
+    indent_log("Step 1: Generate extension API")
+    run_godot_dump_api(
+        FilePaths.extension_api_file(api_version),
+        api_version,
+    )
+
+    indent_log("Step 2: Parse API and extract types")
+    api = load_extension_api(FilePaths.extension_api_file(api_version))
+
+    indent_log("Step 3: Generate node markers")
+    generate_node_markers(
+        FilePaths.node_markers_file(api_version),
+        FilePaths.project_root,
+        api,
+    )
+
+    indent_log("Step 4: Generate type checking code")
+    generate_type_checking_code(
+        FilePaths.type_checking_file(api_version),
+        FilePaths.project_root,
+        api,
+    )
+
+    indent_log("Step 5: Generate optimized GDScript watcher")
+    generate_gdscript_watcher(
+        FilePaths.gdscript_watcher_file(api_version),
+        api,
+    )
+
+    indent_log("Step 6: Generate signal names")
+    generate_signal_names(
+        FilePaths.signal_names_file(api_version),
+        FilePaths.project_root,
+        api,
+    )
+
+
 def main() -> None:
     """Run the complete generation pipeline"""
-    print("🎯 Starting Godot type generation pipeline...")
-
-    project_root = Path(__file__).parent.parent
+    indent_log("🎯 Starting Godot type generation pipeline...")
 
     # The Godot versions used here are sourced from Godot-Rust's handling of gdextension API differences:
     # https://github.com/godot-rust/gdext/blob/3f1d543580c1817f1b7fab57a400e82b50085581/godot-bindings/src/import.rs
+    # Check the main branch for latest versions: https://github.com/godot-rust/gdext/blob/master/godot-bindings/src/import.rs
     api_versions = ["4.2", "4.2.1", "4.2.2", "4.3", "4.4", "4.5"]
-    extension_api_path = project_root / "godot_extension_api"
-    node_markers_path = project_root / "godot-bevy" / "src" / "interop" / "node_markers"
-    type_checking_path = (
-        project_root
-        / "godot-bevy"
-        / "src"
-        / "plugins"
-        / "scene_tree"
-        / "node_type_checking"
-    )
-    gdscript_watcher_path = project_root / "addons" / "godot-bevy"
-    gdscript_watcher_file = gdscript_watcher_path / "optimized_scene_tree_watcher.gd"
-    signal_names_path = project_root / "godot-bevy" / "src" / "interop" / "signal_names"
-
-    def extension_api_file(version: str) -> Path:
-        return extension_api_path / f"extension_api{version}.json"
 
     try:
-        # Step 1: Generate extension API
         for api_version in api_versions:
-            run_godot_dump_api(
-                extension_api_file(api_version),
-                api_version,
-            )
-
-        for api_version in api_versions:
-            # Step 2: Parse API and extract types
-            api = load_extension_api(extension_api_file(api_version))
-
-            # Step 3: Generate node markers
-            generate_node_markers(
-                node_markers_path / f"node_markers{api_version.replace('.', '_')}.rs",
-                project_root,
-                api,
-            )
-
-            # Step 4: Generate type checking code
-            generate_type_checking_code(
-                type_checking_path / f"type_checking{api_version.replace('.', '_')}.rs",
-                project_root,
-                api,
-            )
-
-            # Step 5: Generate optimized GDScript watcher
-            generate_gdscript_watcher(
-                gdscript_watcher_path
-                / f"optimized_scene_tree_watcher{api_version.replace('.', '_')}.gd_ignore",
-                api,
-            )
-
-            # Step 6: Generate signal names
-            generate_signal_names(
-                signal_names_path / f"signal_names{api_version.replace('.', '_')}.rs",
-                project_root,
-                api,
-            )
+            indent_log(f"⚙️  Processing API version {api_version}...")
+            generate_for_version(api_version)
 
         # Use the most recent version as the active OptimizedSceneTreeWatcher
-        most_recent_gdscript_watcher_file: Path = (
-            gdscript_watcher_path
-            / f"optimized_scene_tree_watcher{api_versions[-1].replace('.', '_')}.gd_ignore"
+        most_recent_gdscript_watcher_file: Path = FilePaths.gdscript_watcher_file(
+            api_versions[-1]
         )
-        most_recent_gdscript_watcher_file.replace(gdscript_watcher_file)
+        most_recent_gdscript_watcher_file.replace(
+            FilePaths.gdscript_watcher_current_file
+        )
 
-        # print(textwrap.dedent(f"""
-        #     🎉 Generation complete!
-        #
-        #     Generated:
-        #       • {len(node_types)} node marker components
-        #       • Complete type checking functions
-        #       • Optimized GDScript scene tree watcher
-        #       • Signal name constants for all Godot classes
-        #
-        #     Files generated:
-        #       • {node_markers_file.relative_to(project_root)}
-        #       • {type_checking_file.relative_to(project_root)}
-        #       • {gdscript_watcher_file.relative_to(project_root)}
-        #       • {signal_names_file.relative_to(project_root)}
-        #
-        #     Next steps:
-        #       • Run 'cargo check' to verify the build
-        #       • Commit the generated files
-        #     """))
+        indent_log("")
+        indent_log("🎉 Generation complete!")
+        indent_log("")
+        indent_log("    Files generated:")
+        for path in FilePaths.all_generated_files(api_versions):
+            indent_log(f"       • {path.relative_to(FilePaths.project_root)}")
+        indent_log(textwrap.dedent(f"""
+            Next steps:
+              • Run 'cargo check' to verify the build
+              • Update the following files with the latest versions:
+                • godot-bevy/src/plugins/scene_tree/node_type_checking.rs
+                • godot-bevy/src/interop/node_markers.rs
+                • godot-bevy/src/interop/signal_names.rs
+              • Commit the generated files
+            """))
 
     except Exception as e:
         raise RuntimeError("Generation failed") from e
