@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Optional, Set, Dict, Any
+from typing import List, Optional, Set, Dict
 
 
 @dataclass(frozen=True)

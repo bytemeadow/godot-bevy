@@ -1,5 +1,52 @@
 import re
 import unittest
+from typing import List, Dict
+
+
+def get_type_cfg_attribute(
+    node_type: str,
+) -> str:
+    """Get the cfg attribute for a type if it needs version or feature gating."""
+    cfg = []
+    # Check for WASM-excluded types first
+    if node_type in SpecialCases.wasm_excluded_types:
+        cfg.append('not(feature = "experimental-wasm")\n')
+    if node_type in SpecialCases.experimental_classes:
+        cfg.append('feature = "experimental-godot-api"\n')
+    cfg_start = "#[cfg("
+    cfg_end = ")]\n"
+    if cfg:
+        return cfg_start + ", ".join(cfg) + cfg_end
+    else:
+        return ""
+
+
+def categorize_types_by_hierarchy(
+    node_types: List[str], parent_map: Dict[str, str]
+) -> Dict[str, List[str]]:
+    """Categorize node types by their inheritance hierarchy"""
+
+    def is_descendant_of(ancestor_node_type: str, ancestor: str) -> bool:
+        current = ancestor_node_type
+        while current in parent_map:
+            current = parent_map[current]
+            if current == ancestor:
+                return True
+        return False
+
+    categories = {"3d": [], "2d": [], "control": [], "universal": []}
+
+    for node_type in node_types:
+        if is_descendant_of(node_type, "Node3D"):
+            categories["3d"].append(node_type)
+        elif is_descendant_of(node_type, "Node2D"):
+            categories["2d"].append(node_type)
+        elif is_descendant_of(node_type, "Control"):
+            categories["control"].append(node_type)
+        elif parent_map.get(node_type) == "Node":
+            categories["universal"].append(node_type)
+
+    return categories
 
 
 class SpecialCases:
