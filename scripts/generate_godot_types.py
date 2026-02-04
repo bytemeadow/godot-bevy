@@ -238,8 +238,9 @@ def _generate_gdscript_type_analysis(categories: Dict[str, List[str]]) -> str:
     """Generate the GDScript node type analysis function"""
     # Node3D hierarchy (most common in 3D games)
     lines = [
-        "\t# Check Node3D hierarchy first (most common in 3D games)",
-        "\tif node is Node3D:",
+        "",
+        "    # Check Node3D hierarchy first (most common in 3D games)",
+        "    if node is Node3D:",
     ]
 
     # Add common 3D types first for better performance
@@ -258,19 +259,19 @@ def _generate_gdscript_type_analysis(categories: Dict[str, List[str]]) -> str:
 
     for node_type in common_3d:
         if node_type in categories["3d"]:
-            lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+            lines.append(f'        if node is {node_type}: return "{node_type}"')
 
     # Add remaining 3D types
     for node_type in sorted(categories["3d"]):
         if node_type not in common_3d:
-            lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+            lines.append(f'        if node is {node_type}: return "{node_type}"')
 
-    lines.append('\t\treturn "Node3D"')
+    lines.append('        return "Node3D"')
     lines.append("")
 
     # Node2D hierarchy (common in 2D games)
-    lines.append("\t# Check Node2D hierarchy (common in 2D games)")
-    lines.append("\telif node is Node2D:")
+    lines.append("    # Check Node2D hierarchy (common in 2D games)")
+    lines.append("    elif node is Node2D:")
 
     # Add common 2D types first
     common_2d = [
@@ -286,19 +287,19 @@ def _generate_gdscript_type_analysis(categories: Dict[str, List[str]]) -> str:
 
     for node_type in common_2d:
         if node_type in categories["2d"]:
-            lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+            lines.append(f'        if node is {node_type}: return "{node_type}"')
 
     # Add remaining 2D types
     for node_type in sorted(categories["2d"]):
         if node_type not in common_2d:
-            lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+            lines.append(f'        if node is {node_type}: return "{node_type}"')
 
-    lines.append('\t\treturn "Node2D"')
+    lines.append('        return "Node2D"')
     lines.append("")
 
     # Control hierarchy (UI elements)
-    lines.append("\t# Check Control hierarchy (UI elements)")
-    lines.append("\telif node is Control:")
+    lines.append("    # Check Control hierarchy (UI elements)")
+    lines.append("    elif node is Control:")
 
     # Add common UI types first
     common_control = [
@@ -316,18 +317,18 @@ def _generate_gdscript_type_analysis(categories: Dict[str, List[str]]) -> str:
 
     for node_type in common_control:
         if node_type in categories["control"]:
-            lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+            lines.append(f'        if node is {node_type}: return "{node_type}"')
 
     # Add remaining Control types
     for node_type in sorted(categories["control"]):
         if node_type not in common_control:
-            lines.append(f'\t\tif node is {node_type}: return "{node_type}"')
+            lines.append(f'        if node is {node_type}: return "{node_type}"')
 
-    lines.append('\t\treturn "Control"')
+    lines.append('        return "Control"')
     lines.append("")
 
     # Universal types (direct Node children)
-    lines.append("\t# Check other common node types that inherit directly from Node")
+    lines.append("    # Check other common node types that inherit directly from Node")
     common_universal = [
         "AnimationPlayer",
         "Timer",
@@ -338,12 +339,12 @@ def _generate_gdscript_type_analysis(categories: Dict[str, List[str]]) -> str:
 
     for node_type in common_universal:
         if node_type in categories["universal"]:
-            lines.append(f'\telif node is {node_type}: return "{node_type}"')
+            lines.append(f'    elif node is {node_type}: return "{node_type}"')
 
     # Add remaining universal types
     for node_type in sorted(categories["universal"]):
         if node_type not in common_universal:
-            lines.append(f'\telif node is {node_type}: return "{node_type}"')
+            lines.append(f'    elif node is {node_type}: return "{node_type}"')
 
     return "\n".join(lines)
 
@@ -936,29 +937,31 @@ def generate_type_checking_code(
 
 
 def generate_gdscript_watcher(
-    excluded_classes: Set[str],
     gdscript_watcher_file: Path,
-    node_types: List[str],
-    parent_map: Dict[str, str],
+    api: ExtensionApi,
 ) -> None:
     """Generate the optimized GDScript scene tree watcher with all node types"""
     print("📜 Generating GDScript optimized scene tree watcher...")
 
+    node_types = api.classes_descended_from("Node")
+
     # Filter and categorize types
-    valid_types = filter_valid_godot_classes(excluded_classes, node_types)
-    categories = categorize_types_by_hierarchy(set(valid_types), parent_map)
+    categories = categorize_types_by_hierarchy(set(node_types), api.parent_map())
 
     content = textwrap.dedent(f'''\
-        extends Node
         class_name OptimizedSceneTreeWatcher
+        extends Node
         
-        # 🤖 This file is automatically generated by scripts/generate_godot_types.py
+        # 🤖 This file is generated by `scripts/generate_godot_types.py`
+        # for Godot version: {api.header.version_full_name}
+        # If you need support for a different version, swap out `optimized_scene_tree_watcher.gd`
+        # with `optimized_scene_tree_watcher*_*_*.gd_ignore` of your desired version.
         # To regenerate: python scripts/generate_godot_types.py
         
         # Optimized Scene Tree Watcher
         # This GDScript class intercepts scene tree events and performs type analysis
         # on the GDScript side to avoid expensive FFI calls from Rust.
-        # Handles {len(valid_types)} different Godot node types.
+        # Handles {len(node_types)} different Godot node types.
         
         # Reference to the Rust SceneTreeWatcher
         var rust_watcher: Node = null
@@ -1089,19 +1092,18 @@ def generate_gdscript_watcher(
             This avoids multiple FFI calls that would be needed on the Rust side.
             Generated from Godot extension API to ensure completeness.
             """
-        
-        {_generate_gdscript_type_analysis(categories)}
+        {textwrap.indent(_generate_gdscript_type_analysis(categories), '        ')}
         
             # Default fallback
             return "Node"
         
-        {_generate_initial_tree_analysis()}
+        {textwrap.indent(_generate_initial_tree_analysis(), '        ')}
         ''')
 
     with open(gdscript_watcher_file, "w") as f:
         f.write(content)
 
-    print(f"✅ Generated GDScript watcher with {len(valid_types)} node types")
+    print(f"✅ Generated GDScript watcher with {len(node_types)} node types")
 
 
 def generate_node_markers(
@@ -1163,9 +1165,6 @@ def main() -> None:
     print("🎯 Starting Godot type generation pipeline...")
 
     project_root = Path(__file__).parent.parent
-    gdscript_watcher_file = (
-        project_root / "addons" / "godot-bevy" / "optimized_scene_tree_watcher.gd"
-    )
     signal_names_file = (
         project_root / "godot-bevy" / "src" / "interop" / "signal_names.rs"
     )
@@ -1183,6 +1182,8 @@ def main() -> None:
         / "scene_tree"
         / "node_type_checking"
     )
+    gdscript_watcher_path = project_root / "addons" / "godot-bevy"
+    gdscript_watcher_file = gdscript_watcher_path / "optimized_scene_tree_watcher.gd"
 
     def extension_api_file(version: str) -> Path:
         return extension_api_path / f"extension_api{version}.json"
@@ -1213,14 +1214,20 @@ def main() -> None:
                 parsed_api,
             )
 
-        # # Step 5: Generate optimized GDScript watcher
-        # generate_gdscript_watcher(
-        #     excluded_classes,
-        #     gdscript_watcher_file,
-        #     node_types,
-        #     parent_map,
-        # )
-        #
+            # Step 5: Generate optimized GDScript watcher
+            generate_gdscript_watcher(
+                gdscript_watcher_path
+                / f"optimized_scene_tree_watcher{api_version.replace('.', '_')}.gd_ignore",
+                parsed_api,
+            )
+
+        # Use the most recent version as the active OptimizedSceneTreeWatcher
+        most_recent_gdscript_watcher_file: Path = (
+            gdscript_watcher_path
+            / f"optimized_scene_tree_watcher{api_versions[-1].replace('.', '_')}.gd_ignore"
+        )
+        most_recent_gdscript_watcher_file.replace(gdscript_watcher_file)
+
         # # Step 6: Generate signal names
         # generate_signal_names(
         #     classes_by_name,

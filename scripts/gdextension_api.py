@@ -4,6 +4,19 @@ from typing import List, Optional, Set, Dict, Any
 
 
 @dataclass(frozen=True)
+class VersionHeader:
+    """Raw gdextension_api.json version header format"""
+
+    version_major: int
+    version_minor: int
+    version_patch: int
+    version_status: str
+    version_build: str
+    version_full_name: str
+    precision: Optional[str]
+
+
+@dataclass(frozen=True)
 class GodotClass:
     """Raw gdextension_api.json class format"""
 
@@ -24,6 +37,7 @@ class GodotClass:
 class ExtensionApi:
     """Raw gdextension_api.json data format"""
 
+    header: VersionHeader
     classes: List[GodotClass]
 
     def classes_descended_from(self, root_class_name: str) -> Set[str]:

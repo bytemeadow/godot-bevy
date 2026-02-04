@@ -64,139 +64,57 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
 
             // NodeMarker already added above
         }
-        "GPUParticlesCollisionSDF3D" => {
+        "RetargetModifier3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(GPUParticlesCollisionSDF3DMarker);
-        }
-        "RemoteTransform3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(RemoteTransform3DMarker);
-        }
-        "SpringArm3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(SpringArm3DMarker);
-        }
-        "Sprite3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(Sprite3DMarker);
-        }
-        "AimModifier3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(AimModifier3DMarker);
-        }
-        "ReflectionProbe" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(ReflectionProbeMarker);
-        }
-        "VisibleOnScreenNotifier3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(VisibleOnScreenNotifier3DMarker);
-        }
-        "VisualInstance3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(VisualInstance3DMarker);
-        }
-        "Marker3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(Marker3DMarker);
-        }
-        #[cfg(feature = "experimental-godot-api")]
-        "NavigationLink3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(NavigationLink3DMarker);
+            entity_commands.insert(RetargetModifier3DMarker);
         }
         "CSGBox3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(CSGBox3DMarker);
         }
-        "OpenXRCompositionLayer" => {
+        "LookAtModifier3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(OpenXRCompositionLayerMarker);
+            entity_commands.insert(LookAtModifier3DMarker);
         }
-        "RigidBody3D" => {
+        "CSGMesh3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(RigidBody3DMarker);
+            entity_commands.insert(CSGMesh3DMarker);
         }
-        "CPUParticles3D" => {
+        "GPUParticlesAttractorBox3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(CPUParticles3DMarker);
+            entity_commands.insert(GPUParticlesAttractorBox3DMarker);
         }
-        "AnimatedSprite3D" => {
+        "CharacterBody3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(AnimatedSprite3DMarker);
+            entity_commands.insert(CharacterBody3DMarker);
         }
-        "Light3D" => {
+        "SpringBoneCollisionCapsule3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(Light3DMarker);
+            entity_commands.insert(SpringBoneCollisionCapsule3DMarker);
         }
-        "ConvertTransformModifier3D" => {
+        "Camera3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(ConvertTransformModifier3DMarker);
+            entity_commands.insert(Camera3DMarker);
         }
-        "SkeletonIK3D" => {
+        "RayCast3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(SkeletonIK3DMarker);
+            entity_commands.insert(RayCast3DMarker);
         }
         "MultiMeshInstance3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(MultiMeshInstance3DMarker);
         }
-        "Path3D" => {
+        "CopyTransformModifier3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(Path3DMarker);
+            entity_commands.insert(CopyTransformModifier3DMarker);
         }
-        "GPUParticlesCollision3D" => {
+        "CSGShape3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(GPUParticlesCollision3DMarker);
+            entity_commands.insert(CSGShape3DMarker);
         }
-        "GeometryInstance3D" => {
+        "ConvertTransformModifier3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(GeometryInstance3DMarker);
-        }
-        "LightmapProbe" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(LightmapProbeMarker);
-        }
-        "SpotLight3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(SpotLight3DMarker);
-        }
-        "ConeTwistJoint3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(ConeTwistJoint3DMarker);
-        }
-        "VoxelGI" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(VoxelGIMarker);
-        }
-        #[cfg(feature = "experimental-godot-api")]
-        "NavigationRegion3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(NavigationRegion3DMarker);
-        }
-        "SkeletonModifier3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(SkeletonModifier3DMarker);
-        }
-        "CollisionPolygon3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(CollisionPolygon3DMarker);
-        }
-        "FogVolume" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(FogVolumeMarker);
-        }
-        "DirectionalLight3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(DirectionalLight3DMarker);
-        }
-        "GPUParticlesAttractorSphere3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(GPUParticlesAttractorSphere3DMarker);
-        }
-        "PinJoint3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(PinJoint3DMarker);
+            entity_commands.insert(ConvertTransformModifier3DMarker);
         }
         "BoneAttachment3D" => {
             entity_commands.insert(Node3DMarker);
@@ -206,245 +124,307 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(OccluderInstance3DMarker);
         }
-        "AnimatableBody3D" => {
+        "AudioListener3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(AnimatableBody3DMarker);
-        }
-        "XRAnchor3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(XRAnchor3DMarker);
-        }
-        "CSGMesh3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(CSGMesh3DMarker);
-        }
-        "XRController3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(XRController3DMarker);
-        }
-        "CollisionShape3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(CollisionShape3DMarker);
-        }
-        "SpringBoneCollisionPlane3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(SpringBoneCollisionPlane3DMarker);
-        }
-        "GPUParticles3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(GPUParticles3DMarker);
-        }
-        "RayCast3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(RayCast3DMarker);
-        }
-        "Generic6DOFJoint3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(Generic6DOFJoint3DMarker);
-        }
-        "RootMotionView" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(RootMotionViewMarker);
-        }
-        "Area3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(Area3DMarker);
-        }
-        "XRHandModifier3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(XRHandModifier3DMarker);
-        }
-        "SpringBoneCollisionSphere3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(SpringBoneCollisionSphere3DMarker);
-        }
-        "GPUParticlesCollisionHeightField3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(GPUParticlesCollisionHeightField3DMarker);
-        }
-        "CopyTransformModifier3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(CopyTransformModifier3DMarker);
+            entity_commands.insert(AudioListener3DMarker);
         }
         "XRCamera3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(XRCamera3DMarker);
         }
-        "GPUParticlesAttractorBox3D" => {
+        "RigidBody3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(GPUParticlesAttractorBox3DMarker);
+            entity_commands.insert(RigidBody3DMarker);
         }
-        "OpenXRVisibilityMask" => {
+        "RemoteTransform3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(OpenXRVisibilityMaskMarker);
-        }
-        "VisibleOnScreenEnabler3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(VisibleOnScreenEnabler3DMarker);
-        }
-        "PhysicsBody3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(PhysicsBody3DMarker);
-        }
-        "SpringBoneCollision3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(SpringBoneCollision3DMarker);
-        }
-        "CSGPolygon3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(CSGPolygon3DMarker);
-        }
-        "CSGPrimitive3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(CSGPrimitive3DMarker);
-        }
-        "LightmapGI" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(LightmapGIMarker);
-        }
-        "GridMap" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(GridMapMarker);
-        }
-        "ShapeCast3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(ShapeCast3DMarker);
-        }
-        "SliderJoint3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(SliderJoint3DMarker);
-        }
-        "SpringBoneSimulator3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(SpringBoneSimulator3DMarker);
-        }
-        "CSGShape3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(CSGShape3DMarker);
-        }
-        "ImporterMeshInstance3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(ImporterMeshInstance3DMarker);
-        }
-        "PhysicalBone3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(PhysicalBone3DMarker);
-        }
-        "AudioListener3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(AudioListener3DMarker);
-        }
-        "CollisionObject3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(CollisionObject3DMarker);
-        }
-        "Camera3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(Camera3DMarker);
-        }
-        "GPUParticlesCollisionBox3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(GPUParticlesCollisionBox3DMarker);
-        }
-        "AudioStreamPlayer3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(AudioStreamPlayer3DMarker);
-        }
-        "VehicleBody3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(VehicleBody3DMarker);
-        }
-        "OpenXRCompositionLayerQuad" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(OpenXRCompositionLayerQuadMarker);
-        }
-        "SoftBody3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(SoftBody3DMarker);
-        }
-        "StaticBody3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(StaticBody3DMarker);
+            entity_commands.insert(RemoteTransform3DMarker);
         }
         #[cfg(feature = "experimental-godot-api")]
         "NavigationObstacle3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(NavigationObstacle3DMarker);
         }
-        "CharacterBody3D" => {
+        "GPUParticlesCollisionSDF3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(CharacterBody3DMarker);
+            entity_commands.insert(GPUParticlesCollisionSDF3DMarker);
         }
-        #[cfg(feature = "experimental-godot-api")]
-        "XRBodyModifier3D" => {
+        "VisibleOnScreenNotifier3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(XRBodyModifier3DMarker);
+            entity_commands.insert(VisibleOnScreenNotifier3DMarker);
         }
-        "BoneConstraint3D" => {
+        "GPUParticlesCollisionSphere3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(BoneConstraint3DMarker);
+            entity_commands.insert(GPUParticlesCollisionSphere3DMarker);
         }
-        "HingeJoint3D" => {
+        "OpenXRCompositionLayerQuad" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(HingeJoint3DMarker);
-        }
-        "GPUParticlesAttractor3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(GPUParticlesAttractor3DMarker);
-        }
-        "PathFollow3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(PathFollow3DMarker);
-        }
-        "LookAtModifier3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(LookAtModifier3DMarker);
-        }
-        "CSGCombiner3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(CSGCombiner3DMarker);
-        }
-        "GPUParticlesAttractorVectorField3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(GPUParticlesAttractorVectorField3DMarker);
-        }
-        "SpringBoneCollisionCapsule3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(SpringBoneCollisionCapsule3DMarker);
-        }
-        "XRNode3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(XRNode3DMarker);
-        }
-        "PhysicalBoneSimulator3D" => {
-            entity_commands.insert(Node3DMarker);
-            entity_commands.insert(PhysicalBoneSimulator3DMarker);
+            entity_commands.insert(OpenXRCompositionLayerQuadMarker);
         }
         "OpenXRCompositionLayerCylinder" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(OpenXRCompositionLayerCylinderMarker);
         }
-        "OpenXRCompositionLayerEquirect" => {
+        #[cfg(feature = "experimental-godot-api")]
+        "NavigationRegion3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(OpenXRCompositionLayerEquirectMarker);
+            entity_commands.insert(NavigationRegion3DMarker);
         }
-        #[cfg(not(feature = "experimental-wasm"))]
-        "OpenXRRenderModelManager" => {
+        "PhysicalBone3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(OpenXRRenderModelManagerMarker);
+            entity_commands.insert(PhysicalBone3DMarker);
+        }
+        "VehicleWheel3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(VehicleWheel3DMarker);
+        }
+        "SoftBody3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(SoftBody3DMarker);
+        }
+        "GPUParticlesCollisionHeightField3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(GPUParticlesCollisionHeightField3DMarker);
+        }
+        "GPUParticlesCollisionBox3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(GPUParticlesCollisionBox3DMarker);
+        }
+        "Sprite3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(Sprite3DMarker);
+        }
+        "Marker3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(Marker3DMarker);
+        }
+        "CSGPolygon3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(CSGPolygon3DMarker);
         }
         #[cfg(not(feature = "experimental-wasm"))]
         "OpenXRRenderModel" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(OpenXRRenderModelMarker);
         }
-        "Decal" => {
+        "PathFollow3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(DecalMarker);
+            entity_commands.insert(PathFollow3DMarker);
+        }
+        "OpenXRVisibilityMask" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(OpenXRVisibilityMaskMarker);
+        }
+        "GPUParticlesAttractorSphere3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(GPUParticlesAttractorSphere3DMarker);
+        }
+        "MeshInstance3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(MeshInstance3DMarker);
+        }
+        "SliderJoint3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(SliderJoint3DMarker);
+        }
+        "ShapeCast3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(ShapeCast3DMarker);
+        }
+        #[cfg(feature = "experimental-godot-api")]
+        "XRFaceModifier3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(XRFaceModifier3DMarker);
+        }
+        "SkeletonIK3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(SkeletonIK3DMarker);
+        }
+        "RootMotionView" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(RootMotionViewMarker);
+        }
+        "SpringBoneCollisionPlane3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(SpringBoneCollisionPlane3DMarker);
+        }
+        "ConeTwistJoint3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(ConeTwistJoint3DMarker);
+        }
+        "AnimatedSprite3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(AnimatedSprite3DMarker);
+        }
+        "SpringBoneSimulator3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(SpringBoneSimulator3DMarker);
+        }
+        "XRNode3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(XRNode3DMarker);
+        }
+        "XRController3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(XRController3DMarker);
+        }
+        "GPUParticlesAttractor3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(GPUParticlesAttractor3DMarker);
+        }
+        "SpringArm3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(SpringArm3DMarker);
+        }
+        "Skeleton3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(Skeleton3DMarker);
+        }
+        "LightmapProbe" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(LightmapProbeMarker);
+        }
+        #[cfg(feature = "experimental-godot-api")]
+        "XRBodyModifier3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(XRBodyModifier3DMarker);
+        }
+        "FogVolume" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(FogVolumeMarker);
+        }
+        "GeometryInstance3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(GeometryInstance3DMarker);
+        }
+        "CSGPrimitive3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(CSGPrimitive3DMarker);
+        }
+        "CollisionPolygon3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(CollisionPolygon3DMarker);
+        }
+        "Label3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(Label3DMarker);
+        }
+        "ModifierBoneTarget3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(ModifierBoneTarget3DMarker);
+        }
+        "XRAnchor3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(XRAnchor3DMarker);
+        }
+        "SpotLight3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(SpotLight3DMarker);
+        }
+        "XRHandModifier3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(XRHandModifier3DMarker);
+        }
+        "CSGCylinder3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(CSGCylinder3DMarker);
+        }
+        "DirectionalLight3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(DirectionalLight3DMarker);
+        }
+        "GridMap" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(GridMapMarker);
+        }
+        "Joint3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(Joint3DMarker);
+        }
+        "PhysicalBoneSimulator3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(PhysicalBoneSimulator3DMarker);
+        }
+        #[cfg(feature = "experimental-godot-api")]
+        "NavigationLink3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(NavigationLink3DMarker);
+        }
+        "CPUParticles3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(CPUParticles3DMarker);
         }
         "CSGSphere3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(CSGSphere3DMarker);
+        }
+        "LightmapGI" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(LightmapGIMarker);
+        }
+        "GPUParticlesCollision3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(GPUParticlesCollision3DMarker);
+        }
+        "GPUParticles3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(GPUParticles3DMarker);
+        }
+        "VisualInstance3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(VisualInstance3DMarker);
+        }
+        "PhysicsBody3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(PhysicsBody3DMarker);
+        }
+        "XROrigin3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(XROrigin3DMarker);
+        }
+        "CollisionObject3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(CollisionObject3DMarker);
+        }
+        "VisibleOnScreenEnabler3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(VisibleOnScreenEnabler3DMarker);
+        }
+        "VoxelGI" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(VoxelGIMarker);
+        }
+        "OpenXRCompositionLayerEquirect" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(OpenXRCompositionLayerEquirectMarker);
+        }
+        "Decal" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(DecalMarker);
+        }
+        "AudioStreamPlayer3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(AudioStreamPlayer3DMarker);
+        }
+        "OmniLight3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(OmniLight3DMarker);
+        }
+        "Path3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(Path3DMarker);
+        }
+        "Area3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(Area3DMarker);
+        }
+        "ImporterMeshInstance3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(ImporterMeshInstance3DMarker);
+        }
+        "StaticBody3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(StaticBody3DMarker);
         }
         "SpriteBase3D" => {
             entity_commands.insert(Node3DMarker);
@@ -454,88 +434,83 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(OpenXRHandMarker);
         }
-        "CSGCylinder3D" => {
+        "CSGCombiner3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(CSGCylinder3DMarker);
+            entity_commands.insert(CSGCombiner3DMarker);
         }
-        "Skeleton3D" => {
+        "HingeJoint3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(Skeleton3DMarker);
+            entity_commands.insert(HingeJoint3DMarker);
         }
-        "RetargetModifier3D" => {
+        "OpenXRCompositionLayer" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(RetargetModifier3DMarker);
+            entity_commands.insert(OpenXRCompositionLayerMarker);
         }
-        "Joint3D" => {
+        "AnimatableBody3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(Joint3DMarker);
+            entity_commands.insert(AnimatableBody3DMarker);
         }
-        "OmniLight3D" => {
+        "BoneConstraint3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(OmniLight3DMarker);
+            entity_commands.insert(BoneConstraint3DMarker);
         }
-        "XROrigin3D" => {
+        "SpringBoneCollisionSphere3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(XROrigin3DMarker);
+            entity_commands.insert(SpringBoneCollisionSphere3DMarker);
         }
-        "MeshInstance3D" => {
+        "SkeletonModifier3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(MeshInstance3DMarker);
+            entity_commands.insert(SkeletonModifier3DMarker);
         }
-        "Label3D" => {
+        "PinJoint3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(Label3DMarker);
+            entity_commands.insert(PinJoint3DMarker);
         }
-        #[cfg(feature = "experimental-godot-api")]
-        "XRFaceModifier3D" => {
+        "SpringBoneCollision3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(XRFaceModifier3DMarker);
+            entity_commands.insert(SpringBoneCollision3DMarker);
         }
-        "ModifierBoneTarget3D" => {
+        "CollisionShape3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(ModifierBoneTarget3DMarker);
+            entity_commands.insert(CollisionShape3DMarker);
         }
         "CSGTorus3D" => {
             entity_commands.insert(Node3DMarker);
             entity_commands.insert(CSGTorus3DMarker);
         }
-        "VehicleWheel3D" => {
+        "Light3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(VehicleWheel3DMarker);
+            entity_commands.insert(Light3DMarker);
         }
-        "GPUParticlesCollisionSphere3D" => {
+        "Generic6DOFJoint3D" => {
             entity_commands.insert(Node3DMarker);
-            entity_commands.insert(GPUParticlesCollisionSphere3DMarker);
+            entity_commands.insert(Generic6DOFJoint3DMarker);
         }
-        "DirectionalLight2D" => {
+        "AimModifier3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(AimModifier3DMarker);
+        }
+        "VehicleBody3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(VehicleBody3DMarker);
+        }
+        "GPUParticlesAttractorVectorField3D" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(GPUParticlesAttractorVectorField3DMarker);
+        }
+        "ReflectionProbe" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(ReflectionProbeMarker);
+        }
+        #[cfg(not(feature = "experimental-wasm"))]
+        "OpenXRRenderModelManager" => {
+            entity_commands.insert(Node3DMarker);
+            entity_commands.insert(OpenXRRenderModelManagerMarker);
+        }
+        "CanvasModulate" => {
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(DirectionalLight2DMarker);
-        }
-        "ShapeCast2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(ShapeCast2DMarker);
-        }
-        "Sprite2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(Sprite2DMarker);
-        }
-        "Polygon2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(Polygon2DMarker);
-        }
-        "CPUParticles2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(CPUParticles2DMarker);
-        }
-        "AnimatableBody2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(AnimatableBody2DMarker);
+            entity_commands.insert(CanvasModulateMarker);
         }
         #[cfg(feature = "experimental-godot-api")]
         "NavigationObstacle2D" => {
@@ -543,10 +518,193 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(NavigationObstacle2DMarker);
         }
+        "ShapeCast2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(ShapeCast2DMarker);
+        }
         "AnimatedSprite2D" => {
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(AnimatedSprite2DMarker);
+        }
+        "RayCast2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(RayCast2DMarker);
+        }
+        "Marker2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(Marker2DMarker);
+        }
+        "GPUParticles2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(GPUParticles2DMarker);
+        }
+        "VisibleOnScreenEnabler2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(VisibleOnScreenEnabler2DMarker);
+        }
+        "PhysicsBody2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(PhysicsBody2DMarker);
+        }
+        "Line2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(Line2DMarker);
+        }
+        #[cfg(feature = "experimental-godot-api")]
+        "NavigationLink2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(NavigationLink2DMarker);
+        }
+        #[cfg(feature = "experimental-godot-api")]
+        "Parallax2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(Parallax2DMarker);
+        }
+        "AudioListener2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(AudioListener2DMarker);
+        }
+        "Skeleton2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(Skeleton2DMarker);
+        }
+        "PhysicalBone2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(PhysicalBone2DMarker);
+        }
+        "Area2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(Area2DMarker);
+        }
+        "CollisionObject2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(CollisionObject2DMarker);
+        }
+        "BackBufferCopy" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(BackBufferCopyMarker);
+        }
+        "Bone2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(Bone2DMarker);
+        }
+        "CollisionShape2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(CollisionShape2DMarker);
+        }
+        "CharacterBody2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(CharacterBody2DMarker);
+        }
+        "DampedSpringJoint2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(DampedSpringJoint2DMarker);
+        }
+        "PinJoint2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(PinJoint2DMarker);
+        }
+        "DirectionalLight2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(DirectionalLight2DMarker);
+        }
+        "CPUParticles2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(CPUParticles2DMarker);
+        }
+        "StaticBody2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(StaticBody2DMarker);
+        }
+        "TouchScreenButton" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(TouchScreenButtonMarker);
+        }
+        "Light2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(Light2DMarker);
+        }
+        "LightOccluder2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(LightOccluder2DMarker);
+        }
+        "MeshInstance2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(MeshInstance2DMarker);
+        }
+        "ParallaxLayer" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(ParallaxLayerMarker);
+        }
+        "CollisionPolygon2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(CollisionPolygon2DMarker);
+        }
+        "AnimatableBody2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(AnimatableBody2DMarker);
+        }
+        "Joint2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(Joint2DMarker);
+        }
+        #[cfg(feature = "experimental-godot-api")]
+        "NavigationRegion2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(NavigationRegion2DMarker);
+        }
+        "Polygon2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(Polygon2DMarker);
+        }
+        "CanvasGroup" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(CanvasGroupMarker);
+        }
+        "Sprite2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(Sprite2DMarker);
+        }
+        "PointLight2D" => {
+            entity_commands.insert(Node2DMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(PointLight2DMarker);
         }
         "Path2D" => {
             entity_commands.insert(Node2DMarker);
@@ -558,490 +716,187 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(Camera2DMarker);
         }
-        "Area2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(Area2DMarker);
-        }
-        "Marker2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(Marker2DMarker);
-        }
-        #[cfg(feature = "experimental-godot-api")]
-        "NavigationRegion2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(NavigationRegion2DMarker);
-        }
-        "PinJoint2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(PinJoint2DMarker);
-        }
-        "AudioStreamPlayer2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(AudioStreamPlayer2DMarker);
-        }
-        "Light2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(Light2DMarker);
-        }
-        "PhysicalBone2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(PhysicalBone2DMarker);
-        }
-        "RigidBody2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(RigidBody2DMarker);
-        }
-        "CollisionPolygon2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(CollisionPolygon2DMarker);
-        }
-        "TileMapLayer" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(TileMapLayerMarker);
-        }
-        "RemoteTransform2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(RemoteTransform2DMarker);
-        }
-        "GPUParticles2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(GPUParticles2DMarker);
-        }
-        "TouchScreenButton" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(TouchScreenButtonMarker);
-        }
-        "Joint2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(Joint2DMarker);
-        }
-        "Skeleton2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(Skeleton2DMarker);
-        }
-        "GrooveJoint2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(GrooveJoint2DMarker);
-        }
-        "PhysicsBody2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(PhysicsBody2DMarker);
-        }
-        #[cfg(feature = "experimental-godot-api")]
-        "Parallax2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(Parallax2DMarker);
-        }
-        "CollisionObject2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(CollisionObject2DMarker);
-        }
-        "LightOccluder2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(LightOccluder2DMarker);
-        }
-        "RayCast2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(RayCast2DMarker);
-        }
-        "MeshInstance2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(MeshInstance2DMarker);
-        }
-        "PointLight2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(PointLight2DMarker);
-        }
-        "BackBufferCopy" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(BackBufferCopyMarker);
-        }
-        "Line2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(Line2DMarker);
-        }
-        "MultiMeshInstance2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(MultiMeshInstance2DMarker);
-        }
-        "CanvasGroup" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(CanvasGroupMarker);
-        }
-        "CollisionShape2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(CollisionShape2DMarker);
-        }
-        "ParallaxLayer" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(ParallaxLayerMarker);
-        }
-        "AudioListener2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(AudioListener2DMarker);
-        }
-        "CharacterBody2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(CharacterBody2DMarker);
-        }
         "VisibleOnScreenNotifier2D" => {
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(VisibleOnScreenNotifier2DMarker);
-        }
-        "VisibleOnScreenEnabler2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(VisibleOnScreenEnabler2DMarker);
         }
         "TileMap" => {
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(TileMapMarker);
         }
-        "StaticBody2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(StaticBody2DMarker);
-        }
-        #[cfg(feature = "experimental-godot-api")]
-        "NavigationLink2D" => {
-            entity_commands.insert(Node2DMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(NavigationLink2DMarker);
-        }
         "PathFollow2D" => {
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(PathFollow2DMarker);
         }
-        "CanvasModulate" => {
+        "TileMapLayer" => {
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(CanvasModulateMarker);
+            entity_commands.insert(TileMapLayerMarker);
         }
-        "Bone2D" => {
+        "GrooveJoint2D" => {
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(Bone2DMarker);
+            entity_commands.insert(GrooveJoint2DMarker);
         }
-        "DampedSpringJoint2D" => {
+        "AudioStreamPlayer2D" => {
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(DampedSpringJoint2DMarker);
+            entity_commands.insert(AudioStreamPlayer2DMarker);
         }
-        "VFlowContainer" => {
-            entity_commands.insert(ControlMarker);
+        "MultiMeshInstance2D" => {
+            entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(VFlowContainerMarker);
+            entity_commands.insert(MultiMeshInstance2DMarker);
         }
-        "LineEdit" => {
-            entity_commands.insert(ControlMarker);
+        "RigidBody2D" => {
+            entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(LineEditMarker);
+            entity_commands.insert(RigidBody2DMarker);
         }
-        "MarginContainer" => {
-            entity_commands.insert(ControlMarker);
+        "RemoteTransform2D" => {
+            entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(MarginContainerMarker);
-        }
-        "BoxContainer" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(BoxContainerMarker);
-        }
-        "ColorPickerButton" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(ColorPickerButtonMarker);
-        }
-        "EditorSpinSlider" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(EditorSpinSliderMarker);
-        }
-        "CheckBox" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(CheckBoxMarker);
-        }
-        "MenuBar" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(MenuBarMarker);
-        }
-        #[cfg(feature = "experimental-godot-api")]
-        "GraphEdit" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(GraphEditMarker);
-        }
-        "ScriptEditorBase" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(ScriptEditorBaseMarker);
-        }
-        "TextEdit" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(TextEditMarker);
-        }
-        "HSlider" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(HSliderMarker);
-        }
-        "OptionButton" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(OptionButtonMarker);
-        }
-        "HFlowContainer" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(HFlowContainerMarker);
-        }
-        "ProgressBar" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(ProgressBarMarker);
-        }
-        "VSplitContainer" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(VSplitContainerMarker);
-        }
-        "TextureProgressBar" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(TextureProgressBarMarker);
-        }
-        "HSplitContainer" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(HSplitContainerMarker);
-        }
-        "FlowContainer" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(FlowContainerMarker);
-        }
-        "TextureButton" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(TextureButtonMarker);
-        }
-        "SplitContainer" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(SplitContainerMarker);
-        }
-        "TabContainer" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(TabContainerMarker);
-        }
-        "RichTextLabel" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(RichTextLabelMarker);
-        }
-        "LinkButton" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(LinkButtonMarker);
-        }
-        "VSeparator" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(VSeparatorMarker);
-        }
-        "ReferenceRect" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(ReferenceRectMarker);
-        }
-        "EditorToaster" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(EditorToasterMarker);
-        }
-        "ItemList" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(ItemListMarker);
-        }
-        "EditorProperty" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(EditorPropertyMarker);
-        }
-        "VideoStreamPlayer" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(VideoStreamPlayerMarker);
-        }
-        "Slider" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(SliderMarker);
-        }
-        "ColorRect" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(ColorRectMarker);
-        }
-        "HBoxContainer" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(HBoxContainerMarker);
-        }
-        "SpinBox" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(SpinBoxMarker);
-        }
-        "ScriptEditor" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(ScriptEditorMarker);
-        }
-        "TextureRect" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(TextureRectMarker);
+            entity_commands.insert(RemoteTransform2DMarker);
         }
         "BaseButton" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(BaseButtonMarker);
         }
-        "EditorInspector" => {
+        "ReferenceRect" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(EditorInspectorMarker);
-        }
-        "OpenXRBindingModifierEditor" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(OpenXRBindingModifierEditorMarker);
-        }
-        "Tree" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(TreeMarker);
-        }
-        "EditorScriptPicker" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(EditorScriptPickerMarker);
-        }
-        "VBoxContainer" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(VBoxContainerMarker);
-        }
-        "FileSystemDock" => {
-            entity_commands.insert(ControlMarker);
-            entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(FileSystemDockMarker);
+            entity_commands.insert(ReferenceRectMarker);
         }
         "ColorPicker" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(ColorPickerMarker);
         }
-        "Panel" => {
+        "VideoStreamPlayer" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(PanelMarker);
+            entity_commands.insert(VideoStreamPlayerMarker);
+        }
+        "EditorScriptPicker" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(EditorScriptPickerMarker);
+        }
+        "EditorInspector" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(EditorInspectorMarker);
+        }
+        "ScrollContainer" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(ScrollContainerMarker);
         }
         #[cfg(feature = "experimental-godot-api")]
-        "GraphFrame" => {
+        "GraphNode" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(GraphFrameMarker);
+            entity_commands.insert(GraphNodeMarker);
         }
-        "HScrollBar" => {
+        "VSplitContainer" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(HScrollBarMarker);
+            entity_commands.insert(VSplitContainerMarker);
         }
-        "MenuButton" => {
+        "Tree" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(MenuButtonMarker);
+            entity_commands.insert(TreeMarker);
         }
-        "AspectRatioContainer" => {
+        "EditorProperty" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(AspectRatioContainerMarker);
+            entity_commands.insert(EditorPropertyMarker);
         }
-        "FoldableContainer" => {
+        "GridContainer" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(FoldableContainerMarker);
+            entity_commands.insert(GridContainerMarker);
         }
-        "Button" => {
+        "VScrollBar" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(ButtonMarker);
+            entity_commands.insert(VScrollBarMarker);
         }
-        "OpenXRInteractionProfileEditorBase" => {
+        "Slider" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(OpenXRInteractionProfileEditorBaseMarker);
+            entity_commands.insert(SliderMarker);
+        }
+        "HFlowContainer" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(HFlowContainerMarker);
+        }
+        "EditorToaster" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(EditorToasterMarker);
         }
         "ScrollBar" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(ScrollBarMarker);
         }
-        "OpenXRInteractionProfileEditor" => {
+        "Container" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(OpenXRInteractionProfileEditorMarker);
+            entity_commands.insert(ContainerMarker);
         }
-        "Separator" => {
+        "HSplitContainer" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(SeparatorMarker);
+            entity_commands.insert(HSplitContainerMarker);
         }
-        "GridContainer" => {
+        "HBoxContainer" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(GridContainerMarker);
+            entity_commands.insert(HBoxContainerMarker);
+        }
+        "VSeparator" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(VSeparatorMarker);
+        }
+        #[cfg(feature = "experimental-godot-api")]
+        "GraphElement" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(GraphElementMarker);
+        }
+        "TextEdit" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(TextEditMarker);
+        }
+        "TabBar" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(TabBarMarker);
+        }
+        "HScrollBar" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(HScrollBarMarker);
+        }
+        "VFlowContainer" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(VFlowContainerMarker);
+        }
+        "VBoxContainer" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(VBoxContainerMarker);
         }
         "CenterContainer" => {
             entity_commands.insert(ControlMarker);
@@ -1053,141 +908,286 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(CheckButtonMarker);
         }
-        "VSlider" => {
+        "HSeparator" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(VSliderMarker);
+            entity_commands.insert(HSeparatorMarker);
         }
-        "VScrollBar" => {
+        "FlowContainer" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(VScrollBarMarker);
+            entity_commands.insert(FlowContainerMarker);
         }
-        "Label" => {
+        "TabContainer" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(LabelMarker);
+            entity_commands.insert(TabContainerMarker);
         }
-        "EditorResourcePicker" => {
+        "FoldableContainer" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(EditorResourcePickerMarker);
+            entity_commands.insert(FoldableContainerMarker);
+        }
+        "ColorPickerButton" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(ColorPickerButtonMarker);
+        }
+        "TextureButton" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(TextureButtonMarker);
+        }
+        #[cfg(feature = "experimental-godot-api")]
+        "GraphFrame" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(GraphFrameMarker);
+        }
+        "OpenXRInteractionProfileEditorBase" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(OpenXRInteractionProfileEditorBaseMarker);
+        }
+        "LineEdit" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(LineEditMarker);
+        }
+        "TextureRect" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(TextureRectMarker);
         }
         "CodeEdit" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(CodeEditMarker);
         }
-        "TabBar" => {
+        "RichTextLabel" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(TabBarMarker);
+            entity_commands.insert(RichTextLabelMarker);
         }
-        #[cfg(feature = "experimental-godot-api")]
-        "GraphElement" => {
+        "SplitContainer" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(GraphElementMarker);
+            entity_commands.insert(SplitContainerMarker);
         }
-        "HSeparator" => {
+        "MenuButton" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(HSeparatorMarker);
+            entity_commands.insert(MenuButtonMarker);
         }
-        "NinePatchRect" => {
+        "VSlider" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(NinePatchRectMarker);
+            entity_commands.insert(VSliderMarker);
         }
-        "Range" => {
+        "OpenXRBindingModifierEditor" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(RangeMarker);
+            entity_commands.insert(OpenXRBindingModifierEditorMarker);
         }
-        "ScrollContainer" => {
+        "CheckBox" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(ScrollContainerMarker);
+            entity_commands.insert(CheckBoxMarker);
+        }
+        "EditorResourcePicker" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(EditorResourcePickerMarker);
         }
         "PanelContainer" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(PanelContainerMarker);
         }
+        "OptionButton" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(OptionButtonMarker);
+        }
+        #[cfg(feature = "experimental-godot-api")]
+        "GraphEdit" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(GraphEditMarker);
+        }
+        "LinkButton" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(LinkButtonMarker);
+        }
+        "ScriptEditorBase" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(ScriptEditorBaseMarker);
+        }
+        "ScriptEditor" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(ScriptEditorMarker);
+        }
         "SubViewportContainer" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
             entity_commands.insert(SubViewportContainerMarker);
         }
-        #[cfg(feature = "experimental-godot-api")]
-        "GraphNode" => {
+        "HSlider" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(GraphNodeMarker);
+            entity_commands.insert(HSliderMarker);
         }
-        "Container" => {
+        "Panel" => {
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
-            entity_commands.insert(ContainerMarker);
+            entity_commands.insert(PanelMarker);
         }
-        "Timer" => {
-            entity_commands.insert(TimerMarker);
+        "AspectRatioContainer" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(AspectRatioContainerMarker);
         }
-        "Viewport" => {
-            entity_commands.insert(ViewportMarker);
+        "TextureProgressBar" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(TextureProgressBarMarker);
         }
-        "InstancePlaceholder" => {
-            entity_commands.insert(InstancePlaceholderMarker);
+        "MarginContainer" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(MarginContainerMarker);
         }
-        "MissingNode" => {
-            entity_commands.insert(MissingNodeMarker);
+        "Button" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(ButtonMarker);
         }
-        "EditorFileSystem" => {
-            entity_commands.insert(EditorFileSystemMarker);
+        "EditorSpinSlider" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(EditorSpinSliderMarker);
         }
-        "ResourcePreloader" => {
-            entity_commands.insert(ResourcePreloaderMarker);
+        "Separator" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(SeparatorMarker);
+        }
+        "ProgressBar" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(ProgressBarMarker);
+        }
+        "SpinBox" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(SpinBoxMarker);
+        }
+        "BoxContainer" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(BoxContainerMarker);
+        }
+        "Range" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(RangeMarker);
+        }
+        "FileSystemDock" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(FileSystemDockMarker);
+        }
+        "OpenXRInteractionProfileEditor" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(OpenXRInteractionProfileEditorMarker);
+        }
+        "ColorRect" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(ColorRectMarker);
+        }
+        "ItemList" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(ItemListMarker);
+        }
+        "MenuBar" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(MenuBarMarker);
+        }
+        "NinePatchRect" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(NinePatchRectMarker);
+        }
+        "Label" => {
+            entity_commands.insert(ControlMarker);
+            entity_commands.insert(CanvasItemMarker);
+            entity_commands.insert(LabelMarker);
         }
         "StatusIndicator" => {
             entity_commands.insert(StatusIndicatorMarker);
         }
-        "EditorResourcePreview" => {
-            entity_commands.insert(EditorResourcePreviewMarker);
-        }
-        "MultiplayerSynchronizer" => {
-            entity_commands.insert(MultiplayerSynchronizerMarker);
-        }
-        "CanvasLayer" => {
-            entity_commands.insert(CanvasLayerMarker);
-        }
-        #[cfg(feature = "experimental-godot-api")]
-        "NavigationAgent3D" => {
-            entity_commands.insert(NavigationAgent3DMarker);
-        }
-        "AnimationMixer" => {
-            entity_commands.insert(AnimationMixerMarker);
-        }
-        "WorldEnvironment" => {
-            entity_commands.insert(WorldEnvironmentMarker);
-        }
-        "EditorPlugin" => {
-            entity_commands.insert(EditorPluginMarker);
-        }
-        "HTTPRequest" => {
-            entity_commands.insert(HTTPRequestMarker);
-        }
-        "ShaderGlobalsOverride" => {
-            entity_commands.insert(ShaderGlobalsOverrideMarker);
+        "InstancePlaceholder" => {
+            entity_commands.insert(InstancePlaceholderMarker);
         }
         #[cfg(feature = "experimental-godot-api")]
         "NavigationAgent2D" => {
             entity_commands.insert(NavigationAgent2DMarker);
         }
-        "AudioStreamPlayer" => {
-            entity_commands.insert(AudioStreamPlayerMarker);
+        "ResourcePreloader" => {
+            entity_commands.insert(ResourcePreloaderMarker);
         }
         "MultiplayerSpawner" => {
             entity_commands.insert(MultiplayerSpawnerMarker);
+        }
+        "EditorResourcePreview" => {
+            entity_commands.insert(EditorResourcePreviewMarker);
+        }
+        "HTTPRequest" => {
+            entity_commands.insert(HTTPRequestMarker);
+        }
+        "EditorPlugin" => {
+            entity_commands.insert(EditorPluginMarker);
+        }
+        "WorldEnvironment" => {
+            entity_commands.insert(WorldEnvironmentMarker);
+        }
+        "CanvasLayer" => {
+            entity_commands.insert(CanvasLayerMarker);
+        }
+        "MultiplayerSynchronizer" => {
+            entity_commands.insert(MultiplayerSynchronizerMarker);
+        }
+        "Viewport" => {
+            entity_commands.insert(ViewportMarker);
+        }
+        "AudioStreamPlayer" => {
+            entity_commands.insert(AudioStreamPlayerMarker);
+        }
+        "Timer" => {
+            entity_commands.insert(TimerMarker);
+        }
+        "AnimationMixer" => {
+            entity_commands.insert(AnimationMixerMarker);
+        }
+        "MissingNode" => {
+            entity_commands.insert(MissingNodeMarker);
+        }
+        #[cfg(feature = "experimental-godot-api")]
+        "NavigationAgent3D" => {
+            entity_commands.insert(NavigationAgent3DMarker);
+        }
+        "ShaderGlobalsOverride" => {
+            entity_commands.insert(ShaderGlobalsOverrideMarker);
+        }
+        "EditorFileSystem" => {
+            entity_commands.insert(EditorFileSystemMarker);
         }
         // For any unrecognized type, we already have NodeMarker
         // This handles custom user types that extend Godot nodes
