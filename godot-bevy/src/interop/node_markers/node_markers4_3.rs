@@ -364,18 +364,22 @@ pub struct Generic6DOFJoint3DMarker;
 #[reflect(Component)]
 pub struct GeometryInstance3DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct GraphEditMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct GraphElementMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct GraphFrameMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct GraphNodeMarker;
@@ -532,34 +536,42 @@ pub struct MultiplayerSpawnerMarker;
 #[reflect(Component)]
 pub struct MultiplayerSynchronizerMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationAgent2DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationAgent3DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationLink2DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationLink3DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationObstacle2DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationObstacle3DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationRegion2DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationRegion3DMarker;
@@ -620,6 +632,7 @@ pub struct PanelMarker;
 #[reflect(Component)]
 pub struct PanelContainerMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct Parallax2DMarker;
@@ -980,6 +993,7 @@ pub struct WorldEnvironmentMarker;
 #[reflect(Component)]
 pub struct XRAnchor3DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct XRBodyModifier3DMarker;
@@ -992,6 +1006,7 @@ pub struct XRCamera3DMarker;
 #[reflect(Component)]
 pub struct XRController3DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct XRFaceModifier3DMarker;

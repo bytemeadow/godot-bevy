@@ -364,14 +364,17 @@ pub struct Generic6DOFJoint3DMarker;
 #[reflect(Component)]
 pub struct GeometryInstance3DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct GraphEditMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct GraphElementMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct GraphNodeMarker;
@@ -528,34 +531,42 @@ pub struct MultiplayerSpawnerMarker;
 #[reflect(Component)]
 pub struct MultiplayerSynchronizerMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationAgent2DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationAgent3DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationLink2DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationLink3DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationObstacle2DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationObstacle3DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationRegion2DMarker;
 
+#[cfg(feature = "experimental-godot-api")]
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
 pub struct NavigationRegion3DMarker;

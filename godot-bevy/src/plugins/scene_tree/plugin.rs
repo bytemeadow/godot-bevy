@@ -1,4 +1,4 @@
-use super::node_type_checking_generated::{
+use super::node_type_checking::{
     add_comprehensive_node_type_markers, add_node_type_markers_from_string,
     remove_comprehensive_node_type_markers,
 };

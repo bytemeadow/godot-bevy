@@ -13,18 +13,15 @@ Usage: python scripts/generate_godot_types.py
 """
 
 import json
-import os
 import subprocess
-import sys
 import textwrap
-from collections import defaultdict
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Set
 
 import dacite
 
 from scripts.gdextension_api import ExtensionApi
+from scripts.special_cases import SpecialCases
 
 
 def run_cargo_fmt(file_path: Path, project_root: Path) -> None:
@@ -201,33 +198,6 @@ def _generate_initial_tree_analysis() -> str:
             for child in node.get_children():
                 _analyze_node_recursive(child, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)
         ''')
-
-
-def fix_godot_class_name_for_rust(class_name: str) -> str:
-    """Fix Godot class names to match the actual Rust bindings"""
-    # Map class names from extension API to actual Rust struct names
-    name_fixes = {
-        "CPUParticles2D": "CpuParticles2D",
-        "CPUParticles3D": "CpuParticles3D",
-        "GPUParticles2D": "GpuParticles2D",
-        "GPUParticles3D": "GpuParticles3D",
-        "GPUParticlesAttractor3D": "GpuParticlesAttractor3D",
-        "GPUParticlesAttractorBox3D": "GpuParticlesAttractorBox3D",
-        "GPUParticlesAttractorSphere3D": "GpuParticlesAttractorSphere3D",
-        "GPUParticlesAttractorVectorField3D": "GpuParticlesAttractorVectorField3D",
-        "GPUParticlesCollision3D": "GpuParticlesCollision3D",
-        "GPUParticlesCollisionBox3D": "GpuParticlesCollisionBox3D",
-        "GPUParticlesCollisionHeightField3D": "GpuParticlesCollisionHeightField3D",
-        "GPUParticlesCollisionSDF3D": "GpuParticlesCollisionSdf3d",
-        "GPUParticlesCollisionSphere3D": "GpuParticlesCollisionSphere3D",
-        "HTTPRequest": "HttpRequest",
-        "SkeletonIK3D": "SkeletonIk3d",
-        "Generic6DOFJoint3D": "Generic6DofJoint3D",
-        "OpenXRRenderModel": "OpenXrRenderModel",
-        "OpenXRRenderModelManager": "OpenXrRenderModelManager",
-    }
-
-    return name_fixes.get(class_name, class_name)
 
 
 def signal_name_to_const(signal_name: str) -> str:
@@ -458,7 +428,7 @@ def sanitize_doc_comment(text: str) -> str:
 
 
 def categorize_types_by_hierarchy(
-    node_types: List[str], parent_map: Dict[str, str]
+    node_types: Set[str], parent_map: Dict[str, str]
 ) -> Dict[str, List[str]]:
     """Categorize node types by their inheritance hierarchy"""
 
@@ -486,26 +456,26 @@ def categorize_types_by_hierarchy(
 
 
 def get_type_cfg_attribute(
-    wasm_excluded_types: set[str],
-    version_gated_types: dict[str, list[str]],
     node_type: str,
 ) -> str:
     """Get the cfg attribute for a type if it needs version or feature gating."""
+    cfg = []
     # Check for WASM-excluded types first
-    if node_type in wasm_excluded_types:
-        return '#[cfg(not(feature = "experimental-wasm"))]\n'
-    # Check for version-gated types
-    for version, types in version_gated_types.items():
-        if node_type in types:
-            return f'#[cfg(feature = "api-{version}")]\n'
-    return ""
+    if node_type in SpecialCases.wasm_excluded_types:
+        cfg.append('not(feature = "experimental-wasm")\n')
+    if node_type in SpecialCases.experimental_classes:
+        cfg.append('feature = "experimental-godot-api"\n')
+    cfg_start = "#[cfg("
+    cfg_end = ")]\n"
+    if cfg:
+        return cfg_start + ", ".join(cfg) + cfg_end
+    else:
+        return ""
 
 
 def generate_signal_names(
     classes_by_name: Dict[str, Any],
     excluded_classes: Set[str],
-    wasm_excluded_types: Set[str],
-    version_gated_types: Dict[str, List[str]],
     signal_names_file: Path,
     project_root: Path,
 ) -> None:
@@ -545,13 +515,11 @@ def generate_signal_names(
 
     # Generate a dedicated *Signals struct and impl block for each class
     for class_name, class_info, signals in classes_with_signals:
-        rust_class_name = fix_godot_class_name_for_rust(class_name)
+        rust_class_name = SpecialCases.fix_godot_class_name_for_rust(class_name)
         signals_struct_name = f"{rust_class_name}Signals"
 
         # Optional: cfg-gate the whole struct/impl if the class is version-gated
-        cfg_attr = get_type_cfg_attribute(
-            wasm_excluded_types, version_gated_types, class_name
-        )
+        cfg_attr = get_type_cfg_attribute(class_name)
         if cfg_attr:
             content += cfg_attr
 
@@ -607,8 +575,6 @@ def generate_signal_names(
 
 
 def _generate_hierarchy_function_comprehensive(
-    wasm_excluded_types: Set[str],
-    version_gated_types: Dict[str, List[str]],
     name: str,
     types: List[str],
 ) -> str:
@@ -621,10 +587,8 @@ def _generate_hierarchy_function_comprehensive(
         """)
 
     for node_type in sorted(types):
-        rust_class_name = fix_godot_class_name_for_rust(node_type)
-        cfg_attr = get_type_cfg_attribute(
-            wasm_excluded_types, version_gated_types, node_type
-        )
+        rust_class_name = SpecialCases.fix_godot_class_name_for_rust(node_type)
+        cfg_attr = get_type_cfg_attribute(node_type)
         if cfg_attr:
             content += textwrap.dedent(f"""\
                         {cfg_attr.strip()}
@@ -654,9 +618,7 @@ def _generate_hierarchy_function_comprehensive(
     gated_types = {}
 
     for node_type in sorted(types):
-        cfg_attr = get_type_cfg_attribute(
-            wasm_excluded_types, version_gated_types, node_type
-        )
+        cfg_attr = get_type_cfg_attribute(node_type)
         if cfg_attr:
             version = cfg_attr.strip()
             if version not in gated_types:
@@ -693,8 +655,6 @@ def filter_valid_godot_classes(
 
 
 def _generate_string_match_arms(
-    wasm_excluded_types: Set[str],
-    version_gated_types: Dict[str, List[str]],
     categories: Dict[str, List[str]],
 ) -> str:
     """Generate match arms for the string-based marker function"""
@@ -702,11 +662,23 @@ def _generate_string_match_arms(
 
     # Add base types first
     base_types = [
-        '        "Node3D" => {\n            entity_commands.insert(Node3DMarker);\n        }',
-        '        "Node2D" => {\n            entity_commands.insert(Node2DMarker);\n            entity_commands.insert(CanvasItemMarker);\n        }',
-        '        "Control" => {\n            entity_commands.insert(ControlMarker);\n            entity_commands.insert(CanvasItemMarker);\n        }',
-        '        "CanvasItem" => {\n            entity_commands.insert(CanvasItemMarker);\n        }',
-        '        "Node" => {\n            // NodeMarker already added above\n        }',
+        '        "Node3D" => {\n',
+        "            entity_commands.insert(Node3DMarker);\n",
+        "        }",
+        '        "Node2D" => {\n',
+        "            entity_commands.insert(Node2DMarker);\n",
+        "            entity_commands.insert(CanvasItemMarker);\n",
+        "        }",
+        '        "Control" => {\n',
+        "            entity_commands.insert(ControlMarker);\n",
+        "            entity_commands.insert(CanvasItemMarker);\n",
+        "        }",
+        '        "CanvasItem" => {\n',
+        "            entity_commands.insert(CanvasItemMarker);\n",
+        "        }",
+        '        "Node" => {\n',
+        "            // NodeMarker already added above\n",
+        "        }",
     ]
     match_arms.extend(base_types)
 
@@ -715,9 +687,7 @@ def _generate_string_match_arms(
         if node_type == "Node3D":
             continue  # Skip base type
         marker_name = f"{node_type}Marker"
-        cfg_attr = get_type_cfg_attribute(
-            wasm_excluded_types, version_gated_types, node_type
-        )
+        cfg_attr = get_type_cfg_attribute(node_type)
         if cfg_attr:
             match_arms.append(f"""        {cfg_attr.strip()}
     "{node_type}" => {{
@@ -735,9 +705,7 @@ def _generate_string_match_arms(
         if node_type == "Node2D":
             continue  # Skip base type
         marker_name = f"{node_type}Marker"
-        cfg_attr = get_type_cfg_attribute(
-            wasm_excluded_types, version_gated_types, node_type
-        )
+        cfg_attr = get_type_cfg_attribute(node_type)
         if cfg_attr:
             match_arms.append(f"""        {cfg_attr.strip()}
     "{node_type}" => {{
@@ -757,9 +725,7 @@ def _generate_string_match_arms(
         if node_type == "Control":
             continue  # Skip base type
         marker_name = f"{node_type}Marker"
-        cfg_attr = get_type_cfg_attribute(
-            wasm_excluded_types, version_gated_types, node_type
-        )
+        cfg_attr = get_type_cfg_attribute(node_type)
         if cfg_attr:
             match_arms.append(f"""        {cfg_attr.strip()}
     "{node_type}" => {{
@@ -779,9 +745,7 @@ def _generate_string_match_arms(
         if node_type in ["Node", "CanvasItem", "Node3D"]:
             continue  # Skip base types
         marker_name = f"{node_type}Marker"
-        cfg_attr = get_type_cfg_attribute(
-            wasm_excluded_types, version_gated_types, node_type
-        )
+        cfg_attr = get_type_cfg_attribute(node_type)
         if cfg_attr:
             match_arms.append(f"""        {cfg_attr.strip()}
     "{node_type}" => {{
@@ -796,8 +760,6 @@ def _generate_string_match_arms(
 
 
 def _generate_universal_function_comprehensive(
-    wasm_excluded_types: Set[str],
-    version_gated_types: Dict[str, List[str]],
     types: List[str],
 ) -> str:
     """Generate the universal types checking function"""
@@ -809,10 +771,8 @@ def _generate_universal_function_comprehensive(
         """)
 
     for node_type in sorted(types):
-        rust_class_name = fix_godot_class_name_for_rust(node_type)
-        cfg_attr = get_type_cfg_attribute(
-            wasm_excluded_types, version_gated_types, node_type
-        )
+        rust_class_name = SpecialCases.fix_godot_class_name_for_rust(node_type)
+        cfg_attr = get_type_cfg_attribute(node_type)
         if cfg_attr:
             content += textwrap.dedent(f"""\
                 {cfg_attr.strip()}
@@ -840,9 +800,7 @@ def _generate_universal_function_comprehensive(
     gated_types = {}
 
     for node_type in sorted(types):
-        cfg_attr = get_type_cfg_attribute(
-            wasm_excluded_types, version_gated_types, node_type
-        )
+        cfg_attr = get_type_cfg_attribute(node_type)
         if cfg_attr:
             version = cfg_attr.strip()
             if version not in gated_types:
@@ -871,22 +829,15 @@ def _generate_universal_function_comprehensive(
 
 
 def generate_type_checking_code(
-    excluded_classes: Set[str],
-    wasm_excluded_types: Set[str],
-    version_gated_types: Dict[str, List[str]],
     type_checking_file: Path,
     project_root: Path,
-    node_types: List[str],
-    parent_map: Dict[str, str],
+    api: ExtensionApi,
 ) -> None:
     """Generate the complete type checking implementation"""
     print("🔍 Generating type checking code...")
 
-    # Filter out invalid Godot classes first to avoid unnecessary work
-    valid_types = filter_valid_godot_classes(excluded_classes, node_types)
-
-    # Categorize only the valid types
-    categories = categorize_types_by_hierarchy(valid_types, parent_map)
+    valid_types = api.classes_descended_from("Node")
+    categories = categorize_types_by_hierarchy(valid_types, api.parent_map())
 
     content = textwrap.dedent(f"""\
         // 🤖 This file is automatically generated by scripts/generate_godot_types.py
@@ -938,7 +889,7 @@ def generate_type_checking_code(
         
             // Add appropriate markers based on the type string
             match node_type {{
-        {_generate_string_match_arms(wasm_excluded_types, version_gated_types, categories)}
+        {_generate_string_match_arms(categories)}
                 // For any unrecognized type, we already have NodeMarker
                 // This handles custom user types that extend Godot nodes
                 _ => {{}}
@@ -968,22 +919,15 @@ def generate_type_checking_code(
         """)
 
     # Generate specific checking functions
+    content += _generate_hierarchy_function_comprehensive("3d", categories["3d"])
+    content += _generate_hierarchy_function_comprehensive("2d", categories["2d"])
     content += _generate_hierarchy_function_comprehensive(
-        wasm_excluded_types, version_gated_types, "3d", categories["3d"]
-    )
-    content += _generate_hierarchy_function_comprehensive(
-        wasm_excluded_types, version_gated_types, "2d", categories["2d"]
-    )
-    content += _generate_hierarchy_function_comprehensive(
-        wasm_excluded_types,
-        version_gated_types,
         "control",
         categories["control"],
     )
-    content += _generate_universal_function_comprehensive(
-        wasm_excluded_types, version_gated_types, categories["universal"]
-    )
+    content += _generate_universal_function_comprehensive(categories["universal"])
 
+    type_checking_file.parent.mkdir(parents=True, exist_ok=True)
     with open(type_checking_file, "w") as f:
         f.write(content)
 
@@ -1002,7 +946,7 @@ def generate_gdscript_watcher(
 
     # Filter and categorize types
     valid_types = filter_valid_godot_classes(excluded_classes, node_types)
-    categories = categorize_types_by_hierarchy(valid_types, parent_map)
+    categories = categorize_types_by_hierarchy(set(valid_types), parent_map)
 
     content = textwrap.dedent(f'''\
         extends Node
@@ -1161,8 +1105,6 @@ def generate_gdscript_watcher(
 
 
 def generate_node_markers(
-    wasm_excluded_types: Set[str],
-    version_gated_types: Dict[str, List[str]],
     node_markers_file: Path,
     project_root: Path,
     api: ExtensionApi,
@@ -1187,7 +1129,7 @@ def generate_node_markers(
     node_classes = sorted(api.classes_descended_from("Node"))
 
     for node_class in node_classes:
-        cfg_attr = get_type_cfg_attribute(wasm_excluded_types, {}, node_class)
+        cfg_attr = get_type_cfg_attribute(node_class)
         if cfg_attr:
             content += cfg_attr
         content += f"#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]\n"
@@ -1221,14 +1163,6 @@ def main() -> None:
     print("🎯 Starting Godot type generation pipeline...")
 
     project_root = Path(__file__).parent.parent
-    type_checking_file = (
-        project_root
-        / "godot-bevy"
-        / "src"
-        / "plugins"
-        / "scene_tree"
-        / "node_type_checking_generated.rs"
-    )
     gdscript_watcher_file = (
         project_root / "addons" / "godot-bevy" / "optimized_scene_tree_watcher.gd"
     )
@@ -1236,101 +1170,19 @@ def main() -> None:
         project_root / "godot-bevy" / "src" / "interop" / "signal_names.rs"
     )
 
-    # Known classes that don't exist in current Godot version or aren't available
-    # Used for filtering both node types and signal generation
-    excluded_classes = {
-        # CSG classes (require special module)
-        "CSGBox3D",
-        "CSGCombiner3D",
-        "CSGCylinder3D",
-        "CSGMesh3D",
-        "CSGPolygon3D",
-        "CSGPrimitive3D",
-        "CSGShape3D",
-        "CSGSphere3D",
-        "CSGTorus3D",
-        # Editor classes
-        "GridMapEditorPlugin",
-        "ScriptCreateDialog",
-        "FileSystemDock",
-        "OpenXRBindingModifierEditor",
-        "OpenXRInteractionProfileEditor",
-        "OpenXRInteractionProfileEditorBase",
-        # XR classes that might not be available
-        "XRAnchor3D",
-        "XRBodyModifier3D",
-        "XRCamera3D",
-        "XRController3D",
-        "XRFaceModifier3D",
-        "XRHandModifier3D",
-        "XRNode3D",
-        "XROrigin3D",
-        # OpenXR classes
-        "OpenXRCompositionLayer",
-        "OpenXRCompositionLayerCylinder",
-        "OpenXRCompositionLayerEquirect",
-        "OpenXRCompositionLayerQuad",
-        "OpenXRHand",
-        "OpenXRVisibilityMask",
-        # Classes that might not be available in all builds
-        "VoxelGI",
-        "LightmapGI",
-        "FogVolume",
-        "WorldEnvironment",
-        # Navigation classes (might be module-specific)
-        "NavigationAgent2D",
-        "NavigationAgent3D",
-        "NavigationLink2D",
-        "NavigationLink3D",
-        "NavigationObstacle2D",
-        "NavigationObstacle3D",
-        "NavigationRegion2D",
-        "NavigationRegion3D",
-        # Other problematic classes
-        "StatusIndicator",
-        # Graph classes (not available in all Godot builds)
-        "GraphEdit",
-        "GraphElement",
-        "GraphFrame",
-        "GraphNode",
-        # Parallax2D is in extension API but not in current Rust bindings
-        "Parallax2D",
-    }
-
-    # Types that require specific Godot API versions
-    # Based on Godot release notes and documentation
-    version_gated_types = {
-        "4-3": [  # Types added in Godot 4.3+
-            "TileMapLayer",  # Replaces old TileMap layers system
-            "AnimationMixer",  # Base class for animation (introduced 4.2, enhanced 4.3)
-            "AudioStreamInteractive",  # Interactive music support
-            "AudioStreamPlaylist",  # Playlist support
-            "AudioStreamSynchronized",  # Synchronized audio streams
-        ],
-        "4-4": [  # Types added in Godot 4.4+
-            "LookAtModifier3D",  # New 3D animation modifier
-            "RetargetModifier3D",  # Animation retargeting
-            "SpringBoneSimulator3D",  # Physics-based animation
-            "SpringBoneCollision3D",  # Spring bone collision base
-            "SpringBoneCollisionCapsule3D",  # Capsule collision for spring bones
-            "SpringBoneCollisionPlane3D",  # Plane collision for spring bones
-            "SpringBoneCollisionSphere3D",  # Sphere collision for spring bones
-        ],
-        # Note: Godot 4.5 didn't add significant new node types
-    }
-
-    # Types that are excluded when building for web/WASM
-    # These types don't exist in the web extension API
-    wasm_excluded_types = {
-        "OpenXRRenderModel",
-        "OpenXRRenderModelManager",
-    }
-
     # The Godot versions used here are sourced from Godot-Rust's handling of gdextension API differences:
     # https://github.com/godot-rust/gdext/blob/3f1d543580c1817f1b7fab57a400e82b50085581/godot-bindings/src/import.rs
     api_versions = ["4.2", "4.2.1", "4.2.2", "4.3", "4.4", "4.5"]
     extension_api_path = project_root / "godot_extension_api"
     node_markers_path = project_root / "godot-bevy" / "src" / "interop" / "node_markers"
+    type_checking_path = (
+        project_root
+        / "godot-bevy"
+        / "src"
+        / "plugins"
+        / "scene_tree"
+        / "node_type_checking"
+    )
 
     def extension_api_file(version: str) -> Path:
         return extension_api_path / f"extension_api{version}.json"
@@ -1349,24 +1201,18 @@ def main() -> None:
 
             # Step 3: Generate node markers
             generate_node_markers(
-                wasm_excluded_types,
-                version_gated_types,
                 node_markers_path / f"node_markers{api_version.replace('.', '_')}.rs",
                 project_root,
                 parsed_api,
             )
 
-        # # Step 4: Generate type checking code
-        # generate_type_checking_code(
-        #     excluded_classes,
-        #     wasm_excluded_types,
-        #     version_gated_types,
-        #     type_checking_file,
-        #     project_root,
-        #     node_types,
-        #     parent_map,
-        # )
-        #
+            # Step 4: Generate type checking code
+            generate_type_checking_code(
+                type_checking_path / f"type_checking{api_version.replace('.', '_')}.rs",
+                project_root,
+                parsed_api,
+            )
+
         # # Step 5: Generate optimized GDScript watcher
         # generate_gdscript_watcher(
         #     excluded_classes,
@@ -1379,8 +1225,6 @@ def main() -> None:
         # generate_signal_names(
         #     classes_by_name,
         #     excluded_classes,
-        #     wasm_excluded_types,
-        #     version_gated_types,
         #     signal_names_file,
         #     project_root,
         # )

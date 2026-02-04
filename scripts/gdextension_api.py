@@ -28,14 +28,12 @@ class ExtensionApi:
 
     def classes_descended_from(self, root_class_name: str) -> Set[str]:
         inheritance_map = defaultdict(list)
-        parent_map: Dict[str, Any] = {}
 
         for class_info in self.classes:
             if class_info.inherits is not None:
                 name = class_info.name
                 parent = class_info.inherits
                 inheritance_map[parent].append(name)
-                parent_map[name] = parent
 
         # Collect all Node-derived types
         classes: Set[str] = set()
@@ -47,3 +45,14 @@ class ExtensionApi:
 
         collect_descendants(root_class_name)
         return classes
+
+    def parent_map(self) -> Dict[str, str]:
+        parent_map: Dict[str, str] = {}
+
+        for class_info in self.classes:
+            if class_info.inherits is not None:
+                name = class_info.name
+                parent = class_info.inherits
+                parent_map[name] = parent
+
+        return parent_map

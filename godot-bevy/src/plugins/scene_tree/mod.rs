@@ -1,5 +1,5 @@
 pub mod autosync;
-pub mod node_type_checking_generated;
+pub mod node_type_checking;
 pub mod plugin;
 pub mod relationship;
 

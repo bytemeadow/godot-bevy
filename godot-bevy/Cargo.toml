@@ -62,6 +62,7 @@ api-4-2-2 = ["godot/api-4-2-2"]
 api-4-3 = ["godot/api-4-3"]
 api-4-4 = ["godot/api-4-4"]
 api-4-5 = ["godot/api-4-5"]
+experimental-godot-api = ["godot/experimental-godot-api"]
 # Web/WASM support (experimental)
 # Note: These features intentionally exclude bevy_gamepad, godot_bevy_log,
 # and experimental-threads to avoid incompatible dependencies.
