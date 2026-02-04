@@ -16,11 +16,11 @@ import json
 import subprocess
 import textwrap
 from pathlib import Path
-from typing import Any, Dict, List, Set
+from typing import Dict, List, Set
 
 import dacite
 
-from scripts.gdextension_api import ExtensionApi
+from scripts.gdextension_api import ExtensionApi, GodotClass
 from scripts.special_cases import SpecialCases
 
 
@@ -475,10 +475,9 @@ def get_type_cfg_attribute(
 
 
 def generate_signal_names(
-    classes_by_name: Dict[str, Any],
-    excluded_classes: Set[str],
     signal_names_file: Path,
     project_root: Path,
+    api: ExtensionApi,
 ) -> None:
     """Generate the signal_names.rs file with signal constants"""
     print("📡 Generating signal names...")
@@ -501,26 +500,19 @@ def generate_signal_names(
         """)
 
     # Collect all classes with signals, sorted by name, skipping excluded classes
-    classes_with_signals = []
-    for class_name in sorted(classes_by_name.keys()):
-        # Skip classes that we know are not available / problematic
-        if class_name in excluded_classes:
-            continue
-
-        class_info = classes_by_name[class_name]
-        signals = class_info.get("signals", [])
-        if signals:
-            classes_with_signals.append((class_name, class_info, signals))
+    classes_with_signals: List[GodotClass] = [
+        c for c in api.classes if c.signals is not None
+    ]
 
     signal_count = 0
 
     # Generate a dedicated *Signals struct and impl block for each class
-    for class_name, class_info, signals in classes_with_signals:
-        rust_class_name = SpecialCases.fix_godot_class_name_for_rust(class_name)
+    for godot_class in classes_with_signals:
+        rust_class_name = SpecialCases.fix_godot_class_name_for_rust(godot_class.name)
         signals_struct_name = f"{rust_class_name}Signals"
 
         # Optional: cfg-gate the whole struct/impl if the class is version-gated
-        cfg_attr = get_type_cfg_attribute(class_name)
+        cfg_attr = get_type_cfg_attribute(godot_class.name)
         if cfg_attr:
             content += cfg_attr
 
@@ -534,9 +526,9 @@ def generate_signal_names(
         content += f"impl {signals_struct_name} {{\n"
 
         # Generate constants for each signal
-        for signal in signals:
-            signal_name = signal["name"]
-            description = signal.get("description", "").strip()
+        for signal in godot_class.signals:
+            signal_name = signal.name
+            description = signal.description.strip()
             const_name = signal_name_to_const(signal_name)
 
             # Add doc comment with description if available
@@ -1145,7 +1137,7 @@ def generate_node_markers(
     run_cargo_fmt(node_markers_file, project_root)
 
 
-def load_and_parse_extension_api(
+def load_extension_api(
     api_file: Path,
 ) -> ExtensionApi:
     """Load and parse the extension API to extract node types"""
@@ -1165,9 +1157,6 @@ def main() -> None:
     print("🎯 Starting Godot type generation pipeline...")
 
     project_root = Path(__file__).parent.parent
-    signal_names_file = (
-        project_root / "godot-bevy" / "src" / "interop" / "signal_names.rs"
-    )
 
     # The Godot versions used here are sourced from Godot-Rust's handling of gdextension API differences:
     # https://github.com/godot-rust/gdext/blob/3f1d543580c1817f1b7fab57a400e82b50085581/godot-bindings/src/import.rs
@@ -1184,6 +1173,7 @@ def main() -> None:
     )
     gdscript_watcher_path = project_root / "addons" / "godot-bevy"
     gdscript_watcher_file = gdscript_watcher_path / "optimized_scene_tree_watcher.gd"
+    signal_names_path = project_root / "godot-bevy" / "src" / "interop" / "signal_names"
 
     def extension_api_file(version: str) -> Path:
         return extension_api_path / f"extension_api{version}.json"
@@ -1198,27 +1188,34 @@ def main() -> None:
 
         for api_version in api_versions:
             # Step 2: Parse API and extract types
-            parsed_api = load_and_parse_extension_api(extension_api_file(api_version))
+            api = load_extension_api(extension_api_file(api_version))
 
             # Step 3: Generate node markers
             generate_node_markers(
                 node_markers_path / f"node_markers{api_version.replace('.', '_')}.rs",
                 project_root,
-                parsed_api,
+                api,
             )
 
             # Step 4: Generate type checking code
             generate_type_checking_code(
                 type_checking_path / f"type_checking{api_version.replace('.', '_')}.rs",
                 project_root,
-                parsed_api,
+                api,
             )
 
             # Step 5: Generate optimized GDScript watcher
             generate_gdscript_watcher(
                 gdscript_watcher_path
                 / f"optimized_scene_tree_watcher{api_version.replace('.', '_')}.gd_ignore",
-                parsed_api,
+                api,
+            )
+
+            # Step 6: Generate signal names
+            generate_signal_names(
+                signal_names_path / f"signal_names{api_version.replace('.', '_')}.rs",
+                project_root,
+                api,
             )
 
         # Use the most recent version as the active OptimizedSceneTreeWatcher
@@ -1228,14 +1225,6 @@ def main() -> None:
         )
         most_recent_gdscript_watcher_file.replace(gdscript_watcher_file)
 
-        # # Step 6: Generate signal names
-        # generate_signal_names(
-        #     classes_by_name,
-        #     excluded_classes,
-        #     signal_names_file,
-        #     project_root,
-        # )
-        #
         # print(textwrap.dedent(f"""
         #     🎉 Generation complete!
         #

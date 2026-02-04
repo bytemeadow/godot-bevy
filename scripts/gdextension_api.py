@@ -17,6 +17,14 @@ class VersionHeader:
 
 
 @dataclass(frozen=True)
+class GodotSignal:
+    """Raw gdextension_api.json signal format"""
+
+    name: str
+    description: str
+
+
+@dataclass(frozen=True)
 class GodotClass:
     """Raw gdextension_api.json class format"""
 
@@ -29,13 +37,14 @@ class GodotClass:
     api_type: str
     enums: Optional[List]
     methods: Optional[List]
+    signals: Optional[List[GodotSignal]]
     brief_description: str
     description: str
 
 
 @dataclass
 class ExtensionApi:
-    """Raw gdextension_api.json data format"""
+    """Class representation of the gdextension_api.json data format"""
 
     header: VersionHeader
     classes: List[GodotClass]
