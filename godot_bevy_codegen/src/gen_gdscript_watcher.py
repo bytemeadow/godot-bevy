@@ -360,8 +360,7 @@ def generate_gdscript_watcher(
             # Default fallback
             return "Node"
         
-        {textwrap.indent(_generate_initial_tree_analysis(), '        ')}
-        ''')
+        {textwrap.indent(_generate_initial_tree_analysis(), '        ')}''')
 
     with open(gdscript_watcher_file, "w") as f:
         f.write(content)

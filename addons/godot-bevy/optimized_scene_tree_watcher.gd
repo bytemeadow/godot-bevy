@@ -482,4 +482,3 @@ func _analyze_node_recursive(node: Node, instance_ids: PackedInt64Array, node_ty
     # Recursively process children
     for child in node.get_children():
         _analyze_node_recursive(child, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)
-
