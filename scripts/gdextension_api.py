@@ -40,7 +40,8 @@ class ExtensionApi:
     header: VersionHeader
     classes: List[GodotClass]
 
-    def classes_descended_from(self, root_class_name: str) -> Set[str]:
+    def classes_descended_from(self, root_class_name: str) -> List[str]:
+        """Return an alphabetically sorted list of all classes descended from the given root class name"""
         inheritance_map = defaultdict(list)
 
         for class_info in self.classes:
@@ -58,7 +59,7 @@ class ExtensionApi:
                 collect_descendants(child)
 
         collect_descendants(root_class_name)
-        return classes
+        return sorted(classes)
 
     def parent_map(self) -> Dict[str, str]:
         parent_map: Dict[str, str] = {}
