@@ -5,7 +5,7 @@ from typing import List
 class FilePaths:
     """Keeps track of all file paths used in the generation pipeline"""
 
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
     extension_api_path = project_root / "godot_extension_api"
     node_markers_path = project_root / "godot-bevy" / "src" / "interop" / "node_markers"
     type_checking_path = (

@@ -21,9 +21,9 @@ from typing import Dict, List, Set
 
 import dacite
 
-from scripts.file_paths import FilePaths
-from scripts.gdextension_api import ExtensionApi, GodotClass
-from scripts.special_cases import SpecialCases
+from scripts.generate_godot_types.file_paths import FilePaths
+from scripts.generate_godot_types.gdextension_api import ExtensionApi, GodotClass
+from scripts.generate_godot_types.special_cases import SpecialCases
 
 
 def indent_log(message):
