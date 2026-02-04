@@ -4,8 +4,8 @@ from pathlib import Path
 
 import dacite
 
-from generate_godot_types.gdextension_api import ExtensionApi
-from generate_godot_types.util import indent_log
+from godot_bevy_codegen.src.gdextension_api import ExtensionApi
+from godot_bevy_codegen.src.util import indent_log
 
 
 def run_godot_dump_api(destination_file: Path, godot_version: str) -> None:

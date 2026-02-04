@@ -9,24 +9,24 @@ This script:
 4. Generates complete type checking functions
 5. Updates the scene tree plugin to use generated code
 
-Usage: python scripts/generate_godot_types.py
+Usage: uv run python -m godot_bevy_codegen
 """
 
 import textwrap
 from pathlib import Path
 
-from generate_godot_types.file_paths import FilePaths
-from generate_godot_types.gdextension_api_dump import (
+from godot_bevy_codegen.src.file_paths import FilePaths
+from godot_bevy_codegen.src.gdextension_api_dump import (
     run_godot_dump_api,
     load_extension_api,
 )
-from generate_godot_types.gen_gdscript_watcher import generate_gdscript_watcher
-from generate_godot_types.gen_signal_names import generate_signal_names
-from generate_godot_types.gen_type_checking import (
+from godot_bevy_codegen.src.gen_gdscript_watcher import generate_gdscript_watcher
+from godot_bevy_codegen.src.gen_signal_names import generate_signal_names
+from godot_bevy_codegen.src.gen_type_checking import (
     generate_type_checking_code,
 )
-from generate_godot_types.gen_node_markers import generate_node_markers
-from generate_godot_types.util import (
+from godot_bevy_codegen.src.gen_node_markers import generate_node_markers
+from godot_bevy_codegen.src.util import (
     indent_log,
 )
 

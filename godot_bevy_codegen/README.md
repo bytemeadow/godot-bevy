@@ -19,7 +19,7 @@ The script ensures that godot-bevy has marker components for ALL Godot node type
 
 ```bash
 # From the project root - this does EVERYTHING automatically
-python scripts/generate_godot_types.py
+uv run python -m godot_bevy_codegen
 ```
 
 ### What it does (fully automatic)

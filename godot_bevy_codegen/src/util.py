@@ -3,14 +3,21 @@ import subprocess
 from pathlib import Path
 
 
-def indent_log(message):
-    # Subtract 1 to ignore the current 'indent_log' frame
-    # You might subtract more depending on your entry point
-    depth = len(inspect.stack()) - 1 - 2
+def make_indent_log():
+    # The stack can have several frames before the 'indent_log' function is called,
+    # this will normalize the indentation depth
+    first_stack_depth = None
+    def log(message):
+        nonlocal first_stack_depth
+        if first_stack_depth is None:
+            first_stack_depth = len(inspect.stack())
+        depth = len(inspect.stack()) - first_stack_depth
 
-    # Create the indentation string (e.g., 2 spaces per level)
-    indent = "    " * depth
-    print(f"{indent}{message}")
+        # Create the indentation string (e.g., 2 spaces per level)
+        indent = "    " * depth
+        print(f"{indent}{message}")
+    return log
+indent_log = make_indent_log()
 
 
 def run_cargo_fmt(file_path: Path, project_root: Path) -> None:
