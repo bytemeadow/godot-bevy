@@ -25,7 +25,8 @@ def generate_type_checking_code(
     node_types = api.classes_descended_from("Node")
     categories = categorize_types_by_hierarchy(node_types, api.parent_map())
 
-    content = textwrap.dedent(f"""\
+    content = textwrap.dedent(
+        f"""\
         //! 🤖 This file is generated. Changes to it will be lost.
         //! To regenerate: uv run python -m godot_bevy_codegen
         
@@ -102,7 +103,8 @@ def generate_type_checking_code(
             remove_universal_node_types_comprehensive(entity_commands, node);
         }}
         
-        """)
+        """
+    )
 
     # Generate specific checking functions
     content += _generate_hierarchy_function_comprehensive("3d", categories["3d"])
@@ -126,39 +128,47 @@ def _generate_hierarchy_function_comprehensive(
     types: List[str],
 ) -> str:
     """Generate a hierarchy-specific type checking function"""
-    content = textwrap.dedent(f"""\
+    content = textwrap.dedent(
+        f"""\
         fn check_{name}_node_types_comprehensive(
             entity_commands: &mut EntityCommands,
             node: &mut GodotNode,
         ) {{
-        """)
+        """
+    )
 
     for node_type in sorted(types):
         rust_class_name = SpecialCases.fix_godot_class_name_for_rust(node_type)
         cfg_attr = get_type_cfg_attribute(node_type)
         if cfg_attr:
-            content += textwrap.dedent(f"""\
+            content += textwrap.dedent(
+                f"""\
                         {cfg_attr.strip()}
                     if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
                         entity_commands.insert({node_type}Marker);
                     }}
-                """)
+                """
+            )
         else:
-            content += textwrap.dedent(f"""\
+            content += textwrap.dedent(
+                f"""\
                     if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
                         entity_commands.insert({node_type}Marker);
                     }}
-                """)
+                """
+            )
 
     content += "}\n\n"
 
-    content += textwrap.dedent(f"""\
+    content += textwrap.dedent(
+        f"""\
         fn remove_{name}_node_types_comprehensive(
             entity_commands: &mut EntityCommands,
             _node: &mut GodotNode,
         ) {{
             entity_commands
-        """)
+        """
+    )
 
     # Separate regular and version-gated types
     regular_types = []
@@ -228,16 +238,20 @@ def _generate_string_match_arms(
         marker_name = f"{node_type}Marker"
         cfg_attr = get_type_cfg_attribute(node_type)
         if cfg_attr:
-            match_arms.append(f"""        {cfg_attr.strip()}
+            match_arms.append(
+                f"""        {cfg_attr.strip()}
     "{node_type}" => {{
         entity_commands.insert(Node3DMarker);
         entity_commands.insert({marker_name});
-    }}""")
+    }}"""
+            )
         else:
-            match_arms.append(f"""        "{node_type}" => {{
+            match_arms.append(
+                f"""        "{node_type}" => {{
         entity_commands.insert(Node3DMarker);
         entity_commands.insert({marker_name});
-    }}""")
+    }}"""
+            )
 
     # Generate Node2D types (skip base Node2D since it's already handled)
     for node_type in categories["2d"]:
@@ -246,18 +260,22 @@ def _generate_string_match_arms(
         marker_name = f"{node_type}Marker"
         cfg_attr = get_type_cfg_attribute(node_type)
         if cfg_attr:
-            match_arms.append(f"""        {cfg_attr.strip()}
+            match_arms.append(
+                f"""        {cfg_attr.strip()}
     "{node_type}" => {{
         entity_commands.insert(Node2DMarker);
         entity_commands.insert(CanvasItemMarker);
         entity_commands.insert({marker_name});
-    }}""")
+    }}"""
+            )
         else:
-            match_arms.append(f"""        "{node_type}" => {{
+            match_arms.append(
+                f"""        "{node_type}" => {{
         entity_commands.insert(Node2DMarker);
         entity_commands.insert(CanvasItemMarker);
         entity_commands.insert({marker_name});
-    }}""")
+    }}"""
+            )
 
     # Generate Control types (skip base Control since it's already handled)
     for node_type in categories["control"]:
@@ -266,18 +284,22 @@ def _generate_string_match_arms(
         marker_name = f"{node_type}Marker"
         cfg_attr = get_type_cfg_attribute(node_type)
         if cfg_attr:
-            match_arms.append(f"""        {cfg_attr.strip()}
+            match_arms.append(
+                f"""        {cfg_attr.strip()}
     "{node_type}" => {{
         entity_commands.insert(ControlMarker);
         entity_commands.insert(CanvasItemMarker);
         entity_commands.insert({marker_name});
-    }}""")
+    }}"""
+            )
         else:
-            match_arms.append(f"""        "{node_type}" => {{
+            match_arms.append(
+                f"""        "{node_type}" => {{
         entity_commands.insert(ControlMarker);
         entity_commands.insert(CanvasItemMarker);
         entity_commands.insert({marker_name});
-    }}""")
+    }}"""
+            )
 
     # Generate universal (direct Node) types (skip base Node, Node3D, and CanvasItem since already handled)
     for node_type in categories["universal"]:
@@ -286,14 +308,18 @@ def _generate_string_match_arms(
         marker_name = f"{node_type}Marker"
         cfg_attr = get_type_cfg_attribute(node_type)
         if cfg_attr:
-            match_arms.append(f"""        {cfg_attr.strip()}
+            match_arms.append(
+                f"""        {cfg_attr.strip()}
     "{node_type}" => {{
         entity_commands.insert({marker_name});
-    }}""")
+    }}"""
+            )
         else:
-            match_arms.append(f"""        "{node_type}" => {{
+            match_arms.append(
+                f"""        "{node_type}" => {{
         entity_commands.insert({marker_name});
-    }}""")
+    }}"""
+            )
 
     return "\n".join(match_arms)
 
@@ -302,38 +328,46 @@ def _generate_universal_function_comprehensive(
     types: List[str],
 ) -> str:
     """Generate the universal types checking function"""
-    content = textwrap.dedent("""\
+    content = textwrap.dedent(
+        """\
         fn check_universal_node_types_comprehensive(
             entity_commands: &mut EntityCommands,
             node: &mut GodotNode,
         ) {
-        """)
+        """
+    )
 
     for node_type in sorted(types):
         rust_class_name = SpecialCases.fix_godot_class_name_for_rust(node_type)
         cfg_attr = get_type_cfg_attribute(node_type)
         if cfg_attr:
-            content += textwrap.dedent(f"""\
+            content += textwrap.dedent(
+                f"""\
                 {cfg_attr.strip()}
                     if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
                         entity_commands.insert({node_type}Marker);
                     }}
-                """)
+                """
+            )
         else:
-            content += textwrap.dedent(f"""\
+            content += textwrap.dedent(
+                f"""\
                     if node.try_get::<godot::classes::{rust_class_name}>().is_some() {{
                         entity_commands.insert({node_type}Marker);
                     }}
-                """)
+                """
+            )
     content += "}\n"
 
-    content += textwrap.dedent("""\
+    content += textwrap.dedent(
+        """\
         fn remove_universal_node_types_comprehensive(
             entity_commands: &mut EntityCommands,
             _node: &mut GodotNode,
         ) {
             entity_commands
-        """)
+        """
+    )
     # Separate regular and version-gated types
     regular_types = []
     gated_types = {}

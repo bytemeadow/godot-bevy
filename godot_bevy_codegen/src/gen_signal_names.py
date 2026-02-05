@@ -18,7 +18,8 @@ def generate_signal_names(
     """Generate the signal_names.rs file with signal constants"""
     indent_log("📡 Generating signal names...")
 
-    content = textwrap.dedent("""\
+    content = textwrap.dedent(
+        """\
         #![allow(dead_code)]
         //! 🤖 This file is generated. Changes to it will be lost.
         //! To regenerate: uv run python -m godot_bevy_codegen
@@ -33,7 +34,8 @@ def generate_signal_names(
         //! button.connect(ButtonSignals::PRESSED.into(), callable);
         //! ```
         
-        """)
+        """
+    )
 
     # Collect all classes with signals, sorted by name, skipping excluded classes
     classes_with_signals: List[GodotClass] = [

@@ -7,6 +7,7 @@ def make_indent_log():
     # The stack can have several frames before the 'indent_log' function is called,
     # this will normalize the indentation depth
     first_stack_depth = None
+
     def log(message):
         nonlocal first_stack_depth
         if first_stack_depth is None:
@@ -16,7 +17,10 @@ def make_indent_log():
         # Create the indentation string (e.g., 2 spaces per level)
         indent = "    " * depth
         print(f"{indent}{message}")
+
     return log
+
+
 indent_log = make_indent_log()
 
 

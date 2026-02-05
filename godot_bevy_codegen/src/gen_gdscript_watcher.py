@@ -11,7 +11,8 @@ from godot_bevy_codegen.src.util import (
 
 def _generate_initial_tree_analysis() -> str:
     """Generate method for analyzing the initial scene tree with type info"""
-    return textwrap.dedent('''
+    return textwrap.dedent(
+        '''
         func analyze_initial_tree() -> Dictionary:
             """
             Analyze the entire initial scene tree and return node information with types.
@@ -80,7 +81,8 @@ def _generate_initial_tree_analysis() -> str:
             # Recursively process children
             for child in node.get_children():
                 _analyze_node_recursive(child, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)
-        ''')
+        '''
+    )
 
 
 def _generate_gdscript_type_analysis(categories: Dict[str, List[str]]) -> str:
@@ -210,7 +212,8 @@ def generate_gdscript_watcher(
     # Filter and categorize types
     categories = categorize_types_by_hierarchy(node_types, api.parent_map())
 
-    content = textwrap.dedent(f'''\
+    content = textwrap.dedent(
+        f'''\
         class_name OptimizedSceneTreeWatcher
         extends Node
         
@@ -360,7 +363,8 @@ def generate_gdscript_watcher(
             # Default fallback
             return "Node"
         
-        {textwrap.indent(_generate_initial_tree_analysis(), '        ')}''')
+        {textwrap.indent(_generate_initial_tree_analysis(), '        ')}'''
+    )
 
     with open(gdscript_watcher_file, "w") as f:
         f.write(content)

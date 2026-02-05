@@ -97,7 +97,9 @@ def main() -> None:
         indent_log("    Files generated:")
         for path in FilePaths.all_generated_files(api_versions):
             indent_log(f"       • {path.relative_to(FilePaths.project_root)}")
-        indent_log(textwrap.dedent(f"""
+        indent_log(
+            textwrap.dedent(
+                f"""
             Next steps:
               • Run 'cargo check' to verify the build
               • Update the following files with the latest versions:
@@ -105,7 +107,9 @@ def main() -> None:
                 • godot-bevy/src/interop/node_markers.rs
                 • godot-bevy/src/interop/signal_names.rs
               • Commit the generated files
-            """))
+            """
+            )
+        )
 
     except Exception as e:
         raise RuntimeError("Generation failed") from e

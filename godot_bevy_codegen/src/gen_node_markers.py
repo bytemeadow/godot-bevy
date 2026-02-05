@@ -14,7 +14,8 @@ def generate_node_markers(
     """Generate the node_markers.rs file"""
     indent_log("🏷️  Generating node markers...")
 
-    content = textwrap.dedent("""\
+    content = textwrap.dedent(
+        """\
         use bevy_ecs::component::Component;
         use bevy_ecs::prelude::ReflectComponent;
         use bevy_reflect::Reflect;
@@ -25,7 +26,8 @@ def generate_node_markers(
         /// 🤖 This file is generated. Changes to it will be lost.
         /// To regenerate: `python -m godot_bevy_codegen`
         
-        """)
+        """
+    )
 
     # Generate all markers
     node_classes = sorted(api.classes_descended_from("Node"))
