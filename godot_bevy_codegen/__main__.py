@@ -77,7 +77,7 @@ def main() -> None:
     # The Godot versions used here are sourced from Godot-Rust's handling of gdextension API differences:
     # https://github.com/godot-rust/gdext/blob/3f1d543580c1817f1b7fab57a400e82b50085581/godot-bindings/src/import.rs
     # Check the main branch for latest versions: https://github.com/godot-rust/gdext/blob/master/godot-bindings/src/import.rs
-    api_versions = ["4.2", "4.2.1", "4.2.2", "4.3", "4.4", "4.5"]
+    api_versions = ["4.2", "4.2.1", "4.2.2", "4.3", "4.4", "4.5", "4.6"]
 
     try:
         for api_version in api_versions:
