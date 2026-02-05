@@ -1,8 +1,13 @@
 import textwrap
+import unittest
 from pathlib import Path
 from typing import List, Dict
 
-from godot_bevy_codegen.src.gdextension_api import ExtensionApi
+from godot_bevy_codegen.src.gdextension_api import (
+    ExtensionApi,
+    VersionHeader,
+    GodotClass,
+)
 from godot_bevy_codegen.src.special_cases import (
     SpecialCases,
     get_type_cfg_attribute,
@@ -71,16 +76,8 @@ def generate_type_checking_code(
             entity_commands: &mut EntityCommands,
             node_type: &str,
         ) {{
-            // All nodes inherit from Node
-            entity_commands.insert(NodeMarker);
-        
             // Add appropriate markers based on the type string
-            match node_type {{
-        {_generate_string_match_arms(categories)}
-                // For any unrecognized type, we already have NodeMarker
-                // This handles custom user types that extend Godot nodes
-                _ => {{}}
-            }}
+            {textwrap.indent(_generate_string_match_marker_insertion(api), "            ").strip()}
         }}
         
         pub fn remove_comprehensive_node_type_markers(
@@ -203,125 +200,53 @@ def _generate_hierarchy_function_comprehensive(
     return content
 
 
-def _generate_string_match_arms(
-    categories: Dict[str, List[str]],
+def _count_parents(node_type: str, parent_map: Dict[str, str]) -> int:
+    """Count the number of parents for a given node type"""
+    count = 0
+    parent = parent_map.get(node_type, None)
+    while parent is not None:
+        count += 1
+        parent = parent_map.get(parent, None)
+    return count
+
+
+def _generate_string_match_marker_insertion(
+    api: ExtensionApi,
 ) -> str:
     """Generate match arms for the string-based marker function"""
-    match_arms = []
+    node_types = api.classes_descended_from("Node")
+    parent_map = api.parent_map()
 
-    # Add base types first
-    base_types = [
-        '        "Node3D" => {',
-        "            entity_commands.insert(Node3DMarker);",
-        "        }",
-        '        "Node2D" => {',
-        "            entity_commands.insert(Node2DMarker);",
-        "            entity_commands.insert(CanvasItemMarker);",
-        "        }",
-        '        "Control" => {',
-        "            entity_commands.insert(ControlMarker);",
-        "            entity_commands.insert(CanvasItemMarker);",
-        "        }",
-        '        "CanvasItem" => {',
-        "            entity_commands.insert(CanvasItemMarker);",
-        "        }",
-        '        "Node" => {',
-        "            // NodeMarker already added above",
-        "        }",
+    # Sort node types by parent count (fewer parents first), then alphabetically
+    sorted_node_types = sorted(
+        node_types, key=lambda nt: (_count_parents(nt, parent_map), nt)
+    )
+
+    lines = [
+        "entity_commands.insert(NodeMarker);",
+        "",
+        "match node_type {",
     ]
-    match_arms.extend(base_types)
 
-    # Generate Node3D types (skip base Node3D since it's already handled)
-    for node_type in categories["3d"]:
-        if node_type == "Node3D":
-            continue  # Skip base type
-        marker_name = f"{node_type}Marker"
-        cfg_attr = get_type_cfg_attribute(node_type)
-        if cfg_attr:
-            match_arms.append(
-                f"""        {cfg_attr.strip()}
-    "{node_type}" => {{
-        entity_commands.insert(Node3DMarker);
-        entity_commands.insert({marker_name});
-    }}"""
-            )
+    for node_type in sorted_node_types:
+        lines.append(f'    "{node_type}" => {{')
+        if node_type == "Node":
+            lines.append(f"        // NodeMarker added above for all nodes.")
         else:
-            match_arms.append(
-                f"""        "{node_type}" => {{
-        entity_commands.insert(Node3DMarker);
-        entity_commands.insert({marker_name});
-    }}"""
-            )
+            lines.append(f"        entity_commands.insert({node_type}Marker);")
+            parent = parent_map.get(node_type, None)
+            while parent is not None:
+                if parent == "Node":
+                    break
+                lines.append(f"        entity_commands.insert({parent}Marker);")
+                parent = parent_map.get(parent, None)
+        lines.append("    },")
 
-    # Generate Node2D types (skip base Node2D since it's already handled)
-    for node_type in categories["2d"]:
-        if node_type == "Node2D":
-            continue  # Skip base type
-        marker_name = f"{node_type}Marker"
-        cfg_attr = get_type_cfg_attribute(node_type)
-        if cfg_attr:
-            match_arms.append(
-                f"""        {cfg_attr.strip()}
-    "{node_type}" => {{
-        entity_commands.insert(Node2DMarker);
-        entity_commands.insert(CanvasItemMarker);
-        entity_commands.insert({marker_name});
-    }}"""
-            )
-        else:
-            match_arms.append(
-                f"""        "{node_type}" => {{
-        entity_commands.insert(Node2DMarker);
-        entity_commands.insert(CanvasItemMarker);
-        entity_commands.insert({marker_name});
-    }}"""
-            )
+    lines.append("    // Custom user types that extend Godot nodes")
+    lines.append("    _ => {}")
+    lines.append("}")
 
-    # Generate Control types (skip base Control since it's already handled)
-    for node_type in categories["control"]:
-        if node_type == "Control":
-            continue  # Skip base type
-        marker_name = f"{node_type}Marker"
-        cfg_attr = get_type_cfg_attribute(node_type)
-        if cfg_attr:
-            match_arms.append(
-                f"""        {cfg_attr.strip()}
-    "{node_type}" => {{
-        entity_commands.insert(ControlMarker);
-        entity_commands.insert(CanvasItemMarker);
-        entity_commands.insert({marker_name});
-    }}"""
-            )
-        else:
-            match_arms.append(
-                f"""        "{node_type}" => {{
-        entity_commands.insert(ControlMarker);
-        entity_commands.insert(CanvasItemMarker);
-        entity_commands.insert({marker_name});
-    }}"""
-            )
-
-    # Generate universal (direct Node) types (skip base Node, Node3D, and CanvasItem since already handled)
-    for node_type in categories["universal"]:
-        if node_type in ["Node", "CanvasItem", "Node3D"]:
-            continue  # Skip base types
-        marker_name = f"{node_type}Marker"
-        cfg_attr = get_type_cfg_attribute(node_type)
-        if cfg_attr:
-            match_arms.append(
-                f"""        {cfg_attr.strip()}
-    "{node_type}" => {{
-        entity_commands.insert({marker_name});
-    }}"""
-            )
-        else:
-            match_arms.append(
-                f"""        "{node_type}" => {{
-        entity_commands.insert({marker_name});
-    }}"""
-            )
-
-    return "\n".join(match_arms)
+    return "\n".join(lines)
 
 
 def _generate_universal_function_comprehensive(
@@ -399,3 +324,50 @@ def _generate_universal_function_comprehensive(
 
     content += "}\n"
     return content
+
+
+class Tests(unittest.TestCase):
+    def test_generate_string_match_arms(self):
+        api = ExtensionApi(
+            header=VersionHeader(4, 6, 0, "", "", "", None),
+            classes=[
+                GodotClass(
+                    "Object", "core", True, True, None, None, None, None, "", ""
+                ),
+                GodotClass(
+                    "Node", "core", True, True, "Object", None, None, None, "", ""
+                ),
+                GodotClass(
+                    "Child1", "core", True, True, "Node", None, None, None, "", ""
+                ),
+                GodotClass(
+                    "Child2", "core", True, True, "Child1", None, None, None, "", ""
+                ),
+            ],
+        )
+        self.assertEqual(
+            textwrap.dedent(
+                """\
+                entity_commands.insert(NodeMarker);
+
+                match node_type {
+                    "Node" => {
+                        // NodeMarker added above for all nodes.
+                    },
+                    "Child1" => {
+                        entity_commands.insert(Child1Marker);
+                    },
+                    "Child2" => {
+                        entity_commands.insert(Child2Marker);
+                        entity_commands.insert(Child1Marker);
+                    },
+                    // Custom user types that extend Godot nodes
+                    _ => {}
+                }"""
+            ),
+            _generate_string_match_marker_insertion(api),
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
