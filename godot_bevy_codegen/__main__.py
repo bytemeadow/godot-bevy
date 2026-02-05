@@ -29,6 +29,7 @@ from godot_bevy_codegen.src.gen_type_checking import (
 from godot_bevy_codegen.src.gen_node_markers import generate_node_markers
 from godot_bevy_codegen.src.util import (
     indent_log,
+    run_cargo_fmt,
 )
 
 
@@ -86,6 +87,11 @@ def main() -> None:
 
         # Use the most recent version as the active OptimizedSceneTreeWatcher
         use_watcher_version(api_versions[-1])
+
+        rust_files = [
+            f for f in FilePaths.all_generated_files(api_versions) if f.suffix == ".rs"
+        ]
+        run_cargo_fmt(rust_files, FilePaths.project_root)
 
         indent_log("")
         indent_log("🎉 Generation complete!")

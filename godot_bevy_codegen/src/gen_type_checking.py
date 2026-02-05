@@ -15,7 +15,6 @@ from godot_bevy_codegen.src.special_cases import (
 )
 from godot_bevy_codegen.src.util import (
     indent_log,
-    run_cargo_fmt,
 )
 
 
@@ -117,7 +116,6 @@ def generate_type_checking_code(
         f.write(content)
 
     indent_log(f"✅ Generated type checking for {len(node_types)} types")
-    run_cargo_fmt(type_checking_file, project_root)
 
 
 def _generate_hierarchy_function_comprehensive(

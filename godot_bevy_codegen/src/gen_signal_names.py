@@ -7,7 +7,7 @@ from godot_bevy_codegen.src.special_cases import (
     SpecialCases,
     get_type_cfg_attribute,
 )
-from godot_bevy_codegen.src.util import indent_log, run_cargo_fmt
+from godot_bevy_codegen.src.util import indent_log
 
 
 def generate_signal_names(
@@ -102,7 +102,6 @@ def generate_signal_names(
     indent_log(
         f"✅ Generated {signal_count} signal constants across {len(classes_with_signals)} classes"
     )
-    run_cargo_fmt(signal_names_file, project_root)
 
 
 def signal_name_to_const(signal_name: str) -> str:

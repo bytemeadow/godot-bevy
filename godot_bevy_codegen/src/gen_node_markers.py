@@ -3,7 +3,7 @@ from pathlib import Path
 
 from godot_bevy_codegen.src.special_cases import get_type_cfg_attribute
 from godot_bevy_codegen.src.gdextension_api import ExtensionApi
-from godot_bevy_codegen.src.util import indent_log, run_cargo_fmt
+from godot_bevy_codegen.src.util import indent_log
 
 
 def generate_node_markers(
@@ -44,4 +44,3 @@ def generate_node_markers(
         f.write(content)
 
     indent_log(f"✅ Generated {len(node_classes)} node markers")
-    run_cargo_fmt(node_markers_file, project_root)

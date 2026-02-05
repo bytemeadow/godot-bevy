@@ -1,6 +1,7 @@
 import inspect
 import subprocess
 from pathlib import Path
+from typing import List
 
 
 def make_indent_log():
@@ -24,12 +25,12 @@ def make_indent_log():
 indent_log = make_indent_log()
 
 
-def run_cargo_fmt(file_path: Path, project_root: Path) -> None:
+def run_cargo_fmt(file_paths: List[Path], project_root: Path) -> None:
     """Run cargo fmt on a specific file to format generated Rust code"""
     try:
         # Run cargo fmt on the specific file
         result = subprocess.run(
-            ["cargo", "fmt", "--", str(file_path)],
+            ["cargo", "fmt", "--", *file_paths],
             cwd=project_root,
             capture_output=True,
             text=True,
@@ -37,15 +38,16 @@ def run_cargo_fmt(file_path: Path, project_root: Path) -> None:
         )
 
         if result.returncode == 0:
-            indent_log(f"  ✓ Formatted {file_path.name}")
+            indent_log(f"  ✓ Formatted rust files")
         else:
-            indent_log(f"  ⚠ cargo fmt warning for {file_path.name}: {result.stderr}")
+            indent_log(f"  ⚠ cargo fmt warning")
 
-    except FileNotFoundError:
-        indent_log(
-            f"  ⚠ cargo fmt not found - skipping formatting for {file_path.name}"
-        )
-    except subprocess.TimeoutExpired:
-        indent_log(f"  ⚠ cargo fmt timed out for {file_path.name}")
+    except FileNotFoundError as e:
+        indent_log(f"  ⚠ cargo fmt not found - skipping formatting")
+        raise e
+    except subprocess.TimeoutExpired as e:
+        indent_log(f"  ⚠ cargo fmt timed out")
+        raise e
     except Exception as e:
-        indent_log(f"  ⚠ Could not format {file_path.name}: {e}")
+        indent_log(f"  ⚠ Could not format rust files")
+        raise e
