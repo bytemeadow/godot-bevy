@@ -227,6 +227,10 @@ def _generate_string_match_marker_insertion(
     ]
 
     for node_type in sorted_node_types:
+        cfg_attr = get_type_cfg_attribute(node_type)
+        if cfg_attr:
+            lines.append(f"    {cfg_attr}")
+
         lines.append(f'    "{node_type}" => {{')
         if node_type == "Node":
             lines.append(f"        // NodeMarker added above for all nodes.")

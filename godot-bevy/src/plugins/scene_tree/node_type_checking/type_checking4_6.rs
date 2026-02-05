@@ -82,9 +82,11 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
         "MultiplayerSynchronizer" => {
             entity_commands.insert(MultiplayerSynchronizerMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "NavigationAgent2D" => {
             entity_commands.insert(NavigationAgent2DMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "NavigationAgent3D" => {
             entity_commands.insert(NavigationAgent3DMarker);
         }
@@ -173,14 +175,17 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(Marker3DMarker);
             entity_commands.insert(Node3DMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "NavigationLink3D" => {
             entity_commands.insert(NavigationLink3DMarker);
             entity_commands.insert(Node3DMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "NavigationObstacle3D" => {
             entity_commands.insert(NavigationObstacle3DMarker);
             entity_commands.insert(Node3DMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "NavigationRegion3D" => {
             entity_commands.insert(NavigationRegion3DMarker);
             entity_commands.insert(Node3DMarker);
@@ -197,10 +202,12 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(OpenXRHandMarker);
             entity_commands.insert(Node3DMarker);
         }
+        #[cfg(not(feature = "experimental-wasm"))]
         "OpenXRRenderModel" => {
             entity_commands.insert(OpenXRRenderModelMarker);
             entity_commands.insert(Node3DMarker);
         }
+        #[cfg(not(feature = "experimental-wasm"))]
         "OpenXRRenderModelManager" => {
             entity_commands.insert(OpenXRRenderModelManagerMarker);
             entity_commands.insert(Node3DMarker);
@@ -261,6 +268,7 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(WindowMarker);
             entity_commands.insert(ViewportMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "XRFaceModifier3D" => {
             entity_commands.insert(XRFaceModifier3DMarker);
             entity_commands.insert(Node3DMarker);
@@ -408,6 +416,7 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(VisualInstance3DMarker);
             entity_commands.insert(Node3DMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "GraphEdit" => {
             entity_commands.insert(GraphEditMarker);
             entity_commands.insert(ControlMarker);
@@ -503,16 +512,19 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "NavigationLink2D" => {
             entity_commands.insert(NavigationLink2DMarker);
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "NavigationObstacle2D" => {
             entity_commands.insert(NavigationObstacle2DMarker);
             entity_commands.insert(Node2DMarker);
             entity_commands.insert(CanvasItemMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "NavigationRegion2D" => {
             entity_commands.insert(NavigationRegion2DMarker);
             entity_commands.insert(Node2DMarker);
@@ -553,6 +565,7 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "Parallax2D" => {
             entity_commands.insert(Parallax2DMarker);
             entity_commands.insert(Node2DMarker);
@@ -748,6 +761,7 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(XRNode3DMarker);
             entity_commands.insert(Node3DMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "XRBodyModifier3D" => {
             entity_commands.insert(XRBodyModifier3DMarker);
             entity_commands.insert(SkeletonModifier3DMarker);
@@ -942,6 +956,7 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(VisualInstance3DMarker);
             entity_commands.insert(Node3DMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "GraphElement" => {
             entity_commands.insert(GraphElementMarker);
             entity_commands.insert(ContainerMarker);
@@ -1236,6 +1251,7 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(WindowMarker);
             entity_commands.insert(ViewportMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "GraphFrame" => {
             entity_commands.insert(GraphFrameMarker);
             entity_commands.insert(GraphElementMarker);
@@ -1243,6 +1259,7 @@ pub fn add_node_type_markers_from_string(entity_commands: &mut EntityCommands, n
             entity_commands.insert(ControlMarker);
             entity_commands.insert(CanvasItemMarker);
         }
+        #[cfg(feature = "experimental-godot-api")]
         "GraphNode" => {
             entity_commands.insert(GraphNodeMarker);
             entity_commands.insert(GraphElementMarker);
