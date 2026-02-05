@@ -1,12 +1,187 @@
+import shutil
 import textwrap
 from pathlib import Path
 from typing import Dict, List
 
+from godot_bevy_codegen.src.file_paths import FilePaths
 from godot_bevy_codegen.src.gdextension_api import ExtensionApi
 from godot_bevy_codegen.src.special_cases import categorize_types_by_hierarchy
 from godot_bevy_codegen.src.util import (
     indent_log,
 )
+
+
+def generate_gdscript_watcher(
+    gdscript_watcher_file: Path,
+    api: ExtensionApi,
+) -> None:
+    """Generate the optimized GDScript scene tree watcher with all node types"""
+    indent_log("📜 Generating GDScript optimized scene tree watcher...")
+
+    node_types = api.classes_descended_from("Node")
+
+    # Filter and categorize types
+    categories = categorize_types_by_hierarchy(node_types, api.parent_map())
+
+    content = textwrap.dedent(
+        f'''\
+        class_name OptimizedSceneTreeWatcher
+        extends Node
+        
+        # 🤖 This file is generated. Changes to it will be lost.
+        # To regenerate: uv run python -m godot_bevy_codegen
+        
+        # Generated for Godot version: {api.header.version_full_name}
+        # If you need support for a different version, swap out `optimized_scene_tree_watcher.gd`
+        # with `optimized_scene_tree_watcher_versions/optimized_scene_tree_watcher*_*_*.gd_ignore` of your desired version.
+        
+        # Optimized Scene Tree Watcher
+        # This GDScript class intercepts scene tree events and performs type analysis
+        # on the GDScript side to avoid expensive FFI calls from Rust.
+        # Handles {len(node_types)} different Godot node types.
+        
+        # Reference to the Rust SceneTreeWatcher
+        var rust_watcher: Node = null
+        
+        func _ready():
+            name = "OptimizedSceneTreeWatcher"
+        
+            # Auto-detect the Rust SceneTreeWatcher using multiple strategies:
+            # 1. Try production path: /root/BevyAppSingleton (autoload singleton)
+            # 2. Try as sibling: get_parent().get_node("SceneTreeWatcher") (test framework)
+            # 3. Use set_rust_watcher() if watcher is set externally
+        
+            # Strategy 1: Production - BevyApp autoload singleton
+            var bevy_app = get_node_or_null("/root/BevyAppSingleton")
+            if bevy_app:
+                rust_watcher = bevy_app.get_node_or_null("SceneTreeWatcher")
+        
+            # Strategy 2: Test environment - sibling node
+            if not rust_watcher and get_parent():
+                rust_watcher = get_parent().get_node_or_null("SceneTreeWatcher")
+        
+            # If still not found, it may be set later via set_rust_watcher()
+            if not rust_watcher:
+                push_warning("[OptimizedSceneTreeWatcher] SceneTreeWatcher not found. Will wait for set_rust_watcher() call.")
+        
+            # Connect to scene tree signals - these will forward to Rust with type info
+            # Use immediate connections for add/remove to get events as early as possible
+            get_tree().node_added.connect(_on_node_added)
+            get_tree().node_removed.connect(_on_node_removed)
+            get_tree().node_renamed.connect(_on_node_renamed, CONNECT_DEFERRED)
+        
+        func set_rust_watcher(watcher: Node):
+            """Called from Rust to set the SceneTreeWatcher reference (optional)"""
+            rust_watcher = watcher
+        
+        func _on_node_added(node: Node):
+            """Handle node added events with type optimization"""
+            if not rust_watcher:
+                return
+        
+            # Check if node is still valid
+            if not is_instance_valid(node):
+                return
+        
+            # Check if node is marked to be excluded from scene tree watcher
+            if node.has_meta("_bevy_exclude"):
+                return
+        
+            # Analyze node type on GDScript side - this is much faster than FFI
+            var node_type = _analyze_node_type(node)
+            var node_name = node.name
+            var parent = node.get_parent()
+            var parent_id = parent and parent.get_instance_id() or 0
+            var collision_mask = _compute_collision_mask(node)
+        
+            # Collect groups for this node
+            var node_groups = PackedStringArray()
+            for group in node.get_groups():
+                node_groups.append(group)
+        
+            # Forward to Rust watcher with pre-analyzed metadata
+            # Try newest API first (with groups), then fall back to older APIs
+            if rust_watcher.has_method("scene_tree_event_typed_metadata_groups"):
+                rust_watcher.scene_tree_event_typed_metadata_groups(
+                    node,
+                    "NodeAdded",
+                    node_type,
+                    node_name,
+                    parent_id,
+                    collision_mask,
+                    node_groups
+                )
+            elif rust_watcher.has_method("scene_tree_event_typed_metadata"):
+                rust_watcher.scene_tree_event_typed_metadata(
+                    node,
+                    "NodeAdded",
+                    node_type,
+                    node_name,
+                    parent_id,
+                    collision_mask
+                )
+            elif rust_watcher.has_method("scene_tree_event_typed"):
+                rust_watcher.scene_tree_event_typed(node, "NodeAdded", node_type)
+            else:
+                # Fallback to regular method if typed method not available
+                rust_watcher.scene_tree_event(node, "NodeAdded")
+        
+        func _on_node_removed(node: Node):
+            """Handle node removed events - no type analysis needed for removal"""
+            if not rust_watcher:
+                return
+        
+            # This is called immediately (not deferred) so the node should still be valid
+            # We need to send this event so Rust can clean up the corresponding Bevy entity
+            rust_watcher.scene_tree_event(node, "NodeRemoved")
+        
+        func _on_node_renamed(node: Node):
+            """Handle node renamed events - no type analysis needed for renaming"""
+            if not rust_watcher:
+                return
+        
+            # Check if node is still valid
+            if not is_instance_valid(node):
+                return
+        
+            var node_name = node.name
+            if rust_watcher.has_method("scene_tree_event_named"):
+                rust_watcher.scene_tree_event_named(node, "NodeRenamed", node_name)
+            else:
+                rust_watcher.scene_tree_event(node, "NodeRenamed")
+        
+        func _compute_collision_mask(node: Node) -> int:
+            var mask = 0
+            if node.has_signal("body_entered"):
+                mask |= 1
+            if node.has_signal("body_exited"):
+                mask |= 2
+            if node.has_signal("area_entered"):
+                mask |= 4
+            if node.has_signal("area_exited"):
+                mask |= 8
+            return mask
+        
+        func _analyze_node_type(node: Node) -> String:
+            """
+            Analyze node type hierarchy on GDScript side.
+            Returns the most specific built-in Godot type name.
+            This avoids multiple FFI calls that would be needed on the Rust side.
+            Generated from Godot extension API to ensure completeness.
+            """
+        {textwrap.indent(_generate_gdscript_type_analysis(categories), '        ')}
+        
+            # Default fallback
+            return "Node"
+        
+        {textwrap.indent(_generate_initial_tree_analysis(), '        ')}'''
+    )
+
+    gdscript_watcher_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(gdscript_watcher_file, "w") as f:
+        f.write(content)
+
+    indent_log(f"✅ Generated GDScript watcher with {len(node_types)} node types")
 
 
 def _generate_initial_tree_analysis() -> str:
@@ -200,173 +375,8 @@ def _generate_gdscript_type_analysis(categories: Dict[str, List[str]]) -> str:
     return "\n".join(lines)
 
 
-def generate_gdscript_watcher(
-    gdscript_watcher_file: Path,
-    api: ExtensionApi,
-) -> None:
-    """Generate the optimized GDScript scene tree watcher with all node types"""
-    indent_log("📜 Generating GDScript optimized scene tree watcher...")
-
-    node_types = api.classes_descended_from("Node")
-
-    # Filter and categorize types
-    categories = categorize_types_by_hierarchy(node_types, api.parent_map())
-
-    content = textwrap.dedent(
-        f'''\
-        class_name OptimizedSceneTreeWatcher
-        extends Node
-        
-        # 🤖 This file is generated. Changes to it will be lost.
-        # To regenerate: uv run python -m godot_bevy_codegen
-        
-        # Generated for Godot version: {api.header.version_full_name}
-        # If you need support for a different version, swap out `optimized_scene_tree_watcher.gd`
-        # with `optimized_scene_tree_watcher*_*_*.gd_ignore` of your desired version.
-        
-        # Optimized Scene Tree Watcher
-        # This GDScript class intercepts scene tree events and performs type analysis
-        # on the GDScript side to avoid expensive FFI calls from Rust.
-        # Handles {len(node_types)} different Godot node types.
-        
-        # Reference to the Rust SceneTreeWatcher
-        var rust_watcher: Node = null
-        
-        func _ready():
-            name = "OptimizedSceneTreeWatcher"
-        
-            # Auto-detect the Rust SceneTreeWatcher using multiple strategies:
-            # 1. Try production path: /root/BevyAppSingleton (autoload singleton)
-            # 2. Try as sibling: get_parent().get_node("SceneTreeWatcher") (test framework)
-            # 3. Use set_rust_watcher() if watcher is set externally
-        
-            # Strategy 1: Production - BevyApp autoload singleton
-            var bevy_app = get_node_or_null("/root/BevyAppSingleton")
-            if bevy_app:
-                rust_watcher = bevy_app.get_node_or_null("SceneTreeWatcher")
-        
-            # Strategy 2: Test environment - sibling node
-            if not rust_watcher and get_parent():
-                rust_watcher = get_parent().get_node_or_null("SceneTreeWatcher")
-        
-            # If still not found, it may be set later via set_rust_watcher()
-            if not rust_watcher:
-                push_warning("[OptimizedSceneTreeWatcher] SceneTreeWatcher not found. Will wait for set_rust_watcher() call.")
-        
-            # Connect to scene tree signals - these will forward to Rust with type info
-            # Use immediate connections for add/remove to get events as early as possible
-            get_tree().node_added.connect(_on_node_added)
-            get_tree().node_removed.connect(_on_node_removed)
-            get_tree().node_renamed.connect(_on_node_renamed, CONNECT_DEFERRED)
-        
-        func set_rust_watcher(watcher: Node):
-            """Called from Rust to set the SceneTreeWatcher reference (optional)"""
-            rust_watcher = watcher
-        
-        func _on_node_added(node: Node):
-            """Handle node added events with type optimization"""
-            if not rust_watcher:
-                return
-        
-            # Check if node is still valid
-            if not is_instance_valid(node):
-                return
-        
-            # Check if node is marked to be excluded from scene tree watcher
-            if node.has_meta("_bevy_exclude"):
-                return
-        
-            # Analyze node type on GDScript side - this is much faster than FFI
-            var node_type = _analyze_node_type(node)
-            var node_name = node.name
-            var parent = node.get_parent()
-            var parent_id = parent and parent.get_instance_id() or 0
-            var collision_mask = _compute_collision_mask(node)
-        
-            # Collect groups for this node
-            var node_groups = PackedStringArray()
-            for group in node.get_groups():
-                node_groups.append(group)
-        
-            # Forward to Rust watcher with pre-analyzed metadata
-            # Try newest API first (with groups), then fall back to older APIs
-            if rust_watcher.has_method("scene_tree_event_typed_metadata_groups"):
-                rust_watcher.scene_tree_event_typed_metadata_groups(
-                    node,
-                    "NodeAdded",
-                    node_type,
-                    node_name,
-                    parent_id,
-                    collision_mask,
-                    node_groups
-                )
-            elif rust_watcher.has_method("scene_tree_event_typed_metadata"):
-                rust_watcher.scene_tree_event_typed_metadata(
-                    node,
-                    "NodeAdded",
-                    node_type,
-                    node_name,
-                    parent_id,
-                    collision_mask
-                )
-            elif rust_watcher.has_method("scene_tree_event_typed"):
-                rust_watcher.scene_tree_event_typed(node, "NodeAdded", node_type)
-            else:
-                # Fallback to regular method if typed method not available
-                rust_watcher.scene_tree_event(node, "NodeAdded")
-        
-        func _on_node_removed(node: Node):
-            """Handle node removed events - no type analysis needed for removal"""
-            if not rust_watcher:
-                return
-        
-            # This is called immediately (not deferred) so the node should still be valid
-            # We need to send this event so Rust can clean up the corresponding Bevy entity
-            rust_watcher.scene_tree_event(node, "NodeRemoved")
-        
-        func _on_node_renamed(node: Node):
-            """Handle node renamed events - no type analysis needed for renaming"""
-            if not rust_watcher:
-                return
-        
-            # Check if node is still valid
-            if not is_instance_valid(node):
-                return
-        
-            var node_name = node.name
-            if rust_watcher.has_method("scene_tree_event_named"):
-                rust_watcher.scene_tree_event_named(node, "NodeRenamed", node_name)
-            else:
-                rust_watcher.scene_tree_event(node, "NodeRenamed")
-        
-        func _compute_collision_mask(node: Node) -> int:
-            var mask = 0
-            if node.has_signal("body_entered"):
-                mask |= 1
-            if node.has_signal("body_exited"):
-                mask |= 2
-            if node.has_signal("area_entered"):
-                mask |= 4
-            if node.has_signal("area_exited"):
-                mask |= 8
-            return mask
-        
-        func _analyze_node_type(node: Node) -> String:
-            """
-            Analyze node type hierarchy on GDScript side.
-            Returns the most specific built-in Godot type name.
-            This avoids multiple FFI calls that would be needed on the Rust side.
-            Generated from Godot extension API to ensure completeness.
-            """
-        {textwrap.indent(_generate_gdscript_type_analysis(categories), '        ')}
-        
-            # Default fallback
-            return "Node"
-        
-        {textwrap.indent(_generate_initial_tree_analysis(), '        ')}'''
+def use_watcher_version(version: str) -> None:
+    most_recent_gdscript_watcher_file: Path = FilePaths.gdscript_watcher_file(version)
+    shutil.copy(
+        most_recent_gdscript_watcher_file, FilePaths.gdscript_watcher_current_file
     )
-
-    with open(gdscript_watcher_file, "w") as f:
-        f.write(content)
-
-    indent_log(f"✅ Generated GDScript watcher with {len(node_types)} node types")

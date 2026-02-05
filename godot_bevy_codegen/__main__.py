@@ -11,16 +11,17 @@ This script:
 
 Usage: uv run python -m godot_bevy_codegen
 """
-
 import textwrap
-from pathlib import Path
 
 from godot_bevy_codegen.src.file_paths import FilePaths
 from godot_bevy_codegen.src.gdextension_api_dump import (
     run_godot_dump_api,
     load_extension_api,
 )
-from godot_bevy_codegen.src.gen_gdscript_watcher import generate_gdscript_watcher
+from godot_bevy_codegen.src.gen_gdscript_watcher import (
+    generate_gdscript_watcher,
+    use_watcher_version,
+)
 from godot_bevy_codegen.src.gen_signal_names import generate_signal_names
 from godot_bevy_codegen.src.gen_type_checking import (
     generate_type_checking_code,
@@ -84,12 +85,7 @@ def main() -> None:
             generate_for_version(api_version)
 
         # Use the most recent version as the active OptimizedSceneTreeWatcher
-        most_recent_gdscript_watcher_file: Path = FilePaths.gdscript_watcher_file(
-            api_versions[-1]
-        )
-        most_recent_gdscript_watcher_file.replace(
-            FilePaths.gdscript_watcher_current_file
-        )
+        use_watcher_version(api_versions[-1])
 
         indent_log("")
         indent_log("🎉 Generation complete!")

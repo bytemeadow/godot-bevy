@@ -4,9 +4,9 @@ extends Node
 # 🤖 This file is generated. Changes to it will be lost.
 # To regenerate: uv run python -m godot_bevy_codegen
 
-# Generated for Godot version: Godot Engine v4.2.2.stable.official
+# Generated for Godot version: Godot Engine v4.2.stable.official
 # If you need support for a different version, swap out `optimized_scene_tree_watcher.gd`
-# with `optimized_scene_tree_watcher*_*_*.gd_ignore` of your desired version.
+# with `optimized_scene_tree_watcher_versions/optimized_scene_tree_watcher*_*_*.gd_ignore` of your desired version.
 
 # Optimized Scene Tree Watcher
 # This GDScript class intercepts scene tree events and performs type analysis

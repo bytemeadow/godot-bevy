@@ -16,9 +16,12 @@ class FilePaths:
         / "scene_tree"
         / "node_type_checking"
     )
-    gdscript_watcher_path = project_root / "addons" / "godot-bevy"
+    gdscript_plugin_path = project_root / "addons" / "godot-bevy"
+    gdscript_watcher_path = (
+        gdscript_plugin_path / "optimized_scene_tree_watcher_versions"
+    )
     gdscript_watcher_current_file = (
-        gdscript_watcher_path / "optimized_scene_tree_watcher.gd"
+        gdscript_plugin_path / "optimized_scene_tree_watcher.gd"
     )
     signal_names_path = project_root / "godot-bevy" / "src" / "interop" / "signal_names"
 
