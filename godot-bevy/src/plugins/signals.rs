@@ -363,7 +363,7 @@ where
     }
 }
 
-/// Pending connection for direct node references (singletons, etc.)
+/// Pending connection for direct object references (singletons, Object instances, etc.)
 struct PendingDirectNodeConnection<T>
 where
     T: Event + Clone + Send + 'static,
@@ -382,6 +382,8 @@ where
     for<'a> T::Trigger<'a>: Default,
 {
     fn connect(self: Box<Self>, _godot: &mut GodotAccess) {
+        // GodotAccess is unused here: direct object connections resolve the target
+        // via InstanceId rather than through GodotAccess node lookups.
         let PendingDirectNodeConnection {
             instance_id,
             signal_name,
