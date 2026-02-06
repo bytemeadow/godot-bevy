@@ -90,6 +90,10 @@ impl BevyApp {
     }
 
     fn register_optimized_scene_tree_watcher(&mut self) {
+        if self.base().has_node("OptimizedSceneTreeWatcher") {
+            return;
+        }
+
         // Check if the optimized watcher file exists before trying to load it
         // This prevents error logs when the file is not present (e.g., in examples)
         let path = "res://addons/godot-bevy/optimized_scene_tree_watcher.gd";
@@ -192,10 +196,6 @@ impl INode for BevyApp {
         // This is done before the init check so benchmarks can use it without a full Bevy app
         #[cfg(debug_assertions)]
         self.register_optimized_bulk_operations();
-
-        // Register the optimized scene tree watcher early (before init check)
-        // This allows benchmarks and tools to use the watcher even without a full Bevy app
-        self.register_optimized_scene_tree_watcher();
 
         // If no init function is provided, don't initialize the Bevy app.
         // This allows the node to exist purely for GDScript utility methods (e.g., bulk transforms)
