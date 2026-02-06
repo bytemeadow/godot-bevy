@@ -88,7 +88,6 @@ pub struct TestContext {
 
 /// Prelude for convenient imports
 pub mod prelude {
-    pub use crate::bevy_app_test;
     pub use crate::test_app::TestApp;
     pub use crate::test_helpers::Counter;
     pub use crate::{TestContext, await_frame, await_frames, bench, itest};

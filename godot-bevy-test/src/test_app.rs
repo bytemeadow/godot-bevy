@@ -131,6 +131,45 @@ impl TestApp {
         })
     }
 
+    /// Look up the Bevy entity for a Godot node by instance ID
+    pub fn entity_for_node(&self, instance_id: godot::obj::InstanceId) -> Option<Entity> {
+        self.with_world(|world| {
+            world
+                .resource::<godot_bevy::prelude::NodeEntityIndex>()
+                .get(instance_id)
+        })
+    }
+
+    /// Check whether a Bevy entity exists for a Godot node
+    pub fn has_entity_for_node(&self, instance_id: godot::obj::InstanceId) -> bool {
+        self.with_world(|world| {
+            world
+                .resource::<godot_bevy::prelude::NodeEntityIndex>()
+                .contains(instance_id)
+        })
+    }
+
+    /// Add a new Godot node to the scene tree and return it with its entity
+    ///
+    /// Creates a node, sets its name, adds it to the scene tree, waits one
+    /// frame for entity creation, and returns both the node and its entity.
+    pub async fn add_node<T>(&mut self, name: &str) -> (Gd<T>, Entity)
+    where
+        T: godot::obj::Inherits<godot::classes::Node> + NewAlloc + godot::obj::GodotClass,
+    {
+        let node = T::new_alloc();
+        node.clone().upcast::<godot::classes::Node>().set_name(name);
+        self.ctx
+            .scene_tree
+            .clone()
+            .add_child(&node.clone().upcast::<godot::classes::Node>());
+        self.update().await;
+        let entity = self
+            .entity_for_node(node.instance_id())
+            .unwrap_or_else(|| panic!("Entity should exist for node '{name}' after update"));
+        (node, entity)
+    }
+
     /// Get the test context
     pub fn ctx(&self) -> &TestContext {
         &self.ctx
