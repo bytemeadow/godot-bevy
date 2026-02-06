@@ -15,7 +15,7 @@ use godot::prelude::*;
 use godot_bevy::prelude::*;
 use godot_bevy_test::prelude::*;
 
-/// Test that transforms sync from Bevy to Godot (OneWay mode - default)
+/// Test that position, rotation, and scale sync from Bevy to Godot (OneWay mode)
 #[itest(async)]
 fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -23,15 +23,14 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
     godot::task::spawn(async move {
         await_frames(1).await;
 
-        // Create a Godot Node2D
         let mut node = godot::classes::Node2D::new_alloc();
         node.set_name("BevyMoverNode");
         node.set_position(Vector2::new(0.0, 0.0));
         ctx_clone.scene_tree.clone().add_child(&node);
 
         let node_id = node.instance_id();
+        let target_angle = std::f32::consts::FRAC_PI_4;
 
-        // Create test app with transform sync (OneWay mode)
         let mut app = TestApp::new(&ctx_clone, move |app| {
             app.add_plugins(GodotTransformSyncPlugin::default());
             app.insert_resource(GodotTransformConfig::one_way());
@@ -41,7 +40,10 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
                 move |mut q: Query<(&GodotNodeHandle, &mut Transform)>| {
                     for (handle, mut transform) in q.iter_mut() {
                         if handle.instance_id() == node_id {
-                            transform.translation.x += 1.0;
+                            transform.translation.x = 10.0;
+                            transform.translation.y = 5.0;
+                            transform.rotation = Quat::from_rotation_z(target_angle);
+                            transform.scale = Vec3::new(2.0, 0.5, 1.0);
                         }
                     }
                 },
@@ -49,26 +51,38 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         })
         .await;
 
-        // Frame 1: Initial setup
         app.update().await;
 
-        let start_pos = node.get_position().x;
-
-        // Frame 2-5: Move in Bevy, should sync to Godot
         for _ in 0..4 {
             app.update().await;
         }
 
-        let end_pos = node.get_position().x;
+        let pos = node.get_position();
+        let rot = node.get_rotation();
+        let scale = node.get_scale();
 
         assert!(
-            end_pos > start_pos,
-            "Godot node should move (Bevy→Godot sync), start={start_pos:.1}, end={end_pos:.1}"
+            (pos.x - 10.0).abs() < 0.1 && (pos.y - 5.0).abs() < 0.1,
+            "Position should sync, expected (10, 5), got ({:.1}, {:.1})",
+            pos.x,
+            pos.y
+        );
+        assert!(
+            (rot - target_angle).abs() < 0.01,
+            "Rotation should sync, expected {target_angle:.3}, got {rot:.3}"
+        );
+        assert!(
+            (scale.x - 2.0).abs() < 0.01 && (scale.y - 0.5).abs() < 0.01,
+            "Scale should sync, expected (2.0, 0.5), got ({:.3}, {:.3})",
+            scale.x,
+            scale.y
         );
 
-        println!("✓ Bevy→Godot transform sync: moved from {start_pos:.1} to {end_pos:.1}");
+        println!(
+            "✓ Bevy→Godot transform sync: pos=({:.1},{:.1}), rot={rot:.3}, scale=({:.2},{:.2})",
+            pos.x, pos.y, scale.x, scale.y
+        );
 
-        // Cleanup: free BevyApp BEFORE freeing node
         app.cleanup();
         node.queue_free();
         await_frames(1).await;

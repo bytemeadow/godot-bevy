@@ -9,6 +9,7 @@
 
 use bevy::prelude::*;
 use godot::obj::NewAlloc;
+use godot::prelude::*;
 use godot_bevy::prelude::*;
 use godot_bevy_test::prelude::*;
 
@@ -110,6 +111,67 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
         // Cleanup
         app.cleanup();
         button.queue_free();
+        await_frames(1).await;
+    })
+}
+
+/// Event type for connect_object testing
+#[derive(Event, Debug, Clone)]
+struct NodeAdded;
+
+/// Test that connect_object connects signals from non-entity Godot objects.
+#[itest(async)]
+fn test_connect_object_signal(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        await_frames(1).await;
+
+        #[derive(Resource, Default)]
+        struct SignalReceived(bool);
+
+        let mut app = TestApp::new(&ctx_clone, |app| {
+            app.add_plugins(GodotSignalsPlugin::<NodeAdded>::default());
+            app.init_resource::<SignalReceived>();
+            app.add_observer(
+                |_trigger: On<NodeAdded>, mut received: ResMut<SignalReceived>| {
+                    received.0 = true;
+                },
+            );
+        })
+        .await;
+
+        let scene_tree: Gd<godot::classes::SceneTree> = ctx_clone.scene_tree.get_tree().unwrap();
+
+        app.with_world_mut(|world| {
+            let mut system_state: bevy::ecs::system::SystemState<GodotSignals<NodeAdded>> =
+                bevy::ecs::system::SystemState::new(world);
+            let signals = system_state.get(world);
+
+            signals.connect_object(scene_tree, "node_added", |_args| Some(NodeAdded));
+
+            system_state.apply(world);
+        });
+
+        app.update().await;
+
+        let mut trigger_node = godot::classes::Node::new_alloc();
+        trigger_node.set_name("ConnectObjectTrigger");
+        ctx_clone.scene_tree.clone().add_child(&trigger_node);
+
+        app.update().await;
+
+        let was_received = app.with_world(|world| world.resource::<SignalReceived>().0);
+
+        assert!(
+            was_received,
+            "connect_object should receive signals from non-entity Godot objects"
+        );
+
+        println!("✓ connect_object works for non-entity objects (SceneTree)");
+
+        app.cleanup();
+        trigger_node.queue_free();
         await_frames(1).await;
     })
 }

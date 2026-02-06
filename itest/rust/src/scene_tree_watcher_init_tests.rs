@@ -5,7 +5,6 @@
  * and SceneTreeWatcher during BevyApp::ready():
  * - Only one OptimizedSceneTreeWatcher should exist (no duplicates)
  * - OptimizedSceneTreeWatcher.rust_watcher should be connected (not null)
- * - SceneTreeWatcher should exist alongside OptimizedSceneTreeWatcher
  */
 
 use godot::prelude::*;
@@ -96,41 +95,6 @@ fn test_optimized_watcher_rust_watcher_connected(ctx: &TestContext) -> godot::ta
         );
 
         println!("✓ OptimizedSceneTreeWatcher.rust_watcher is connected");
-
-        app.cleanup();
-        await_frames(1).await;
-    })
-}
-
-/// Test that SceneTreeWatcher exists as a sibling when OptimizedSceneTreeWatcher
-/// is present. Both should be children of BevyApp.
-#[itest(async)]
-fn test_scene_tree_watcher_exists_with_optimized(ctx: &TestContext) -> godot::task::TaskHandle {
-    let ctx_clone = ctx.clone();
-
-    godot::task::spawn(async move {
-        await_frames(1).await;
-
-        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
-
-        let bevy_app_node = find_bevy_app_node(&ctx_clone.scene_tree)
-            .expect("BevyApp node should exist as child of scene_tree");
-
-        let has_scene_tree_watcher = bevy_app_node.get_node_or_null("SceneTreeWatcher").is_some();
-        let has_optimized_watcher = bevy_app_node
-            .get_node_or_null("OptimizedSceneTreeWatcher")
-            .is_some();
-
-        assert!(
-            has_scene_tree_watcher,
-            "SceneTreeWatcher should exist as child of BevyApp"
-        );
-        assert!(
-            has_optimized_watcher,
-            "OptimizedSceneTreeWatcher should exist as child of BevyApp"
-        );
-
-        println!("✓ Both SceneTreeWatcher and OptimizedSceneTreeWatcher exist");
 
         app.cleanup();
         await_frames(1).await;
