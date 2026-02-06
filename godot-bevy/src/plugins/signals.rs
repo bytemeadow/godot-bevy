@@ -277,6 +277,54 @@ where
             _marker: std::marker::PhantomData,
         }));
     }
+
+    /// Connect a signal from any Godot object directly.
+    ///
+    /// This is useful for connecting to signals from objects that aren't tracked
+    /// as ECS entities, such as the SceneTree or other non-node objects.
+    ///
+    /// When the signal fires, the `mapper` function is called with the signal arguments.
+    /// If it returns `Some(event)`, that event is triggered for observers.
+    ///
+    /// # Arguments
+    ///
+    /// * `object` - A `Gd<T>` reference to any Godot object
+    /// * `signal_name` - The name of the Godot signal (e.g., "scene_changed", "timeout")
+    /// * `mapper` - Function to convert signal arguments to the event type
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use bevy::prelude::*;
+    /// use godot_bevy::prelude::*;
+    /// use godot_bevy::interop::signal_names::SceneTreeSignals;
+    ///
+    /// #[derive(Event, Clone)]
+    /// struct SceneChanged;
+    ///
+    /// fn connect_scene_tree(
+    ///     signals: GodotSignals<SceneChanged>,
+    ///     mut scene_tree: SceneTreeRef,
+    /// ) {
+    ///     let tree = scene_tree.get().clone();
+    ///     signals.connect_object(tree, SceneTreeSignals::SCENE_CHANGED, |_args| {
+    ///         Some(SceneChanged)
+    ///     });
+    /// }
+    /// ```
+    pub fn connect_object<O, F>(&self, object: Gd<O>, signal_name: &str, mapper: F)
+    where
+        O: godot::obj::Inherits<godot::classes::Object> + godot::obj::GodotClass,
+        F: FnMut(&[Variant]) -> Option<T> + Send + 'static,
+    {
+        self.pending.push(Box::new(PendingDirectNodeConnection {
+            instance_id: object.instance_id(),
+            signal_name: signal_name.to_string(),
+            mapper: Box::new(mapper),
+            sender: self.sender.0.clone(),
+            _marker: std::marker::PhantomData,
+        }));
+    }
 }
 
 /// Backwards compatibility alias
@@ -312,6 +360,58 @@ where
             _marker: _,
         } = *self;
         connect_signal(godot, node, &signal_name, source_entity, mapper, sender);
+    }
+}
+
+/// Pending connection for direct object references (singletons, Object instances, etc.)
+struct PendingDirectNodeConnection<T>
+where
+    T: Event + Clone + Send + 'static,
+    for<'a> T::Trigger<'a>: Default,
+{
+    instance_id: godot::obj::InstanceId,
+    signal_name: String,
+    mapper: Box<dyn FnMut(&[Variant]) -> Option<T> + Send + 'static>,
+    sender: Sender<Box<dyn SignalDispatch>>,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T> PendingSignalConnection for PendingDirectNodeConnection<T>
+where
+    T: Event + Clone + Send + 'static,
+    for<'a> T::Trigger<'a>: Default,
+{
+    fn connect(self: Box<Self>, _godot: &mut GodotAccess) {
+        // GodotAccess is unused here: direct object connections resolve the target
+        // via InstanceId rather than through GodotAccess node lookups.
+        let PendingDirectNodeConnection {
+            instance_id,
+            signal_name,
+            mut mapper,
+            sender,
+            _marker: _,
+        } = *self;
+
+        let Ok(mut node) = Gd::<godot::classes::Object>::try_from_instance_id(instance_id) else {
+            error!(
+                "Failed to get object with instance_id {:?} for signal connection",
+                instance_id
+            );
+            return;
+        };
+
+        let signal_name_copy = signal_name.clone();
+
+        let closure = move |args: &[&Variant]| -> Variant {
+            let owned: Vec<Variant> = args.iter().map(|&v| v.clone()).collect();
+            if let Some(event) = mapper(&owned) {
+                let _ = sender.send(Box::new(SignalEnvelope { event }));
+            }
+            Variant::nil()
+        };
+
+        let callable = Callable::from_fn(&format!("signal_handler_{signal_name_copy}"), closure);
+        node.connect(&signal_name, &callable);
     }
 }
 
