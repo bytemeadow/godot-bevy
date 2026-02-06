@@ -1,15 +1,10 @@
 /*
  * Scene tree integration tests
  *
- * Tests automatic entity creation and scene tree event handling:
- * - NodeAdded events when nodes are added to the scene tree
- * - NodeRemoved events when nodes are removed
- * - NodeRenamed events when nodes are renamed
- * - Automatic entity creation for scene tree nodes
- * - GodotNodeHandle components on entities
+ * Tests automatic entity creation, removal, renaming, reparenting,
+ * ProtectedNodeEntity, GodotNodeHandle validity, and NodeEntityIndex.
  */
 
-use bevy::prelude::{Entity, Name, With};
 use godot::obj::NewAlloc;
 use godot::prelude::*;
 use godot_bevy::plugins::scene_tree::ProtectedNodeEntity;
@@ -44,33 +39,6 @@ fn test_node_added_creates_entity(ctx: &TestContext) -> godot::task::TaskHandle 
         assert!(
             app.has_entity_for_node(node.instance_id()),
             "Entity should have correct GodotNodeHandle"
-        );
-
-        app.cleanup();
-        node.queue_free();
-        await_frames(1).await;
-    })
-}
-
-/// Test that SceneTreeEvent::NodeAdded is sent when nodes are added
-#[itest(async)]
-fn test_scene_tree_event_node_added(ctx: &TestContext) -> godot::task::TaskHandle {
-    let ctx_clone = ctx.clone();
-
-    godot::task::spawn(async move {
-        await_frames(1).await;
-
-        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
-
-        app.update().await;
-
-        let (mut node, _entity) = app
-            .add_node::<godot::classes::Node2D>("EventTestNode")
-            .await;
-
-        assert!(
-            app.has_entity_for_node(node.instance_id()),
-            "Entity should exist for added node (event processed)"
         );
 
         app.cleanup();
@@ -206,18 +174,11 @@ fn test_node_handle_validity(ctx: &TestContext) -> godot::task::TaskHandle {
 
         app.update().await;
 
-        let mut node = godot::classes::Node2D::new_alloc();
-        node.set_name("UniqueNodeName");
+        let (mut node, entity) = app
+            .add_node::<godot::classes::Node2D>("UniqueNodeName")
+            .await;
+
         node.set_position(Vector2::new(42.0, 84.0));
-        ctx_clone.scene_tree.clone().add_child(&node);
-
-        let node_id = node.instance_id();
-
-        app.update().await;
-
-        let entity = app
-            .entity_for_node(node_id)
-            .expect("Entity should exist for node");
 
         let position_match = app.with_world_mut(|world| {
             let handle = world
@@ -273,18 +234,9 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
 
         app.update().await;
 
-        let entity = app.with_world_mut(|world| {
-            let mut query = world.query_filtered::<Entity, With<GodotNodeHandle>>();
-            query
-                .iter(world)
-                .find(|e| {
-                    world
-                        .get::<Name>(*e)
-                        .map(|n| n.as_str() == "Child")
-                        .unwrap_or(false)
-                })
-                .expect("Child entity should exist")
-        });
+        let entity = app
+            .entity_for_node(child.instance_id())
+            .expect("Child entity should exist");
 
         #[derive(bevy::prelude::Component, Clone, Copy, Debug, PartialEq)]
         struct CustomData(i32);
@@ -348,18 +300,9 @@ fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHand
 
         app.update().await;
 
-        let entity = app.with_world_mut(|world| {
-            let mut query = world.query_filtered::<Entity, With<GodotNodeHandle>>();
-            query
-                .iter(world)
-                .find(|e| {
-                    world
-                        .get::<Name>(*e)
-                        .map(|n| n.as_str() == "RemoveChildTest")
-                        .unwrap_or(false)
-                })
-                .expect("Child entity should exist")
-        });
+        let entity = app
+            .entity_for_node(child.instance_id())
+            .expect("Child entity should exist");
 
         parent.remove_child(&child);
 

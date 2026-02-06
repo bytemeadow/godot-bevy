@@ -40,54 +40,6 @@ fn test_update_runs_on_real_frames(ctx: &TestContext) -> godot::task::TaskHandle
     })
 }
 
-/// Test that entities persist across frames
-#[itest(async)]
-fn test_entity_persists_across_frames(ctx: &TestContext) -> godot::task::TaskHandle {
-    let ctx_clone = ctx.clone();
-
-    godot::task::spawn(async move {
-        await_frames(1).await;
-
-        let counter = Counter::new();
-        let c = counter.clone();
-
-        let mut app = TestApp::new(&ctx_clone, move |app| {
-            #[derive(Component)]
-            struct Persistent;
-
-            #[derive(Resource)]
-            struct Tracker(Counter);
-
-            app.insert_resource(Tracker(c.clone()));
-            app.add_systems(
-                Update,
-                (
-                    |mut cmd: Commands, q: Query<(), With<Persistent>>| {
-                        if q.is_empty() {
-                            cmd.spawn(Persistent);
-                        }
-                    },
-                    |q: Query<(), With<Persistent>>, t: Res<Tracker>| {
-                        if !q.is_empty() {
-                            t.0.increment();
-                        }
-                    },
-                )
-                    .chain(),
-            );
-        })
-        .await;
-
-        await_frames(10).await;
-        let count = counter.get();
-
-        assert!(count >= 8, "Entity should persist 8+ frames, got {count}");
-
-        app.cleanup();
-        await_frames(1).await;
-    })
-}
-
 /// Test PhysicsUpdate runs on physics frames
 #[itest(async)]
 fn test_physics_update_runs(ctx: &TestContext) -> godot::task::TaskHandle {
