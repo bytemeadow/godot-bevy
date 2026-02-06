@@ -12,6 +12,7 @@ godot_bevy_test::declare_test_runner!();
 mod benchmarks;
 mod real_frame_tests;
 mod scene_tree_tests;
+mod scene_tree_watcher_init_tests;
 mod signal_tests;
 mod transform_sync_tests;
 
