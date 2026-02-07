@@ -103,67 +103,6 @@ class SpecialCases:
         "OpenXRRenderModelManager",
     }
 
-    # Known classes that don't exist in the current Godot version or aren't available
-    # Used for filtering both node types and signal generation
-    excluded_classes = {
-        # CSG classes (require special module)
-        "CSGBox3D",
-        "CSGCombiner3D",
-        "CSGCylinder3D",
-        "CSGMesh3D",
-        "CSGPolygon3D",
-        "CSGPrimitive3D",
-        "CSGShape3D",
-        "CSGSphere3D",
-        "CSGTorus3D",
-        # Editor classes
-        "GridMapEditorPlugin",
-        "ScriptCreateDialog",
-        "FileSystemDock",
-        "OpenXRBindingModifierEditor",
-        "OpenXRInteractionProfileEditor",
-        "OpenXRInteractionProfileEditorBase",
-        # XR classes that might not be available
-        "XRAnchor3D",
-        "XRBodyModifier3D",
-        "XRCamera3D",
-        "XRController3D",
-        "XRFaceModifier3D",
-        "XRHandModifier3D",
-        "XRNode3D",
-        "XROrigin3D",
-        # OpenXR classes
-        "OpenXRCompositionLayer",
-        "OpenXRCompositionLayerCylinder",
-        "OpenXRCompositionLayerEquirect",
-        "OpenXRCompositionLayerQuad",
-        "OpenXRHand",
-        "OpenXRVisibilityMask",
-        # Classes that might not be available in all builds
-        "VoxelGI",
-        "LightmapGI",
-        "FogVolume",
-        "WorldEnvironment",
-        # Navigation classes (might be module-specific)
-        "NavigationAgent2D",
-        "NavigationAgent3D",
-        "NavigationLink2D",
-        "NavigationLink3D",
-        "NavigationObstacle2D",
-        "NavigationObstacle3D",
-        "NavigationRegion2D",
-        "NavigationRegion3D",
-        # Other problematic classes
-        "StatusIndicator",
-        # Graph classes (not available in all Godot builds)
-        "GraphEdit",
-        "GraphElement",
-        "GraphFrame",
-        "GraphNode",
-        # Parallax2D is in extension API but not in current Rust bindings
-        "Parallax2D",
-    }
-
     @staticmethod
     def fix_godot_class_name_for_rust(name: str) -> str:
         """

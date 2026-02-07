@@ -1,6 +1,5 @@
 use super::node_type_checking::{
-    add_comprehensive_node_type_markers, add_node_type_markers_from_string,
-    remove_comprehensive_node_type_markers,
+    add_node_type_markers_from_string, remove_comprehensive_node_type_markers,
 };
 use crate::plugins::core::SceneTreeComponentRegistry;
 use crate::prelude::GodotScene;
@@ -602,13 +601,13 @@ fn create_scene_tree_entity(
                 ent.insert(node_id).insert(Name::from(node_name));
 
                 // Add node type marker components - use optimized version if available
-                if let Some(ref node_type_str) = node_type {
-                    // Use pre-analyzed type from GDScript watcher (much faster)
-                    add_node_type_markers_from_string(&mut ent, node_type_str);
-                } else {
-                    // Fallback to comprehensive analysis with FFI calls
-                    add_comprehensive_node_type_markers(&mut ent, &mut node_accessor);
-                }
+                add_node_type_markers_from_string(
+                    &mut ent,
+                    node_type
+                        // Fall back to getting node-type from node if not provided
+                        .unwrap_or_else(|| node.get_class().to_string())
+                        .as_str(),
+                );
 
                 // Check if the node is a collision body (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.)
                 // These nodes typically have collision detection capabilities
@@ -691,7 +690,7 @@ fn create_scene_tree_entity(
                         if !protected {
                             commands.entity(ent).despawn();
                         } else {
-                            _strip_godot_components(commands, ent, godot, node_handle);
+                            _strip_godot_components(commands, ent);
                         }
                         ent_mapping.remove(&instance_id);
                         node_index.remove(instance_id);
@@ -817,12 +816,7 @@ fn batch_connect_collision_signals(
     }
 }
 
-fn _strip_godot_components(
-    commands: &mut Commands,
-    ent: Entity,
-    godot: &mut GodotAccess,
-    node_handle: GodotNodeHandle,
-) {
+fn _strip_godot_components(commands: &mut Commands, ent: Entity) {
     let mut entity_commands = commands.entity(ent);
 
     entity_commands.remove::<GodotNodeHandle>();
@@ -830,8 +824,7 @@ fn _strip_godot_components(
     entity_commands.remove::<Name>();
     entity_commands.remove::<Groups>();
 
-    let mut node_accessor = godot.node(node_handle);
-    remove_comprehensive_node_type_markers(&mut entity_commands, &mut node_accessor);
+    remove_comprehensive_node_type_markers(&mut entity_commands);
 }
 
 #[allow(clippy::too_many_arguments)]

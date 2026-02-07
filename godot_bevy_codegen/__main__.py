@@ -18,10 +18,6 @@ from godot_bevy_codegen.src.gdextension_api_dump import (
     run_godot_dump_api,
     load_extension_api,
 )
-from godot_bevy_codegen.src.gen_gdscript_watcher import (
-    generate_gdscript_watcher,
-    use_watcher_version,
-)
 from godot_bevy_codegen.src.gen_signal_names import generate_signal_names
 from godot_bevy_codegen.src.gen_type_checking import (
     generate_type_checking_code,
@@ -57,13 +53,7 @@ def generate_for_version(api_version: str) -> None:
         api,
     )
 
-    indent_log("Step 5: Generate optimized GDScript watcher")
-    generate_gdscript_watcher(
-        FilePaths.gdscript_watcher_file(api_version),
-        api,
-    )
-
-    indent_log("Step 6: Generate signal names")
+    indent_log("Step 5: Generate signal names")
     generate_signal_names(
         FilePaths.signal_names_file(api_version),
         FilePaths.project_root,
@@ -84,9 +74,6 @@ def main() -> None:
         for api_version in api_versions:
             indent_log(f"⚙️  Processing API version {api_version}...")
             generate_for_version(api_version)
-
-        # Use the most recent version as the active OptimizedSceneTreeWatcher
-        use_watcher_version(api_versions[-1])
 
         rust_files = [
             f for f in FilePaths.all_generated_files(api_versions) if f.suffix == ".rs"
