@@ -4,8 +4,6 @@
 //! They measure real-world performance of syncing transforms between Bevy and Godot.
 
 use crossbeam_channel as mpsc;
-use godot::classes::{Area3D, Engine, Node, Node2D, Node3D, SceneTree};
-use godot::obj::NewAlloc;
 use godot::builtin::StringName;
 use godot::classes::{Area3D, Engine, InputEventKey, InputMap, Node, Node2D, Node3D, SceneTree};
 use godot::global::Key;
