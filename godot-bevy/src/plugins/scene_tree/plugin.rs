@@ -538,8 +538,8 @@ fn create_scene_tree_entity(
     node_index: &mut NodeEntityIndex,
     godot: &mut GodotAccess,
 ) {
-    // Build local mapping with protection info (only needed during this function)
-    let mut ent_mapping = entities
+    // Make InstanceId to entity mapping for efficient random access (only needed during this function)
+    let mut godot_entity_map = entities
         .iter()
         .map(|(reference, ent, protected)| (reference.instance_id(), (ent, protected)))
         .collect::<HashMap<_, _>>();
@@ -573,13 +573,13 @@ fn create_scene_tree_entity(
             message_type,
             node_type,
             node_name,
-            parent_id,
+            parent_id: parent_id_from_gdscript,
             collision_mask,
             groups,
         } = message;
         let instance_id = node_id.instance_id();
         let node_handle = node_id;
-        let ent = ent_mapping.get(&instance_id).cloned();
+        let entity_info = godot_entity_map.get(&instance_id).cloned();
 
         match message_type {
             SceneTreeMessageType::NodeAdded => {
@@ -588,7 +588,7 @@ fn create_scene_tree_entity(
                     continue;
                 }
 
-                let mut ent = if let Some((ent, _)) = ent {
+                let mut new_entity_commands = if let Some((ent, _)) = entity_info {
                     commands.entity(ent)
                 } else {
                     commands.spawn_empty()
@@ -598,11 +598,13 @@ fn create_scene_tree_entity(
                 let mut node = node_accessor.get::<Node>();
 
                 let node_name = node_name.unwrap_or_else(|| node.get_name().to_string());
-                ent.insert(node_id).insert(Name::from(node_name));
+                new_entity_commands
+                    .insert(node_id)
+                    .insert(Name::from(node_name));
 
                 // Add node type marker components - use optimized version if available
                 add_node_type_markers_from_string(
-                    &mut ent,
+                    &mut new_entity_commands,
                     node_type
                         // Fall back to getting node-type from node if not provided
                         .unwrap_or_else(|| node.get_class().to_string())
@@ -636,40 +638,43 @@ fn create_scene_tree_entity(
                 }
                 // Use pre-analyzed groups from GDScript watcher if available, otherwise fallback to FFI
                 if let Some(groups_vec) = groups {
-                    ent.insert(Groups::from(groups_vec));
+                    new_entity_commands.insert(Groups::from(groups_vec));
                 } else {
-                    ent.insert(Groups::from(&node));
+                    new_entity_commands.insert(Groups::from(&node));
                 }
 
                 // Add all components registered by plugins
-                component_registry.add_to_entity(&mut ent, &mut node_accessor);
+                component_registry.add_to_entity(&mut new_entity_commands, &mut node_accessor);
 
-                let ent = ent.id();
-                ent_mapping.insert(instance_id, (ent, None));
-                node_index.insert(instance_id, ent);
+                let new_entity = new_entity_commands.id();
+                godot_entity_map.insert(
+                    instance_id,
+                    (new_entity, entity_info.and_then(|(_, protected)| protected)),
+                );
+                node_index.insert(instance_id, new_entity);
 
                 // Try to add any registered bundles for this node type
-                super::autosync::try_add_bundles_for_node(commands, ent, godot, node_handle);
+                super::autosync::try_add_bundles_for_node(commands, new_entity, godot, node_handle);
 
                 // Add GodotChildOf relationship to mirror Godot's scene tree hierarchy
-                let parent_id =
-                    parent_id.or_else(|| node.get_parent().map(|parent| parent.instance_id()));
-                if instance_id != scene_root.instance_id()
-                    && let Some(parent_id) = parent_id
+                let parent_id = parent_id_from_gdscript
+                    .or_else(|| node.get_parent().map(|parent| parent.instance_id()));
+                if let Some(parent_id) = parent_id
+                    && parent_id != scene_root.instance_id()
                 {
-                    if let Some((parent_entity, _)) = ent_mapping.get(&parent_id) {
+                    if let Some((parent_entity, _)) = godot_entity_map.get(&parent_id) {
                         commands
-                            .entity(ent)
+                            .entity(new_entity)
                             .insert(super::relationship::GodotChildOf(*parent_entity));
                     } else {
                         warn!(target: "godot_scene_tree_messages",
-                            "Parent entity with ID {} not found in ent_mapping. This might indicate a missing or incorrect mapping.",
-                            parent_id);
+                            "Parent entity with ID {} not found in godot_entity_map. This might indicate a missing or incorrect mapping. Path={}",
+                            parent_id, node.get_path());
                     }
                 }
             }
             SceneTreeMessageType::NodeRemoved => {
-                if let Some((ent, prot_opt)) = ent {
+                if let Some((ent, prot_opt)) = entity_info {
                     // Check if node is being reparented vs truly removed
                     // During reparenting, the node is temporarily removed from old parent
                     // but still exists in the scene tree (has a parent)
@@ -692,7 +697,7 @@ fn create_scene_tree_entity(
                         } else {
                             _strip_godot_components(commands, ent);
                         }
-                        ent_mapping.remove(&instance_id);
+                        godot_entity_map.remove(&instance_id);
                         node_index.remove(instance_id);
                     }
                 } else {
@@ -701,7 +706,7 @@ fn create_scene_tree_entity(
                 }
             }
             SceneTreeMessageType::NodeRenamed => {
-                if let Some((ent, _)) = ent {
+                if let Some((ent, _)) = entity_info {
                     let name = node_name
                         .unwrap_or_else(|| godot.get::<Node>(node_handle).get_name().to_string());
                     commands.entity(ent).insert(Name::from(name));

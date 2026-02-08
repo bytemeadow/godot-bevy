@@ -68,10 +68,10 @@ func _on_node_added(node: Node):
         return
 
     # Analyze node type on GDScript side - this is much faster than FFI
-    var node_type = node.get_class()
-    var node_name = node.name
-    var parent = node.get_parent()
-    var parent_id = parent and parent.get_instance_id() or 0
+    var node_type: String = node.get_class()
+    var node_name: StringName = node.name
+    var parent: Node = node.get_parent()
+    var parent_id: int = parent.get_instance_id() if parent else 0
     var collision_mask = _compute_collision_mask(node)
 
     # Collect groups for this node
@@ -196,12 +196,12 @@ func _analyze_node_recursive(
         return
 
     # Add this node's information with pre-analyzed type
-    var instance_id = node.get_instance_id()
-    var node_type = node.get_class()
-    var node_name = node.name
-    var parent = node.get_parent()
-    var parent_id = parent and parent.get_instance_id() or 0
-    var collision_mask = _compute_collision_mask(node)
+    var instance_id: int = node.get_instance_id()
+    var node_type: String = node.get_class()
+    var node_name: StringName = node.name
+    var parent: Node = node.get_parent()
+    var parent_id: int = parent.get_instance_id() if parent else 0
+    var collision_mask: int = _compute_collision_mask(node)
 
     # Collect groups for this node
     var node_groups = PackedStringArray()
