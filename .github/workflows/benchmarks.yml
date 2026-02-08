@@ -68,7 +68,7 @@ jobs:
         env:
           GODOT4_BIN: godot
           BENCHMARK_JSON: "1"
-          BENCHMARK_JSON_PATH: baseline.json
+          BENCHMARK_JSON_PATH: ${{ github.workspace }}/itest/baseline.json
         run: |
           # Shared target dir is in main workspace; use absolute path so Godot finds the .so
           cat > godot/itest.gdextension << EOF
@@ -87,16 +87,13 @@ jobs:
           "$GODOT4_BIN" --headless --path godot --import --quit || true
           "$GODOT4_BIN" --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000 2>&1 | tee baseline-output.txt
 
-          if [ ! -f baseline.json ]; then
+          BASELINE_JSON="${{ github.workspace }}/itest/baseline.json"
+          if [ ! -f "$BASELINE_JSON" ]; then
             sed -n '/===BENCHMARK_JSON_START===/,/===BENCHMARK_JSON_END===/p' baseline-output.txt | \
-              sed '1d;$d' > baseline.json
+              sed '1d;$d' > "$BASELINE_JSON"
           fi
 
-          jq empty baseline.json || { echo "Error: Invalid baseline JSON"; exit 1; }
-
-      - name: Copy baseline results
-        if: github.event_name == 'pull_request'
-        run: cp ../baseline/itest/baseline.json itest/baseline.json
+          jq empty "$BASELINE_JSON" || { echo "Error: Invalid baseline JSON"; exit 1; }
 
       - name: Cleanup worktree
         if: always() && github.event_name == 'pull_request'

@@ -42,14 +42,14 @@ jobs:
 
             let comment = '## Benchmark Results\n\n';
 
-            const { regressions, improvements, new: newBenchmarks, total } = comparison.summary;
+            const { regressions, improvements, new: newBenchmarks, total, baseline_count = 0 } = comparison.summary;
 
             if (regressions > 0) {
               comment += `> **${regressions} performance regression(s) detected**\n\n`;
             } else if (improvements > 0) {
               comment += `> **${improvements} performance improvement(s) detected**\n\n`;
             } else if (newBenchmarks === total) {
-              comment += `> **First benchmark run** - ${total} benchmarks baselined\n\n`;
+              comment += `> **All benchmarks added or renamed vs main** - ${total} on PR, ${baseline_count} on main (no names in common)\n\n`;
             } else {
               comment += `> **Performance is stable** - no significant changes\n\n`;
             }

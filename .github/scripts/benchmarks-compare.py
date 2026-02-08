@@ -51,9 +51,16 @@ def main(args: list[str]) -> None:
         )
         print(json_error)
 
+    baseline_benchmark_names = list(baseline.get("benchmarks", {}).keys())
     comparison = {
         "benchmarks": [],
-        "summary": {"total": 0, "regressions": 0, "improvements": 0, "new": 0},
+        "summary": {
+            "total": 0,
+            "regressions": 0,
+            "improvements": 0,
+            "new": 0,
+            "baseline_count": len(baseline_benchmark_names),
+        },
     }
 
     for name, curr_data in current_results.get("benchmarks", {}).items():
@@ -103,10 +110,19 @@ def main(args: list[str]) -> None:
     # Log summary - regressions are reported in PR comment, don't fail the build
     regressions = comparison["summary"]["regressions"]
     improvements = comparison["summary"]["improvements"]
+    new_count = comparison["summary"]["new"]
+    baseline_names = baseline_benchmark_names
     if regressions > 0:
         print(f"⚠️  {regressions} regression(s) detected - see PR comment for details")
     if improvements > 0:
         print(f"✅ {improvements} improvement(s) detected")
+    if new_count == comparison["summary"]["total"] and comparison["summary"]["total"] > 0:
+        if not baseline_names:
+            print("⚠️  Baseline (main) produced no benchmark entries.")
+        else:
+            print(
+                f"⚠️  No PR benchmark names match main. Main has {len(baseline_names)}: {baseline_names[:5]}{'...' if len(baseline_names) > 5 else ''}"
+            )
 
 
 if __name__ == "__main__":
