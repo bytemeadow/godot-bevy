@@ -6,16 +6,13 @@ on:
     types: [completed]
 
 permissions:
-  contents: read
-  issues: write
-  pull-requests: write
+  actions: read   # download artifacts from benchmarks workflow
+  issues: write  # create/update PR comments (PRs are issues)
 
 jobs:
   comment:
-    name: Post benchmark results
     runs-on: ubuntu-latest
-    # Only run for PRs and when benchmarks succeeded
-    if: |
+    if: >
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'pull_request'
 
@@ -27,59 +24,45 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           name: benchmark-results
 
-      - name: Read PR number
-        id: pr
-        run: |
-          # Artifacts maintain their upload path structure (itest/ prefix)
-          if [ -f itest/pr_number.txt ]; then
-            echo "number=$(cat itest/pr_number.txt)" >> $GITHUB_OUTPUT
-          elif [ -f pr_number.txt ]; then
-            echo "number=$(cat pr_number.txt)" >> $GITHUB_OUTPUT
-          else
-            echo "Error: PR number not found"
-            exit 1
-          fi
-
-      - name: Post comment
+      - name: Post PR comment
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
 
-            // Read comparison data (check both possible locations)
+            // Artifacts may have itest/ prefix from upload path
             let comparisonPath = 'itest/comparison.json';
-            if (!fs.existsSync(comparisonPath)) {
-              comparisonPath = 'comparison.json';
-            }
+            if (!fs.existsSync(comparisonPath)) comparisonPath = 'comparison.json';
             const comparison = JSON.parse(fs.readFileSync(comparisonPath, 'utf8'));
 
-            // Build comment
-            let comment = '## 📊 Benchmark Results\n\n';
+            let prPath = 'itest/pr_number.txt';
+            if (!fs.existsSync(prPath)) prPath = 'pr_number.txt';
+            const prNumber = parseInt(fs.readFileSync(prPath, 'utf8').trim(), 10);
 
-            // Summary section
+            let comment = '## Benchmark Results\n\n';
+
             const { regressions, improvements, new: newBenchmarks, total } = comparison.summary;
 
             if (regressions > 0) {
-              comment += `> ⚠️ **${regressions} performance regression(s) detected**\n\n`;
+              comment += `> **${regressions} performance regression(s) detected**\n\n`;
             } else if (improvements > 0) {
-              comment += `> ✨ **${improvements} performance improvement(s) detected**\n\n`;
+              comment += `> **${improvements} performance improvement(s) detected**\n\n`;
             } else if (newBenchmarks === total) {
-              comment += `> 🆕 **First benchmark run** - ${total} benchmarks baselined\n\n`;
+              comment += `> **First benchmark run** - ${total} benchmarks baselined\n\n`;
             } else {
-              comment += `> ✅ **Performance is stable** - no significant changes\n\n`;
+              comment += `> **Performance is stable** - no significant changes\n\n`;
             }
 
-            // Results table
-            comment += '| Benchmark | Current | Baseline | Change |\n';
-            comment += '|-----------|---------|----------|--------|\n';
+            comment += '| Benchmark | PR | Base | Change |\n';
+            comment += '|-----------|-----|------|--------|\n';
 
             for (const bench of comparison.benchmarks) {
               let changeStr = '';
 
               if (bench.status === 'new') {
-                changeStr = '🆕 *new*';
+                changeStr = '*new*';
               } else if (bench.change_pct !== null) {
-                let icon = '⚪';
+                let icon = '';
                 if (bench.status === 'regression') icon = '🔴';
                 else if (bench.status === 'slower') icon = '🟡';
                 else if (bench.status === 'faster') icon = '🟢';
@@ -88,24 +71,15 @@ jobs:
                 changeStr = `${icon} ${sign}${bench.change_pct.toFixed(1)}%`;
               }
 
-              const baseline = bench.baseline || '*-*';
+              const baseline = bench.baseline || '-';
               comment += `| \`${bench.name}\` | ${bench.current} | ${baseline} | ${changeStr} |\n`;
             }
 
-            // Details section
-            comment += '\n<details>\n<summary>ℹ️ About these benchmarks</summary>\n\n';
-            comment += '- **Regression threshold:** Performance drops >10% are marked as regressions\n';
-            comment += '- **Caution threshold:** Performance drops >5% are marked with caution\n';
-            comment += '- **Improvement threshold:** Performance gains >5% are marked as improvements\n';
-            comment += '- **Runner:** Ubuntu (GitHub Actions)\n';
-            comment += '- **Baseline:** Latest benchmarks from `main` branch\n';
-            comment += '</details>\n\n';
-            comment += '<sub>🤖 Generated by godot-bevy CI</sub>';
+            comment += '\n<details>\n<summary>About these benchmarks</summary>\n\n';
+            comment += '- Baseline and PR benchmarks run on the **same machine** in a single CI job\n';
+            comment += '- Regression threshold: >10%, Caution: >5%, Improvement: <-5%\n';
+            comment += '</details>\n';
 
-            // Get PR number
-            const prNumber = ${{ steps.pr.outputs.number }};
-
-            // Find existing comment or create new one
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -114,7 +88,7 @@ jobs:
 
             const botComment = comments.find(c =>
               c.user.type === 'Bot' &&
-              c.body.includes('📊 Benchmark Results')
+              c.body.includes('Benchmark Results')
             );
 
             if (botComment) {
@@ -124,7 +98,6 @@ jobs:
                 comment_id: botComment.id,
                 body: comment,
               });
-              console.log('✅ Updated existing benchmark comment');
             } else {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
@@ -132,5 +105,4 @@ jobs:
                 issue_number: prNumber,
                 body: comment,
               });
-              console.log('✅ Created new benchmark comment');
             }
