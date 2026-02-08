@@ -7,6 +7,10 @@ publish = false
 [lib]
 crate-type = ["cdylib"]
 
+[[bin]]
+path = "run_godot.rs"
+name = "godot_bevy_itest"
+
 [features]
 default = []
 # Enable internal/exploratory benchmarks (not tracked in CI)
@@ -21,3 +25,4 @@ bevy = { version = "0.18", default-features = false, features = [
   "multi_threaded",
 ] }
 crossbeam-channel = "0.5"
+cargo-godot-lib.workspace = true
