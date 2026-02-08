@@ -10,1552 +10,309 @@ use bevy_ecs::system::EntityCommands;
 /// GodotNode::try_get calls for each node.
 pub fn add_node_type_markers_from_string(ec: &mut EntityCommands, node_type: &str) {
     // Add appropriate markers based on the type string
-    ec.insert(NodeMarker);
-
     match node_type {
-        "Node" => {
-            // NodeMarker added above for all nodes.
-        }
-        "AnimationMixer" => {
-            ec.insert(AnimationMixerMarker);
-        }
-        "AudioStreamPlayer" => {
-            ec.insert(AudioStreamPlayerMarker);
-        }
-        "CanvasItem" => {
-            ec.insert(CanvasItemMarker);
-        }
-        "CanvasLayer" => {
-            ec.insert(CanvasLayerMarker);
-        }
-        "EditorFileSystem" => {
-            ec.insert(EditorFileSystemMarker);
-        }
-        "EditorPlugin" => {
-            ec.insert(EditorPluginMarker);
-        }
-        "EditorResourcePreview" => {
-            ec.insert(EditorResourcePreviewMarker);
-        }
-        "HTTPRequest" => {
-            ec.insert(HTTPRequestMarker);
-        }
-        "InstancePlaceholder" => {
-            ec.insert(InstancePlaceholderMarker);
-        }
-        "MissingNode" => {
-            ec.insert(MissingNodeMarker);
-        }
-        "MultiplayerSpawner" => {
-            ec.insert(MultiplayerSpawnerMarker);
-        }
-        "MultiplayerSynchronizer" => {
-            ec.insert(MultiplayerSynchronizerMarker);
-        }
+        "Node" => ec.insert(NodeMarker),
+        "AnimationMixer" => ec.insert(AnimationMixerMarker),
+        "AudioStreamPlayer" => ec.insert(AudioStreamPlayerMarker),
+        "CanvasItem" => ec.insert(CanvasItemMarker),
+        "CanvasLayer" => ec.insert(CanvasLayerMarker),
+        "EditorFileSystem" => ec.insert(EditorFileSystemMarker),
+        "EditorPlugin" => ec.insert(EditorPluginMarker),
+        "EditorResourcePreview" => ec.insert(EditorResourcePreviewMarker),
+        "HTTPRequest" => ec.insert(HTTPRequestMarker),
+        "InstancePlaceholder" => ec.insert(InstancePlaceholderMarker),
+        "MissingNode" => ec.insert(MissingNodeMarker),
+        "MultiplayerSpawner" => ec.insert(MultiplayerSpawnerMarker),
+        "MultiplayerSynchronizer" => ec.insert(MultiplayerSynchronizerMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationAgent2D" => {
-            ec.insert(NavigationAgent2DMarker);
-        }
+        "NavigationAgent2D" => ec.insert(NavigationAgent2DMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationAgent3D" => {
-            ec.insert(NavigationAgent3DMarker);
-        }
-        "Node3D" => {
-            ec.insert(Node3DMarker);
-        }
-        "ResourcePreloader" => {
-            ec.insert(ResourcePreloaderMarker);
-        }
-        "ShaderGlobalsOverride" => {
-            ec.insert(ShaderGlobalsOverrideMarker);
-        }
-        "StatusIndicator" => {
-            ec.insert(StatusIndicatorMarker);
-        }
-        "Timer" => {
-            ec.insert(TimerMarker);
-        }
-        "Viewport" => {
-            ec.insert(ViewportMarker);
-        }
-        "WorldEnvironment" => {
-            ec.insert(WorldEnvironmentMarker);
-        }
-        "AnimationPlayer" => {
-            ec.insert(AnimationPlayerMarker);
-            ec.insert(AnimationMixerMarker);
-        }
-        "AnimationTree" => {
-            ec.insert(AnimationTreeMarker);
-            ec.insert(AnimationMixerMarker);
-        }
-        "AudioListener3D" => {
-            ec.insert(AudioListener3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "AudioStreamPlayer3D" => {
-            ec.insert(AudioStreamPlayer3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "BoneAttachment3D" => {
-            ec.insert(BoneAttachment3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Camera3D" => {
-            ec.insert(Camera3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CollisionObject3D" => {
-            ec.insert(CollisionObject3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CollisionPolygon3D" => {
-            ec.insert(CollisionPolygon3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CollisionShape3D" => {
-            ec.insert(CollisionShape3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Control" => {
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "GridMap" => {
-            ec.insert(GridMapMarker);
-            ec.insert(Node3DMarker);
-        }
-        "GridMapEditorPlugin" => {
-            ec.insert(GridMapEditorPluginMarker);
-            ec.insert(EditorPluginMarker);
-        }
-        "ImporterMeshInstance3D" => {
-            ec.insert(ImporterMeshInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Joint3D" => {
-            ec.insert(Joint3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "LightmapProbe" => {
-            ec.insert(LightmapProbeMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Marker3D" => {
-            ec.insert(Marker3DMarker);
-            ec.insert(Node3DMarker);
-        }
+        "NavigationAgent3D" => ec.insert(NavigationAgent3DMarker),
+        "Node3D" => ec.insert(Node3DMarker),
+        "ResourcePreloader" => ec.insert(ResourcePreloaderMarker),
+        "ShaderGlobalsOverride" => ec.insert(ShaderGlobalsOverrideMarker),
+        "StatusIndicator" => ec.insert(StatusIndicatorMarker),
+        "Timer" => ec.insert(TimerMarker),
+        "Viewport" => ec.insert(ViewportMarker),
+        "WorldEnvironment" => ec.insert(WorldEnvironmentMarker),
+        "AnimationPlayer" => ec.insert(AnimationPlayerMarker),
+        "AnimationTree" => ec.insert(AnimationTreeMarker),
+        "AudioListener3D" => ec.insert(AudioListener3DMarker),
+        "AudioStreamPlayer3D" => ec.insert(AudioStreamPlayer3DMarker),
+        "BoneAttachment3D" => ec.insert(BoneAttachment3DMarker),
+        "Camera3D" => ec.insert(Camera3DMarker),
+        "CollisionObject3D" => ec.insert(CollisionObject3DMarker),
+        "CollisionPolygon3D" => ec.insert(CollisionPolygon3DMarker),
+        "CollisionShape3D" => ec.insert(CollisionShape3DMarker),
+        "Control" => ec.insert(ControlMarker),
+        "GridMap" => ec.insert(GridMapMarker),
+        "GridMapEditorPlugin" => ec.insert(GridMapEditorPluginMarker),
+        "ImporterMeshInstance3D" => ec.insert(ImporterMeshInstance3DMarker),
+        "Joint3D" => ec.insert(Joint3DMarker),
+        "LightmapProbe" => ec.insert(LightmapProbeMarker),
+        "Marker3D" => ec.insert(Marker3DMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationLink3D" => {
-            ec.insert(NavigationLink3DMarker);
-            ec.insert(Node3DMarker);
-        }
+        "NavigationLink3D" => ec.insert(NavigationLink3DMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationObstacle3D" => {
-            ec.insert(NavigationObstacle3DMarker);
-            ec.insert(Node3DMarker);
-        }
+        "NavigationObstacle3D" => ec.insert(NavigationObstacle3DMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationRegion3D" => {
-            ec.insert(NavigationRegion3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Node2D" => {
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "OpenXRCompositionLayer" => {
-            ec.insert(OpenXRCompositionLayerMarker);
-            ec.insert(Node3DMarker);
-        }
-        "OpenXRHand" => {
-            ec.insert(OpenXRHandMarker);
-            ec.insert(Node3DMarker);
-        }
+        "NavigationRegion3D" => ec.insert(NavigationRegion3DMarker),
+        "Node2D" => ec.insert(Node2DMarker),
+        "OpenXRCompositionLayer" => ec.insert(OpenXRCompositionLayerMarker),
+        "OpenXRHand" => ec.insert(OpenXRHandMarker),
         #[cfg(not(feature = "experimental-wasm"))]
-        "OpenXRRenderModel" => {
-            ec.insert(OpenXRRenderModelMarker);
-            ec.insert(Node3DMarker);
-        }
+        "OpenXRRenderModel" => ec.insert(OpenXRRenderModelMarker),
         #[cfg(not(feature = "experimental-wasm"))]
-        "OpenXRRenderModelManager" => {
-            ec.insert(OpenXRRenderModelManagerMarker);
-            ec.insert(Node3DMarker);
-        }
-        "ParallaxBackground" => {
-            ec.insert(ParallaxBackgroundMarker);
-            ec.insert(CanvasLayerMarker);
-        }
-        "Path3D" => {
-            ec.insert(Path3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "PathFollow3D" => {
-            ec.insert(PathFollow3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "RayCast3D" => {
-            ec.insert(RayCast3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "RemoteTransform3D" => {
-            ec.insert(RemoteTransform3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "ShapeCast3D" => {
-            ec.insert(ShapeCast3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Skeleton3D" => {
-            ec.insert(Skeleton3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "SkeletonModifier3D" => {
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "SpringArm3D" => {
-            ec.insert(SpringArm3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "SpringBoneCollision3D" => {
-            ec.insert(SpringBoneCollision3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "SubViewport" => {
-            ec.insert(SubViewportMarker);
-            ec.insert(ViewportMarker);
-        }
-        "VehicleWheel3D" => {
-            ec.insert(VehicleWheel3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "VisualInstance3D" => {
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Window" => {
-            ec.insert(WindowMarker);
-            ec.insert(ViewportMarker);
-        }
+        "OpenXRRenderModelManager" => ec.insert(OpenXRRenderModelManagerMarker),
+        "ParallaxBackground" => ec.insert(ParallaxBackgroundMarker),
+        "Path3D" => ec.insert(Path3DMarker),
+        "PathFollow3D" => ec.insert(PathFollow3DMarker),
+        "RayCast3D" => ec.insert(RayCast3DMarker),
+        "RemoteTransform3D" => ec.insert(RemoteTransform3DMarker),
+        "ShapeCast3D" => ec.insert(ShapeCast3DMarker),
+        "Skeleton3D" => ec.insert(Skeleton3DMarker),
+        "SkeletonModifier3D" => ec.insert(SkeletonModifier3DMarker),
+        "SpringArm3D" => ec.insert(SpringArm3DMarker),
+        "SpringBoneCollision3D" => ec.insert(SpringBoneCollision3DMarker),
+        "SubViewport" => ec.insert(SubViewportMarker),
+        "VehicleWheel3D" => ec.insert(VehicleWheel3DMarker),
+        "VisualInstance3D" => ec.insert(VisualInstance3DMarker),
+        "Window" => ec.insert(WindowMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "XRFaceModifier3D" => {
-            ec.insert(XRFaceModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "XRNode3D" => {
-            ec.insert(XRNode3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "XROrigin3D" => {
-            ec.insert(XROrigin3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "AcceptDialog" => {
-            ec.insert(AcceptDialogMarker);
-            ec.insert(WindowMarker);
-            ec.insert(ViewportMarker);
-        }
-        "AnimatedSprite2D" => {
-            ec.insert(AnimatedSprite2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Area3D" => {
-            ec.insert(Area3DMarker);
-            ec.insert(CollisionObject3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "AudioListener2D" => {
-            ec.insert(AudioListener2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "AudioStreamPlayer2D" => {
-            ec.insert(AudioStreamPlayer2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "BackBufferCopy" => {
-            ec.insert(BackBufferCopyMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "BaseButton" => {
-            ec.insert(BaseButtonMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Bone2D" => {
-            ec.insert(Bone2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "BoneConstraint3D" => {
-            ec.insert(BoneConstraint3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "BoneTwistDisperser3D" => {
-            ec.insert(BoneTwistDisperser3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CPUParticles2D" => {
-            ec.insert(CPUParticles2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Camera2D" => {
-            ec.insert(Camera2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "CanvasGroup" => {
-            ec.insert(CanvasGroupMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "CanvasModulate" => {
-            ec.insert(CanvasModulateMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "CollisionObject2D" => {
-            ec.insert(CollisionObject2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "CollisionPolygon2D" => {
-            ec.insert(CollisionPolygon2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "CollisionShape2D" => {
-            ec.insert(CollisionShape2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "ColorRect" => {
-            ec.insert(ColorRectMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "ConeTwistJoint3D" => {
-            ec.insert(ConeTwistJoint3DMarker);
-            ec.insert(Joint3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Container" => {
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Decal" => {
-            ec.insert(DecalMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "FogVolume" => {
-            ec.insert(FogVolumeMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "GPUParticles2D" => {
-            ec.insert(GPUParticles2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "GPUParticlesAttractor3D" => {
-            ec.insert(GPUParticlesAttractor3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "GPUParticlesCollision3D" => {
-            ec.insert(GPUParticlesCollision3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Generic6DOFJoint3D" => {
-            ec.insert(Generic6DOFJoint3DMarker);
-            ec.insert(Joint3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "GeometryInstance3D" => {
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
+        "XRFaceModifier3D" => ec.insert(XRFaceModifier3DMarker),
+        "XRNode3D" => ec.insert(XRNode3DMarker),
+        "XROrigin3D" => ec.insert(XROrigin3DMarker),
+        "AcceptDialog" => ec.insert(AcceptDialogMarker),
+        "AnimatedSprite2D" => ec.insert(AnimatedSprite2DMarker),
+        "Area3D" => ec.insert(Area3DMarker),
+        "AudioListener2D" => ec.insert(AudioListener2DMarker),
+        "AudioStreamPlayer2D" => ec.insert(AudioStreamPlayer2DMarker),
+        "BackBufferCopy" => ec.insert(BackBufferCopyMarker),
+        "BaseButton" => ec.insert(BaseButtonMarker),
+        "Bone2D" => ec.insert(Bone2DMarker),
+        "BoneConstraint3D" => ec.insert(BoneConstraint3DMarker),
+        "BoneTwistDisperser3D" => ec.insert(BoneTwistDisperser3DMarker),
+        "CPUParticles2D" => ec.insert(CPUParticles2DMarker),
+        "Camera2D" => ec.insert(Camera2DMarker),
+        "CanvasGroup" => ec.insert(CanvasGroupMarker),
+        "CanvasModulate" => ec.insert(CanvasModulateMarker),
+        "CollisionObject2D" => ec.insert(CollisionObject2DMarker),
+        "CollisionPolygon2D" => ec.insert(CollisionPolygon2DMarker),
+        "CollisionShape2D" => ec.insert(CollisionShape2DMarker),
+        "ColorRect" => ec.insert(ColorRectMarker),
+        "ConeTwistJoint3D" => ec.insert(ConeTwistJoint3DMarker),
+        "Container" => ec.insert(ContainerMarker),
+        "Decal" => ec.insert(DecalMarker),
+        "FogVolume" => ec.insert(FogVolumeMarker),
+        "GPUParticles2D" => ec.insert(GPUParticles2DMarker),
+        "GPUParticlesAttractor3D" => ec.insert(GPUParticlesAttractor3DMarker),
+        "GPUParticlesCollision3D" => ec.insert(GPUParticlesCollision3DMarker),
+        "Generic6DOFJoint3D" => ec.insert(Generic6DOFJoint3DMarker),
+        "GeometryInstance3D" => ec.insert(GeometryInstance3DMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "GraphEdit" => {
-            ec.insert(GraphEditMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "HingeJoint3D" => {
-            ec.insert(HingeJoint3DMarker);
-            ec.insert(Joint3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "IKModifier3D" => {
-            ec.insert(IKModifier3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "ItemList" => {
-            ec.insert(ItemListMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Joint2D" => {
-            ec.insert(Joint2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Label" => {
-            ec.insert(LabelMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Light2D" => {
-            ec.insert(Light2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Light3D" => {
-            ec.insert(Light3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "LightOccluder2D" => {
-            ec.insert(LightOccluder2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "LightmapGI" => {
-            ec.insert(LightmapGIMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "LimitAngularVelocityModifier3D" => {
-            ec.insert(LimitAngularVelocityModifier3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Line2D" => {
-            ec.insert(Line2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "LineEdit" => {
-            ec.insert(LineEditMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "LookAtModifier3D" => {
-            ec.insert(LookAtModifier3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Marker2D" => {
-            ec.insert(Marker2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "MenuBar" => {
-            ec.insert(MenuBarMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "MeshInstance2D" => {
-            ec.insert(MeshInstance2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "ModifierBoneTarget3D" => {
-            ec.insert(ModifierBoneTarget3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "MultiMeshInstance2D" => {
-            ec.insert(MultiMeshInstance2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
+        "GraphEdit" => ec.insert(GraphEditMarker),
+        "HingeJoint3D" => ec.insert(HingeJoint3DMarker),
+        "IKModifier3D" => ec.insert(IKModifier3DMarker),
+        "ItemList" => ec.insert(ItemListMarker),
+        "Joint2D" => ec.insert(Joint2DMarker),
+        "Label" => ec.insert(LabelMarker),
+        "Light2D" => ec.insert(Light2DMarker),
+        "Light3D" => ec.insert(Light3DMarker),
+        "LightOccluder2D" => ec.insert(LightOccluder2DMarker),
+        "LightmapGI" => ec.insert(LightmapGIMarker),
+        "LimitAngularVelocityModifier3D" => ec.insert(LimitAngularVelocityModifier3DMarker),
+        "Line2D" => ec.insert(Line2DMarker),
+        "LineEdit" => ec.insert(LineEditMarker),
+        "LookAtModifier3D" => ec.insert(LookAtModifier3DMarker),
+        "Marker2D" => ec.insert(Marker2DMarker),
+        "MenuBar" => ec.insert(MenuBarMarker),
+        "MeshInstance2D" => ec.insert(MeshInstance2DMarker),
+        "ModifierBoneTarget3D" => ec.insert(ModifierBoneTarget3DMarker),
+        "MultiMeshInstance2D" => ec.insert(MultiMeshInstance2DMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationLink2D" => {
-            ec.insert(NavigationLink2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
+        "NavigationLink2D" => ec.insert(NavigationLink2DMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationObstacle2D" => {
-            ec.insert(NavigationObstacle2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
+        "NavigationObstacle2D" => ec.insert(NavigationObstacle2DMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationRegion2D" => {
-            ec.insert(NavigationRegion2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "NinePatchRect" => {
-            ec.insert(NinePatchRectMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "OccluderInstance3D" => {
-            ec.insert(OccluderInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "OpenXRCompositionLayerCylinder" => {
-            ec.insert(OpenXRCompositionLayerCylinderMarker);
-            ec.insert(OpenXRCompositionLayerMarker);
-            ec.insert(Node3DMarker);
-        }
-        "OpenXRCompositionLayerEquirect" => {
-            ec.insert(OpenXRCompositionLayerEquirectMarker);
-            ec.insert(OpenXRCompositionLayerMarker);
-            ec.insert(Node3DMarker);
-        }
-        "OpenXRCompositionLayerQuad" => {
-            ec.insert(OpenXRCompositionLayerQuadMarker);
-            ec.insert(OpenXRCompositionLayerMarker);
-            ec.insert(Node3DMarker);
-        }
-        "OpenXRVisibilityMask" => {
-            ec.insert(OpenXRVisibilityMaskMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Panel" => {
-            ec.insert(PanelMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
+        "NavigationRegion2D" => ec.insert(NavigationRegion2DMarker),
+        "NinePatchRect" => ec.insert(NinePatchRectMarker),
+        "OccluderInstance3D" => ec.insert(OccluderInstance3DMarker),
+        "OpenXRCompositionLayerCylinder" => ec.insert(OpenXRCompositionLayerCylinderMarker),
+        "OpenXRCompositionLayerEquirect" => ec.insert(OpenXRCompositionLayerEquirectMarker),
+        "OpenXRCompositionLayerQuad" => ec.insert(OpenXRCompositionLayerQuadMarker),
+        "OpenXRVisibilityMask" => ec.insert(OpenXRVisibilityMaskMarker),
+        "Panel" => ec.insert(PanelMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "Parallax2D" => {
-            ec.insert(Parallax2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "ParallaxLayer" => {
-            ec.insert(ParallaxLayerMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Path2D" => {
-            ec.insert(Path2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "PathFollow2D" => {
-            ec.insert(PathFollow2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "PhysicalBoneSimulator3D" => {
-            ec.insert(PhysicalBoneSimulator3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "PhysicsBody3D" => {
-            ec.insert(PhysicsBody3DMarker);
-            ec.insert(CollisionObject3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "PinJoint3D" => {
-            ec.insert(PinJoint3DMarker);
-            ec.insert(Joint3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Polygon2D" => {
-            ec.insert(Polygon2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Popup" => {
-            ec.insert(PopupMarker);
-            ec.insert(WindowMarker);
-            ec.insert(ViewportMarker);
-        }
-        "Range" => {
-            ec.insert(RangeMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "RayCast2D" => {
-            ec.insert(RayCast2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "ReferenceRect" => {
-            ec.insert(ReferenceRectMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "ReflectionProbe" => {
-            ec.insert(ReflectionProbeMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "RemoteTransform2D" => {
-            ec.insert(RemoteTransform2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "RetargetModifier3D" => {
-            ec.insert(RetargetModifier3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "RichTextLabel" => {
-            ec.insert(RichTextLabelMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "RootMotionView" => {
-            ec.insert(RootMotionViewMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Separator" => {
-            ec.insert(SeparatorMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "ShapeCast2D" => {
-            ec.insert(ShapeCast2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Skeleton2D" => {
-            ec.insert(Skeleton2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "SkeletonIK3D" => {
-            ec.insert(SkeletonIK3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "SliderJoint3D" => {
-            ec.insert(SliderJoint3DMarker);
-            ec.insert(Joint3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "SpringBoneCollisionCapsule3D" => {
-            ec.insert(SpringBoneCollisionCapsule3DMarker);
-            ec.insert(SpringBoneCollision3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "SpringBoneCollisionPlane3D" => {
-            ec.insert(SpringBoneCollisionPlane3DMarker);
-            ec.insert(SpringBoneCollision3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "SpringBoneCollisionSphere3D" => {
-            ec.insert(SpringBoneCollisionSphere3DMarker);
-            ec.insert(SpringBoneCollision3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "SpringBoneSimulator3D" => {
-            ec.insert(SpringBoneSimulator3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Sprite2D" => {
-            ec.insert(Sprite2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "TabBar" => {
-            ec.insert(TabBarMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "TextEdit" => {
-            ec.insert(TextEditMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "TextureRect" => {
-            ec.insert(TextureRectMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "TileMap" => {
-            ec.insert(TileMapMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "TileMapLayer" => {
-            ec.insert(TileMapLayerMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "TouchScreenButton" => {
-            ec.insert(TouchScreenButtonMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Tree" => {
-            ec.insert(TreeMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "VideoStreamPlayer" => {
-            ec.insert(VideoStreamPlayerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "VisibleOnScreenNotifier2D" => {
-            ec.insert(VisibleOnScreenNotifier2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "VisibleOnScreenNotifier3D" => {
-            ec.insert(VisibleOnScreenNotifier3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "VoxelGI" => {
-            ec.insert(VoxelGIMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "XRAnchor3D" => {
-            ec.insert(XRAnchor3DMarker);
-            ec.insert(XRNode3DMarker);
-            ec.insert(Node3DMarker);
-        }
+        "Parallax2D" => ec.insert(Parallax2DMarker),
+        "ParallaxLayer" => ec.insert(ParallaxLayerMarker),
+        "Path2D" => ec.insert(Path2DMarker),
+        "PathFollow2D" => ec.insert(PathFollow2DMarker),
+        "PhysicalBoneSimulator3D" => ec.insert(PhysicalBoneSimulator3DMarker),
+        "PhysicsBody3D" => ec.insert(PhysicsBody3DMarker),
+        "PinJoint3D" => ec.insert(PinJoint3DMarker),
+        "Polygon2D" => ec.insert(Polygon2DMarker),
+        "Popup" => ec.insert(PopupMarker),
+        "Range" => ec.insert(RangeMarker),
+        "RayCast2D" => ec.insert(RayCast2DMarker),
+        "ReferenceRect" => ec.insert(ReferenceRectMarker),
+        "ReflectionProbe" => ec.insert(ReflectionProbeMarker),
+        "RemoteTransform2D" => ec.insert(RemoteTransform2DMarker),
+        "RetargetModifier3D" => ec.insert(RetargetModifier3DMarker),
+        "RichTextLabel" => ec.insert(RichTextLabelMarker),
+        "RootMotionView" => ec.insert(RootMotionViewMarker),
+        "Separator" => ec.insert(SeparatorMarker),
+        "ShapeCast2D" => ec.insert(ShapeCast2DMarker),
+        "Skeleton2D" => ec.insert(Skeleton2DMarker),
+        "SkeletonIK3D" => ec.insert(SkeletonIK3DMarker),
+        "SliderJoint3D" => ec.insert(SliderJoint3DMarker),
+        "SpringBoneCollisionCapsule3D" => ec.insert(SpringBoneCollisionCapsule3DMarker),
+        "SpringBoneCollisionPlane3D" => ec.insert(SpringBoneCollisionPlane3DMarker),
+        "SpringBoneCollisionSphere3D" => ec.insert(SpringBoneCollisionSphere3DMarker),
+        "SpringBoneSimulator3D" => ec.insert(SpringBoneSimulator3DMarker),
+        "Sprite2D" => ec.insert(Sprite2DMarker),
+        "TabBar" => ec.insert(TabBarMarker),
+        "TextEdit" => ec.insert(TextEditMarker),
+        "TextureRect" => ec.insert(TextureRectMarker),
+        "TileMap" => ec.insert(TileMapMarker),
+        "TileMapLayer" => ec.insert(TileMapLayerMarker),
+        "TouchScreenButton" => ec.insert(TouchScreenButtonMarker),
+        "Tree" => ec.insert(TreeMarker),
+        "VideoStreamPlayer" => ec.insert(VideoStreamPlayerMarker),
+        "VisibleOnScreenNotifier2D" => ec.insert(VisibleOnScreenNotifier2DMarker),
+        "VisibleOnScreenNotifier3D" => ec.insert(VisibleOnScreenNotifier3DMarker),
+        "VoxelGI" => ec.insert(VoxelGIMarker),
+        "XRAnchor3D" => ec.insert(XRAnchor3DMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "XRBodyModifier3D" => {
-            ec.insert(XRBodyModifier3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "XRCamera3D" => {
-            ec.insert(XRCamera3DMarker);
-            ec.insert(Camera3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "XRController3D" => {
-            ec.insert(XRController3DMarker);
-            ec.insert(XRNode3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "XRHandModifier3D" => {
-            ec.insert(XRHandModifier3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "AimModifier3D" => {
-            ec.insert(AimModifier3DMarker);
-            ec.insert(BoneConstraint3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Area2D" => {
-            ec.insert(Area2DMarker);
-            ec.insert(CollisionObject2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "AspectRatioContainer" => {
-            ec.insert(AspectRatioContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "BoxContainer" => {
-            ec.insert(BoxContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Button" => {
-            ec.insert(ButtonMarker);
-            ec.insert(BaseButtonMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "CPUParticles3D" => {
-            ec.insert(CPUParticles3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CSGShape3D" => {
-            ec.insert(CSGShape3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CenterContainer" => {
-            ec.insert(CenterContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "ChainIK3D" => {
-            ec.insert(ChainIK3DMarker);
-            ec.insert(IKModifier3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CharacterBody3D" => {
-            ec.insert(CharacterBody3DMarker);
-            ec.insert(PhysicsBody3DMarker);
-            ec.insert(CollisionObject3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CodeEdit" => {
-            ec.insert(CodeEditMarker);
-            ec.insert(TextEditMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "ConfirmationDialog" => {
-            ec.insert(ConfirmationDialogMarker);
-            ec.insert(AcceptDialogMarker);
-            ec.insert(WindowMarker);
-            ec.insert(ViewportMarker);
-        }
-        "ConvertTransformModifier3D" => {
-            ec.insert(ConvertTransformModifier3DMarker);
-            ec.insert(BoneConstraint3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CopyTransformModifier3D" => {
-            ec.insert(CopyTransformModifier3DMarker);
-            ec.insert(BoneConstraint3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "DampedSpringJoint2D" => {
-            ec.insert(DampedSpringJoint2DMarker);
-            ec.insert(Joint2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "DirectionalLight2D" => {
-            ec.insert(DirectionalLight2DMarker);
-            ec.insert(Light2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "DirectionalLight3D" => {
-            ec.insert(DirectionalLight3DMarker);
-            ec.insert(Light3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "EditorProperty" => {
-            ec.insert(EditorPropertyMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "EditorSpinSlider" => {
-            ec.insert(EditorSpinSliderMarker);
-            ec.insert(RangeMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "FlowContainer" => {
-            ec.insert(FlowContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "FoldableContainer" => {
-            ec.insert(FoldableContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "GPUParticles3D" => {
-            ec.insert(GPUParticles3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "GPUParticlesAttractorBox3D" => {
-            ec.insert(GPUParticlesAttractorBox3DMarker);
-            ec.insert(GPUParticlesAttractor3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "GPUParticlesAttractorSphere3D" => {
-            ec.insert(GPUParticlesAttractorSphere3DMarker);
-            ec.insert(GPUParticlesAttractor3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "GPUParticlesAttractorVectorField3D" => {
-            ec.insert(GPUParticlesAttractorVectorField3DMarker);
-            ec.insert(GPUParticlesAttractor3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "GPUParticlesCollisionBox3D" => {
-            ec.insert(GPUParticlesCollisionBox3DMarker);
-            ec.insert(GPUParticlesCollision3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "GPUParticlesCollisionHeightField3D" => {
-            ec.insert(GPUParticlesCollisionHeightField3DMarker);
-            ec.insert(GPUParticlesCollision3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "GPUParticlesCollisionSDF3D" => {
-            ec.insert(GPUParticlesCollisionSDF3DMarker);
-            ec.insert(GPUParticlesCollision3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "GPUParticlesCollisionSphere3D" => {
-            ec.insert(GPUParticlesCollisionSphere3DMarker);
-            ec.insert(GPUParticlesCollision3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
+        "XRBodyModifier3D" => ec.insert(XRBodyModifier3DMarker),
+        "XRCamera3D" => ec.insert(XRCamera3DMarker),
+        "XRController3D" => ec.insert(XRController3DMarker),
+        "XRHandModifier3D" => ec.insert(XRHandModifier3DMarker),
+        "AimModifier3D" => ec.insert(AimModifier3DMarker),
+        "Area2D" => ec.insert(Area2DMarker),
+        "AspectRatioContainer" => ec.insert(AspectRatioContainerMarker),
+        "BoxContainer" => ec.insert(BoxContainerMarker),
+        "Button" => ec.insert(ButtonMarker),
+        "CPUParticles3D" => ec.insert(CPUParticles3DMarker),
+        "CSGShape3D" => ec.insert(CSGShape3DMarker),
+        "CenterContainer" => ec.insert(CenterContainerMarker),
+        "ChainIK3D" => ec.insert(ChainIK3DMarker),
+        "CharacterBody3D" => ec.insert(CharacterBody3DMarker),
+        "CodeEdit" => ec.insert(CodeEditMarker),
+        "ConfirmationDialog" => ec.insert(ConfirmationDialogMarker),
+        "ConvertTransformModifier3D" => ec.insert(ConvertTransformModifier3DMarker),
+        "CopyTransformModifier3D" => ec.insert(CopyTransformModifier3DMarker),
+        "DampedSpringJoint2D" => ec.insert(DampedSpringJoint2DMarker),
+        "DirectionalLight2D" => ec.insert(DirectionalLight2DMarker),
+        "DirectionalLight3D" => ec.insert(DirectionalLight3DMarker),
+        "EditorProperty" => ec.insert(EditorPropertyMarker),
+        "EditorSpinSlider" => ec.insert(EditorSpinSliderMarker),
+        "FlowContainer" => ec.insert(FlowContainerMarker),
+        "FoldableContainer" => ec.insert(FoldableContainerMarker),
+        "GPUParticles3D" => ec.insert(GPUParticles3DMarker),
+        "GPUParticlesAttractorBox3D" => ec.insert(GPUParticlesAttractorBox3DMarker),
+        "GPUParticlesAttractorSphere3D" => ec.insert(GPUParticlesAttractorSphere3DMarker),
+        "GPUParticlesAttractorVectorField3D" => ec.insert(GPUParticlesAttractorVectorField3DMarker),
+        "GPUParticlesCollisionBox3D" => ec.insert(GPUParticlesCollisionBox3DMarker),
+        "GPUParticlesCollisionHeightField3D" => ec.insert(GPUParticlesCollisionHeightField3DMarker),
+        "GPUParticlesCollisionSDF3D" => ec.insert(GPUParticlesCollisionSDF3DMarker),
+        "GPUParticlesCollisionSphere3D" => ec.insert(GPUParticlesCollisionSphere3DMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "GraphElement" => {
-            ec.insert(GraphElementMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "GridContainer" => {
-            ec.insert(GridContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "GrooveJoint2D" => {
-            ec.insert(GrooveJoint2DMarker);
-            ec.insert(Joint2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "HSeparator" => {
-            ec.insert(HSeparatorMarker);
-            ec.insert(SeparatorMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Label3D" => {
-            ec.insert(Label3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "LinkButton" => {
-            ec.insert(LinkButtonMarker);
-            ec.insert(BaseButtonMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "MarginContainer" => {
-            ec.insert(MarginContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "MeshInstance3D" => {
-            ec.insert(MeshInstance3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "MultiMeshInstance3D" => {
-            ec.insert(MultiMeshInstance3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "OmniLight3D" => {
-            ec.insert(OmniLight3DMarker);
-            ec.insert(Light3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "PanelContainer" => {
-            ec.insert(PanelContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "PhysicalBone3D" => {
-            ec.insert(PhysicalBone3DMarker);
-            ec.insert(PhysicsBody3DMarker);
-            ec.insert(CollisionObject3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "PhysicsBody2D" => {
-            ec.insert(PhysicsBody2DMarker);
-            ec.insert(CollisionObject2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "PinJoint2D" => {
-            ec.insert(PinJoint2DMarker);
-            ec.insert(Joint2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "PointLight2D" => {
-            ec.insert(PointLight2DMarker);
-            ec.insert(Light2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "PopupMenu" => {
-            ec.insert(PopupMenuMarker);
-            ec.insert(PopupMarker);
-            ec.insert(WindowMarker);
-            ec.insert(ViewportMarker);
-        }
-        "PopupPanel" => {
-            ec.insert(PopupPanelMarker);
-            ec.insert(PopupMarker);
-            ec.insert(WindowMarker);
-            ec.insert(ViewportMarker);
-        }
-        "ProgressBar" => {
-            ec.insert(ProgressBarMarker);
-            ec.insert(RangeMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "RigidBody3D" => {
-            ec.insert(RigidBody3DMarker);
-            ec.insert(PhysicsBody3DMarker);
-            ec.insert(CollisionObject3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "ScrollBar" => {
-            ec.insert(ScrollBarMarker);
-            ec.insert(RangeMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "ScrollContainer" => {
-            ec.insert(ScrollContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "Slider" => {
-            ec.insert(SliderMarker);
-            ec.insert(RangeMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "SpinBox" => {
-            ec.insert(SpinBoxMarker);
-            ec.insert(RangeMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "SplitContainer" => {
-            ec.insert(SplitContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "SpotLight3D" => {
-            ec.insert(SpotLight3DMarker);
-            ec.insert(Light3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "SpriteBase3D" => {
-            ec.insert(SpriteBase3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "StaticBody3D" => {
-            ec.insert(StaticBody3DMarker);
-            ec.insert(PhysicsBody3DMarker);
-            ec.insert(CollisionObject3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "SubViewportContainer" => {
-            ec.insert(SubViewportContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "TabContainer" => {
-            ec.insert(TabContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "TextureButton" => {
-            ec.insert(TextureButtonMarker);
-            ec.insert(BaseButtonMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "TextureProgressBar" => {
-            ec.insert(TextureProgressBarMarker);
-            ec.insert(RangeMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "TwoBoneIK3D" => {
-            ec.insert(TwoBoneIK3DMarker);
-            ec.insert(IKModifier3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "VSeparator" => {
-            ec.insert(VSeparatorMarker);
-            ec.insert(SeparatorMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "VisibleOnScreenEnabler2D" => {
-            ec.insert(VisibleOnScreenEnabler2DMarker);
-            ec.insert(VisibleOnScreenNotifier2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "VisibleOnScreenEnabler3D" => {
-            ec.insert(VisibleOnScreenEnabler3DMarker);
-            ec.insert(VisibleOnScreenNotifier3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "AnimatableBody3D" => {
-            ec.insert(AnimatableBody3DMarker);
-            ec.insert(StaticBody3DMarker);
-            ec.insert(PhysicsBody3DMarker);
-            ec.insert(CollisionObject3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "AnimatedSprite3D" => {
-            ec.insert(AnimatedSprite3DMarker);
-            ec.insert(SpriteBase3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CSGCombiner3D" => {
-            ec.insert(CSGCombiner3DMarker);
-            ec.insert(CSGShape3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CSGPrimitive3D" => {
-            ec.insert(CSGPrimitive3DMarker);
-            ec.insert(CSGShape3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CharacterBody2D" => {
-            ec.insert(CharacterBody2DMarker);
-            ec.insert(PhysicsBody2DMarker);
-            ec.insert(CollisionObject2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "CheckBox" => {
-            ec.insert(CheckBoxMarker);
-            ec.insert(ButtonMarker);
-            ec.insert(BaseButtonMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "CheckButton" => {
-            ec.insert(CheckButtonMarker);
-            ec.insert(ButtonMarker);
-            ec.insert(BaseButtonMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "ColorPickerButton" => {
-            ec.insert(ColorPickerButtonMarker);
-            ec.insert(ButtonMarker);
-            ec.insert(BaseButtonMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "EditorCommandPalette" => {
-            ec.insert(EditorCommandPaletteMarker);
-            ec.insert(ConfirmationDialogMarker);
-            ec.insert(AcceptDialogMarker);
-            ec.insert(WindowMarker);
-            ec.insert(ViewportMarker);
-        }
-        "EditorDock" => {
-            ec.insert(EditorDockMarker);
-            ec.insert(MarginContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "EditorInspector" => {
-            ec.insert(EditorInspectorMarker);
-            ec.insert(ScrollContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "FileDialog" => {
-            ec.insert(FileDialogMarker);
-            ec.insert(ConfirmationDialogMarker);
-            ec.insert(AcceptDialogMarker);
-            ec.insert(WindowMarker);
-            ec.insert(ViewportMarker);
-        }
+        "GraphElement" => ec.insert(GraphElementMarker),
+        "GridContainer" => ec.insert(GridContainerMarker),
+        "GrooveJoint2D" => ec.insert(GrooveJoint2DMarker),
+        "HSeparator" => ec.insert(HSeparatorMarker),
+        "Label3D" => ec.insert(Label3DMarker),
+        "LinkButton" => ec.insert(LinkButtonMarker),
+        "MarginContainer" => ec.insert(MarginContainerMarker),
+        "MeshInstance3D" => ec.insert(MeshInstance3DMarker),
+        "MultiMeshInstance3D" => ec.insert(MultiMeshInstance3DMarker),
+        "OmniLight3D" => ec.insert(OmniLight3DMarker),
+        "PanelContainer" => ec.insert(PanelContainerMarker),
+        "PhysicalBone3D" => ec.insert(PhysicalBone3DMarker),
+        "PhysicsBody2D" => ec.insert(PhysicsBody2DMarker),
+        "PinJoint2D" => ec.insert(PinJoint2DMarker),
+        "PointLight2D" => ec.insert(PointLight2DMarker),
+        "PopupMenu" => ec.insert(PopupMenuMarker),
+        "PopupPanel" => ec.insert(PopupPanelMarker),
+        "ProgressBar" => ec.insert(ProgressBarMarker),
+        "RigidBody3D" => ec.insert(RigidBody3DMarker),
+        "ScrollBar" => ec.insert(ScrollBarMarker),
+        "ScrollContainer" => ec.insert(ScrollContainerMarker),
+        "Slider" => ec.insert(SliderMarker),
+        "SpinBox" => ec.insert(SpinBoxMarker),
+        "SplitContainer" => ec.insert(SplitContainerMarker),
+        "SpotLight3D" => ec.insert(SpotLight3DMarker),
+        "SpriteBase3D" => ec.insert(SpriteBase3DMarker),
+        "StaticBody3D" => ec.insert(StaticBody3DMarker),
+        "SubViewportContainer" => ec.insert(SubViewportContainerMarker),
+        "TabContainer" => ec.insert(TabContainerMarker),
+        "TextureButton" => ec.insert(TextureButtonMarker),
+        "TextureProgressBar" => ec.insert(TextureProgressBarMarker),
+        "TwoBoneIK3D" => ec.insert(TwoBoneIK3DMarker),
+        "VSeparator" => ec.insert(VSeparatorMarker),
+        "VisibleOnScreenEnabler2D" => ec.insert(VisibleOnScreenEnabler2DMarker),
+        "VisibleOnScreenEnabler3D" => ec.insert(VisibleOnScreenEnabler3DMarker),
+        "AnimatableBody3D" => ec.insert(AnimatableBody3DMarker),
+        "AnimatedSprite3D" => ec.insert(AnimatedSprite3DMarker),
+        "CSGCombiner3D" => ec.insert(CSGCombiner3DMarker),
+        "CSGPrimitive3D" => ec.insert(CSGPrimitive3DMarker),
+        "CharacterBody2D" => ec.insert(CharacterBody2DMarker),
+        "CheckBox" => ec.insert(CheckBoxMarker),
+        "CheckButton" => ec.insert(CheckButtonMarker),
+        "ColorPickerButton" => ec.insert(ColorPickerButtonMarker),
+        "EditorCommandPalette" => ec.insert(EditorCommandPaletteMarker),
+        "EditorDock" => ec.insert(EditorDockMarker),
+        "EditorInspector" => ec.insert(EditorInspectorMarker),
+        "FileDialog" => ec.insert(FileDialogMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "GraphFrame" => {
-            ec.insert(GraphFrameMarker);
-            ec.insert(GraphElementMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
+        "GraphFrame" => ec.insert(GraphFrameMarker),
         #[cfg(feature = "experimental-godot-api")]
-        "GraphNode" => {
-            ec.insert(GraphNodeMarker);
-            ec.insert(GraphElementMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "HBoxContainer" => {
-            ec.insert(HBoxContainerMarker);
-            ec.insert(BoxContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "HFlowContainer" => {
-            ec.insert(HFlowContainerMarker);
-            ec.insert(FlowContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "HScrollBar" => {
-            ec.insert(HScrollBarMarker);
-            ec.insert(ScrollBarMarker);
-            ec.insert(RangeMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "HSlider" => {
-            ec.insert(HSliderMarker);
-            ec.insert(SliderMarker);
-            ec.insert(RangeMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "HSplitContainer" => {
-            ec.insert(HSplitContainerMarker);
-            ec.insert(SplitContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "IterateIK3D" => {
-            ec.insert(IterateIK3DMarker);
-            ec.insert(ChainIK3DMarker);
-            ec.insert(IKModifier3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "MenuButton" => {
-            ec.insert(MenuButtonMarker);
-            ec.insert(ButtonMarker);
-            ec.insert(BaseButtonMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "OpenXRBindingModifierEditor" => {
-            ec.insert(OpenXRBindingModifierEditorMarker);
-            ec.insert(PanelContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "OptionButton" => {
-            ec.insert(OptionButtonMarker);
-            ec.insert(ButtonMarker);
-            ec.insert(BaseButtonMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "RigidBody2D" => {
-            ec.insert(RigidBody2DMarker);
-            ec.insert(PhysicsBody2DMarker);
-            ec.insert(CollisionObject2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "ScriptCreateDialog" => {
-            ec.insert(ScriptCreateDialogMarker);
-            ec.insert(ConfirmationDialogMarker);
-            ec.insert(AcceptDialogMarker);
-            ec.insert(WindowMarker);
-            ec.insert(ViewportMarker);
-        }
-        "ScriptEditor" => {
-            ec.insert(ScriptEditorMarker);
-            ec.insert(PanelContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "SoftBody3D" => {
-            ec.insert(SoftBody3DMarker);
-            ec.insert(MeshInstance3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "SplineIK3D" => {
-            ec.insert(SplineIK3DMarker);
-            ec.insert(ChainIK3DMarker);
-            ec.insert(IKModifier3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "Sprite3D" => {
-            ec.insert(Sprite3DMarker);
-            ec.insert(SpriteBase3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "StaticBody2D" => {
-            ec.insert(StaticBody2DMarker);
-            ec.insert(PhysicsBody2DMarker);
-            ec.insert(CollisionObject2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "VBoxContainer" => {
-            ec.insert(VBoxContainerMarker);
-            ec.insert(BoxContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "VFlowContainer" => {
-            ec.insert(VFlowContainerMarker);
-            ec.insert(FlowContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "VScrollBar" => {
-            ec.insert(VScrollBarMarker);
-            ec.insert(ScrollBarMarker);
-            ec.insert(RangeMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "VSlider" => {
-            ec.insert(VSliderMarker);
-            ec.insert(SliderMarker);
-            ec.insert(RangeMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "VSplitContainer" => {
-            ec.insert(VSplitContainerMarker);
-            ec.insert(SplitContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "VehicleBody3D" => {
-            ec.insert(VehicleBody3DMarker);
-            ec.insert(RigidBody3DMarker);
-            ec.insert(PhysicsBody3DMarker);
-            ec.insert(CollisionObject3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "AnimatableBody2D" => {
-            ec.insert(AnimatableBody2DMarker);
-            ec.insert(StaticBody2DMarker);
-            ec.insert(PhysicsBody2DMarker);
-            ec.insert(CollisionObject2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "CCDIK3D" => {
-            ec.insert(CCDIK3DMarker);
-            ec.insert(IterateIK3DMarker);
-            ec.insert(ChainIK3DMarker);
-            ec.insert(IKModifier3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CSGBox3D" => {
-            ec.insert(CSGBox3DMarker);
-            ec.insert(CSGPrimitive3DMarker);
-            ec.insert(CSGShape3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CSGCylinder3D" => {
-            ec.insert(CSGCylinder3DMarker);
-            ec.insert(CSGPrimitive3DMarker);
-            ec.insert(CSGShape3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CSGMesh3D" => {
-            ec.insert(CSGMesh3DMarker);
-            ec.insert(CSGPrimitive3DMarker);
-            ec.insert(CSGShape3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CSGPolygon3D" => {
-            ec.insert(CSGPolygon3DMarker);
-            ec.insert(CSGPrimitive3DMarker);
-            ec.insert(CSGShape3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CSGSphere3D" => {
-            ec.insert(CSGSphere3DMarker);
-            ec.insert(CSGPrimitive3DMarker);
-            ec.insert(CSGShape3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "CSGTorus3D" => {
-            ec.insert(CSGTorus3DMarker);
-            ec.insert(CSGPrimitive3DMarker);
-            ec.insert(CSGShape3DMarker);
-            ec.insert(GeometryInstance3DMarker);
-            ec.insert(VisualInstance3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "ColorPicker" => {
-            ec.insert(ColorPickerMarker);
-            ec.insert(VBoxContainerMarker);
-            ec.insert(BoxContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "EditorFileDialog" => {
-            ec.insert(EditorFileDialogMarker);
-            ec.insert(FileDialogMarker);
-            ec.insert(ConfirmationDialogMarker);
-            ec.insert(AcceptDialogMarker);
-            ec.insert(WindowMarker);
-            ec.insert(ViewportMarker);
-        }
-        "EditorResourcePicker" => {
-            ec.insert(EditorResourcePickerMarker);
-            ec.insert(HBoxContainerMarker);
-            ec.insert(BoxContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "EditorToaster" => {
-            ec.insert(EditorToasterMarker);
-            ec.insert(HBoxContainerMarker);
-            ec.insert(BoxContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "FABRIK3D" => {
-            ec.insert(FABRIK3DMarker);
-            ec.insert(IterateIK3DMarker);
-            ec.insert(ChainIK3DMarker);
-            ec.insert(IKModifier3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "FileSystemDock" => {
-            ec.insert(FileSystemDockMarker);
-            ec.insert(EditorDockMarker);
-            ec.insert(MarginContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "JacobianIK3D" => {
-            ec.insert(JacobianIK3DMarker);
-            ec.insert(IterateIK3DMarker);
-            ec.insert(ChainIK3DMarker);
-            ec.insert(IKModifier3DMarker);
-            ec.insert(SkeletonModifier3DMarker);
-            ec.insert(Node3DMarker);
-        }
-        "OpenXRInteractionProfileEditorBase" => {
-            ec.insert(OpenXRInteractionProfileEditorBaseMarker);
-            ec.insert(HBoxContainerMarker);
-            ec.insert(BoxContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "PhysicalBone2D" => {
-            ec.insert(PhysicalBone2DMarker);
-            ec.insert(RigidBody2DMarker);
-            ec.insert(PhysicsBody2DMarker);
-            ec.insert(CollisionObject2DMarker);
-            ec.insert(Node2DMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "ScriptEditorBase" => {
-            ec.insert(ScriptEditorBaseMarker);
-            ec.insert(VBoxContainerMarker);
-            ec.insert(BoxContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "EditorScriptPicker" => {
-            ec.insert(EditorScriptPickerMarker);
-            ec.insert(EditorResourcePickerMarker);
-            ec.insert(HBoxContainerMarker);
-            ec.insert(BoxContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
-        "OpenXRInteractionProfileEditor" => {
-            ec.insert(OpenXRInteractionProfileEditorMarker);
-            ec.insert(OpenXRInteractionProfileEditorBaseMarker);
-            ec.insert(HBoxContainerMarker);
-            ec.insert(BoxContainerMarker);
-            ec.insert(ContainerMarker);
-            ec.insert(ControlMarker);
-            ec.insert(CanvasItemMarker);
-        }
+        "GraphNode" => ec.insert(GraphNodeMarker),
+        "HBoxContainer" => ec.insert(HBoxContainerMarker),
+        "HFlowContainer" => ec.insert(HFlowContainerMarker),
+        "HScrollBar" => ec.insert(HScrollBarMarker),
+        "HSlider" => ec.insert(HSliderMarker),
+        "HSplitContainer" => ec.insert(HSplitContainerMarker),
+        "IterateIK3D" => ec.insert(IterateIK3DMarker),
+        "MenuButton" => ec.insert(MenuButtonMarker),
+        "OpenXRBindingModifierEditor" => ec.insert(OpenXRBindingModifierEditorMarker),
+        "OptionButton" => ec.insert(OptionButtonMarker),
+        "RigidBody2D" => ec.insert(RigidBody2DMarker),
+        "ScriptCreateDialog" => ec.insert(ScriptCreateDialogMarker),
+        "ScriptEditor" => ec.insert(ScriptEditorMarker),
+        "SoftBody3D" => ec.insert(SoftBody3DMarker),
+        "SplineIK3D" => ec.insert(SplineIK3DMarker),
+        "Sprite3D" => ec.insert(Sprite3DMarker),
+        "StaticBody2D" => ec.insert(StaticBody2DMarker),
+        "VBoxContainer" => ec.insert(VBoxContainerMarker),
+        "VFlowContainer" => ec.insert(VFlowContainerMarker),
+        "VScrollBar" => ec.insert(VScrollBarMarker),
+        "VSlider" => ec.insert(VSliderMarker),
+        "VSplitContainer" => ec.insert(VSplitContainerMarker),
+        "VehicleBody3D" => ec.insert(VehicleBody3DMarker),
+        "AnimatableBody2D" => ec.insert(AnimatableBody2DMarker),
+        "CCDIK3D" => ec.insert(CCDIK3DMarker),
+        "CSGBox3D" => ec.insert(CSGBox3DMarker),
+        "CSGCylinder3D" => ec.insert(CSGCylinder3DMarker),
+        "CSGMesh3D" => ec.insert(CSGMesh3DMarker),
+        "CSGPolygon3D" => ec.insert(CSGPolygon3DMarker),
+        "CSGSphere3D" => ec.insert(CSGSphere3DMarker),
+        "CSGTorus3D" => ec.insert(CSGTorus3DMarker),
+        "ColorPicker" => ec.insert(ColorPickerMarker),
+        "EditorFileDialog" => ec.insert(EditorFileDialogMarker),
+        "EditorResourcePicker" => ec.insert(EditorResourcePickerMarker),
+        "EditorToaster" => ec.insert(EditorToasterMarker),
+        "FABRIK3D" => ec.insert(FABRIK3DMarker),
+        "FileSystemDock" => ec.insert(FileSystemDockMarker),
+        "JacobianIK3D" => ec.insert(JacobianIK3DMarker),
+        "OpenXRInteractionProfileEditorBase" => ec.insert(OpenXRInteractionProfileEditorBaseMarker),
+        "PhysicalBone2D" => ec.insert(PhysicalBone2DMarker),
+        "ScriptEditorBase" => ec.insert(ScriptEditorBaseMarker),
+        "EditorScriptPicker" => ec.insert(EditorScriptPickerMarker),
+        "OpenXRInteractionProfileEditor" => ec.insert(OpenXRInteractionProfileEditorMarker),
         // Custom user types that extend Godot nodes
-        _ => {}
-    }
+        _ => ec,
+    };
 }
 
 pub fn remove_comprehensive_node_type_markers(ec: &mut EntityCommands) {

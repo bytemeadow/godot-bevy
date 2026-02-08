@@ -87,8 +87,6 @@ def _generate_string_match_marker_insertion(
     )
 
     lines = [
-        "ec.insert(NodeMarker);",
-        "",
         "match node_type {",
     ]
 
@@ -97,22 +95,11 @@ def _generate_string_match_marker_insertion(
         if cfg_attr:
             lines.append(f"    {cfg_attr}")
 
-        lines.append(f'    "{node_type}" => {{')
-        if node_type == "Node":
-            lines.append(f"        // NodeMarker added above for all nodes.")
-        else:
-            lines.append(f"        ec.insert({node_type}Marker);")
-            parent = parent_map.get(node_type, None)
-            while parent is not None:
-                if parent == "Node":
-                    break
-                lines.append(f"        ec.insert({parent}Marker);")
-                parent = parent_map.get(parent, None)
-        lines.append("    },")
+        lines.append(f'    "{node_type}" => ec.insert({node_type}Marker),')
 
     lines.append("    // Custom user types that extend Godot nodes")
-    lines.append("    _ => {}")
-    lines.append("}")
+    lines.append("    _ => ec")
+    lines.append("};")
 
     return "\n".join(lines)
 

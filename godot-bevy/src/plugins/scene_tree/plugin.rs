@@ -19,6 +19,7 @@ use bevy_ecs::{
     system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam},
 };
 use bevy_reflect::Reflect;
+use godot::classes::ClassDb;
 use godot::{
     builtin::{GString, StringName},
     classes::{Engine, Node, SceneTree},
@@ -602,14 +603,18 @@ fn create_scene_tree_entity(
                     .insert(node_id)
                     .insert(Name::from(node_name));
 
-                // Add node type marker components - use optimized version if available
-                add_node_type_markers_from_string(
-                    &mut new_entity_commands,
+                // Add node type marker components
+                for class_name in get_inheritance_hierarchy(
                     node_type
-                        // Fall back to getting node-type from node if not provided
+                        // Fall back to getting node-type from node if not provided by message
                         .unwrap_or_else(|| node.get_class().to_string())
                         .as_str(),
-                );
+                ) {
+                    add_node_type_markers_from_string(
+                        &mut new_entity_commands,
+                        class_name.as_str(),
+                    );
+                }
 
                 // Check if the node is a collision body (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.)
                 // These nodes typically have collision detection capabilities
@@ -723,6 +728,24 @@ fn create_scene_tree_entity(
     {
         batch_connect_collision_signals(&scene_root, collision_watcher, &pending_collision_bodies);
     }
+}
+
+fn get_inheritance_hierarchy(class_name: &str) -> Vec<String> {
+    let class_db = ClassDb::singleton();
+    let mut hierarchy = Vec::new();
+
+    // Initialize a local mutable variable to track the "current" class name
+    let mut current_class = StringName::from(class_name);
+
+    while !current_class.is_empty() {
+        // Convert to String for the return vector
+        hierarchy.push(current_class.to_string());
+
+        // Update current_class to its parent
+        current_class = class_db.get_parent_class(&current_class);
+    }
+
+    hierarchy
 }
 
 /// Batch connect collision signals using GDScript bulk operations.
