@@ -6,12 +6,17 @@
 use crossbeam_channel as mpsc;
 use godot::classes::{Area3D, Engine, Node, Node2D, Node3D, SceneTree};
 use godot::obj::NewAlloc;
+use godot::builtin::StringName;
+use godot::classes::{Area3D, Engine, InputEventKey, InputMap, Node, Node2D, Node3D, SceneTree};
+use godot::global::Key;
+use godot::obj::{NewAlloc, Singleton};
 use godot::prelude::*;
 use godot_bevy::bevy_app::{App, First, Last, PreUpdate};
 use godot_bevy::bevy_math::Vec3;
 use godot_bevy::bevy_transform::components::Transform as BevyTransform;
 use godot_bevy::interop::{GodotMainThread, GodotNodeHandle, Node2DMarker, Node3DMarker};
 use godot_bevy::plugins::core::SceneTreeComponentRegistry;
+use godot_bevy::plugins::input::{GodotInputEventPlugin, InputEventReader, InputEventType};
 use godot_bevy::plugins::scene_tree::{
     GodotSceneTreePlugin, NodeEntityIndex, SceneTreeMessage, SceneTreeMessageReader,
     SceneTreeMessageType,
@@ -639,4 +644,65 @@ fn scene_tree_process_collision_bodies_fallback() -> i32 {
     watcher.clone().free();
 
     result
+}
+
+// =============================================================================
+// Input Action-Checking Benchmarks
+// =============================================================================
+
+const INPUT_EVENT_COUNT: usize = 100;
+const INPUT_ACTION_COUNT: usize = 50;
+
+type InputActionBenchSender = mpsc::Sender<(InputEventType, Gd<godot::classes::InputEvent>)>;
+
+/// Setup for input actionaction benchmark. Returns (app, sender, action_names for cleanup).
+fn setup_input_action_benchmark_app() -> (App, InputActionBenchSender, Vec<StringName>) {
+    let (sender, receiver) = mpsc::unbounded();
+
+    let mut app = App::new();
+
+    app.init_schedule(First);
+    app.insert_non_send_resource(GodotMainThread);
+
+    app.add_plugins(GodotInputEventPlugin);
+    app.insert_non_send_resource(InputEventReader(receiver));
+
+    let mut input_map = InputMap::singleton();
+    let mut action_names = Vec::with_capacity(INPUT_ACTION_COUNT);
+    for i in 0..INPUT_ACTION_COUNT {
+        let name = StringName::from(&format!("bench_act_{i}"));
+        input_map.add_action(&name);
+        action_names.push(name);
+    }
+
+    (app, sender, action_names)
+}
+
+/// Runs write_input_messages (First) with INPUT_EVENT_COUNT Normal events and INPUT_ACTION_COUNT InputMap actions.
+#[bench(repeat = 3)]
+fn input_action_checking_many_events_many_actions() -> i32 {
+    let (mut app, sender, action_names) = setup_input_action_benchmark_app();
+
+    let events: Vec<_> = (0..INPUT_EVENT_COUNT)
+        .map(|_| {
+            let mut key_ev = InputEventKey::new_gd();
+            key_ev.set_keycode(Key::SPACE);
+            key_ev.set_pressed(true);
+            key_ev.upcast::<godot::classes::InputEvent>()
+        })
+        .collect();
+
+    for event in events {
+        let _ = sender.send((InputEventType::Normal, event));
+    }
+    drop(sender);
+
+    app.world_mut().run_schedule(First);
+
+    let mut input_map = InputMap::singleton();
+    for name in &action_names {
+        input_map.erase_action(name);
+    }
+
+    (INPUT_EVENT_COUNT * INPUT_ACTION_COUNT) as i32
 }
