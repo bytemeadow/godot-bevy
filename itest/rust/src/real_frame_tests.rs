@@ -12,8 +12,6 @@ fn test_update_runs_on_real_frames(ctx: &TestContext) -> godot::task::TaskHandle
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         let counter = Counter::new();
         let c = counter.clone();
 
@@ -27,7 +25,7 @@ fn test_update_runs_on_real_frames(ctx: &TestContext) -> godot::task::TaskHandle
         .await;
 
         let start = counter.get();
-        await_frames(5).await;
+        app.updates(5).await;
         let end = counter.get();
 
         assert!(
@@ -35,8 +33,7 @@ fn test_update_runs_on_real_frames(ctx: &TestContext) -> godot::task::TaskHandle
             "Expected 4+ increments, got {start} -> {end}"
         );
 
-        app.cleanup();
-        await_frames(1).await;
+        app.cleanup().await;
     })
 }
 
@@ -46,8 +43,6 @@ fn test_physics_update_runs(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         let counter = Counter::new();
         let c = counter.clone();
 
@@ -66,7 +61,7 @@ fn test_physics_update_runs(ctx: &TestContext) -> godot::task::TaskHandle {
         .await;
 
         let start = counter.get();
-        await_frames(10).await;
+        app.updates(10).await;
         let end = counter.get();
 
         assert!(
@@ -74,8 +69,7 @@ fn test_physics_update_runs(ctx: &TestContext) -> godot::task::TaskHandle {
             "PhysicsUpdate should run, got {start} -> {end}"
         );
 
-        app.cleanup();
-        await_frames(1).await;
+        app.cleanup().await;
     })
 }
 
@@ -85,8 +79,6 @@ fn test_frame_pacing_controlled_by_godot(ctx: &TestContext) -> godot::task::Task
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         let counter = Counter::new();
         let c = counter.clone();
 
@@ -99,18 +91,17 @@ fn test_frame_pacing_controlled_by_godot(ctx: &TestContext) -> godot::task::Task
         })
         .await;
 
-        await_frame().await;
+        app.update().await;
         let c1 = counter.get();
 
-        await_frame().await;
+        app.update().await;
         let c2 = counter.get();
 
-        await_frame().await;
+        app.update().await;
         let c3 = counter.get();
 
         assert!(c2 > c1 && c3 > c2, "Each frame should increment");
 
-        app.cleanup();
-        await_frames(1).await;
+        app.cleanup().await;
     })
 }

@@ -17,11 +17,7 @@ fn test_node_added_creates_entity(ctx: &TestContext) -> godot::task::TaskHandle 
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
-
-        app.update().await;
 
         let initial_count =
             app.with_world_mut(|world| world.query::<&GodotNodeHandle>().iter(world).count());
@@ -41,9 +37,8 @@ fn test_node_added_creates_entity(ctx: &TestContext) -> godot::task::TaskHandle 
             "Entity should have correct GodotNodeHandle"
         );
 
-        app.cleanup();
+        app.cleanup().await;
         node.queue_free();
-        await_frames(1).await;
     })
 }
 
@@ -53,11 +48,7 @@ fn test_node_removed_cleanup(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
-
-        app.update().await;
 
         let (mut node, _entity) = app
             .add_node::<godot::classes::Node2D>("RemovalTestNode")
@@ -69,11 +60,9 @@ fn test_node_removed_cleanup(ctx: &TestContext) -> godot::task::TaskHandle {
         );
 
         node.queue_free();
-
         app.update().await;
 
-        app.cleanup();
-        await_frames(1).await;
+        app.cleanup().await;
     })
 }
 
@@ -83,18 +72,13 @@ fn test_node_renamed_event(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
-
-        app.update().await;
 
         let (mut node, _entity) = app.add_node::<godot::classes::Node2D>("OriginalName").await;
 
         let node_id = node.instance_id();
 
         node.set_name("RenamedNode");
-
         app.update().await;
 
         assert!(
@@ -102,9 +86,8 @@ fn test_node_renamed_event(ctx: &TestContext) -> godot::task::TaskHandle {
             "Entity should still exist after rename"
         );
 
-        app.cleanup();
+        app.cleanup().await;
         node.queue_free();
-        await_frames(1).await;
     })
 }
 
@@ -114,11 +97,7 @@ fn test_protected_node_entity(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
-
-        app.update().await;
 
         let (mut node, entity) = app
             .add_node::<godot::classes::Node2D>("ProtectedNode")
@@ -131,9 +110,7 @@ fn test_protected_node_entity(ctx: &TestContext) -> godot::task::TaskHandle {
         });
 
         node.queue_free();
-
-        app.update().await;
-        app.update().await;
+        app.updates(2).await;
 
         let entity_still_exists = app.with_world(|world| world.get_entity(entity).is_ok());
 
@@ -157,8 +134,7 @@ fn test_protected_node_entity(ctx: &TestContext) -> godot::task::TaskHandle {
             "NodeEntityIndex should remove entry for protected entity when node is freed"
         );
 
-        app.cleanup();
-        await_frames(1).await;
+        app.cleanup().await;
     })
 }
 
@@ -168,11 +144,7 @@ fn test_node_handle_validity(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
-
-        app.update().await;
 
         let (mut node, entity) = app
             .add_node::<godot::classes::Node2D>("UniqueNodeName")
@@ -206,9 +178,8 @@ fn test_node_handle_validity(ctx: &TestContext) -> godot::task::TaskHandle {
             "GodotNodeHandle should reference correct node"
         );
 
-        app.cleanup();
+        app.cleanup().await;
         node.queue_free();
-        await_frames(1).await;
     })
 }
 
@@ -232,7 +203,8 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
         child.set_name("Child");
         parent1.clone().add_child(&child);
 
-        app.update().await;
+        // Wait for entities to be created (double-buffered pipeline)
+        app.updates(2).await;
 
         let entity = app
             .entity_for_node(child.instance_id())
@@ -246,9 +218,7 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
         });
 
         child.reparent(&parent2);
-
-        app.update().await;
-        app.update().await;
+        app.updates(2).await;
 
         let entity_exists = app.with_world(|world| world.get_entity(entity).is_ok());
 
@@ -275,10 +245,9 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
             );
         }
 
-        app.cleanup();
+        app.cleanup().await;
         parent1.queue_free();
         parent2.queue_free();
-        await_frames(1).await;
     })
 }
 
@@ -298,16 +267,15 @@ fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHand
         child.set_name("RemoveChildTest");
         parent.clone().add_child(&child);
 
-        app.update().await;
+        // Wait for entities to be created (double-buffered pipeline)
+        app.updates(2).await;
 
         let entity = app
             .entity_for_node(child.instance_id())
             .expect("Child entity should exist");
 
         parent.remove_child(&child);
-
-        app.update().await;
-        app.update().await;
+        app.updates(2).await;
 
         let entity_exists = app.with_world(|world| world.get_entity(entity).is_ok());
 
@@ -316,9 +284,8 @@ fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHand
             "Entity should be despawned after remove_child()"
         );
 
-        app.cleanup();
+        app.cleanup().await;
         parent.queue_free();
-        await_frames(1).await;
     })
 }
 
@@ -328,11 +295,7 @@ fn test_node_entity_index_populated_on_add(ctx: &TestContext) -> godot::task::Ta
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
-
-        app.update().await;
 
         let (mut node, entity) = app
             .add_node::<godot::classes::Node2D>("IndexTestNode")
@@ -353,9 +316,8 @@ fn test_node_entity_index_populated_on_add(ctx: &TestContext) -> godot::task::Ta
             "NodeEntityIndex should map to correct entity"
         );
 
-        app.cleanup();
+        app.cleanup().await;
         node.queue_free();
-        await_frames(1).await;
     })
 }
 
@@ -365,11 +327,7 @@ fn test_node_entity_index_updated_on_remove(ctx: &TestContext) -> godot::task::T
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
-
-        app.update().await;
 
         let (mut node, _entity) = app
             .add_node::<godot::classes::Node2D>("IndexRemovalTestNode")
@@ -383,16 +341,13 @@ fn test_node_entity_index_updated_on_remove(ctx: &TestContext) -> godot::task::T
         );
 
         node.queue_free();
-
-        app.update().await;
-        app.update().await;
+        app.updates(2).await;
 
         assert!(
             !app.has_entity_for_node(node_id),
             "NodeEntityIndex should remove entry when node is freed"
         );
 
-        app.cleanup();
-        await_frames(1).await;
+        app.cleanup().await;
     })
 }

@@ -48,14 +48,10 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         let mut app = TestApp::new(&ctx_clone, |app| {
             app.add_plugins(GodotCollisionsPlugin);
         })
         .await;
-
-        app.update().await;
 
         let (mut area_a, entity_a) = app.add_node::<godot::classes::Area2D>("CollisionA").await;
         let (mut area_b, entity_b) = app.add_node::<godot::classes::Area2D>("CollisionB").await;
@@ -70,7 +66,7 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
             "Started",
         );
 
-        await_frames(2).await;
+        app.updates(2).await;
 
         let (contains, colliding_with_a) = app.with_world_mut(|world| {
             let mut system_state: bevy::ecs::system::SystemState<Collisions> =
@@ -97,7 +93,7 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
             "Ended",
         );
 
-        await_frames(2).await;
+        app.updates(2).await;
 
         let still_contains = app.with_world_mut(|world| {
             let mut system_state: bevy::ecs::system::SystemState<Collisions> =
@@ -111,10 +107,9 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
             "Collision pair should be removed after Ended event"
         );
 
-        app.cleanup();
+        app.cleanup().await;
         area_a.queue_free();
         area_b.queue_free();
-        await_frames(1).await;
     })
 }
 
@@ -124,8 +119,6 @@ fn test_collision_started_observer_from_system(ctx: &TestContext) -> godot::task
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         #[derive(Resource, Default)]
         struct CollisionCount(u32);
 
@@ -140,8 +133,6 @@ fn test_collision_started_observer_from_system(ctx: &TestContext) -> godot::task
         })
         .await;
 
-        app.update().await;
-
         let (mut area_a, _entity_a) = app.add_node::<godot::classes::Area2D>("ObsStartA").await;
         let (mut area_b, _entity_b) = app.add_node::<godot::classes::Area2D>("ObsStartB").await;
 
@@ -155,7 +146,7 @@ fn test_collision_started_observer_from_system(ctx: &TestContext) -> godot::task
             "Started",
         );
 
-        await_frames(2).await;
+        app.updates(2).await;
 
         let count = app.with_world(|world| world.resource::<CollisionCount>().0);
 
@@ -164,10 +155,9 @@ fn test_collision_started_observer_from_system(ctx: &TestContext) -> godot::task
             "CollisionStarted observer should fire once from system pipeline"
         );
 
-        app.cleanup();
+        app.cleanup().await;
         area_a.queue_free();
         area_b.queue_free();
-        await_frames(1).await;
     })
 }
 
@@ -177,8 +167,6 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         #[derive(Resource, Default)]
         struct EndedCount(u32);
 
@@ -193,8 +181,6 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
         })
         .await;
 
-        app.update().await;
-
         let (mut area_a, _entity_a) = app.add_node::<godot::classes::Area2D>("ObsEndA").await;
         let (mut area_b, _entity_b) = app.add_node::<godot::classes::Area2D>("ObsEndB").await;
 
@@ -208,7 +194,7 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
             "Started",
         );
 
-        await_frames(2).await;
+        app.updates(2).await;
 
         send_collision_event(
             &mut watcher,
@@ -217,7 +203,7 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
             "Ended",
         );
 
-        await_frames(2).await;
+        app.updates(2).await;
 
         let count = app.with_world(|world| world.resource::<EndedCount>().0);
 
@@ -226,9 +212,8 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
             "CollisionEnded observer should fire once from system pipeline"
         );
 
-        app.cleanup();
+        app.cleanup().await;
         area_a.queue_free();
         area_b.queue_free();
-        await_frames(1).await;
     })
 }

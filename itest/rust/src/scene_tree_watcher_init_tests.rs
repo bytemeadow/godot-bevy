@@ -44,8 +44,6 @@ fn test_single_optimized_scene_tree_watcher(ctx: &TestContext) -> godot::task::T
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
 
         let bevy_app_node = find_bevy_app_node(&ctx_clone.scene_tree)
@@ -61,8 +59,7 @@ fn test_single_optimized_scene_tree_watcher(ctx: &TestContext) -> godot::task::T
 
         println!("✓ Single OptimizedSceneTreeWatcher: no duplicates");
 
-        app.cleanup();
-        await_frames(1).await;
+        app.cleanup().await;
     })
 }
 
@@ -73,8 +70,6 @@ fn test_optimized_watcher_rust_watcher_connected(ctx: &TestContext) -> godot::ta
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
 
         let bevy_app_node = find_bevy_app_node(&ctx_clone.scene_tree)
@@ -96,7 +91,6 @@ fn test_optimized_watcher_rust_watcher_connected(ctx: &TestContext) -> godot::ta
 
         println!("✓ OptimizedSceneTreeWatcher.rust_watcher is connected");
 
-        app.cleanup();
-        await_frames(1).await;
+        app.cleanup().await;
     })
 }

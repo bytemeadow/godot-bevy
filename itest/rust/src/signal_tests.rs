@@ -25,8 +25,6 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         #[derive(Resource, Default)]
         struct SignalReceived(bool);
 
@@ -42,13 +40,9 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
         })
         .await;
 
-        app.update().await;
-
         let (mut button, _entity) = app.add_node::<godot::classes::Button>("TestButton").await;
 
         let button_id = button.instance_id();
-
-        app.update().await;
 
         app.with_world_mut(|world| {
             let handle = world
@@ -74,10 +68,12 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
             system_state.apply(world);
         });
 
+        // One frame for pending connections to be processed (Last schedule)
         app.update().await;
 
         button.emit_signal("pressed", &[]);
 
+        // One frame for drain_and_trigger_signals (First schedule)
         app.update().await;
 
         let was_received = app.with_world(|world| world.resource::<SignalReceived>().0);
@@ -87,9 +83,8 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
             "Signal should be received after connect (connection applied same-frame)"
         );
 
-        app.cleanup();
+        app.cleanup().await;
         button.queue_free();
-        await_frames(1).await;
     })
 }
 
@@ -103,8 +98,6 @@ fn test_connect_object_signal(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         #[derive(Resource, Default)]
         struct SignalReceived(bool);
 
@@ -131,12 +124,14 @@ fn test_connect_object_signal(ctx: &TestContext) -> godot::task::TaskHandle {
             system_state.apply(world);
         });
 
+        // One frame for pending connections to be processed
         app.update().await;
 
         let mut trigger_node = godot::classes::Node::new_alloc();
         trigger_node.set_name("ConnectObjectTrigger");
         ctx_clone.scene_tree.clone().add_child(&trigger_node);
 
+        // One frame for signal to be drained and triggered
         app.update().await;
 
         let was_received = app.with_world(|world| world.resource::<SignalReceived>().0);
@@ -146,9 +141,8 @@ fn test_connect_object_signal(ctx: &TestContext) -> godot::task::TaskHandle {
             "connect_object should receive signals from non-entity Godot objects"
         );
 
-        app.cleanup();
+        app.cleanup().await;
         trigger_node.queue_free();
-        await_frames(1).await;
     })
 }
 
@@ -158,8 +152,6 @@ fn test_multiple_signal_connections(ctx: &TestContext) -> godot::task::TaskHandl
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         #[derive(Resource, Default)]
         struct SignalCounts {
             button1: i32,
@@ -183,15 +175,11 @@ fn test_multiple_signal_connections(ctx: &TestContext) -> godot::task::TaskHandl
         })
         .await;
 
-        app.update().await;
-
         let (mut button1, _) = app.add_node::<godot::classes::Button>("Button1").await;
         let (mut button2, _) = app.add_node::<godot::classes::Button>("Button2").await;
 
         let button1_id = button1.instance_id();
         let button2_id = button2.instance_id();
-
-        app.update().await;
 
         app.with_world_mut(|world| {
             let index = world.resource::<NodeEntityIndex>();
@@ -225,12 +213,14 @@ fn test_multiple_signal_connections(ctx: &TestContext) -> godot::task::TaskHandl
             system_state.apply(world);
         });
 
+        // One frame for pending connections to be processed
         app.update().await;
 
         button1.emit_signal("pressed", &[]);
         button2.emit_signal("pressed", &[]);
         button1.emit_signal("pressed", &[]);
 
+        // One frame for signals to be drained and triggered
         app.update().await;
 
         let counts = app.with_world(|world| {
@@ -241,10 +231,9 @@ fn test_multiple_signal_connections(ctx: &TestContext) -> godot::task::TaskHandl
         assert_eq!(counts.0, 2, "Button1 should have received 2 signals");
         assert_eq!(counts.1, 1, "Button2 should have received 1 signal");
 
-        app.cleanup();
+        app.cleanup().await;
         button1.queue_free();
         button2.queue_free();
-        await_frames(1).await;
     })
 }
 
@@ -254,8 +243,6 @@ fn test_signal_connection_via_system(ctx: &TestContext) -> godot::task::TaskHand
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
-        await_frames(1).await;
-
         #[derive(Resource, Default)]
         struct SignalReceived(bool);
 
@@ -299,14 +286,16 @@ fn test_signal_connection_via_system(ctx: &TestContext) -> godot::task::TaskHand
         })
         .await;
 
-        app.update().await;
-        app.update().await;
+        // Two frames: one for the system to find the handle and queue the
+        // connection, one for process_pending_signal_connections (Last) to apply it
+        app.updates(2).await;
 
         let connection_made = app.with_world(|world| world.resource::<ConnectionMade>().0);
         assert!(connection_made, "Signal connection should have been made");
 
         button.emit_signal("pressed", &[]);
 
+        // One frame for drain_and_trigger_signals
         app.update().await;
 
         let was_received = app.with_world(|world| world.resource::<SignalReceived>().0);
@@ -316,8 +305,7 @@ fn test_signal_connection_via_system(ctx: &TestContext) -> godot::task::TaskHand
             "Signal should work when connection is made via system"
         );
 
-        app.cleanup();
+        app.cleanup().await;
         button.queue_free();
-        await_frames(1).await;
     })
 }

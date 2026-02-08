@@ -5,6 +5,16 @@
 //! - app.update().await for frame stepping (async because we wait for Godot)
 //! - Automatic cleanup on drop
 //! - Relies on library's automatic watcher setup
+//!
+//! # Frame pacing
+//!
+//! The only way to advance time in tests is through `app.update()` (one frame)
+//! or `app.updates(n)` (multiple frames). Both wait for real Godot frames, during
+//! which BevyApp::process() runs and triggers all Bevy schedules.
+//!
+//! `TestApp::new()` returns a fully-settled app: the scene tree has been initialized
+//! and the initial population of entities is complete. Tests should NOT need any
+//! manual `await_frames()` calls.
 
 use bevy::prelude::*;
 use godot::obj::{Gd, NewAlloc};
@@ -13,7 +23,8 @@ use crate::{TestContext, await_frame};
 
 /// A test app that provides Bevy-style API while running in Godot runtime
 ///
-/// Example:
+/// # Example
+///
 /// ```ignore
 /// let mut app = TestApp::new(ctx, |app| {
 ///     app.add_plugins(GodotTransformSyncPlugin);
@@ -29,6 +40,8 @@ use crate::{TestContext, await_frame};
 ///     world.get::<Transform>(entity).unwrap().translation.x
 /// });
 /// assert_eq!(translation_x, 0.0);
+///
+/// app.cleanup().await;
 /// ```
 pub struct TestApp {
     ctx: TestContext,
@@ -36,7 +49,11 @@ pub struct TestApp {
 }
 
 impl TestApp {
-    /// Create a new test app with custom setup
+    /// Create a new test app with custom setup.
+    ///
+    /// Returns a fully-settled app: the BevyApp is added to the scene tree,
+    /// `ready()` has fired, and two frames have elapsed so that the initial
+    /// scene tree population is complete (messages written, swapped, and read).
     ///
     /// The setup function is called during BevyApp initialization.
     /// GodotCorePlugins is automatically added, providing scene tree integration.
@@ -69,18 +86,32 @@ impl TestApp {
         // Wait for ready() to complete
         await_frame().await;
 
+        // Run one more frame so the initial scene tree population settles
+        // (write_scene_tree_messages → message_update_system swap → read_scene_tree_messages)
+        await_frame().await;
+
         Self {
             ctx: ctx.clone(),
             bevy_app: Some(bevy_app),
         }
     }
 
-    /// Step one frame
+    /// Advance one Godot frame.
     ///
     /// This waits for Godot to advance one frame, during which Godot will call
     /// BevyApp::process(), which internally calls app.update().
+    /// This is the primary way to advance time in tests.
     pub async fn update(&self) {
         await_frame().await;
+    }
+
+    /// Advance multiple Godot frames.
+    ///
+    /// Convenience for calling `update()` N times.
+    pub async fn updates(&self, count: u32) {
+        for _ in 0..count {
+            self.update().await;
+        }
     }
 
     /// Get immutable access to the Bevy World
@@ -149,13 +180,13 @@ impl TestApp {
         })
     }
 
-    /// Add a new Godot node to the scene tree and return it with its entity
+    /// Add a new Godot node to the scene tree and return it with its entity.
     ///
     /// Creates a node, sets its name, adds it to the scene tree, and waits
     /// for entity creation. Due to the double-buffered message pipeline
     /// (crossbeam → MessageWriter → message_update_system swap → MessageReader),
     /// entity creation may take up to 2 frames. This method waits up to 3
-    /// frames to account for scheduler ordering variations in CI.
+    /// frames to account for scheduler ordering variations.
     pub async fn add_node<T>(&mut self, name: &str) -> (Gd<T>, Entity)
     where
         T: godot::obj::Inherits<godot::classes::Node> + NewAlloc + godot::obj::GodotClass,
@@ -167,11 +198,6 @@ impl TestApp {
             .clone()
             .add_child(&node.clone().upcast::<godot::classes::Node>());
 
-        // The scene tree message pipeline is double-buffered:
-        //   Frame 1: write_scene_tree_messages drains channel → MessageWriter
-        //   (buffer swap via message_update_system)
-        //   Frame 2: read_scene_tree_messages reads MessageReader → entity created
-        // Wait up to 3 frames to handle scheduler ordering variations.
         for i in 0..3 {
             self.update().await;
             if let Some(entity) = self.entity_for_node(node.instance_id()) {
@@ -194,21 +220,27 @@ impl TestApp {
         &self.ctx
     }
 
-    /// Manually cleanup the TestApp
+    /// Clean up the TestApp, freeing the BevyApp node.
     ///
     /// This should be called BEFORE calling queue_free() on any Godot nodes
     /// that have entities in the ECS. This prevents transform sync systems
     /// from trying to access freed nodes.
-    pub fn cleanup(&mut self) {
+    ///
+    /// Waits one frame for Godot to process the queue_free.
+    pub async fn cleanup(&mut self) {
         if let Some(mut app) = self.bevy_app.take() {
             app.queue_free();
         }
+        await_frame().await;
     }
 }
 
 impl Drop for TestApp {
     fn drop(&mut self) {
-        // Cleanup if not already done
-        self.cleanup();
+        // Synchronous fallback if cleanup() wasn't called.
+        // Prefer calling cleanup().await explicitly.
+        if let Some(mut app) = self.bevy_app.take() {
+            app.queue_free();
+        }
     }
 }
