@@ -151,8 +151,11 @@ impl TestApp {
 
     /// Add a new Godot node to the scene tree and return it with its entity
     ///
-    /// Creates a node, sets its name, adds it to the scene tree, waits one
-    /// frame for entity creation, and returns both the node and its entity.
+    /// Creates a node, sets its name, adds it to the scene tree, and waits
+    /// for entity creation. Due to the double-buffered message pipeline
+    /// (crossbeam → MessageWriter → message_update_system swap → MessageReader),
+    /// entity creation may take up to 2 frames. This method waits up to 3
+    /// frames to account for scheduler ordering variations in CI.
     pub async fn add_node<T>(&mut self, name: &str) -> (Gd<T>, Entity)
     where
         T: godot::obj::Inherits<godot::classes::Node> + NewAlloc + godot::obj::GodotClass,
@@ -163,11 +166,27 @@ impl TestApp {
             .scene_tree
             .clone()
             .add_child(&node.clone().upcast::<godot::classes::Node>());
-        self.update().await;
-        let entity = self
-            .entity_for_node(node.instance_id())
-            .unwrap_or_else(|| panic!("Entity should exist for node '{name}' after update"));
-        (node, entity)
+
+        // The scene tree message pipeline is double-buffered:
+        //   Frame 1: write_scene_tree_messages drains channel → MessageWriter
+        //   (buffer swap via message_update_system)
+        //   Frame 2: read_scene_tree_messages reads MessageReader → entity created
+        // Wait up to 3 frames to handle scheduler ordering variations.
+        for i in 0..3 {
+            self.update().await;
+            if let Some(entity) = self.entity_for_node(node.instance_id()) {
+                return (node, entity);
+            }
+            if i < 2 {
+                godot::global::godot_print!(
+                    "Entity not yet created for node '{}' after {} frame(s), waiting another frame",
+                    name,
+                    i + 1,
+                );
+            }
+        }
+
+        panic!("Entity should exist for node '{name}' after 3 frames");
     }
 
     /// Get the test context
