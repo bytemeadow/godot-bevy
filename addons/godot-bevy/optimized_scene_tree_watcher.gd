@@ -30,7 +30,7 @@ func _ready():
     # 3. Use set_rust_watcher() if watcher is set externally
 
     # Strategy 1: Production - BevyApp autoload singleton
-    var bevy_app = get_node_or_null("/root/BevyAppSingleton")
+    var bevy_app: Node = get_node_or_null("/root/BevyAppSingleton")
     if bevy_app:
         rust_watcher = bevy_app.get_node_or_null("SceneTreeWatcher")
 
@@ -72,11 +72,11 @@ func _on_node_added(node: Node):
     var node_name: StringName = node.name
     var parent: Node = node.get_parent()
     var parent_id: int = parent.get_instance_id() if parent else 0
-    var collision_mask = _compute_collision_mask(node)
+    var collision_mask: int = _compute_collision_mask(node)
 
     # Collect groups for this node
-    var node_groups = PackedStringArray()
-    for group in node.get_groups():
+    var node_groups: PackedStringArray = PackedStringArray()
+    for group: StringName in node.get_groups():
         node_groups.append(group)
 
     # Forward to Rust watcher with pre-analyzed metadata
@@ -124,14 +124,14 @@ func _on_node_renamed(node: Node):
     if not is_instance_valid(node):
         return
 
-    var node_name = node.name
+    var node_name: StringName = node.name
     if rust_watcher.has_method("scene_tree_event_named"):
         rust_watcher.scene_tree_event_named(node, "NodeRenamed", node_name)
     else:
         rust_watcher.scene_tree_event(node, "NodeRenamed")
 
 func _compute_collision_mask(node: Node) -> int:
-    var mask = 0
+    var mask: int = 0
     if node.has_signal("body_entered"):
         mask |= 1
     if node.has_signal("body_exited"):
@@ -157,13 +157,13 @@ func analyze_initial_tree() -> Dictionary:
     }
     Used for optimized initial scene tree setup.
     """
-    var instance_ids = PackedInt64Array()
-    var node_types = PackedStringArray()
-    var node_names = PackedStringArray()
-    var parent_ids = PackedInt64Array()
-    var collision_masks = PackedInt64Array()
-    var groups = []  # Array of PackedStringArrays
-    var root = get_tree().get_root()
+    var instance_ids: PackedInt64Array = PackedInt64Array()
+    var node_types: PackedStringArray = PackedStringArray()
+    var node_names: PackedStringArray = PackedStringArray()
+    var parent_ids: PackedInt64Array = PackedInt64Array()
+    var collision_masks: PackedInt64Array = PackedInt64Array()
+    var groups: Array = []  # Array of PackedStringArrays
+    var root: Window = get_tree().get_root()
     if root:
         _analyze_node_recursive(root, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)
 
@@ -204,8 +204,8 @@ func _analyze_node_recursive(
     var collision_mask: int = _compute_collision_mask(node)
 
     # Collect groups for this node
-    var node_groups = PackedStringArray()
-    for group in node.get_groups():
+    var node_groups: PackedStringArray = PackedStringArray()
+    for group: StringName in node.get_groups():
         node_groups.append(group)
 
     # Only append if we have valid data
@@ -218,5 +218,5 @@ func _analyze_node_recursive(
         groups.append(node_groups)
 
     # Recursively process children
-    for child in node.get_children():
+    for child: Node in node.get_children():
         _analyze_node_recursive(child, instance_ids, node_types, node_names, parent_ids, collision_masks, groups)
