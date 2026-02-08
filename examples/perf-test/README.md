@@ -1,6 +1,6 @@
-# Particle Rain Performance Benchmark
+# Transform Sync Performance Benchmark
 
-This example demonstrates the performance characteristics of **godot-bevy** (Rust + ECS) compared to pure Godot (GDScript) for simple entity management and transform synchronization tasks.
+This example benchmarks the overhead of **godot-bevy** transform synchronization at scale, comparing Rust + ECS to pure Godot (GDScript) with tens of thousands of entities.
 
 ## What This Benchmark Tests
 
@@ -92,7 +92,7 @@ Unlike complex algorithms (like boids), this test isolates the **pure overhead**
 
 ## Implementation Details
 
-### Godot Implementation (`scripts/godot_boids.gd`)
+### Godot Implementation (`scripts/godot_particles.gd`)
 - Uses `Node2D` instances with direct position updates
 - Arrays store positions and velocities for cache efficiency  
 - Simple physics loop with immediate visual updates

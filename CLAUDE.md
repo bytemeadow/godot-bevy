@@ -29,8 +29,6 @@ cargo build --release
 # Build a specific example (replace {example} with project name)
 cargo build --release --manifest-path examples/{example}/rust/Cargo.toml
 
-# Build performance test with validation
-./examples/boids-perf-test/build.sh
 ```
 
 ## Architecture Overview

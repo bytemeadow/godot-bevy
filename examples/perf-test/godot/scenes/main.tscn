@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3 uid="uid://c7q8xvbgkktxh"]
 
 [ext_resource type="Script" uid="uid://cy8hdccl6jgw3" path="res://scripts/main.gd" id="1_0x8vg"]
-[ext_resource type="Script" uid="uid://dr1wry58o81eo" path="res://scripts/godot_boids.gd" id="3_4x8vg"]
+[ext_resource type="Script" uid="uid://dr1wry58o81eo" path="res://scripts/godot_particles.gd" id="3_4x8vg"]
 
 [node name="Main" type="Control"]
 layout_mode = 3

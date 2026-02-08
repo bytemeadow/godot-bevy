@@ -40,8 +40,8 @@ trace_tracy = ["dep:tracing-tracy", "godot-bevy/trace_tracy"]
   _much_ faster than a dev build.
 - Run your game, you should see real time data streaming into the Tracy
   profiler GUI.
-- For a complete example of this in action, see our [Bevy Boids
-  example](https://github.com/bytemeadow/godot-bevy/tree/main/examples/boids-perf-test)
+- For a complete example of this in action, see our [perf-test
+  example](https://github.com/bytemeadow/godot-bevy/tree/main/examples/perf-test)
 
 ## Notes
 
