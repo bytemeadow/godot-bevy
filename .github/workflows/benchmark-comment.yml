@@ -6,8 +6,9 @@ on:
     types: [completed]
 
 permissions:
-  actions: read   # download artifacts from benchmarks workflow
-  issues: write  # create/update PR comments (PRs are issues)
+  actions: read
+  issues: write
+  pull-requests: write
 
 jobs:
   comment:
