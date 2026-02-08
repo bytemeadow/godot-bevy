@@ -481,7 +481,12 @@ const FMT_YELLOW: &str = "\x1b[33m";
 const FMT_RED: &str = "\x1b[31m";
 const FMT_END: &str = "\x1b[0m";
 
-/// Helper function to wait for the next Godot process frame
+/// Helper function to wait for the next Godot process frame.
+///
+/// The `process_frame` signal fires after all `_physics_process()` calls
+/// but before `_process()` calls for that frame. When this resolves,
+/// any PrePhysicsUpdate/PhysicsUpdate schedules have run, but the visual
+/// schedules (First, Update, Last, etc.) have not yet run for this frame.
 pub async fn await_frame() {
     let tree = Engine::singleton()
         .get_main_loop()
@@ -489,6 +494,21 @@ pub async fn await_frame() {
         .cast::<godot::classes::SceneTree>();
 
     let signal = Signal::from_object_signal(&tree, "process_frame");
+    let _: () = signal.to_future().await;
+}
+
+/// Helper function to wait for the next Godot physics frame.
+///
+/// Waits for the `physics_frame` signal, which fires immediately before
+/// `_physics_process()` runs. Use this when you need to guarantee that
+/// a physics tick has occurred (e.g., collision processing).
+pub async fn await_physics_frame() {
+    let tree = Engine::singleton()
+        .get_main_loop()
+        .expect("Main loop should exist")
+        .cast::<godot::classes::SceneTree>();
+
+    let signal = Signal::from_object_signal(&tree, "physics_frame");
     let _: () = signal.to_future().await;
 }
 

@@ -3,7 +3,7 @@ extends Node2D
 ## Pure Godot particle rain implementation for performance comparison
 ## This uses GDScript and Godot's built-in systems for particle simulation
 
-class_name GodotBoids
+class_name GodotParticles
 
 # Simulation parameters
 var world_bounds: Vector2 = Vector2(1920, 1080)
@@ -68,13 +68,6 @@ func set_target_particle_count(count: int):
 
 func get_particle_count() -> int:
 	return particle_nodes.size()
-
-# Compatibility methods for legacy interface
-func get_boid_count() -> int:
-	return get_particle_count()
-
-func set_target_boid_count(count: int):
-	set_target_particle_count(count)
 
 func _update_particle_count():
 	var current_count = particle_nodes.size()
@@ -161,7 +154,7 @@ func _update_particle_physics(particle_index: int, delta: float):
 	if position.y > world_bounds.y + 50.0:
 		position.x = randf() * world_bounds.x  # Random x position
 		position.y = -50.0  # Above the screen
-		
+
 		# Reset velocity for variety
 		var fall_speed = min_speed + randf() * (max_speed - min_speed)
 		var horizontal_speed = (randf() - 0.5) * horizontal_drift

@@ -112,18 +112,15 @@ This provides significant performance benefits:
 - **`godot_to_bevy` only**: Skips writing to Godot, useful for reading physics results
 - **Both directions** (no prefix): Full synchronization when needed
 
-### Real Example: Boids Performance Optimization
+### Real Example: High-Volume Transform Sync
 
-From the boids performance test example:
+From the [perf-test](https://github.com/bytemeadow/godot-bevy/tree/main/examples/perf-test) example, which benchmarks transform sync with tens of thousands of entities:
 
 ```rust
 use godot_bevy::{add_transform_sync_systems, prelude::*};
 
 #[derive(Component)]
-struct Boid {
-    velocity: Vec2,
-    // ... other fields
-}
+struct Particle;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
@@ -133,11 +130,11 @@ fn build_app(app: &mut App) {
             .without_auto_sync()
     );
 
-    // Add custom transform sync systems for Boid entities only
-    // Only sync Bevy -> Godot since boids are driven by ECS movement systems
+    // Add custom transform sync systems for Particle entities only
+    // Only sync Bevy -> Godot since particles are driven by ECS movement systems
     add_transform_sync_systems! {
         app,
-        Boid = bevy_to_godot: With<Boid>
+        Particle = bevy_to_godot: With<Particle>
     }
 
     // ... movement systems, etc.

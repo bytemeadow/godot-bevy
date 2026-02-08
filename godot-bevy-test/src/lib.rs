@@ -70,7 +70,7 @@ pub use runner::__GODOT_ITEST;
 
 // Re-export core types
 pub use runner::{AsyncRustTestCase, RustBenchmark, RustTestCase, TestRunnerImpl};
-pub use runner::{await_frame, await_frames};
+pub use runner::{await_frame, await_frames, await_physics_frame};
 pub use test_app::TestApp;
 pub use test_helpers::Counter;
 
@@ -88,7 +88,6 @@ pub struct TestContext {
 
 /// Prelude for convenient imports
 pub mod prelude {
-    pub use crate::bevy_app_test;
     pub use crate::test_app::TestApp;
     pub use crate::test_helpers::Counter;
     pub use crate::{TestContext, await_frame, await_frames, bench, itest};

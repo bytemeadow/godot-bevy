@@ -12,10 +12,8 @@ use crate::particle_rain::ParticleRainPlugin;
 mod container;
 mod particle_rain;
 
-/// Performance benchmark comparing pure Godot vs godot-bevy implementations
-///
-/// This benchmark demonstrates the performance characteristics of different
-/// implementations for simple entity management and transform updates.
+/// Transform sync performance benchmark comparing pure Godot vs godot-bevy
+/// with tens of thousands of entities requiring position updates each frame.
 
 #[bevy_app]
 fn build_app(app: &mut App) {

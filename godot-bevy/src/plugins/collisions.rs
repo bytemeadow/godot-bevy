@@ -453,7 +453,7 @@ fn process_godot_collisions(
     }
 }
 
-/// System that triggers observers for collision events
+/// System that triggers observers for collision events.
 fn trigger_collision_observers(
     mut commands: Commands,
     mut started_reader: MessageReader<CollisionStarted>,
