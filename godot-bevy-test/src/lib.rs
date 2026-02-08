@@ -70,7 +70,7 @@ pub use runner::__GODOT_ITEST;
 
 // Re-export core types
 pub use runner::{AsyncRustTestCase, RustBenchmark, RustTestCase, TestRunnerImpl};
-pub use runner::{await_frame, await_frames};
+pub use runner::{await_frame, await_frames, await_physics_frame};
 pub use test_app::TestApp;
 pub use test_helpers::Counter;
 

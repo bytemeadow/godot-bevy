@@ -1,11 +1,18 @@
 /*
  * Collision system integration tests
  *
- * Tests the full collision pipeline:
+ * Tests the full collision pipeline through real Godot frames:
  * - CollisionWatcher receives collision events via channel
- * - process_godot_collisions system updates CollisionState
- * - trigger_collision_observers system fires observers
+ * - Godot calls _physics_process() → PrePhysicsUpdate runs
+ * - process_godot_collisions drains channel → updates CollisionState
+ * - trigger_collision_observers reads CollisionState → fires observers
  * - Collisions SystemParam provides query access
+ *
+ * Frame strategy: Collision processing runs in PrePhysicsUpdate, which only
+ * executes during Godot's _physics_process(). Since a render frame can have
+ * 0 physics ticks, we use app.physics_update() which waits for the
+ * physics_frame signal (guaranteeing a tick will run) then process_frame
+ * (guaranteeing both _physics_process and _process have completed).
  */
 
 use bevy::prelude::*;
@@ -59,6 +66,7 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
         let mut watcher = find_collision_watcher(&ctx_clone.scene_tree)
             .expect("CollisionWatcher should exist when GodotCollisionsPlugin is added");
 
+        // Send Started event
         send_collision_event(
             &mut watcher,
             &area_b.clone().upcast(),
@@ -66,7 +74,9 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
             "Started",
         );
 
-        app.updates(2).await;
+        // Wait for a physics tick + render frame so PrePhysicsUpdate drains
+        // the channel and updates CollisionState.
+        app.physics_update().await;
 
         let (contains, colliding_with_a) = app.with_world_mut(|world| {
             let mut system_state: bevy::ecs::system::SystemState<Collisions> =
@@ -86,6 +96,7 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
             "colliding_with should return entity_b for entity_a"
         );
 
+        // Send Ended event
         send_collision_event(
             &mut watcher,
             &area_b.clone().upcast(),
@@ -93,7 +104,7 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
             "Ended",
         );
 
-        app.updates(2).await;
+        app.physics_update().await;
 
         let still_contains = app.with_world_mut(|world| {
             let mut system_state: bevy::ecs::system::SystemState<Collisions> =
@@ -146,7 +157,9 @@ fn test_collision_started_observer_from_system(ctx: &TestContext) -> godot::task
             "Started",
         );
 
-        app.updates(2).await;
+        // physics_update() guarantees a physics tick runs, which processes
+        // the collision and triggers the observer in the same PrePhysicsUpdate.
+        app.physics_update().await;
 
         let count = app.with_world(|world| world.resource::<CollisionCount>().0);
 
@@ -187,6 +200,7 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
         let mut watcher =
             find_collision_watcher(&ctx_clone.scene_tree).expect("CollisionWatcher should exist");
 
+        // First: Start collision
         send_collision_event(
             &mut watcher,
             &area_b.clone().upcast(),
@@ -194,8 +208,9 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
             "Started",
         );
 
-        app.updates(2).await;
+        app.physics_update().await;
 
+        // Then: End collision
         send_collision_event(
             &mut watcher,
             &area_b.clone().upcast(),
@@ -203,7 +218,7 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
             "Ended",
         );
 
-        app.updates(2).await;
+        app.physics_update().await;
 
         let count = app.with_world(|world| world.resource::<EndedCount>().0);
 

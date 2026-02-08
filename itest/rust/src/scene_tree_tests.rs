@@ -60,6 +60,8 @@ fn test_node_removed_cleanup(ctx: &TestContext) -> godot::task::TaskHandle {
         );
 
         node.queue_free();
+        // Wait for removal to process (crash-freedom check only;
+        // test_node_entity_index_updated_on_remove verifies actual removal).
         app.update().await;
 
         app.cleanup().await;
@@ -79,7 +81,8 @@ fn test_node_renamed_event(ctx: &TestContext) -> godot::task::TaskHandle {
         let node_id = node.instance_id();
 
         node.set_name("RenamedNode");
-        app.update().await;
+        // Wait for rename to propagate to ECS
+        app.updates(2).await;
 
         assert!(
             app.has_entity_for_node(node_id),
@@ -110,6 +113,7 @@ fn test_protected_node_entity(ctx: &TestContext) -> godot::task::TaskHandle {
         });
 
         node.queue_free();
+        // Wait for removal to propagate to ECS
         app.updates(2).await;
 
         let entity_still_exists = app.with_world(|world| world.get_entity(entity).is_ok());
@@ -203,7 +207,7 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
         child.set_name("Child");
         parent1.clone().add_child(&child);
 
-        // Wait for entities to be created (double-buffered pipeline)
+        // Wait for entities to be created
         app.updates(2).await;
 
         let entity = app
@@ -218,6 +222,7 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
         });
 
         child.reparent(&parent2);
+        // Wait for reparent to propagate to ECS
         app.updates(2).await;
 
         let entity_exists = app.with_world(|world| world.get_entity(entity).is_ok());
@@ -267,7 +272,7 @@ fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHand
         child.set_name("RemoveChildTest");
         parent.clone().add_child(&child);
 
-        // Wait for entities to be created (double-buffered pipeline)
+        // Wait for entities to be created
         app.updates(2).await;
 
         let entity = app
@@ -275,6 +280,7 @@ fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHand
             .expect("Child entity should exist");
 
         parent.remove_child(&child);
+        // Wait for removal to propagate to ECS
         app.updates(2).await;
 
         let entity_exists = app.with_world(|world| world.get_entity(entity).is_ok());
@@ -341,6 +347,7 @@ fn test_node_entity_index_updated_on_remove(ctx: &TestContext) -> godot::task::T
         );
 
         node.queue_free();
+        // Wait for removal to propagate to ECS
         app.updates(2).await;
 
         assert!(

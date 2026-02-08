@@ -86,8 +86,7 @@ impl TestApp {
         // Wait for ready() to complete
         await_frame().await;
 
-        // Run one more frame so the initial scene tree population settles
-        // (write_scene_tree_messages → message_update_system swap → read_scene_tree_messages)
+        // Run one more frame so initial scene tree entities are created
         await_frame().await;
 
         Self {
@@ -112,6 +111,19 @@ impl TestApp {
         for _ in 0..count {
             self.update().await;
         }
+    }
+
+    /// Advance time until a physics tick and a render frame have both completed.
+    ///
+    /// Godot's main loop can run 0 physics ticks in a given render frame if
+    /// insufficient time has accumulated. This method waits for the
+    /// `physics_frame` signal (guaranteeing a physics tick is about to run),
+    /// then waits for `process_frame` (guaranteeing both `_physics_process()`
+    /// and `_process()` have completed). Use this when testing systems that
+    /// run in `PrePhysicsUpdate` or `PhysicsUpdate`, such as collisions.
+    pub async fn physics_update(&self) {
+        crate::await_physics_frame().await;
+        await_frame().await;
     }
 
     /// Get immutable access to the Bevy World
@@ -183,10 +195,8 @@ impl TestApp {
     /// Add a new Godot node to the scene tree and return it with its entity.
     ///
     /// Creates a node, sets its name, adds it to the scene tree, and waits
-    /// for entity creation. Due to the double-buffered message pipeline
-    /// (crossbeam → MessageWriter → message_update_system swap → MessageReader),
-    /// entity creation may take up to 2 frames. This method waits up to 3
-    /// frames to account for scheduler ordering variations.
+    /// for entity creation. Entity creation may take up to 2 frames, so this
+    /// method retries for up to 3 frames before panicking.
     pub async fn add_node<T>(&mut self, name: &str) -> (Gd<T>, Entity)
     where
         T: godot::obj::Inherits<godot::classes::Node> + NewAlloc + godot::obj::GodotClass,

@@ -49,8 +49,8 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         })
         .await;
 
-        // Run a few frames for the system to set transforms and sync to kick in
-        app.updates(4).await;
+        // Wait for Bevy transform to sync to Godot node
+        app.update().await;
 
         let pos = node.get_position();
         let rot = node.get_rotation();
@@ -107,8 +107,8 @@ fn test_godot_to_bevy_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         // Move the Godot node (should sync to Bevy in TwoWay mode)
         node.set_position(Vector2::new(10.0, 0.0));
 
-        // Two frames for sync to propagate
-        app.updates(2).await;
+        // Wait for Godot position change to sync into Bevy
+        app.update().await;
 
         let synced_x =
             app.with_world(|world| world.get::<Transform>(entity).unwrap().translation.x);
@@ -166,7 +166,8 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         // Move Godot node (tests Godot→Bevy sync)
         godot_node.set_position(Vector2::new(20.0, 0.0));
 
-        // Run a few frames for both directions to sync
+        // Run several frames so the Bevy-controlled node accumulates
+        // enough movement for a meaningful assertion.
         app.updates(4).await;
 
         let bevy_end = bevy_node.get_position().x;
@@ -235,7 +236,8 @@ fn test_transform_sync_disabled(ctx: &TestContext) -> godot::task::TaskHandle {
 
         let start_pos = node.get_position().x;
 
-        // Run a few frames -- Bevy entity moves but Godot node should NOT
+        // Run a few frames so the Bevy entity accumulates multiple += 10.0
+        // increments -- Godot node should stay at 0 since sync is disabled.
         app.updates(4).await;
 
         let end_pos = node.get_position().x;

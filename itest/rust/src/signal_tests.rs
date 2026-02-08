@@ -68,12 +68,12 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
             system_state.apply(world);
         });
 
-        // One frame for pending connections to be processed (Last schedule)
+        // Wait for pending signal connections to be processed
         app.update().await;
 
         button.emit_signal("pressed", &[]);
 
-        // One frame for drain_and_trigger_signals (First schedule)
+        // Wait for signal to be processed and observer to fire
         app.update().await;
 
         let was_received = app.with_world(|world| world.resource::<SignalReceived>().0);
@@ -286,8 +286,7 @@ fn test_signal_connection_via_system(ctx: &TestContext) -> godot::task::TaskHand
         })
         .await;
 
-        // Two frames: one for the system to find the handle and queue the
-        // connection, one for process_pending_signal_connections (Last) to apply it
+        // Wait for signal connection to be established
         app.updates(2).await;
 
         let connection_made = app.with_world(|world| world.resource::<ConnectionMade>().0);
