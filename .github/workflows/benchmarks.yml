@@ -16,6 +16,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   GODOT_VERSION: "4.5.1"
+  # Shared target dir so baseline (worktree) and PR builds share cache and avoid double compile time
+  CARGO_TARGET_DIR: ${{ github.workspace }}/target
 
 permissions:
   contents: read
@@ -40,7 +42,7 @@ jobs:
 
       - name: Install Linux dependencies
         run: |
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
       - name: Setup Godot
@@ -68,21 +70,22 @@ jobs:
           BENCHMARK_JSON: "1"
           BENCHMARK_JSON_PATH: baseline.json
         run: |
-          cat > godot/itest.gdextension << 'EOF'
+          # Shared target dir is in main workspace; use absolute path so Godot finds the .so
+          cat > godot/itest.gdextension << EOF
           [configuration]
           entry_symbol = "godot_bevy_itest"
           compatibility_minimum = 4.2
 
           [libraries]
-          linux.debug.x86_64 = "res://../../target/release/libgodot_bevy_itest.so"
-          linux.release.x86_64 = "res://../../target/release/libgodot_bevy_itest.so"
+          linux.debug.x86_64 = "$GITHUB_WORKSPACE/target/release/libgodot_bevy_itest.so"
+          linux.release.x86_64 = "$GITHUB_WORKSPACE/target/release/libgodot_bevy_itest.so"
           EOF
 
           mkdir -p godot/.godot
           echo "res://itest.gdextension" > godot/.godot/extension_list.cfg
 
-          godot --headless --path godot --import --quit || true
-          godot --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000 2>&1 | tee baseline-output.txt
+          "$GODOT4_BIN" --headless --path godot --import --quit || true
+          "$GODOT4_BIN" --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000 2>&1 | tee baseline-output.txt
 
           if [ ! -f baseline.json ]; then
             sed -n '/===BENCHMARK_JSON_START===/,/===BENCHMARK_JSON_END===/p' baseline-output.txt | \
@@ -124,8 +127,8 @@ jobs:
           mkdir -p godot/.godot
           echo "res://itest.gdextension" > godot/.godot/extension_list.cfg
 
-          godot --headless --path godot --import --quit || true
-          godot --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000 2>&1 | tee bench-output.txt
+          "$GODOT4_BIN" --headless --path godot --import --quit || true
+          "$GODOT4_BIN" --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000 2>&1 | tee bench-output.txt
 
           if [ ! -f bench-results.json ]; then
             sed -n '/===BENCHMARK_JSON_START===/,/===BENCHMARK_JSON_END===/p' bench-output.txt | \
