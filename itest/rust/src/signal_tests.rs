@@ -50,7 +50,7 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
 
         app.update().await;
 
-        let entity_found = app.with_world_mut(|world| {
+        app.with_world_mut(|world| {
             let handle = world
                 .get::<GodotNodeHandle>(
                     world
@@ -72,10 +72,7 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
             });
 
             system_state.apply(world);
-            true
         });
-
-        assert!(entity_found, "Button entity should exist");
 
         app.update().await;
 

@@ -17,11 +17,8 @@ use godot_bevy_test::prelude::*;
 fn find_collision_watcher(
     scene_tree: &Gd<godot::classes::Node>,
 ) -> Option<Gd<godot::classes::Node>> {
-    let children = scene_tree.get_children();
-    for i in 0..children.len() {
-        if let Some(child) = children.get(i)
-            && let Some(watcher) = child.get_node_or_null("CollisionWatcher")
-        {
+    for child in scene_tree.get_children().iter_shared() {
+        if let Some(watcher) = child.get_node_or_null("CollisionWatcher") {
             return Some(watcher);
         }
     }
