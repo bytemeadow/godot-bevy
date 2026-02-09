@@ -11,6 +11,7 @@ This script:
 
 Usage: uv run python -m godot_bevy_codegen
 """
+
 import textwrap
 
 from godot_bevy_codegen.src.file_paths import FilePaths
@@ -18,11 +19,18 @@ from godot_bevy_codegen.src.gdextension_api_dump import (
     run_godot_dump_api,
     load_extension_api,
 )
-from godot_bevy_codegen.src.gen_signal_names import generate_signal_names
+from godot_bevy_codegen.src.gen_signal_names import (
+    generate_signal_names,
+    generate_signal_names_dispatcher,
+)
 from godot_bevy_codegen.src.gen_type_checking import (
     generate_type_checking_code,
+    generate_node_type_checking_dispatcher,
 )
-from godot_bevy_codegen.src.gen_node_markers import generate_node_markers
+from godot_bevy_codegen.src.gen_node_markers import (
+    generate_node_markers,
+    generate_node_markers_dispatcher,
+)
 from godot_bevy_codegen.src.util import (
     indent_log,
     run_cargo_fmt,
@@ -42,21 +50,18 @@ def generate_for_version(api_version: str) -> None:
     indent_log("Step 3: Generate node markers")
     generate_node_markers(
         FilePaths.node_markers_file(api_version),
-        FilePaths.project_root,
         api,
     )
 
     indent_log("Step 4: Generate type checking code")
     generate_type_checking_code(
         FilePaths.type_checking_file(api_version),
-        FilePaths.project_root,
         api,
     )
 
     indent_log("Step 5: Generate signal names")
     generate_signal_names(
         FilePaths.signal_names_file(api_version),
-        FilePaths.project_root,
         api,
     )
 
@@ -74,6 +79,16 @@ def main() -> None:
         for api_version in api_versions:
             indent_log(f"⚙️  Processing API version {api_version}...")
             generate_for_version(api_version)
+
+        generate_node_type_checking_dispatcher(
+            FilePaths.type_checking_dispatcher_file, api_versions
+        )
+        generate_node_markers_dispatcher(
+            FilePaths.node_markers_dispatcher_file, api_versions
+        )
+        generate_signal_names_dispatcher(
+            FilePaths.signal_names_dispatcher_file, api_versions
+        )
 
         rust_files = [
             f for f in FilePaths.all_generated_files(api_versions) if f.suffix == ".rs"

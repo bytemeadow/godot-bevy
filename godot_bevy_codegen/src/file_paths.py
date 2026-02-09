@@ -5,17 +5,17 @@ from typing import List
 class FilePaths:
     """Keeps track of all file paths used in the generation pipeline"""
 
+    # Remember to update all_generated_files() if adding/removing files
     project_root = Path(__file__).parent.parent.parent
-    extension_api_path = project_root / "godot_extension_api"
-    node_markers_path = project_root / "godot-bevy" / "src" / "interop" / "node_markers"
-    type_checking_path = (
-        project_root
-        / "godot-bevy"
-        / "src"
-        / "plugins"
-        / "scene_tree"
-        / "node_type_checking"
+    interop_path = project_root / "godot-bevy" / "src" / "interop"
+    scene_tree_plugin_path = (
+        project_root / "godot-bevy" / "src" / "plugins" / "scene_tree"
     )
+    extension_api_path = project_root / "godot_extension_api"
+    node_markers_path = interop_path / "node_markers"
+    node_markers_dispatcher_file = interop_path / "node_markers.rs"
+    type_checking_path = scene_tree_plugin_path / "node_type_checking"
+    type_checking_dispatcher_file = scene_tree_plugin_path / "node_type_checking.rs"
     gdscript_plugin_path = project_root / "addons" / "godot-bevy"
     gdscript_watcher_path = (
         gdscript_plugin_path / "optimized_scene_tree_watcher_versions"
@@ -23,7 +23,8 @@ class FilePaths:
     gdscript_watcher_current_file = (
         gdscript_plugin_path / "optimized_scene_tree_watcher.gd"
     )
-    signal_names_path = project_root / "godot-bevy" / "src" / "interop" / "signal_names"
+    signal_names_path = interop_path / "signal_names"
+    signal_names_dispatcher_file = interop_path / "signal_names.rs"
 
     @staticmethod
     def extension_api_file(version: str) -> Path:
@@ -64,4 +65,7 @@ class FilePaths:
             paths.append(FilePaths.type_checking_file(version))
             paths.append(FilePaths.gdscript_watcher_file(version))
             paths.append(FilePaths.signal_names_file(version))
+        paths.append(FilePaths.node_markers_dispatcher_file)
+        paths.append(FilePaths.type_checking_dispatcher_file)
+        paths.append(FilePaths.signal_names_dispatcher_file)
         return sorted(paths)
