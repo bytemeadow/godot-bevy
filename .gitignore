@@ -10,6 +10,8 @@ profile.json.gz
 # Book
 book/book
 benchmark_results/
+.bench-baseline/
+itest/.bench-results/
 
 # https://devenv.sh/
 .devenv*

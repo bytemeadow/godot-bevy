@@ -16,6 +16,23 @@ This will:
 2. Run benchmarks in Godot headless mode
 3. Display results with min/median times
 
+### Compare Against a Base Branch
+
+```bash
+cd itest
+./compare-benches.sh          # compare current branch vs main
+./compare-benches.sh develop  # compare current branch vs develop
+```
+
+This mirrors what CI does on every PR:
+1. Creates a git worktree for the base branch
+2. Builds and runs benchmarks on the base branch
+3. Builds and runs benchmarks on the current branch
+4. Prints a comparison table with change percentages
+
+Both builds share `target/` so dependency compilation only happens once.
+Results are saved to `itest/.bench-results/` for further inspection.
+
 ### Example Output
 
 ```
