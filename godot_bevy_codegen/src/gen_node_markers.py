@@ -22,7 +22,7 @@ def generate_node_markers(
         /// These enable type-safe ECS queries like: Query<&GodotNodeHandle, With<Sprite2DMarker>>
         ///
         /// 🤖 This file is generated. Changes to it will be lost.
-        /// To regenerate: `python -m godot_bevy_codegen`
+        /// To regenerate: `uv run python -m godot_bevy_codegen`
         
         """)
 

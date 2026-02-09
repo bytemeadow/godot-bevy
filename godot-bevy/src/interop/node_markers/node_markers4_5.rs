@@ -6,7 +6,7 @@ use bevy_reflect::Reflect;
 /// These enable type-safe ECS queries like: Query<&GodotNodeHandle, With<Sprite2DMarker>>
 ///
 /// 🤖 This file is generated. Changes to it will be lost.
-/// To regenerate: `python -m godot_bevy_codegen`
+/// To regenerate: `uv run python -m godot_bevy_codegen`
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 #[reflect(Component)]
