@@ -1,0 +1,13 @@
+[project]
+name = "godot-bevy"
+version = "0.1.0"
+description = "Dependencies for use by Python scripts. Use the `uv` command to launch a script using this environment."
+requires-python = ">=3.13"
+dependencies = [
+    "dacite>=1.9.2",
+]
+
+[dependency-groups]
+dev = [
+    "black>=26.1.0",
+]

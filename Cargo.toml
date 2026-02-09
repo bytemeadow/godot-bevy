@@ -31,4 +31,4 @@ godot-bevy = { version = "0.10.0", path = "godot-bevy" }
 godot-bevy-macros = { version = "0.10.0", path = "godot-bevy-macros" }
 godot-bevy-test = { version = "0.10.0", path = "godot-bevy-test" }
 godot-bevy-test-macros = { version = "0.10.0", path = "godot-bevy-test-macros" }
-cargo-godot-lib = "0.1.3"
+cargo-godot-lib = "0.2.0"

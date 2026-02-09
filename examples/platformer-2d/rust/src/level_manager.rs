@@ -202,6 +202,7 @@ fn emit_level_loaded_event_when_scene_ready(
         for event in scene_tree_events.read() {
             if let SceneTreeMessageType::NodeAdded = event.message_type
                 && let Some(node) = godot.try_get::<Node>(event.node_id)
+                && node.is_inside_tree()
             {
                 let node_path = node.get_path().to_string();
                 if node_path == expected_path {

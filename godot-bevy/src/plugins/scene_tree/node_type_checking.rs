@@ -5,30 +5,30 @@
 #![allow(unexpected_cfgs)]
 
 #[cfg(feature = "api-4-2")]
-mod signal_names4_2;
+mod type_checking4_2;
 #[cfg(feature = "api-4-2-1")]
-mod signal_names4_2_1;
+mod type_checking4_2_1;
 #[cfg(feature = "api-4-2-2")]
-mod signal_names4_2_2;
+mod type_checking4_2_2;
 #[cfg(feature = "api-4-3")]
-mod signal_names4_3;
+mod type_checking4_3;
 #[cfg(feature = "api-4-4")]
-mod signal_names4_4;
+mod type_checking4_4;
 #[cfg(feature = "api-4-5")]
-mod signal_names4_5;
+mod type_checking4_5;
 
 #[cfg(feature = "api-4-2")]
-pub use signal_names4_2::*;
+pub use type_checking4_2::*;
 #[cfg(feature = "api-4-2-1")]
-pub use signal_names4_2_1::*;
+pub use type_checking4_2_1::*;
 #[cfg(feature = "api-4-2-2")]
-pub use signal_names4_2_2::*;
+pub use type_checking4_2_2::*;
 #[cfg(feature = "api-4-3")]
-pub use signal_names4_3::*;
+pub use type_checking4_3::*;
 #[cfg(feature = "api-4-4")]
-pub use signal_names4_4::*;
+pub use type_checking4_4::*;
 #[cfg(feature = "api-4-5")]
-pub use signal_names4_5::*;
+pub use type_checking4_5::*;
 
 #[cfg(not(any(
     feature = "api-4-2",
@@ -40,7 +40,7 @@ pub use signal_names4_5::*;
     feature = "api-custom",
     feature = "api-custom-json",
 )))]
-mod signal_names4_5;
+mod type_checking4_5;
 #[cfg(not(any(
     feature = "api-4-2",
     feature = "api-4-2-1",
@@ -51,4 +51,4 @@ mod signal_names4_5;
     feature = "api-custom",
     feature = "api-custom-json",
 )))]
-pub use signal_names4_5::*;
+pub use type_checking4_5::*;

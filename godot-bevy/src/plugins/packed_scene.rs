@@ -9,7 +9,7 @@ use crate::plugins::transforms::IntoGodotTransform2D;
 use bevy_app::{App, Plugin, PostUpdate};
 use bevy_asset::{Assets, Handle};
 use bevy_ecs::event::Event;
-use bevy_ecs::system::NonSend;
+use bevy_ecs::prelude::Res;
 use bevy_ecs::{
     component::Component,
     entity::Entity,
@@ -145,7 +145,7 @@ fn spawn_scene(
     mut new_scenes: Query<(&mut GodotScene, Entity, Option<&Transform>), Without<GodotNodeHandle>>,
     mut scene_tree: SceneTreeRef,
     mut assets: ResMut<Assets<GodotResource>>,
-    signal_sender: Option<NonSend<SignalSender>>,
+    signal_sender: Option<Res<SignalSender>>,
     mut godot: GodotAccess,
 ) {
     // Build a per-frame cache for path-based scene loading.
