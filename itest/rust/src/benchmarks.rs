@@ -13,7 +13,11 @@ use godot_bevy::bevy_app::{App, First, Last, PreUpdate};
 use godot_bevy::bevy_math::Vec3;
 use godot_bevy::bevy_transform::components::Transform as BevyTransform;
 use godot_bevy::interop::{GodotMainThread, GodotNodeHandle, Node2DMarker, Node3DMarker};
-use godot_bevy::plugins::core::SceneTreeComponentRegistry;
+use godot_bevy::plugins::collisions::{
+    CollisionMessageReader, CollisionMessageType, CollisionState, GodotCollisionsPlugin,
+    RawCollisionMessage,
+};
+use godot_bevy::plugins::core::{PrePhysicsUpdate, SceneTreeComponentRegistry};
 use godot_bevy::plugins::input::{GodotInputEventPlugin, InputEventReader, InputEventType};
 use godot_bevy::plugins::scene_tree::{
     GodotSceneTreePlugin, NodeEntityIndex, SceneTreeMessage, SceneTreeMessageReader,
@@ -503,6 +507,8 @@ const COLLISION_MASK_BODY_ENTERED: u8 = 1 << 0;
 const COLLISION_MASK_BODY_EXITED: u8 = 1 << 1;
 const COLLISION_MASK_AREA_ENTERED: u8 = 1 << 2;
 const COLLISION_MASK_AREA_EXITED: u8 = 1 << 3;
+const COLLISION_PROCESS_NODE_COUNT: usize = 200;
+const COLLISION_PROCESS_CYCLES: usize = 200;
 
 /// Creates Area3D nodes for collision body benchmarking.
 /// These nodes have collision signals that need to be connected.
@@ -658,6 +664,117 @@ fn scene_tree_process_collision_bodies_fallback() -> i32 {
     watcher.clone().free();
 
     result
+}
+
+type CollisionBenchSender = mpsc::Sender<RawCollisionMessage>;
+
+/// Setup app for collision message processing benchmarks.
+/// Returns (app, scene_tree_sender, collision_sender).
+fn setup_collision_processing_benchmark_app()
+-> (App, mpsc::Sender<SceneTreeMessage>, CollisionBenchSender) {
+    let mut app = App::new();
+    app.init_schedule(First);
+    app.init_schedule(PreUpdate);
+    app.init_schedule(PrePhysicsUpdate);
+
+    app.insert_non_send_resource(GodotMainThread);
+    app.init_resource::<SceneTreeComponentRegistry>();
+
+    let (scene_sender, scene_receiver) = mpsc::unbounded::<SceneTreeMessage>();
+    let (collision_sender, collision_receiver) = mpsc::unbounded::<RawCollisionMessage>();
+
+    app.add_plugins((GodotSceneTreePlugin::default(), GodotCollisionsPlugin));
+    app.insert_resource(SceneTreeMessageReader::new(scene_receiver));
+    app.insert_resource(CollisionMessageReader::new(collision_receiver));
+
+    (app, scene_sender, collision_sender)
+}
+
+/// Creates plain Node instances for collision-processing benchmarks.
+fn create_collision_processing_nodes() -> Vec<Gd<Node>> {
+    let scene_tree = get_scene_tree();
+    let root = scene_tree.get_root().expect("Root should exist");
+
+    let mut nodes = Vec::with_capacity(COLLISION_PROCESS_NODE_COUNT + 1);
+    for i in 0..=COLLISION_PROCESS_NODE_COUNT {
+        let mut node = Node::new_alloc();
+        node.set_name(&format!("CollisionProcessNode_{i}"));
+        root.clone().add_child(&node);
+        nodes.push(node);
+    }
+    nodes
+}
+
+fn create_collision_processing_node_added_messages(nodes: &[Gd<Node>]) -> Vec<SceneTreeMessage> {
+    nodes
+        .iter()
+        .map(|node| SceneTreeMessage {
+            node_id: GodotNodeHandle::from(node.instance_id()),
+            message_type: SceneTreeMessageType::NodeAdded,
+            node_type: Some("Node".to_string()),
+            node_name: Some(node.get_name().to_string()),
+            parent_id: node.get_parent().map(|parent| parent.instance_id()),
+            collision_mask: Some(0),
+            groups: Some(vec![]),
+        })
+        .collect()
+}
+
+/// Benchmark: process a burst of collision start/end messages.
+///
+/// This focuses on `process_godot_collisions` and `CollisionState` update costs
+/// by sending repeated start/end cycles for one origin colliding with many targets.
+#[bench(repeat = 3)]
+fn collisions_process_start_end_burst() -> i32 {
+    let (mut app, scene_sender, collision_sender) = setup_collision_processing_benchmark_app();
+    let nodes = create_collision_processing_nodes();
+
+    for msg in create_collision_processing_node_added_messages(&nodes) {
+        scene_sender.send(msg).expect("Send should succeed");
+    }
+
+    // Populate NodeEntityIndex via scene-tree processing
+    app.world_mut().run_schedule(First);
+    app.world_mut().run_schedule(First);
+
+    let origin = GodotNodeHandle::from(nodes[0].instance_id());
+    let targets: Vec<GodotNodeHandle> = nodes[1..]
+        .iter()
+        .map(|node| GodotNodeHandle::from(node.instance_id()))
+        .collect();
+
+    for _ in 0..COLLISION_PROCESS_CYCLES {
+        for &target in &targets {
+            collision_sender
+                .send(RawCollisionMessage {
+                    event_type: CollisionMessageType::Started,
+                    origin,
+                    target,
+                })
+                .expect("Send should succeed");
+        }
+        for &target in &targets {
+            collision_sender
+                .send(RawCollisionMessage {
+                    event_type: CollisionMessageType::Ended,
+                    origin,
+                    target,
+                })
+                .expect("Send should succeed");
+        }
+    }
+
+    app.world_mut().run_schedule(PrePhysicsUpdate);
+
+    let active = app.world().resource::<CollisionState>().len();
+
+    for mut node in nodes {
+        node.queue_free();
+    }
+
+    // Expect zero active collisions after balanced Started/Ended bursts.
+    assert_eq!(active, 0);
+    (COLLISION_PROCESS_NODE_COUNT * COLLISION_PROCESS_CYCLES * 2) as i32
 }
 
 // =============================================================================
