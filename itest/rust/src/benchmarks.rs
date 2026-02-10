@@ -297,6 +297,7 @@ fn transform_sync_roundtrip_2d() -> i32 {
 // (NodeAdded events) which is critical for entity creation and component setup.
 
 const SCENE_TREE_NODE_COUNT: usize = 500;
+const SCENE_TREE_SPARSE_RENAME_FRAMES: usize = 80;
 
 /// Get the Godot scene tree
 fn get_scene_tree() -> Gd<SceneTree> {
@@ -492,6 +493,56 @@ fn scene_tree_process_node_added_fallback() -> i32 {
     }
 
     result
+}
+
+/// Benchmark: Process sparse NodeRenamed messages on an already-populated index.
+///
+/// This captures per-frame overhead for tiny scene-tree updates after startup,
+/// when many entities are already tracked.
+#[bench(repeat = 3)]
+fn scene_tree_process_node_renamed_sparse_updates() -> i32 {
+    let (mut app, sender) = setup_scene_tree_benchmark_app();
+    let nodes = create_scene_tree_nodes();
+
+    // Initial population: create tracked entities/index entries.
+    for msg in create_node_added_messages(&nodes) {
+        sender.send(msg).expect("Send should succeed");
+    }
+    app.world_mut().run_schedule(First);
+    app.world_mut().run_schedule(First);
+
+    let target_node = nodes
+        .first()
+        .expect("At least one scene tree node should exist");
+    let target_handle = GodotNodeHandle::from(target_node.instance_id());
+
+    // Sparse updates: one rename message per frame.
+    for i in 0..SCENE_TREE_SPARSE_RENAME_FRAMES {
+        sender
+            .send(SceneTreeMessage {
+                node_id: target_handle,
+                message_type: SceneTreeMessageType::NodeRenamed,
+                node_type: None,
+                node_name: Some(format!("SparseRename_{i}")),
+                parent_id: None,
+                collision_mask: None,
+                groups: None,
+            })
+            .expect("Send should succeed");
+
+        // message_update_system double-buffering requires two First runs.
+        app.world_mut().run_schedule(First);
+        app.world_mut().run_schedule(First);
+    }
+
+    let node_index_len = app.world().resource::<NodeEntityIndex>().len();
+
+    for mut node in nodes {
+        node.queue_free();
+    }
+
+    assert_eq!(node_index_len, SCENE_TREE_NODE_COUNT);
+    SCENE_TREE_SPARSE_RENAME_FRAMES as i32
 }
 
 // =============================================================================

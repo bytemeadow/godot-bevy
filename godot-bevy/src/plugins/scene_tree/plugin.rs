@@ -855,6 +855,36 @@ fn _strip_godot_components(commands: &mut Commands, ent: Entity) {
     remove_comprehensive_node_type_markers(&mut entity_commands);
 }
 
+fn try_process_node_renamed_messages_fast_path(
+    commands: &mut Commands,
+    messages: &[SceneTreeMessage],
+    node_index: &NodeEntityIndex,
+    godot: &mut GodotAccess,
+) -> bool {
+    if !messages
+        .iter()
+        .all(|message| matches!(message.message_type, SceneTreeMessageType::NodeRenamed))
+    {
+        return false;
+    }
+
+    for message in messages {
+        let node_handle = message.node_id;
+        let Some(entity) = node_index.get(node_handle.instance_id()) else {
+            trace!(target: "godot_scene_tree_messages", "Entity for renamed node was already despawned");
+            continue;
+        };
+
+        let name = message
+            .node_name
+            .clone()
+            .unwrap_or_else(|| godot.get::<Node>(node_handle).get_name().to_string());
+        commands.entity(entity).insert(Name::from(name));
+    }
+
+    true
+}
+
 #[allow(clippy::too_many_arguments)]
 fn read_scene_tree_messages(
     mut commands: Commands,
@@ -867,6 +897,15 @@ fn read_scene_tree_messages(
 ) {
     let messages: Vec<_> = message_reader.read().cloned().collect();
     if messages.is_empty() {
+        return;
+    }
+
+    if try_process_node_renamed_messages_fast_path(
+        &mut commands,
+        &messages,
+        &node_index,
+        &mut godot,
+    ) {
         return;
     }
 
