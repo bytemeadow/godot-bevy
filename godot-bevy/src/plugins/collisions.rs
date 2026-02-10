@@ -78,8 +78,8 @@ pub const AREA_EXITED: &str = "area_exited";
 /// All collision signals that indicate collision start
 pub const COLLISION_START_SIGNALS: &[&str] = &[BODY_ENTERED, AREA_ENTERED];
 
-/// When a collision batch is very large, it's cheaper to rebuild adjacency once
-/// from `active_pairs` than to update per-entity vectors incrementally per event.
+/// Event-count cutoff for batch neighbor rebuild mode.
+/// Batches at or above this size rebuild adjacency from `active_pairs`.
 const COLLISION_NEIGHBOR_REBUILD_THRESHOLD: usize = 512;
 
 // ============================================================================
@@ -194,11 +194,9 @@ impl CollisionState {
         let pair = normalize_pair(origin, target);
 
         if self.active_pairs.insert(pair) {
-            // New collision
             self.started_this_frame.push(pair);
 
             if update_neighbors {
-                // Update entity maps (both directions)
                 self.entity_collisions
                     .entry(origin)
                     .or_default()
@@ -235,7 +233,6 @@ impl CollisionState {
             self.ended_this_frame.push(pair);
 
             if update_neighbors {
-                // Update entity maps
                 if let Some(collisions) = self.entity_collisions.get_mut(&origin) {
                     collisions.retain(|&e| e != target);
                 }

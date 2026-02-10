@@ -504,7 +504,6 @@ fn scene_tree_process_node_renamed_sparse_updates() -> i32 {
     let (mut app, sender) = setup_scene_tree_benchmark_app();
     let nodes = create_scene_tree_nodes();
 
-    // Initial population: create tracked entities/index entries.
     for msg in create_node_added_messages(&nodes) {
         sender.send(msg).expect("Send should succeed");
     }
@@ -516,7 +515,6 @@ fn scene_tree_process_node_renamed_sparse_updates() -> i32 {
         .expect("At least one scene tree node should exist");
     let target_handle = GodotNodeHandle::from(target_node.instance_id());
 
-    // Sparse updates: one rename message per frame.
     for i in 0..SCENE_TREE_SPARSE_RENAME_FRAMES {
         sender
             .send(SceneTreeMessage {
