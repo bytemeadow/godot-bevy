@@ -389,6 +389,22 @@ fn setup_scene_tree_benchmark_app() -> (App, mpsc::Sender<SceneTreeMessage>) {
     (app, sender)
 }
 
+/// Benchmark: Scene tree message systems when no messages are pending (idle path)
+///
+/// This captures per-frame overhead when the scene tree is stable and no
+/// node-added/removed messages are flowing from Godot.
+#[bench(repeat = 3)]
+fn scene_tree_idle_no_messages() -> i32 {
+    let (mut app, _sender) = setup_scene_tree_benchmark_app();
+
+    const IDLE_FRAMES: usize = 200;
+    for _ in 0..IDLE_FRAMES {
+        app.world_mut().run_schedule(First);
+    }
+
+    IDLE_FRAMES as i32
+}
+
 /// Benchmark: Process NodeAdded messages with pre-analyzed types (optimized path)
 ///
 /// This measures the performance of the `read_scene_tree_messages` system

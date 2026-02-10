@@ -866,6 +866,10 @@ fn read_scene_tree_messages(
     mut godot: GodotAccess,
 ) {
     let messages: Vec<_> = message_reader.read().cloned().collect();
+    if messages.is_empty() {
+        return;
+    }
+
     create_scene_tree_entity(
         &mut commands,
         messages,
