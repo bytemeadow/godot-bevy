@@ -175,11 +175,13 @@ jobs:
           sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
       - name: Install Godot
-        uses: chickensoft-games/setup-godot@v2
+        uses: bytemeadow/gdenv@v0.2.2
         with:
           version: ${{ env.GODOT_VERSION }}
+          gdenv-version: 0.2.2
           use-dotnet: false
           include-templates: false
+          cache: true
 
       - name: Cache Godot imports
         uses: actions/cache@v4

@@ -147,11 +147,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Godot
-        uses: chickensoft-games/setup-godot@v2
+        uses: bytemeadow/gdenv@v0.2.2
         with:
           version: ${{ env.GODOT_VERSION }}
+          gdenv-version: 0.2.2
           use-dotnet: false
           include-templates: true
+          cache: true
 
       - name: Download all platform libraries
         uses: actions/download-artifact@v4
@@ -228,11 +230,13 @@ jobs:
           version: 1.0
 
       - name: Install Godot
-        uses: chickensoft-games/setup-godot@v2
+        uses: bytemeadow/gdenv@v0.2.2
         with:
           version: ${{ env.GODOT_VERSION }}
+          gdenv-version: 0.2.2
           use-dotnet: false
           include-templates: false
+          cache: true
 
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v14
