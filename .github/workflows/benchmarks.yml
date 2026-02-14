@@ -11,6 +11,8 @@ on:
       - "Cargo.lock"
       - ".github/workflows/benchmarks.yml"
       - ".github/scripts/benchmarks-compare.py"
+      - ".github/scripts/benchmarks-merge.py"
+      - ".github/scripts/benchmarks-assert-names.py"
   workflow_dispatch:
 
 env:
@@ -60,15 +62,31 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git worktree add ../baseline "$BASE_SHA"
-          cd ../baseline/itest/rust && cargo build --release
+          BASELINE_ROOT="${{ github.workspace }}/../baseline"
+          BASELINE_BENCH_FILE="$BASELINE_ROOT/itest/rust/src/benchmarks.rs"
+          BASELINE_BENCH_BACKUP="$BASELINE_ROOT/itest/rust/src/benchmarks.rs.baseline"
+          PR_BENCH_FILE="${{ github.workspace }}/itest/rust/src/benchmarks.rs"
+
+          cp "$BASELINE_BENCH_FILE" "$BASELINE_BENCH_BACKUP"
+          cp "$PR_BENCH_FILE" "$BASELINE_BENCH_FILE"
+
+          cd "$BASELINE_ROOT/itest/rust"
+          cargo clean --release -p godot-bevy -p godot-bevy-test -p godot-bevy-itest
+
+          if cargo build --release; then
+            echo "Baseline build succeeded with PR benchmark definitions."
+          else
+            echo "PR benchmark definitions failed on baseline; falling back to baseline benchmarks."
+            cp "$BASELINE_BENCH_BACKUP" "$BASELINE_BENCH_FILE"
+            cargo clean --release -p godot-bevy -p godot-bevy-test -p godot-bevy-itest
+            cargo build --release
+          fi
 
       - name: Run baseline benchmarks
         if: github.event_name == 'pull_request'
         working-directory: ../baseline/itest
         env:
           GODOT4_BIN: godot
-          BENCHMARK_JSON: "1"
-          BENCHMARK_JSON_PATH: ${{ github.workspace }}/itest/baseline.json
         run: |
           # Shared target dir is in main workspace; use absolute path so Godot finds the .so
           cat > godot/itest.gdextension << EOF
@@ -85,15 +103,31 @@ jobs:
           echo "res://itest.gdextension" > godot/.godot/extension_list.cfg
 
           "$GODOT4_BIN" --headless --path godot --import --quit || true
-          "$GODOT4_BIN" --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000 2>&1 | tee baseline-output.txt
+          for run in 1 2; do
+            BASELINE_RUN_JSON="${{ github.workspace }}/itest/baseline-run${run}.json"
+            BASELINE_RUN_LOG="baseline-output-${run}.txt"
 
-          BASELINE_JSON="${{ github.workspace }}/itest/baseline.json"
-          if [ ! -f "$BASELINE_JSON" ]; then
-            sed -n '/===BENCHMARK_JSON_START===/,/===BENCHMARK_JSON_END===/p' baseline-output.txt | \
-              sed '1d;$d' > "$BASELINE_JSON"
-          fi
+            BENCHMARK_JSON=1 BENCHMARK_JSON_PATH="$BASELINE_RUN_JSON" \
+              "$GODOT4_BIN" --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000 \
+              2>&1 | tee "$BASELINE_RUN_LOG"
 
-          jq empty "$BASELINE_JSON" || { echo "Error: Invalid baseline JSON"; exit 1; }
+            if [ ! -f "$BASELINE_RUN_JSON" ]; then
+              sed -n '/===BENCHMARK_JSON_START===/,/===BENCHMARK_JSON_END===/p' "$BASELINE_RUN_LOG" | \
+                sed '1d;$d' > "$BASELINE_RUN_JSON"
+            fi
+
+            jq empty "$BASELINE_RUN_JSON" || { echo "Error: Invalid baseline JSON for run ${run}"; exit 1; }
+          done
+
+          python3 "${{ github.workspace }}/.github/scripts/benchmarks-merge.py" \
+            "${{ github.workspace }}/itest/baseline.json" \
+            "${{ github.workspace }}/itest/baseline-run1.json" \
+            "${{ github.workspace }}/itest/baseline-run2.json"
+
+          jq empty "${{ github.workspace }}/itest/baseline.json" || { echo "Error: Invalid merged baseline JSON"; exit 1; }
+          python3 "${{ github.workspace }}/.github/scripts/benchmarks-assert-names.py" \
+            rust/src/benchmarks.rs \
+            "${{ github.workspace }}/itest/baseline.json"
 
       - name: Cleanup worktree
         if: always() && github.event_name == 'pull_request'
@@ -102,14 +136,15 @@ jobs:
       # ── PR branch ───────────────────────────────────────────────────
 
       - name: Build PR branch
-        run: cd itest/rust && cargo build --release
+        run: |
+          cd itest/rust
+          cargo clean --release -p godot-bevy -p godot-bevy-test -p godot-bevy-itest
+          cargo build --release
 
       - name: Run PR benchmarks
         working-directory: itest
         env:
           GODOT4_BIN: godot
-          BENCHMARK_JSON: "1"
-          BENCHMARK_JSON_PATH: bench-results.json
         run: |
           cat > godot/itest.gdextension << 'EOF'
           [configuration]
@@ -125,14 +160,31 @@ jobs:
           echo "res://itest.gdextension" > godot/.godot/extension_list.cfg
 
           "$GODOT4_BIN" --headless --path godot --import --quit || true
-          "$GODOT4_BIN" --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000 2>&1 | tee bench-output.txt
+          for run in 1 2; do
+            BENCH_RUN_JSON="bench-results-run${run}.json"
+            BENCH_RUN_LOG="bench-output-${run}.txt"
 
-          if [ ! -f bench-results.json ]; then
-            sed -n '/===BENCHMARK_JSON_START===/,/===BENCHMARK_JSON_END===/p' bench-output.txt | \
-              sed '1d;$d' > bench-results.json
-          fi
+            BENCHMARK_JSON=1 BENCHMARK_JSON_PATH="$BENCH_RUN_JSON" \
+              "$GODOT4_BIN" --headless --path godot addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000 \
+              2>&1 | tee "$BENCH_RUN_LOG"
 
-          jq empty bench-results.json || { echo "Error: Invalid benchmark JSON"; exit 1; }
+            if [ ! -f "$BENCH_RUN_JSON" ]; then
+              sed -n '/===BENCHMARK_JSON_START===/,/===BENCHMARK_JSON_END===/p' "$BENCH_RUN_LOG" | \
+                sed '1d;$d' > "$BENCH_RUN_JSON"
+            fi
+
+            jq empty "$BENCH_RUN_JSON" || { echo "Error: Invalid benchmark JSON for run ${run}"; exit 1; }
+          done
+
+          python3 "${{ github.workspace }}/.github/scripts/benchmarks-merge.py" \
+            bench-results.json \
+            bench-results-run1.json \
+            bench-results-run2.json
+
+          jq empty bench-results.json || { echo "Error: Invalid merged benchmark JSON"; exit 1; }
+          python3 "${{ github.workspace }}/.github/scripts/benchmarks-assert-names.py" \
+            rust/src/benchmarks.rs \
+            bench-results.json
 
       # ── Compare and upload ──────────────────────────────────────────
 

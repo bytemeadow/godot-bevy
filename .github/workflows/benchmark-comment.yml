@@ -78,6 +78,7 @@ jobs:
 
             comment += '\n<details>\n<summary>About these benchmarks</summary>\n\n';
             comment += '- Baseline and PR benchmarks run on the **same machine** in a single CI job\n';
+            comment += '- Each side runs twice; reported numbers use merged medians across runs\n';
             comment += '- Regression threshold: >10%, Caution: >5%, Improvement: <-5%\n';
             comment += '</details>\n';
 

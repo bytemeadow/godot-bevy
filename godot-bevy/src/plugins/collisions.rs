@@ -78,6 +78,10 @@ pub const AREA_EXITED: &str = "area_exited";
 /// All collision signals that indicate collision start
 pub const COLLISION_START_SIGNALS: &[&str] = &[BODY_ENTERED, AREA_ENTERED];
 
+/// Event-count cutoff for batch neighbor rebuild mode.
+/// Batches at or above this size rebuild adjacency from `active_pairs`.
+const COLLISION_NEIGHBOR_REBUILD_THRESHOLD: usize = 512;
+
 // ============================================================================
 // EVENTS
 // ============================================================================
@@ -172,40 +176,88 @@ impl CollisionState {
     }
 
     /// Record a collision start
-    fn add_collision(&mut self, origin: Entity, target: Entity) {
+    fn add_collision(&mut self, origin: Entity, target: Entity) -> bool {
+        self.add_collision_internal(origin, target, true)
+    }
+
+    fn add_collision_without_neighbors(&mut self, origin: Entity, target: Entity) -> bool {
+        self.add_collision_internal(origin, target, false)
+    }
+
+    fn add_collision_internal(
+        &mut self,
+        origin: Entity,
+        target: Entity,
+        update_neighbors: bool,
+    ) -> bool {
         // Normalize pair order for consistent storage
         let pair = normalize_pair(origin, target);
 
         if self.active_pairs.insert(pair) {
-            // New collision
             self.started_this_frame.push(pair);
 
-            // Update entity maps (both directions)
-            self.entity_collisions
-                .entry(origin)
-                .or_default()
-                .push(target);
-            self.entity_collisions
-                .entry(target)
-                .or_default()
-                .push(origin);
+            if update_neighbors {
+                self.entity_collisions
+                    .entry(origin)
+                    .or_default()
+                    .push(target);
+                self.entity_collisions
+                    .entry(target)
+                    .or_default()
+                    .push(origin);
+            }
+            true
+        } else {
+            false
         }
     }
 
     /// Record a collision end
-    fn remove_collision(&mut self, origin: Entity, target: Entity) {
+    fn remove_collision(&mut self, origin: Entity, target: Entity) -> bool {
+        self.remove_collision_internal(origin, target, true)
+    }
+
+    fn remove_collision_without_neighbors(&mut self, origin: Entity, target: Entity) -> bool {
+        self.remove_collision_internal(origin, target, false)
+    }
+
+    fn remove_collision_internal(
+        &mut self,
+        origin: Entity,
+        target: Entity,
+        update_neighbors: bool,
+    ) -> bool {
         let pair = normalize_pair(origin, target);
 
         if self.active_pairs.remove(&pair) {
             self.ended_this_frame.push(pair);
 
-            // Update entity maps
-            if let Some(collisions) = self.entity_collisions.get_mut(&origin) {
-                collisions.retain(|&e| e != target);
+            if update_neighbors {
+                if let Some(collisions) = self.entity_collisions.get_mut(&origin) {
+                    collisions.retain(|&e| e != target);
+                }
+                if let Some(collisions) = self.entity_collisions.get_mut(&target) {
+                    collisions.retain(|&e| e != origin);
+                }
             }
-            if let Some(collisions) = self.entity_collisions.get_mut(&target) {
-                collisions.retain(|&e| e != origin);
-            }
+            true
+        } else {
+            false
+        }
+    }
+
+    fn rebuild_entity_collisions(&mut self) {
+        self.entity_collisions.clear();
+        self.entity_collisions.reserve(self.active_pairs.len() * 2);
+        for &(entity1, entity2) in &self.active_pairs {
+            self.entity_collisions
+                .entry(entity1)
+                .or_default()
+                .push(entity2);
+            self.entity_collisions
+                .entry(entity2)
+                .or_default()
+                .push(entity1);
         }
     }
 
@@ -421,6 +473,7 @@ fn process_godot_collisions(
     };
 
     let receiver = events.0.lock();
+    let use_rebuild_path = receiver.len() >= COLLISION_NEIGHBOR_REBUILD_THRESHOLD;
 
     for event in receiver.try_iter() {
         trace!(target: "godot_collisions", event = ?event);
@@ -436,20 +489,36 @@ fn process_godot_collisions(
 
         match event.event_type {
             CollisionMessageType::Started => {
-                collision_state.add_collision(origin, target);
-                started_writer.write(CollisionStarted {
-                    entity1: origin,
-                    entity2: target,
-                });
+                let changed = if use_rebuild_path {
+                    collision_state.add_collision_without_neighbors(origin, target)
+                } else {
+                    collision_state.add_collision(origin, target)
+                };
+                if changed {
+                    started_writer.write(CollisionStarted {
+                        entity1: origin,
+                        entity2: target,
+                    });
+                }
             }
             CollisionMessageType::Ended => {
-                collision_state.remove_collision(origin, target);
-                ended_writer.write(CollisionEnded {
-                    entity1: origin,
-                    entity2: target,
-                });
+                let changed = if use_rebuild_path {
+                    collision_state.remove_collision_without_neighbors(origin, target)
+                } else {
+                    collision_state.remove_collision(origin, target)
+                };
+                if changed {
+                    ended_writer.write(CollisionEnded {
+                        entity1: origin,
+                        entity2: target,
+                    });
+                }
             }
         }
+    }
+
+    if use_rebuild_path {
+        collision_state.rebuild_entity_collisions();
     }
 }
 
