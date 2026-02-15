@@ -24,6 +24,7 @@ pub use crate::plugins::{
         ActionInput, BevyInputBridgePlugin, GodotInputEventPlugin, KeyboardInput, MouseButtonInput,
         MouseMotion,
     },
+    mailbox::{GodotMailboxMessage, GodotMailboxPlugin, GodotMailboxSet},
     // Core functionality
     packed_scene::{GodotPackedScenePlugin, GodotScene},
     // Input
