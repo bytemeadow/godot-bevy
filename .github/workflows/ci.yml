@@ -22,6 +22,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   GODOT_VERSION: "4.5.1"
+  GDENV_VERSION: "0.2.2"
 
 permissions:
   contents: read
@@ -178,7 +179,7 @@ jobs:
         uses: bytemeadow/gdenv@v0.2.2
         with:
           version: ${{ env.GODOT_VERSION }}
-          gdenv-version: 0.2.2
+          gdenv-version: ${{ env.GDENV_VERSION }}
           use-dotnet: false
           include-templates: false
           cache: true
