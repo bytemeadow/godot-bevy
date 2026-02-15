@@ -10,6 +10,7 @@ pub mod debugger;
 #[cfg(feature = "godot_bevy_log")]
 pub mod godot_bevy_logger;
 pub mod input;
+pub mod mailbox;
 pub mod packed_scene;
 pub mod scene_tree;
 pub mod signals;
@@ -24,6 +25,7 @@ pub use debugger::{DebuggerConfig, GodotDebuggerPlugin};
 #[cfg(feature = "godot_bevy_log")]
 pub use godot_bevy_logger::GodotBevyLogPlugin;
 pub use input::{BevyInputBridgePlugin, GodotInputEventPlugin};
+pub use mailbox::{GodotMailboxMessage, GodotMailboxPlugin, GodotMailboxSet};
 pub use packed_scene::GodotPackedScenePlugin;
 pub use scene_tree::GodotSceneTreePlugin;
 pub use transforms::GodotTransformSyncPlugin;

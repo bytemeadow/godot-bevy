@@ -58,6 +58,11 @@
 
 ---
 
+- [Project Transition Patterns](./project-transition/index.md)
+  - [Transitional Mailbox Bridge (Godot -> Bevy Messages)](./project-transition/transitional-mailbox-bridge.md)
+
+---
+
 - [Migration Guides](./migration/index.md)
   - [v0.10 to v0.11](./migration/v0.10-to-v0.11.md)
   - [v0.9 to v0.10](./migration/v0.9-to-v0.10.md)
