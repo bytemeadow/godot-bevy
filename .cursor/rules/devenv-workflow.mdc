@@ -1,0 +1,21 @@
+---
+description: Use devenv for all build, run, and compilation tasks
+alwaysApply: true
+---
+
+# devenv Workflow
+
+This project uses [devenv](https://devenv.sh/) to manage tooling, environment variables, and scripts. All build and run operations must go through devenv.
+
+## Key Commands
+
+| Task | Command |
+|------|---------|
+| Run all validations (JS + native) | `validate` |
+
+## Rules
+
+- Always use devenv scripts instead of raw commands. The scripts set required environment variables.
+- When adding a new example, add corresponding `run-<name>` scripts to `devenv.nix`, and update the `enterShell` help text.
+- When adding a new dependency or tool, add it to the `packages` list in `devenv.nix`.
+- Keep `devenv.nix` as the single source of truth for all project scripts and tooling.
