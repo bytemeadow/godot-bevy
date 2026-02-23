@@ -140,6 +140,42 @@ h3 .header {
   margin-block-start: 0.55em;
 }
 
+/* Collapsible screenshots / spoilers */
+#content main details {
+  margin: 0.75em 0;
+  border: 1px solid var(--meadow-clay);
+  border-radius: 8px;
+  background: rgba(15, 90, 60, 0.04);
+}
+#content main details summary {
+  padding: 0.4em 0.6em;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--meadow-moss);
+  list-style: none;
+  user-select: none;
+}
+#content main details summary::-webkit-details-marker {
+  display: none;
+}
+#content main details summary::before {
+  content: "▶ ";
+  font-size: 0.75em;
+  margin-right: 0.25em;
+}
+#content main details[open] summary::before {
+  content: "▼ ";
+}
+#content main details > *:not(summary) {
+  padding: 0.6em 0.75em 0.75em;
+  border-top: 1px solid var(--meadow-clay);
+}
+#content main details img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
 /* Sidebar: softer, less blocky */
 .sidebar {
     border-radius: 0 12px 12px 0;
