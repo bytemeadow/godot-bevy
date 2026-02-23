@@ -34,6 +34,7 @@ in
       # dev tools
       sccache # cache rust build artifacts, ref https://github.com/mozilla/sccache
       python3 # for godot type generation script
+      mdbook # build the godot-bevy book (book/)
       rust-toolchain
       rust-nightly # for web builds (-Zbuild-std requires nightly)
       act # run GitHub Actions locally
@@ -123,6 +124,16 @@ in
     bench.exec = ''
       echo "Running benchmarks..."
       cd itest && ./run-benches.sh "$@"
+    '';
+
+    # Build the godot-bevy book
+    book.exec = ''
+      cd book && mdbook build "$@"
+    '';
+
+    # Serve the book locally (with live reload)
+    book-serve.exec = ''
+      cd book && mdbook serve "$@"
     '';
   };
 

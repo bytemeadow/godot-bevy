@@ -1,71 +1,20 @@
+# Summary
+
 - [Introduction](./introduction.md)
 
 ---
 
-- [Getting Started](./getting-started/index.md)
-  - [Installation](./getting-started/installation.md)
-  - [Basic Concepts](./getting-started/basic-concepts.md)
-  - [Plugin System](./getting-started/plugins.md)
-  - [Examples](./getting-started/examples.md)
+- [Part 1: Getting Started](./part-1/index.md)
+  - [Chapter 1](./part-1/chapter-1.md)
+  - [Chapter 2](./part-1/chapter-2.md)
 
 ---
 
-- [Scene Tree](./scene-tree/index.md)
-  - [Initialization and Timing](./scene-tree/timing.md)
-  - [Querying with Node Type Markers](./scene-tree/querying.md)
-  - [Custom Nodes](./scene-tree/custom-nodes/index.md)
-    - [Automatic Markers](./scene-tree/custom-nodes/automatic-markers.md) 
-    - [Property Mapping (BevyBundle)](./scene-tree/custom-nodes/property-mapping-with-bevy-bundle.md)
-    - [Nodes from Components and Bundles](scene-tree/custom-nodes/nodes-from-components-and-bundles.md)
-  - [Spawning Scenes](scene-tree/spawning-scenes.md)
+- [Part 2: Core Concepts](./core-concepts/index.md)
+  - [Chapter 1](./core-concepts/chapter-1.md)
+  - [Chapter 2](./core-concepts/chapter-2.md)
 
 ---
 
-- [Transform System](./transforms/index.md)
-  - [Sync Modes](./transforms/sync-modes.md)
-  - [Custom Transform Sync](./transforms/custom-sync.md)
-
----
-
-- [Input Handling](./input/index.md)
-  - [Bevy vs Godot Input](./input/bevy-vs-godot.md)
-  - [Signal Handling](./input/signals.md)
-
----
-
-- [Timing & Schedules](./timing/index.md)
-
----
-
-- [Threading & Main Thread Access](./threading/index.md)
-
----
-
-- [Bevy Godot Profiling](./profiling/profiling.md)
-
----
-
-- [Debugging](./debugging/index.md)
-
----
-
-- [Integration Testing](./testing/index.md)
-
----
-
-- [Platform Targets](./platform-targets/index.md)
-  - [Android](./platform-targets/android.md)
-
----
-
-- [Project Transition Patterns](./project-transition/index.md)
-  - [Transitional Mailbox Bridge (Godot -> Bevy Messages)](./project-transition/transitional-mailbox-bridge.md)
-
----
-
-- [Migration Guides](./migration/index.md)
-  - [v0.10 to v0.11](./migration/v0.10-to-v0.11.md)
-  - [v0.9 to v0.10](./migration/v0.9-to-v0.10.md)
-  - [v0.8 to v0.9](./migration/v0.8-to-v0.9.md)
-  - [v0.7 to v0.8](./migration/v0.7-to-v0.8.md)
-  - [v0.6 to v0.7](./migration/v0.6-to-v0.7.md)
+- [Part 3: Advanced Topics](./part-3/index.md)
+  - [Chapter 1](./part-3/chapter-1.md)
