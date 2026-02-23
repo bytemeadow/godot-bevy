@@ -8,7 +8,7 @@ The aim of this library is to combine the strengths of using Bevy ECS for your g
 
 A quick summary of using this library would be:
 1. You create Bevy [Entities](https://bevy-cheatbook.github.io/programming/ec.html) or [Bundles](https://bevy-cheatbook.github.io/programming/bundle.html), and use the [GodotNode](./core-workflow/godot-node-entities-and-bundles.md) derive macro to generate a Godot class (node) you can place in your editor.
-2. You create [Scenes](https://docs.godotengine.org/en/4.5/getting_started/step_by_step/nodes_and_scenes.html) in Godot and use the generated Godot nodes from our macros to compose your scenes.
+2. You create [Scenes](https://docs.godotengine.org/en/4.5/getting_started/step_by_step/nodes_and_scenes.html) in Godot and use the generated Godot nodes from our macros to compose those scenes.
 3. You create Bevy systems to [Instantiate Scenes](./core-workflow/scenes-and-instantiation.md) and build your game logic with systems that [Query](./core-workflow/queries-and-marker-components.md) the components your Godot nodes were derived from, or the [Built-in Marker Components](./core-workflow/queries-and-marker-components.md).
 
 ## How the library is organized

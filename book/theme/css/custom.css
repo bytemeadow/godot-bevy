@@ -1,19 +1,191 @@
 /*
-Customize headers so each level looks more unique
+ * Byte Meadow book theme – matches bytemeadow.com
+ * Tokens from byte-meadow-website/src/app.css
+ */
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;600;700&display=swap");
 
-Available CSS variables can be found here:
-https://github.com/rust-lang/mdBook/blob/master/crates/mdbook-html/front-end/css/variables.css
-*/
+:root {
+    --font-display: "Fraunces", "Georgia", serif;
+    --font-body: "Space Grotesk", "Helvetica Neue", "Segoe UI", sans-serif;
+    --meadow-ink: #0f172a;
+    --meadow-muted: #4b5563;
+    --meadow-sand: #f6f1e7;
+    --meadow-clay: #e7dccb;
+    --meadow-moss: #0f5a3c;
+    --meadow-leaf: #22c55e;
+    --meadow-glow: #f59e0b;
+    --meadow-water: #0ea5a4;
+}
 
+/* Typography: match website */
+body,
+.md-typeset {
+    font-family: var(--font-body);
+    color: var(--meadow-ink);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.chapter h1 .header,
+.chapter h2 .header,
+.chapter h3 .header {
+    font-family: var(--font-display);
+    color: var(--meadow-ink);
+}
+
+/* Light theme = Byte Meadow palette (default) */
+.light,
+html:not(.js) {
+    --bg: var(--meadow-sand);
+    --fg: var(--meadow-ink);
+
+    --sidebar-bg: var(--meadow-clay);
+    --sidebar-fg: var(--meadow-ink);
+    --sidebar-non-existant: var(--meadow-muted);
+    --sidebar-active: var(--meadow-moss);
+    --sidebar-spacer: #d9cfc1;
+
+    --scrollbar: var(--meadow-muted);
+
+    --icons: var(--meadow-muted);
+    --icons-hover: var(--meadow-ink);
+
+    --links: var(--meadow-water);
+
+    --inline-code-color: var(--meadow-moss);
+
+    --theme-popup-bg: var(--meadow-sand);
+    --theme-popup-border: var(--meadow-clay);
+    --theme-hover: var(--meadow-clay);
+
+    --quote-bg: #edf5f2;
+    --quote-border: var(--meadow-moss);
+
+    --warning-border: var(--meadow-glow);
+
+    --table-border-color: var(--meadow-clay);
+    --table-header-bg: var(--meadow-clay);
+    --table-alternate-bg: #faf8f4;
+
+    --searchbar-border-color: var(--meadow-muted);
+    --searchbar-bg: #fff;
+    --searchbar-fg: var(--meadow-ink);
+    --searchbar-shadow-color: var(--meadow-muted);
+    --searchresults-header-fg: var(--meadow-muted);
+    --searchresults-border-color: var(--meadow-clay);
+    --searchresults-li-bg: #faf8f4;
+    --search-mark-bg: var(--meadow-leaf);
+
+    --color-scheme: light;
+
+    --footnote-highlight: var(--meadow-moss);
+
+    --overlay-bg: rgba(15, 23, 42, 0.15);
+}
+
+/* Chapter content area (main page, not sidebar TOC) */
+.page-wrapper .chapter {
+    background: var(--meadow-sand);
+}
+
+/* Header styling – keep structure, meadow colors */
 h1:has(.header) {
-    border-bottom: 4px groove var(--sidebar-fg);
+    border-bottom: 4px groove var(--meadow-moss);
+    font-family: var(--font-display);
 }
 
 h2:has(.header) {
-    border-bottom: 2px dashed var(--theme-popup-border);
+    border-bottom: 2px dashed var(--meadow-water);
+    font-family: var(--font-display);
 }
 
 h3 .header {
     font-style: italic;
-    border-bottom: 2px solid var(--theme-popup-border);
+    border-bottom: 2px solid var(--meadow-clay);
+    font-family: var(--font-display);
+}
+
+/* Links and code in content */
+.chapter a {
+    color: var(--meadow-water);
+}
+
+.chapter a:hover {
+    color: var(--meadow-moss);
+}
+
+.chapter code {
+    color: var(--meadow-moss);
+    background: rgba(15, 90, 60, 0.08);
+}
+
+/* Block code */
+.chapter pre {
+    background: var(--meadow-ink);
+    color: var(--meadow-sand);
+    border-radius: 6px;
+}
+
+.chapter pre code {
+    background: transparent;
+    color: inherit;
+}
+
+/* Spacing between numbered list items in main content */
+#content main ol li + li {
+  margin-block-start: 0.55em;
+}
+
+/* Sidebar: softer, less blocky */
+.sidebar {
+    border-radius: 0 12px 12px 0;
+    box-shadow: 2px 0 12px rgba(15, 23, 42, 0.06);
+}
+
+.sidebar .sidebar-scrollbox {
+    padding: 14px 16px 14px 14px;
+}
+
+.sidebar .chapter .spacer {
+    height: 1px;
+    margin: 8px 0;
+    background: var(--sidebar-spacer);
+    border-radius: 1px;
+    opacity: 0.8;
+}
+
+.sidebar .chapter li.chapter-item {
+    margin-block-start: 0.35em;
+}
+
+.sidebar .chapter li a {
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition:
+        background 0.15s ease,
+        color 0.15s ease;
+}
+
+.sidebar .chapter li a:hover {
+    background: rgba(15, 90, 60, 0.08);
+}
+
+.sidebar .chapter li a.active {
+    background: rgba(15, 90, 60, 0.12);
+    font-weight: 500;
+}
+
+.sidebar .chapter ol.section {
+    padding-inline-start: 16px;
+}
+
+/* Single theme only: hide mdBook theme selector */
+#theme-toggle,
+#theme-list,
+.theme-popup {
+    display: none !important;
 }
