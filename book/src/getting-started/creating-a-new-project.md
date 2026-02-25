@@ -31,7 +31,8 @@ In this step, we'll create a new Godot project to use for this guide. Make sure 
 Next we'll install `godot-bevy`'s Godot Editor Plugin. The plugin has a project creation wizard which will make things a ton easier for us!
 
 1. **Download** the `addons/godot-bevy` folder from our [repository](https://github.com/bytemeadow/godot-bevy)
-2. **Copy** it to your project's folder
+2. **Create** the `/addons` folder if it is missing. This is where all plugins live inside Godot projects.
+3. **Copy** the `godot-bevy` plugin to your project's `/addons` folder.
 <details>
 <summary>View screenshot</summary>
 
@@ -39,15 +40,15 @@ Next we'll install `godot-bevy`'s Godot Editor Plugin. The plugin has a project 
 
 </details>
 
-3. **Open** Plugins via the AssetLib Section
+4. **Open** the project settings and navigate to the Plugins section.
 <details>
 <summary>View screenshot</summary>
 
-![Godot AssetLib Plugins button](../images/open-plugins.png)
+![Godot AssetLib Plugins button](../images/project-settings-menu.png)
 
 </details>
 
-4. **Enable** godot-bevy
+5. **Enable** godot-bevy
 
 <details>
 <summary>View screenshot</summary>
@@ -69,11 +70,13 @@ Next we'll create the rust project via our Godot Editor Plugin's > Tools functio
 
 </details>
 
-2. Fill in project details and **Create Project** (will take a moment)
+2. Fill in project details and **Create Project**. This starts a background project to generate the rust code for the bevy project _(will take a moment)_.
 
 <details>
 <summary>View screenshot</summary>
 
 ![Setup godot-bevy project in Project > Tools menu](../images/create-godot-bevy-project.png)
+
+![Generated Bevy project inside and editor](../images/bevy-project-in-editor.png)
 
 </details>
