@@ -30,9 +30,16 @@ In this step, we'll create a new Godot project to use for this guide. Make sure 
 
 Next we'll install `godot-bevy`'s Godot Editor Plugin. The plugin has a project creation wizard which will make things a ton easier for us!
 
-1. **Download** the `addons/godot-bevy` folder from our [repository](https://github.com/bytemeadow/godot-bevy)
-2. **Create** the `/addons` folder if it is missing. This is where all plugins live inside Godot projects.
-3. **Copy** the `godot-bevy` plugin to your project's `/addons` folder.
+1. **Download** a zip of the [release](https://github.com/bytemeadow/godot-bevy/releases) associated with the version.
+
+<details>
+<summary>View screenshot</summary>
+
+![Release page asset downloads](../images/release-zips.png)
+
+</details>
+
+2. **Extract and Copy** the `godot-bevy` plugin to your project's `/addons` folder from the zipped release you downloaded in the previous step. You can find the plugin at `godot-bevy-<x.y.z version>/addons/godot-bevy`.
 <details>
 <summary>View screenshot</summary>
 
@@ -40,15 +47,15 @@ Next we'll install `godot-bevy`'s Godot Editor Plugin. The plugin has a project 
 
 </details>
 
-4. **Open** the project settings and navigate to the Plugins section.
+3. **Open** Project > Project settings and navigate to the Plugins tab.
 <details>
 <summary>View screenshot</summary>
 
-![Godot AssetLib Plugins button](../images/project-settings-menu.png)
+![Godot project settings screen](../images/project-settings-menu.png)
 
 </details>
 
-5. **Enable** godot-bevy
+4. **Enable** godot-bevy
 
 <details>
 <summary>View screenshot</summary>
