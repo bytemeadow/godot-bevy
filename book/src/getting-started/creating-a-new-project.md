@@ -66,7 +66,7 @@ Next we'll install `godot-bevy`'s Godot Editor Plugin. The plugin has a project 
 
 ## Generate the `godot-bevy` Project
 
-Next we'll create the rust project via our Godot Editor Plugin's > Tools functionality.
+Next we'll create the Bevy rust project via our Godot Editor Plugin's > Tools functionality. This will create the basic Bevy boilerplate code for us as well as the `rust.gdextension` file to link it to Godot.
 
 1. **Open** Project > Tools > Setup `godot-bevy` project
 
@@ -87,3 +87,26 @@ Next we'll create the rust project via our Godot Editor Plugin's > Tools functio
 ![Generated Bevy project inside and editor](../images/bevy-project-in-editor.png)
 
 </details>
+
+## Creating a scene
+
+1. **Create** a new  3D scene node and rename it to "Main" by double clicking it. 
+
+<details>
+<summary>View screenshot</summary>
+
+![Create a main scene](../images/create-scene-3d.png)
+
+</details>
+
+2. Set this to the project's main scene by opening Project -> Project Settings -> General -> Application -> Run. You can also press `f5` and a prompt will appear, allowing you to select the current scene as the main one.
+
+<details>
+<summary>View screenshot</summary>
+
+![Set project a main scene](../images/main-scene-settings.png)
+![Select a main scene from f5](../images/select-main-scene.png)
+
+</details>
+
+3. Run the project and check out the output window to see a message from the Bevy application printed every second.
