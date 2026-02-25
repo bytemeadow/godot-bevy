@@ -70,7 +70,7 @@ Next we'll create the rust project via our Godot Editor Plugin's > Tools functio
 
 </details>
 
-2. Fill in project details and **Create Project**. This starts a background project to generate the rust code for the bevy project _(will take a moment)_.
+2. Fill in project details and **Create Project**. This starts a background process to generate the rust code for the bevy project _(will take a moment)_.
 
 <details>
 <summary>View screenshot</summary>
