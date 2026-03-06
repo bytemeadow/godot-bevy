@@ -3,7 +3,7 @@
 [![Discord](https://img.shields.io/discord/1379465862800736258.svg?color=7289da&&logo=discord)](https://discord.gg/gqkeBsH93H)
 [![Current Crates.io Version](https://img.shields.io/crates/v/godot-bevy.svg)](https://crates.io/crates/godot-bevy)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue)](https://docs.rs/godot-bevy/latest/godot_bevy/)
-[![Book](https://img.shields.io/badge/book-read-green)](https://bytemeadow.github.io/godot-bevy)
+[![Book](https://img.shields.io/badge/book-read-green)](https://bytemeadow.github.io/godot-bevy-book)
 [![Test Status](https://github.com/bytemeadow/godot-bevy/actions/workflows/ci.yml/badge.svg)](https://github.com/bytemeadow/godot-bevy/actions/workflows/ci.yml)
 [![Rust Version](https://img.shields.io/badge/Rust-1.88.0+-blue)](https://releases.rs/docs/1.88.0)
 ![license](https://shields.io/badge/license-MIT%2FApache--2.0-blue)
@@ -28,7 +28,7 @@ _Special thanks to [Blaze](https://runblaze.dev) for their support of this proje
 
 ## 📚 Documentation
 
-**[Read the godot-bevy Book →](https://bytemeadow.github.io/godot-bevy)**
+**[Read the godot-bevy Book →](https://bytemeadow.github.io/godot-bevy-book)**
 
 The book covers everything you need to know:
 - Installation and setup
@@ -115,7 +115,7 @@ fn build_app(app: &mut App) {
 }
 ```
 
-**Benefits**: Smaller binaries, better performance, clearer dependencies. See the [Plugin System Guide](https://bytemeadow.github.io/godot-bevy/getting-started/plugins.html) for details.
+**Benefits**: Smaller binaries, better performance, clearer dependencies. See the [Plugin System Guide](https://bytemeadow.github.io/godot-bevy-book?page=getting-started/plugins.html) for details.
 
 ## 🎮 Examples
 
