@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Godot-bevy Book Versions</title>
+    <style>
+        :root {
+            --primary-color: #f8f9fa;
+            --accent-color: #47a1ff;
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #e0e0e0;
+            --text-muted: #a0a0a0;
+            --border-radius: 12px;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            --transition: all 0.2s ease-in-out;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            padding: 5rem 2rem 3rem;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 2.8rem;
+            font-weight: 800;
+            background: linear-gradient(120deg, #47a1ff, #9b59b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.03em;
+        }
+
+        header p {
+            color: var(--text-muted);
+            margin-top: 0.75rem;
+            font-size: 1.2rem;
+        }
+
+        main {
+            flex: 1;
+            max-width: 500px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 0 1.5rem 5rem;
+            box-sizing: border-box;
+        }
+
+        .version-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .version-card {
+            background: var(--card-bg);
+            padding: 1.5rem 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            text-decoration: none;
+            color: inherit;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            transition: var(--transition);
+        }
+
+        .version-card:hover {
+            transform: scale(1.01);
+            background: #252525;
+            border-color: var(--accent-color);
+        }
+
+        /* Card Content layout */
+        .version-name {
+            min-width: 140px;
+            display: flex;
+            flex-direction: row;
+            flex-grow: 1;
+            gap: 0.5rem;
+        }
+
+        .version-tag {
+            display: inline-block;
+            background: rgba(71, 161, 255, 0.15);
+            color: var(--accent-color);
+            padding: 0.2rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .version-tag.latest {
+            background: rgba(204, 46, 191, 0.15);
+            color: #c72ecc;
+        }
+
+        .version-card h3 {
+            margin: 0;
+            font-size: 1.4rem;
+            white-space: nowrap;
+        }
+
+        .arrow {
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            transition: var(--transition);
+        }
+
+        .version-card:hover .arrow {
+            color: var(--accent-color);
+            transform: translateX(5px);
+        }
+
+        footer {
+            text-align: center;
+            padding: 3rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        footer a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        /* Responsive adjustment for very small screens */
+        @media (max-width: 600px) {
+            .version-card {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+                padding: 1.5rem;
+            }
+
+            .version-name {
+                min-width: auto;
+            }
+
+            .arrow {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>The <code>godot-bevy</code> Book</h1>
+    <p>Select a documentation version</p>
+</header>
+
+<main>
+    <div class="version-list">
+        {% for version in versions %}
+        <a href="{{ version.id }}" class="version-card">
+            <div class="version-tag {{ 'latest' if version.is_latest else '' }}">
+                {{ version.tag }}
+            </div>
+            <div class="version-name">
+                <h3>{{ version.name }}</h3>
+            </div>
+            <div class="arrow">→</div>
+        </a>
+        {% endfor %}
+    </div>
+</main>
+
+</body>
+</html>
