@@ -17,3 +17,19 @@ h3 .header {
     font-style: italic;
     border-bottom: 2px solid var(--theme-popup-border);
 }
+
+.menu-title a {
+    position: relative;
+    padding: 0 8px;
+    z-index: 10;
+    line-height: var(--menu-bar-height);
+    cursor: pointer;
+    transition: color 0.5s;
+    color: var(--icons);
+    text-decoration: none;
+}
+
+/* Optional: Subtle hover effect */
+.menu-title a:hover {
+    color: var(--icons-hover);
+}

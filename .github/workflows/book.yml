@@ -58,16 +58,20 @@ jobs:
               # refs/pull/123/merge -> pr-123
               parts = ref.split("/")
               dest = f"pr-{parts[2]}" if len(parts) >= 3 else "main"
+              dest_human = dest
           else:
               dest = "main"
+              dest_human = "Main Branch"
           
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"dest={dest}\n")
+              f.write(f"dest={dest_human}\n")
           EOF
 
       - name: Build book
         run: |
           cd book
+          export MDBOOK_BOOK__TITLE="The godot-bevy Book 👾 ${{ steps.vars.outputs.dest_human }}"
           mdbook build --dest-dir "../output/${{ steps.vars.outputs.dest }}"
 
       - name: Generate index.html
