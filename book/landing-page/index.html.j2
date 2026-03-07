@@ -128,6 +128,50 @@
             transform: translateX(5px);
         }
 
+        #nav-info {
+            display: none;
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: rgba(255,255,255,0.03);
+            border-radius: var(--border-radius);
+            border: 1px solid rgba(255,255,255,0.1);
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #page-display {
+            display: block;
+            color: var(--accent-color);
+            font-size: 1rem;
+            word-break: break-all;
+            padding: 0 0 0 0.5rem;
+        }
+
+        .flex-break {
+            flex-basis: 100%;
+            height: 0;
+        }
+
+        #nav-info button {
+            background: none;
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+            padding: 0.4rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: var(--transition);
+            margin-top: 0.5rem;
+            font-weight: bold;
+
+            &:hover {
+                background: var(--accent-color);
+                color: var(--bg-color);
+            }
+        }
+
         footer {
             text-align: center;
             padding: 3rem;
@@ -159,6 +203,33 @@
             }
         }
     </style>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const params = new URLSearchParams(window.location.search);
+            const page = params.get("page");
+
+            if (page) {
+                // Show the status info
+                document.getElementById("nav-info").style.display = "flex";
+                document.getElementById("page-display").textContent = page;
+
+                // Update all version links
+                document.querySelectorAll(".version-card").forEach((card) => {
+                    // Remove leading slash if any
+                    const baseHref = card.getAttribute("href").replace(/\/+$/, "");
+                    // Remove trailing slash if any
+                    const normalizedPage = page.replace(/^\/+/, "");
+                    card.href = `${baseHref}/${normalizedPage}`;
+                });
+            }
+        });
+
+        function clearPageParam() {
+            const url = new URL(window.location);
+            url.searchParams.delete("page");
+            window.location.href = url.toString();
+        }
+    </script>
 </head>
 <body>
 
@@ -168,9 +239,18 @@
 </header>
 
 <main>
+    <div id="nav-info">
+        <div style="color: var(--text-muted); font-size: 0.9rem;">Navigating to:</div>
+        <code id="page-display"></code>
+        <div class="flex-break"></div>
+        <button onclick="clearPageParam()">
+            Navigate to "Introduction" instead
+        </button>
+    </div>
+
     <div class="version-list">
         {% for version in versions %}
-        <a href="{{ version.id }}" class="version-card">
+        <a href="{{ version.id }}" class="version-card" data-version-id="{{ version.id }}">
             <div class="version-tag {{ 'latest' if version.is_latest else '' }}">
                 {{ version.tag }}
             </div>
