@@ -33,7 +33,7 @@ The easiest way to get started is using the godot-bevy editor plugin, which auto
 1. Go to **Project > Tools > Setup godot-bevy Project**
 2. Configure your project settings:
    - **Project name**: Used for the Rust crate name
-   - **godot-bevy version**: Library version (default: 0.10.0)
+   - **godot-bevy version**: Library version (default: 0.11.0)
    - **Release build**: Whether to build in release mode initially
 3. Click **"Create Project"**
 
@@ -97,8 +97,8 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-godot-bevy = "0.10.0"
-bevy = { version = "0.17", default-features = false }
+godot-bevy = "0.11.0"
+bevy = { version = "0.18", default-features = false }
 godot = "0.4"
 ```
 

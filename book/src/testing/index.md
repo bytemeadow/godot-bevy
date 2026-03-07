@@ -45,9 +45,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 godot = "0.4"
-godot-bevy = "0.9"
-godot-bevy-test = "0.9"
-bevy = { version = "0.17", default-features = false }
+godot-bevy = "0.11"
+godot-bevy-test = "0.11"
+bevy = { version = "0.18", default-features = false }
 
 # Import your game crate to test its systems
 my-game = { path = "../my-game" }
