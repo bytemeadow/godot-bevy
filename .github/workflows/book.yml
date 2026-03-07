@@ -65,7 +65,7 @@ jobs:
           
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"dest={dest}\n")
-              f.write(f"dest={dest_human}\n")
+              f.write(f"dest_human={dest_human}\n")
           EOF
 
       - name: Build book
