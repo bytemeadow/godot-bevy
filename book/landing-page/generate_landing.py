@@ -56,7 +56,7 @@ def main() -> None:
     ]
 
     # Sort versions alphabetically, (most recent on top).
-    version_ids.sort()
+    version_ids.sort(key=lambda v: (v == "main", v), reverse=True)
 
     # Build version metadata list
     versions: List[VersionInfo] = [get_version_metadata(vid) for vid in version_ids]
