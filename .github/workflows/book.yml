@@ -54,6 +54,7 @@ jobs:
           ref = os.environ.get("GITHUB_REF", "")
           if ref.startswith("refs/tags/"):
               dest = ref.replace("refs/tags/", "")
+              dest_human = dest
           elif ref.startswith("refs/pull/"):
               # refs/pull/123/merge -> pr-123
               parts = ref.split("/")
