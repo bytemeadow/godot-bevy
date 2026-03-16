@@ -36,31 +36,88 @@ Results are saved to `itest/.bench-results/` for further inspection.
 ### Example Output
 
 ```
-📊 Benchmark Results:
+Benchmark Results:
                                                                     min       median
 itest/rust/src/benchmarks.rs:14
-  transform_update_individual_3d                                 6.32ms       6.70ms
-  transform_update_bulk_3d                                       4.42ms       4.88ms
-  transform_update_individual_2d                                 6.90ms       7.39ms
-  transform_update_bulk_2d                                       5.19ms       5.57ms
+  transform_sync_bevy_to_godot_3d                                1.58ms       1.62ms
+  transform_sync_godot_to_bevy_3d                                1.40ms       1.44ms
+  transform_sync_bevy_to_godot_2d                                1.52ms       1.56ms
+  transform_sync_godot_to_bevy_2d                                1.36ms       1.40ms
+  transform_sync_roundtrip_3d                                    3.10ms       3.20ms
+  transform_sync_roundtrip_2d                                    2.98ms       3.06ms
+  scene_tree_idle_no_messages                                    0.02ms       0.03ms
+  scene_tree_process_node_added_optimized                        1.80ms       1.92ms
+  scene_tree_process_node_added_fallback                         3.40ms       3.55ms
+  scene_tree_process_node_renamed_sparse_updates                 0.45ms       0.50ms
+  scene_tree_process_collision_bodies_optimized                   1.10ms       1.18ms
+  scene_tree_process_collision_bodies_fallback                    2.20ms       2.35ms
+  collisions_process_start_end_burst                             5.80ms       6.10ms
+  input_action_checking_many_events_many_actions                 0.90ms       0.95ms
+  packed_scene_batch_spawn                                       4.20ms       4.40ms
+  packed_scene_spawn_with_transforms                             4.50ms       4.70ms
+  signal_dispatch_throughput                                      0.60ms       0.65ms
+  signal_idle_no_signals                                         0.01ms       0.02ms
+  signal_connection_setup                                        1.20ms       1.30ms
 
-Benchmarks completed in 52.54s.
+Benchmarks completed in 85.32s.
 ```
 
 ## What We Benchmark
 
-### Transform Synchronization (5000 entities)
+The suite contains **20 benchmarks** across six categories. Every benchmark runs the real godot-bevy systems (plugins, schedules, ECS queries) rather than raw FFI calls, so regressions in actual user-facing code are caught.
 
-These benchmarks measure the performance of our **PackedArray optimization** for bulk transform updates:
+### Transform Synchronization (6 benchmarks, 1000 entities)
 
-| Benchmark | What It Tests | Entity Count |
-|-----------|---------------|--------------|
-| `transform_update_individual_3d` | Individual FFI calls (5000 calls) | 5000 Node3D |
-| `transform_update_bulk_3d` | Bulk PackedArray update (1 call) | 5000 Node3D |
-| `transform_update_individual_2d` | Individual FFI calls (5000 calls) | 5000 Node2D |
-| `transform_update_bulk_2d` | Bulk PackedArray update (1 call) | 5000 Node2D |
+These benchmarks measure the real `GodotTransformSyncPlugin` systems that sync transforms between Bevy ECS and Godot nodes.
 
-**Key Insight**: Bulk operations are ~25-30% faster, saving ~2ms per frame for 5000 entities.
+| Benchmark | What It Tests |
+|-----------|---------------|
+| `transform_sync_bevy_to_godot_3d` | Bevy->Godot 3D sync (Last schedule) |
+| `transform_sync_godot_to_bevy_3d` | Godot->Bevy 3D sync (PreUpdate schedule) |
+| `transform_sync_bevy_to_godot_2d` | Bevy->Godot 2D sync (Last schedule) |
+| `transform_sync_godot_to_bevy_2d` | Godot->Bevy 2D sync (PreUpdate schedule) |
+| `transform_sync_roundtrip_3d` | Full frame: PreUpdate -> game logic -> Last (3D) |
+| `transform_sync_roundtrip_2d` | Full frame: PreUpdate -> game logic -> Last (2D) |
+
+### Scene Tree Processing (5 benchmarks, 500 nodes)
+
+These benchmarks measure the `GodotSceneTreePlugin` systems that process node-added, renamed, and collision-body messages from Godot.
+
+| Benchmark | What It Tests |
+|-----------|---------------|
+| `scene_tree_idle_no_messages` | Per-frame overhead when stable (200 frames) |
+| `scene_tree_process_node_added_optimized` | NodeAdded with pre-analyzed types |
+| `scene_tree_process_node_added_fallback` | NodeAdded with FFI type detection |
+| `scene_tree_process_node_renamed_sparse_updates` | Sparse rename messages (80 frames) |
+| `scene_tree_process_collision_bodies_optimized` | Area3D with collision signals (optimized path, 100 nodes) |
+
+### Collision Processing (2 benchmarks)
+
+| Benchmark | What It Tests |
+|-----------|---------------|
+| `scene_tree_process_collision_bodies_fallback` | Area3D with collision signals (fallback FFI path, 100 nodes) |
+| `collisions_process_start_end_burst` | Burst start/end events (200 nodes x 200 cycles) |
+
+### Input Action Checking (1 benchmark)
+
+| Benchmark | What It Tests |
+|-----------|---------------|
+| `input_action_checking_many_events_many_actions` | 100 events x 50 actions |
+
+### Packed Scene Spawning (2 benchmarks, 100 scenes)
+
+| Benchmark | What It Tests |
+|-----------|---------------|
+| `packed_scene_batch_spawn` | Batch spawn 100 instances (per-frame cache) |
+| `packed_scene_spawn_with_transforms` | Batch spawn with transform application |
+
+### Signal System (3 benchmarks, 200 nodes)
+
+| Benchmark | What It Tests |
+|-----------|---------------|
+| `signal_dispatch_throughput` | Full emit -> drain -> trigger pipeline |
+| `signal_idle_no_signals` | Per-frame overhead when idle (200 frames) |
+| `signal_connection_setup` | FFI cost of 200 Callable+connect calls |
 
 ## CI Integration
 
@@ -68,7 +125,7 @@ These benchmarks measure the performance of our **PackedArray optimization** for
 
 Every PR automatically runs benchmarks and compares against the `main` branch baseline:
 
-1. **PR opened/updated** → Benchmarks run automatically
+1. **PR opened/updated** -> Benchmarks run automatically
 2. **Compare** against baseline from `main`
 3. **Comment on PR** with results table
 4. **Fail if regression** > 10% slowdown detected
@@ -88,12 +145,13 @@ When code is merged to `main`:
 Add to `itest/rust/src/benchmarks.rs`:
 
 ```rust
-use godot_bevy_itest_macros::bench;
+use godot_bevy_test::bench;
 
-#[bench(repeat = 3)]  // Optional: custom repetitions
+#[bench(repeat = 3)]  // Optional: custom inner repetitions
 fn my_new_benchmark() -> i32 {
-    // Benchmark code - must return a value
-    // Will be run 3 times internally, plus 200 warmup + 501 test runs
+    // Benchmark code - must return a value to prevent dead-code elimination.
+    // Will be run 3 times internally per iteration,
+    // plus 5 warmup + 21 test runs by the harness.
 
     let result = do_expensive_operation();
     result
@@ -104,6 +162,7 @@ fn my_new_benchmark() -> i32 {
 - Must return a value (prevents compiler optimization)
 - Should be deterministic (avoid randomness)
 - Keep runtime reasonable (< 1 second per iteration)
+- Test the real plugin/system, not raw FFI (see [CLAUDE.md](../CLAUDE.md) Benchmark Philosophy)
 
 ### 2. Run Locally
 
@@ -126,15 +185,23 @@ The CI will automatically:
 ```
 itest/
 ├── run-benches.sh              # Main entry point
-├── parse-bench-results.py      # Parse output → JSON
+├── compare-benches.sh          # A/B comparison (current vs base branch)
 ├── baseline.json               # CI-generated baseline
 └── rust/
-    ├── src/
-    │   ├── benchmarks.rs       # Benchmark definitions
-    │   └── framework/
-    │       └── bencher.rs      # Benchmark runner
-    └── macros/
-        └── src/lib.rs          # #[bench] macro
+    └── src/
+        └── benchmarks.rs       # All benchmark definitions
+
+godot-bevy-test/
+└── src/
+    ├── bencher.rs              # Benchmark runner (warmup, stats)
+    └── lib.rs                  # #[bench] proc-macro re-export
+
+.github/
+├── workflows/
+│   ├── benchmarks.yml          # Runs benchmarks, checks regressions, saves artifacts
+│   └── benchmark-comment.yml   # Posts results as PR comments (elevated permissions)
+└── scripts/
+    └── benchmarks-compare.py   # JSON comparison and regression detection
 ```
 
 ### How It Works
@@ -144,9 +211,9 @@ itest/
    - Registration in plugin system
    - Uses `std::hint::black_box()` to prevent optimization
 
-2. **Benchmark runner** (`bencher.rs`):
-   - 200 warmup runs
-   - 501 test runs (odd number for clean median)
+2. **Benchmark runner** (`godot-bevy-test/src/bencher.rs`):
+   - 5 warmup runs
+   - 21 test runs (odd number for clean median)
    - Reports min and median (ignores outliers)
 
 3. **CI workflows**:
@@ -158,19 +225,19 @@ itest/
 
 ### itest Benchmarks (THIS - Used in CI)
 
-✅ **Fast**: ~1 minute total
-✅ **Deterministic**: Measures exact µs/ms
-✅ **Focused**: Tests specific optimizations
-✅ **Headless**: No rendering overhead
-✅ **CI-friendly**: Runs on every PR
+- **Fast**: ~2 minutes total
+- **Deterministic**: Measures exact us/ms
+- **Focused**: Tests specific systems and plugins
+- **Headless**: No rendering overhead
+- **CI-friendly**: Runs on every PR
 
 ### perf-test Example (Demo/Manual Testing)
 
-✅ **End-to-end**: Full game loop with rendering
-✅ **Visual**: Users can see and interact
-✅ **Comparison**: GDScript vs Bevy implementations
-❌ **Slow**: ~10+ minutes to run
-❌ **Flaky**: FPS varies with hardware
+- **End-to-end**: Full game loop with rendering
+- **Visual**: Users can see and interact
+- **Comparison**: GDScript vs Bevy implementations
+- Slow: ~10+ minutes to run
+- Flaky: FPS varies with hardware
 
 **Recommendation**: Use itest benchmarks for CI regression detection, keep perf-test as user-facing demo.
 
@@ -180,18 +247,18 @@ itest/
 
 ```json
 {
-  "timestamp": "2025-10-10T10:00:00.000000",
+  "timestamp": "2025-10-16T15:53:12.483786",
   "benchmarks": {
-    "transform_update_individual_3d": {
-      "min_ns": 6250000.0,
-      "median_ns": 6410000.0,
-      "min_display": "6.25ms",
-      "median_display": "6.41ms"
+    "transform_sync_bevy_to_godot_3d": {
+      "min_ns": 1580000.0,
+      "median_ns": 1590000.0,
+      "min_display": "1.58ms",
+      "median_display": "1.59ms"
     }
   },
   "ci_metadata": {
     "commit": "abc123...",
-    "timestamp": "2025-10-10T10:00:00Z",
+    "timestamp": "2025-10-16T15:53:12Z",
     "runner": "GitHub Actions"
   }
 }
@@ -201,7 +268,8 @@ itest/
 
 ```bash
 cd itest
-./run-benches.sh 2>&1 | python3 parse-bench-results.py --output baseline.json
+# Run benchmarks with JSON output, then copy the result to baseline.json
+BENCHMARK_JSON=1 BENCHMARK_JSON_PATH=baseline.json ./run-benches.sh
 git add baseline.json
 git commit -m "chore: update benchmark baseline"
 ```
@@ -210,40 +278,45 @@ git commit -m "chore: update benchmark baseline"
 
 ### Threshold
 
-Default: **90%** (10% slowdown allowed)
+Default: **10%** slowdown triggers a regression warning.
 
-Configurable via `--threshold` parameter:
-```bash
-python3 parse-bench-results.py --baseline baseline.json --threshold 0.95  # 5% tolerance
-```
+The comparison script (`benchmarks-compare.py`) classifies each benchmark as:
+
+| Change | Status |
+|--------|--------|
+| > +10% | `regression` (flagged in PR) |
+| +5% to +10% | `slower` (noted, not flagged) |
+| -5% to +5% | `neutral` |
+| < -5% | `faster` (improvement) |
 
 ### What Triggers Failure
 
-A benchmark fails regression check if:
+A benchmark is flagged as a regression if:
 ```
-current_median / baseline_median > 1.11  # More than 11% slower (with 90% threshold)
+(current_median - baseline_median) / baseline_median > 0.10  # More than 10% slower
 ```
 
 ### Example PR Comment
 
 ```markdown
-## 📊 Benchmark Results
+## Benchmark Results
 
 | Benchmark | Median | Min |
 |-----------|--------|-----|
-| transform_update_individual_3d | 6.70ms | 6.32ms |
-| transform_update_bulk_3d | 4.88ms | 4.42ms |
+| transform_sync_bevy_to_godot_3d | 1.62ms | 1.58ms |
+| transform_sync_godot_to_bevy_3d | 1.44ms | 1.40ms |
+| scene_tree_process_node_added_optimized | 1.92ms | 1.80ms |
 
 ### Regression Check
 
-⚠️ Performance Regressions Detected:
+Performance Regressions Detected:
 
-**transform_update_bulk_3d**:
-  - Baseline: 2.10ms
-  - Current:  4.88ms
-  - Regression: +132.4% slower
+**scene_tree_process_node_added_optimized**:
+  - Baseline: 0.95ms
+  - Current:  1.92ms
+  - Regression: +101.1% slower
 
-> ⚠️ **Warning**: Performance regressions detected. Please investigate before merging.
+> Warning: Performance regressions detected. Please investigate before merging.
 ```
 
 ## Troubleshooting
@@ -252,15 +325,15 @@ current_median / baseline_median > 1.11  # More than 11% slower (with 90% thresh
 
 Check that:
 - Benchmarks are in `itest/rust/src/benchmarks.rs`
-- Using `#[bench]` macro from `godot_bevy_itest_macros`
+- Using `#[bench]` macro from `godot_bevy_test`
 - Function returns a value
 - `mod benchmarks;` is in `lib.rs`
 
 ### "Benchmarks taking too long"
 
-Reduce entity count in `BENCH_ENTITY_COUNT` constant or reduce `repeat` parameter:
+Reduce entity count constants or reduce the `repeat` parameter:
 ```rust
-const BENCH_ENTITY_COUNT: usize = 1000;  // Down from 5000
+const NODE_COUNT: usize = 500;  // Down from 1000
 
 #[bench(repeat = 1)]  // Down from 3
 fn my_benchmark() -> i32 { ... }
@@ -277,15 +350,14 @@ for node in nodes {
 
 ## Future Improvements
 
-- [ ] Add benchmarks for scene tree event processing
 - [ ] Benchmark asset loading performance
-- [ ] Add audio system benchmarks
+- [ ] Add audio system benchmarks (deferred: <100 concurrent sounds is not a realistic bottleneck)
 - [ ] Compare different entity counts (scaling)
 - [ ] Add memory usage tracking
 - [ ] Benchmark parallel ECS systems
 
 ## References
 
-- [CLAUDE.md](../CLAUDE.md) - PackedArray optimization pattern
+- [CLAUDE.md](../CLAUDE.md) - Benchmark philosophy, PackedArray optimization pattern
 - [gdext benchmarking](https://github.com/godot-rust/gdext/tree/master/itest) - Inspiration for this system
 - [Criterion.rs](https://github.com/bheisler/criterion.rs) - Statistical benchmarking (not used, but relevant)

@@ -3,13 +3,14 @@
 //! These benchmarks test the actual godot-bevy systems rather than raw FFI overhead.
 //! They measure real-world performance of syncing transforms between Bevy and Godot.
 
+use bevy::prelude::{Event, On, ResMut, Resource};
 use crossbeam_channel as mpsc;
 use godot::builtin::StringName;
 use godot::classes::{Area3D, Engine, InputEventKey, InputMap, Node, Node2D, Node3D, SceneTree};
 use godot::global::Key;
 use godot::obj::{NewAlloc, Singleton};
 use godot::prelude::*;
-use godot_bevy::bevy_app::{App, First, Last, PreUpdate};
+use godot_bevy::bevy_app::{App, First, Last, PostUpdate, PreUpdate, Update};
 use godot_bevy::bevy_math::Vec3;
 use godot_bevy::bevy_transform::components::Transform as BevyTransform;
 use godot_bevy::interop::{GodotMainThread, GodotNodeHandle, Node2DMarker, Node3DMarker};
@@ -19,10 +20,12 @@ use godot_bevy::plugins::collisions::{
 };
 use godot_bevy::plugins::core::{PrePhysicsUpdate, SceneTreeComponentRegistry};
 use godot_bevy::plugins::input::{GodotInputEventPlugin, InputEventReader, InputEventType};
+use godot_bevy::plugins::packed_scene::{GodotPackedScenePlugin, GodotScene};
 use godot_bevy::plugins::scene_tree::{
     GodotSceneTreePlugin, NodeEntityIndex, SceneTreeMessage, SceneTreeMessageReader,
     SceneTreeMessageType,
 };
+use godot_bevy::plugins::signals::{GodotSignals, GodotSignalsPlugin};
 use godot_bevy::plugins::transforms::{
     GodotTransformSyncPlugin, GodotTransformSyncPluginExt, TransformSyncMetadata, TransformSyncMode,
 };
@@ -885,4 +888,204 @@ fn input_action_checking_many_events_many_actions() -> i32 {
     }
 
     (INPUT_EVENT_COUNT * INPUT_ACTION_COUNT) as i32
+}
+
+// =============================================================================
+// Packed Scene Spawning Benchmarks
+// =============================================================================
+// These benchmarks measure the performance of spawning Godot scenes from Bevy,
+// using the real spawn_scene() system in PostUpdate.
+
+const PACKED_SCENE_COUNT: usize = 100;
+
+/// Creates a Bevy App with packed scene spawning infrastructure.
+/// IMPORTANT: Only run PostUpdate — never PreStartup, which would panic
+/// without a SceneTreeWatcher in the scene tree.
+fn setup_packed_scene_benchmark_app() -> App {
+    let mut app = App::new();
+
+    app.init_schedule(First);
+    app.init_schedule(PostUpdate);
+
+    app.insert_non_send_resource(GodotMainThread);
+    app.init_resource::<SceneTreeComponentRegistry>();
+
+    // Scene tree plugin provides SceneTreeRef (needed by spawn_scene)
+    app.add_plugins(GodotSceneTreePlugin::default());
+    // Packed scene plugin adds spawn_scene system to PostUpdate
+    app.add_plugins(GodotPackedScenePlugin);
+    // Asset plugin provides AssetServer + Assets<GodotResource> (needed by spawn_scene)
+    app.add_plugins(godot_bevy::plugins::assets::GodotAssetsPlugin);
+
+    for _ in 0..PACKED_SCENE_COUNT {
+        app.world_mut()
+            .spawn(GodotScene::from_path("res://test_spawn_scene.tscn"));
+    }
+
+    app
+}
+
+/// Cleanup spawned scene instances by querying GodotNodeHandle entities.
+fn cleanup_packed_scene_nodes(app: &mut App) {
+    let mut query = app.world_mut().query::<&GodotNodeHandle>();
+    let handles: Vec<GodotNodeHandle> = query.iter(app.world()).copied().collect();
+
+    for handle in handles {
+        if let Ok(node) = Gd::<Node>::try_from_instance_id(handle.instance_id()) {
+            node.free();
+        }
+    }
+}
+
+/// Benchmark: Batch spawn 100 instances of the same packed scene
+///
+/// This runs the real spawn_scene() system which:
+/// 1. Loads via ResourceLoader (1st instance)
+/// 2. Hits per-frame HashMap cache (remaining 99)
+/// 3. Instantiates each PackedScene
+/// 4. Adds each instance to the scene tree
+/// 5. Inserts GodotNodeHandle on each entity
+#[bench(repeat = 3)]
+fn packed_scene_batch_spawn() -> i32 {
+    let mut app = setup_packed_scene_benchmark_app();
+
+    // Run PostUpdate which contains the spawn_scene system
+    app.world_mut().run_schedule(PostUpdate);
+
+    let result = PACKED_SCENE_COUNT as i32;
+
+    cleanup_packed_scene_nodes(&mut app);
+
+    result
+}
+
+// =============================================================================
+// Signal System Benchmarks
+// =============================================================================
+// These benchmarks measure the performance of the Godot signal → Bevy observer
+// pipeline: signal connection setup, per-frame dispatch throughput, and idle overhead.
+
+const SIGNAL_NODE_COUNT: usize = 200;
+
+#[derive(Event, Clone, Debug)]
+struct BenchSignalEvent {
+    #[allow(dead_code)]
+    value: i32,
+}
+
+#[derive(Resource, Default)]
+struct SignalCounter(i32);
+
+/// System that connects signals on all entities with GodotNodeHandle.
+/// Added to Update schedule, run once during setup, then schedule is not run again.
+fn connect_bench_signals(
+    query: bevy::prelude::Query<(bevy::prelude::Entity, &GodotNodeHandle)>,
+    signals: GodotSignals<BenchSignalEvent>,
+) {
+    for (entity, handle) in query.iter() {
+        signals.connect(*handle, "bench_signal", Some(entity), |_, _, _| {
+            Some(BenchSignalEvent { value: 1 })
+        });
+    }
+}
+
+/// Creates a signal benchmark app with N nodes that have custom "bench_signal" user signals.
+/// Returns the app and the nodes (to keep them alive and for emitting signals).
+fn setup_signal_benchmark_app() -> (App, Vec<Gd<Node>>) {
+    let mut app = App::new();
+
+    app.init_schedule(First);
+    app.init_schedule(Update);
+    app.init_schedule(Last);
+
+    app.add_plugins(GodotSignalsPlugin::<BenchSignalEvent>::default());
+    app.insert_non_send_resource(GodotMainThread);
+    app.init_resource::<SignalCounter>();
+    app.add_observer(
+        |_: On<BenchSignalEvent>, mut counter: ResMut<SignalCounter>| {
+            counter.0 += 1;
+        },
+    );
+
+    let mut nodes = Vec::with_capacity(SIGNAL_NODE_COUNT);
+
+    for i in 0..SIGNAL_NODE_COUNT {
+        let mut node = Node::new_alloc();
+        node.set_name(&format!("BenchSignalNode_{i}"));
+        node.add_user_signal("bench_signal");
+
+        let handle = GodotNodeHandle::new(node.clone());
+        app.world_mut().spawn(handle);
+        nodes.push(node);
+    }
+
+    (app, nodes)
+}
+
+/// Sets up signal connections by running the connect system once.
+/// After this call, all nodes have their "bench_signal" connected to the observer pipeline.
+fn connect_all_bench_signals(app: &mut App) {
+    app.add_systems(Update, connect_bench_signals);
+    app.world_mut().run_schedule(Update); // Queues connections to PendingSignalConnections
+    app.world_mut().run_schedule(Last); // Processes pending → actually connects via FFI
+}
+
+/// Benchmark: Signal dispatch throughput (full pipeline)
+///
+/// Measures the complete signal pipeline per frame:
+/// 1. Godot signal emission (emit_signal on each node)
+/// 2. Callable closure runs → Variant cloning → crossbeam channel push
+/// 3. drain_and_trigger_signals exclusive system drains channel
+/// 4. world.trigger() fires observer for each event
+#[bench(repeat = 3)]
+fn signal_dispatch_throughput() -> i32 {
+    let (mut app, mut nodes) = setup_signal_benchmark_app();
+    connect_all_bench_signals(&mut app);
+
+    let signal_name = StringName::from("bench_signal");
+
+    // Emit signals on all nodes (synchronously runs callable closures,
+    // pushing events to the crossbeam channel)
+    for node in &mut nodes {
+        node.emit_signal(&signal_name, &[]);
+    }
+
+    // Drain channel and trigger observers
+    app.world_mut().run_schedule(First);
+
+    // Verify all signals were dispatched
+    let counter = app.world().resource::<SignalCounter>();
+    assert_eq!(counter.0, SIGNAL_NODE_COUNT as i32);
+
+    let result = SIGNAL_NODE_COUNT as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+/// Benchmark: Signal connection setup cost (FFI)
+///
+/// Measures the cost of process_pending_signal_connections in the Last schedule:
+/// 200x Callable::from_fn() creation + 200x node.connect() FFI calls.
+#[bench(repeat = 3)]
+fn signal_connection_setup() -> i32 {
+    let (mut app, nodes) = setup_signal_benchmark_app();
+
+    // Queue connections (runs connect_bench_signals in Update)
+    app.add_systems(Update, connect_bench_signals);
+    app.world_mut().run_schedule(Update);
+
+    // Measure: process pending connections (FFI: Callable creation + node.connect)
+    app.world_mut().run_schedule(Last);
+
+    let result = SIGNAL_NODE_COUNT as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
 }
