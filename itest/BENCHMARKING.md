@@ -54,9 +54,7 @@ itest/rust/src/benchmarks.rs:14
   collisions_process_start_end_burst                             5.80ms       6.10ms
   input_action_checking_many_events_many_actions                 0.90ms       0.95ms
   packed_scene_batch_spawn                                       4.20ms       4.40ms
-  packed_scene_spawn_with_transforms                             4.50ms       4.70ms
   signal_dispatch_throughput                                      0.60ms       0.65ms
-  signal_idle_no_signals                                         0.01ms       0.02ms
   signal_connection_setup                                        1.20ms       1.30ms
 
 Benchmarks completed in 85.32s.
@@ -64,7 +62,7 @@ Benchmarks completed in 85.32s.
 
 ## What We Benchmark
 
-The suite contains **20 benchmarks** across six categories. Every benchmark runs the real godot-bevy systems (plugins, schedules, ECS queries) rather than raw FFI calls, so regressions in actual user-facing code are caught.
+The suite contains **17 benchmarks** across six categories. Every benchmark runs the real godot-bevy systems (plugins, schedules, ECS queries) rather than raw FFI calls, so regressions in actual user-facing code are caught.
 
 ### Transform Synchronization (6 benchmarks, 1000 entities)
 
@@ -104,19 +102,17 @@ These benchmarks measure the `GodotSceneTreePlugin` systems that process node-ad
 |-----------|---------------|
 | `input_action_checking_many_events_many_actions` | 100 events x 50 actions |
 
-### Packed Scene Spawning (2 benchmarks, 100 scenes)
+### Packed Scene Spawning (1 benchmark, 100 scenes)
 
 | Benchmark | What It Tests |
 |-----------|---------------|
 | `packed_scene_batch_spawn` | Batch spawn 100 instances (per-frame cache) |
-| `packed_scene_spawn_with_transforms` | Batch spawn with transform application |
 
-### Signal System (3 benchmarks, 200 nodes)
+### Signal System (2 benchmarks, 200 nodes)
 
 | Benchmark | What It Tests |
 |-----------|---------------|
 | `signal_dispatch_throughput` | Full emit -> drain -> trigger pipeline |
-| `signal_idle_no_signals` | Per-frame overhead when idle (200 frames) |
 | `signal_connection_setup` | FFI cost of 200 Callable+connect calls |
 
 ## CI Integration

@@ -100,15 +100,14 @@ impl IntoGodotTransform2D for BevyTransform {
         // Derive cos(θ) and sin(θ) from the quaternion using the double-angle identity:
         //   cos(θ) = w² - z²
         //   sin(θ) = 2·w·z
-        let (cos_rot, sin_rot) =
-            if self.rotation.x.abs() < 1e-6 && self.rotation.y.abs() < 1e-6 {
-                let w = self.rotation.w;
-                let z = self.rotation.z;
-                (w * w - z * z, 2.0 * w * z)
-            } else {
-                let (_, _, angle) = self.rotation.to_euler(bevy_math::EulerRot::XYZ);
-                angle.sin_cos()
-            };
+        let (cos_rot, sin_rot) = if self.rotation.x.abs() < 1e-6 && self.rotation.y.abs() < 1e-6 {
+            let w = self.rotation.w;
+            let z = self.rotation.z;
+            (w * w - z * z, 2.0 * w * z)
+        } else {
+            let (_, _, angle) = self.rotation.to_euler(bevy_math::EulerRot::XYZ);
+            angle.sin_cos()
+        };
 
         // Apply scale to rotation matrix
         let a = Vector2::new(cos_rot * self.scale.x, sin_rot * self.scale.x);
