@@ -13,8 +13,6 @@ name = "godot_bevy_itest"
 
 [features]
 default = []
-# Enable internal/exploratory benchmarks (not tracked in CI)
-internal-benchmarks = []
 
 [dependencies]
 godot = { workspace = true, features = ["__trace"] }

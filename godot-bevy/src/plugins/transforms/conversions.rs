@@ -30,19 +30,31 @@ impl IntoBevyTransform for GodotTransform3D {
 impl IntoBevyTransform for GodotTransform2D {
     #[inline]
     fn to_bevy_transform(self) -> BevyTransform {
-        // Extract 2D position
         let translation = vec3(self.origin.x, self.origin.y, 0.0);
 
-        // Extract 2D rotation (z-axis rotation from the 2D transform matrix)
-        // Optimization: We only need the angle for quaternion construction
-        let rotation_angle = self.a.y.atan2(self.a.x);
-        let rotation = Quat::from_rotation_z(rotation_angle);
-
-        // Extract 2D scale from the transform matrix
-        // Optimization: Could use length_squared and defer sqrt, but we need the actual scale values
+        // Scale = column lengths of the 2D rotation+scale matrix
         let scale_x = (self.a.x * self.a.x + self.a.y * self.a.y).sqrt();
         let scale_y = (self.b.x * self.b.x + self.b.y * self.b.y).sqrt();
         let scale = Vec3::new(scale_x, scale_y, 1.0);
+
+        // Build quaternion from the normalized matrix column using half-angle identities:
+        //   cos(θ) = a.x / scale_x,  sin(θ) = a.y / scale_x
+        //   q.w = cos(θ/2) = sqrt((1 + cos(θ)) / 2)
+        //   q.z = sin(θ/2) = sin(θ) / (2 · q.w)
+        let rotation = if scale_x > 1e-6 {
+            let cos_theta = self.a.x / scale_x;
+            let sin_theta = self.a.y / scale_x;
+            let cos_half = ((1.0 + cos_theta) * 0.5).sqrt();
+            let sin_half = if cos_half.abs() > 1e-6 {
+                sin_theta / (2.0 * cos_half)
+            } else {
+                // θ ≈ ±π, cos(θ/2) ≈ 0, sin(θ/2) ≈ ±1
+                if sin_theta >= 0.0 { 1.0 } else { -1.0 }
+            };
+            Quat::from_xyzw(0.0, 0.0, sin_half, cos_half)
+        } else {
+            Quat::IDENTITY
+        };
 
         BevyTransform {
             translation,
@@ -85,27 +97,22 @@ impl IntoGodotTransform for BevyTransform {
 impl IntoGodotTransform2D for BevyTransform {
     #[inline]
     fn to_godot_transform_2d(self) -> GodotTransform2D {
-        // For 2D transforms, we expect a quaternion representing pure Z-axis rotation
-        // A pure Z rotation has the form: (0, 0, sin(θ/2), cos(θ/2))
-        // We can check if x and y components are near zero
-        let rotation_z = if self.rotation.x.abs() < 1e-6 && self.rotation.y.abs() < 1e-6 {
-            // Pure Z rotation - use optimized extraction
-            // angle = 2 * atan2(z, w)
-            2.0 * self.rotation.z.atan2(self.rotation.w)
+        // Derive cos(θ) and sin(θ) from the quaternion using the double-angle identity:
+        //   cos(θ) = w² - z²
+        //   sin(θ) = 2·w·z
+        let (cos_rot, sin_rot) = if self.rotation.x.abs() < 1e-6 && self.rotation.y.abs() < 1e-6 {
+            let w = self.rotation.w;
+            let z = self.rotation.z;
+            (w * w - z * z, 2.0 * w * z)
         } else {
-            // Complex rotation - fall back to full Euler conversion
-            let (_, _, z) = self.rotation.to_euler(bevy_math::EulerRot::XYZ);
-            z
+            let (_, _, angle) = self.rotation.to_euler(bevy_math::EulerRot::XYZ);
+            angle.sin_cos()
         };
 
-        // Create 2D rotation matrix
-        let cos_rot = rotation_z.cos();
-        let sin_rot = rotation_z.sin();
-
         // Apply scale to rotation matrix
-        let a = godot::builtin::Vector2::new(cos_rot * self.scale.x, sin_rot * self.scale.x);
-        let b = godot::builtin::Vector2::new(-sin_rot * self.scale.y, cos_rot * self.scale.y);
-        let origin = godot::builtin::Vector2::new(self.translation.x, self.translation.y);
+        let a = Vector2::new(cos_rot * self.scale.x, sin_rot * self.scale.x);
+        let b = Vector2::new(-sin_rot * self.scale.y, cos_rot * self.scale.y);
+        let origin = Vector2::new(self.translation.x, self.translation.y);
 
         GodotTransform2D { a, b, origin }
     }
