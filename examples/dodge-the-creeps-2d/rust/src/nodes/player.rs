@@ -6,7 +6,7 @@ use godot::prelude::*;
 pub struct Player {
     base: Base<Area2D>,
     screen_size: Vector2,
-    #[export]
+    #[var(pub)]
     speed: f32,
 }
 

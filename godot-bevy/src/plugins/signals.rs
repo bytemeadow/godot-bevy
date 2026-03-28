@@ -117,7 +117,7 @@ fn connect_signal<T>(
         Variant::nil()
     };
 
-    let callable = Callable::from_fn(&format!("signal_handler_{signal_name_copy}"), closure);
+    let callable = Callable::from_fn(format!("signal_handler_{signal_name_copy}"), closure);
     node_ref.connect(signal_name, &callable);
 }
 
@@ -410,7 +410,7 @@ where
             Variant::nil()
         };
 
-        let callable = Callable::from_fn(&format!("signal_handler_{signal_name_copy}"), closure);
+        let callable = Callable::from_fn(format!("signal_handler_{signal_name_copy}"), closure);
         node.connect(&signal_name, &callable);
     }
 }
@@ -574,7 +574,7 @@ where
 
             target_node.connect(
                 &signal_name,
-                &Callable::from_fn(&format!("signal_handler_{signal_name}"), closure),
+                &Callable::from_fn(format!("signal_handler_{signal_name}"), closure),
             );
         }
     }

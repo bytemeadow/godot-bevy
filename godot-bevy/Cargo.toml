@@ -57,8 +57,6 @@ trace_tracy = ["dep:tracing-tracy", "dep:tracing-subscriber"]
 experimental-threads = ["godot/experimental-threads"]
 # Godot API version features - matches gdext naming convention
 api-4-2 = ["godot/api-4-2"]
-api-4-2-1 = ["godot/api-4-2-1"]
-api-4-2-2 = ["godot/api-4-2-2"]
 api-4-3 = ["godot/api-4-3"]
 api-4-4 = ["godot/api-4-4"]
 api-4-5 = ["godot/api-4-5"]

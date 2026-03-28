@@ -17,7 +17,7 @@ fn find_bevy_app_node(
 ) -> Option<Gd<godot::classes::Node>> {
     for i in 0..scene_tree_node.get_child_count() {
         if let Some(child) = scene_tree_node.get_child(i)
-            && child.get_class() == GString::from("BevyApp")
+            && child.get_class() == "BevyApp"
         {
             return Some(child.clone());
         }

@@ -112,7 +112,8 @@ fn test_connect_object_signal(ctx: &TestContext) -> godot::task::TaskHandle {
         })
         .await;
 
-        let scene_tree: Gd<godot::classes::SceneTree> = ctx_clone.scene_tree.get_tree().unwrap();
+        let scene_tree: Gd<godot::classes::SceneTree> =
+            ctx_clone.scene_tree.get_tree_or_null().unwrap();
 
         app.with_world_mut(|world| {
             let mut system_state: bevy::ecs::system::SystemState<GodotSignals<NodeAdded>> =

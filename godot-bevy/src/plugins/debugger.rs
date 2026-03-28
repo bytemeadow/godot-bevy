@@ -146,8 +146,8 @@ fn debugger_exclusive_system(world: &mut World) {
                 continue;
             }
 
-            component_dict.set("name", GString::from(&full_name));
-            component_dict.set("short_name", GString::from(&short_name));
+            component_dict.set("name", full_name);
+            component_dict.set("short_name", short_name);
 
             // Try to get reflected value
             if let Some(ref registry) = type_registry {
@@ -160,7 +160,7 @@ fn debugger_exclusive_system(world: &mut World) {
                     // SAFETY: ptr is valid and type matches registration
                     let reflected = unsafe { reflect_from_ptr.as_reflect(ptr) };
                     let value_dict = reflect_to_dict(reflected);
-                    component_dict.set("value", value_dict);
+                    component_dict.set("value", &value_dict);
                 }
             }
 
@@ -204,10 +204,10 @@ fn reflect_to_dict(value: &dyn PartialReflect) -> Dictionary {
                 if let Some(field_name) = s.name_at(i)
                     && let Some(field_value) = s.field_at(i)
                 {
-                    fields.set(field_name, reflect_value_to_variant(field_value));
+                    fields.set(field_name, &reflect_value_to_variant(field_value));
                 }
             }
-            dict.set("fields", fields);
+            dict.set("fields", &fields);
         }
         ReflectRef::TupleStruct(ts) => {
             dict.set("type", "tuple_struct");
@@ -217,7 +217,7 @@ fn reflect_to_dict(value: &dyn PartialReflect) -> Dictionary {
                     fields.push(&reflect_value_to_variant(field_value));
                 }
             }
-            dict.set("fields", fields);
+            dict.set("fields", &fields);
         }
         ReflectRef::Tuple(t) => {
             dict.set("type", "tuple");
@@ -227,7 +227,7 @@ fn reflect_to_dict(value: &dyn PartialReflect) -> Dictionary {
                     fields.push(&reflect_value_to_variant(field_value));
                 }
             }
-            dict.set("fields", fields);
+            dict.set("fields", &fields);
         }
         ReflectRef::List(l) => {
             dict.set("type", "list");
@@ -237,7 +237,7 @@ fn reflect_to_dict(value: &dyn PartialReflect) -> Dictionary {
                     items.push(&reflect_value_to_variant(item));
                 }
             }
-            dict.set("items", items);
+            dict.set("items", &items);
         }
         ReflectRef::Map(m) => {
             dict.set("type", "map");
@@ -257,11 +257,11 @@ fn reflect_to_dict(value: &dyn PartialReflect) -> Dictionary {
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| i.to_string());
                 if let Some(field_value) = e.field_at(i) {
-                    fields.set(field_name, reflect_value_to_variant(field_value));
+                    fields.set(field_name, &reflect_value_to_variant(field_value));
                 }
             }
             if !fields.is_empty() {
-                dict.set("fields", fields);
+                dict.set("fields", &fields);
             }
         }
         ReflectRef::Array(a) => {
@@ -272,13 +272,13 @@ fn reflect_to_dict(value: &dyn PartialReflect) -> Dictionary {
                     items.push(&reflect_value_to_variant(item));
                 }
             }
-            dict.set("items", items);
+            dict.set("items", &items);
         }
         ReflectRef::Opaque(_) => {
             dict.set("type", "opaque");
             // Try to get debug representation
             if let Some(debug_str) = value.try_as_reflect().map(|r| format!("{r:?}")) {
-                dict.set("debug", GString::from(&debug_str));
+                dict.set("debug", debug_str);
             }
         }
     }

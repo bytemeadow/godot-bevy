@@ -211,7 +211,7 @@ fn on_quit(
     }
     println!("Quit button pressed (typed)");
     if let Some(button) = godot.try_get::<Button>(trigger.event().source)
-        && let Some(mut tree) = button.get_tree()
+        && let Some(mut tree) = button.get_tree_or_null()
     {
         tree.quit();
     }

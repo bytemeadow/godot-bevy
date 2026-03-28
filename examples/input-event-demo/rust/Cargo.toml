@@ -13,7 +13,7 @@ name = "input_event_example"
 [dependencies]
 bevy = { version = "0.18", default-features = false }
 fastrand = { version = "2.3.0" }
-godot = "0.4"
+godot = "0.5"
 godot-bevy = { path = "../../../godot-bevy" }
 leafwing-input-manager = "0.20"
 bevy_enhanced_input = "0.22"
