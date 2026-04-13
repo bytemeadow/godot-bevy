@@ -56,7 +56,12 @@ impl BevyApp {
     /// which skipped initialization in `_ready()` (no init func was set).
     pub fn initialize(&mut self) {
         self.app = None;
-        for name in &["SceneTreeWatcher", "OptimizedSceneTreeWatcher", "CollisionWatcher", "InputEventWatcher"] {
+        for name in &[
+            "SceneTreeWatcher",
+            "OptimizedSceneTreeWatcher",
+            "CollisionWatcher",
+            "InputEventWatcher",
+        ] {
             if let Some(mut child) = self.base().try_get_node_as::<godot::classes::Node>(*name) {
                 self.base_mut().remove_child(&child);
                 child.queue_free();
