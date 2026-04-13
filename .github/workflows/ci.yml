@@ -21,7 +21,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  GODOT_VERSION: "4.5.1"
+  GODOT_VERSION: "4.6.2"
   GDENV_VERSION: "0.2.2"
 
 permissions:

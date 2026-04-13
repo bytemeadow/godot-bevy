@@ -285,7 +285,7 @@ fn check_action_events(
     input_event: &Gd<GodotInputEvent>,
     action_events: &mut MessageWriter<ActionInput>,
 ) {
-    let mut input_map = InputMap::singleton();
+    let input_map = InputMap::singleton();
     let actions = input_map.get_actions();
 
     for action_name in actions.iter_shared() {

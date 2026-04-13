@@ -8,10 +8,6 @@
 
 #[cfg(feature = "api-4-2")]
 mod node_markers4_2;
-#[cfg(feature = "api-4-2-1")]
-mod node_markers4_2_1;
-#[cfg(feature = "api-4-2-2")]
-mod node_markers4_2_2;
 #[cfg(feature = "api-4-3")]
 mod node_markers4_3;
 #[cfg(feature = "api-4-4")]
@@ -23,10 +19,6 @@ mod node_markers4_6;
 
 #[cfg(feature = "api-4-2")]
 pub use node_markers4_2::*;
-#[cfg(feature = "api-4-2-1")]
-pub use node_markers4_2_1::*;
-#[cfg(feature = "api-4-2-2")]
-pub use node_markers4_2_2::*;
 #[cfg(feature = "api-4-3")]
 pub use node_markers4_3::*;
 #[cfg(feature = "api-4-4")]
@@ -38,8 +30,6 @@ pub use node_markers4_6::*;
 
 #[cfg(not(any(
     feature = "api-4-2",
-    feature = "api-4-2-1",
-    feature = "api-4-2-2",
     feature = "api-4-3",
     feature = "api-4-4",
     feature = "api-4-5",
@@ -50,8 +40,6 @@ pub use node_markers4_6::*;
 mod node_markers4_6;
 #[cfg(not(any(
     feature = "api-4-2",
-    feature = "api-4-2-1",
-    feature = "api-4-2-2",
     feature = "api-4-3",
     feature = "api-4-4",
     feature = "api-4-5",

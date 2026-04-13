@@ -7,7 +7,7 @@ pub struct Player {
     base: Base<Area2D>,
     screen_size: Vector2,
     #[export]
-    speed: f32,
+    pub speed: f32,
 }
 
 #[godot_api]

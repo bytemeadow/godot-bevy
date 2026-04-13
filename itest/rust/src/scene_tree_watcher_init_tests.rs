@@ -10,19 +10,13 @@
 use godot::prelude::*;
 use godot_bevy_test::prelude::*;
 
-/// Find the BevyApp node that TestApp created as a child of ctx.scene_tree.
-/// Returns the first child that is a BevyApp.
+/// Find the BevyAppSingleton autoload node.
 fn find_bevy_app_node(
     scene_tree_node: &Gd<godot::classes::Node>,
 ) -> Option<Gd<godot::classes::Node>> {
-    for i in 0..scene_tree_node.get_child_count() {
-        if let Some(child) = scene_tree_node.get_child(i)
-            && child.get_class() == GString::from("BevyApp")
-        {
-            return Some(child.clone());
-        }
-    }
-    None
+    let tree = scene_tree_node.get_tree();
+    let root = tree.get_root()?;
+    root.try_get_node_as::<godot::classes::Node>("BevyAppSingleton")
 }
 
 /// Count children whose name starts with the given prefix.

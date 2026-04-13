@@ -69,7 +69,7 @@ fn player_on_ready(
     if let Ok((entity, mut player_data, player_handle)) = player.single_mut() {
         let player = godot.get::<GodotPlayerNode>(*player_handle);
         let screen_size = player.get_viewport_rect().size;
-        player_data.speed = player.bind().get_speed();
+        player_data.speed = player.bind().speed;
 
         // Mark as initialized and add command system components
         commands

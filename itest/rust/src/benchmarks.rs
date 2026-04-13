@@ -580,27 +580,22 @@ fn create_collision_body_nodes() -> Vec<Gd<Node>> {
     nodes
 }
 
-/// Ensures a CollisionWatcher node exists in the scene tree.
-/// The plugin looks for CollisionWatcher at:
-/// 1. /root/BevyAppSingleton/CollisionWatcher
-/// 2. BevyAppSingleton/CollisionWatcher
-/// 3. Fallback: recursive search from root
-///
-/// For benchmarks, we add it directly to root and rely on the fallback search.
+/// Ensures a CollisionWatcher node exists under BevyAppSingleton, mirroring production layout.
 fn ensure_collision_watcher() -> Gd<Node> {
     let scene_tree = get_scene_tree();
     let root = scene_tree.get_root().expect("Root should exist");
 
-    // Check if CollisionWatcher already exists (direct child of root)
-    if let Some(watcher) = root.try_get_node_as::<Node>("CollisionWatcher") {
+    if let Some(watcher) = root.try_get_node_as::<Node>("BevyAppSingleton/CollisionWatcher") {
         return watcher;
     }
 
-    // Create a new CollisionWatcher as direct child of root
-    // The plugin's find_node_by_name will find it via recursive search
+    let bevy_app = root
+        .try_get_node_as::<Node>("BevyAppSingleton")
+        .expect("BevyAppSingleton autoload should exist in benchmark scene");
+
     let mut watcher = CollisionWatcher::new_alloc();
     watcher.set_name("CollisionWatcher");
-    root.clone().add_child(&watcher);
+    bevy_app.clone().add_child(&watcher);
     watcher.upcast()
 }
 
@@ -641,7 +636,9 @@ fn scene_tree_process_collision_bodies_optimized() -> i32 {
     // Verify watcher is in tree
     let scene_tree = get_scene_tree();
     let root = scene_tree.get_root().expect("Root should exist");
-    let watcher_found = root.try_get_node_as::<Node>("CollisionWatcher").is_some();
+    let watcher_found = root
+        .try_get_node_as::<Node>("BevyAppSingleton/CollisionWatcher")
+        .is_some();
     if !watcher_found {
         godot::prelude::godot_error!("[BENCH] CollisionWatcher not found in tree!");
     }
