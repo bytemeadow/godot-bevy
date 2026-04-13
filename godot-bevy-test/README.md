@@ -30,7 +30,7 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-godot = "0.4"
+godot = "0.5"
 godot-bevy = "0.11"
 godot-bevy-test = "0.11"
 bevy = { version = "0.18", default-features = false }
@@ -162,8 +162,8 @@ app.with_world_mut(|world| { /* read-write */ });
 let transform = app.get_single::<Transform>();
 let entity = app.single_entity_with::<Player>();
 
-// Cleanup (automatic on drop)
-app.cleanup();
+// Cleanup (automatic on drop, but prefer explicit async cleanup)
+app.cleanup().await;
 ```
 
 ### Frame Helpers
