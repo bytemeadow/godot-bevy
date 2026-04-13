@@ -49,15 +49,13 @@ pub struct TestApp {
 }
 
 impl TestApp {
-    /// Create a new test app with custom setup.
+    /// Create a new test app by initializing the BevyAppSingleton autoload.
     ///
-    /// Returns a fully-settled app: the BevyApp is added to the scene tree,
-    /// `ready()` has fired, and two frames have elapsed so that the initial
+    /// Returns a fully-settled app: two frames have elapsed so that the initial
     /// scene tree population is complete (messages written, swapped, and read).
     ///
     /// The setup function is called during BevyApp initialization.
     /// GodotCorePlugins is automatically added, providing scene tree integration.
-    /// The library handles all watcher creation automatically.
     pub async fn new<F>(ctx: &TestContext, setup: F) -> Self
     where
         F: FnOnce(&mut App) + Send + 'static,
@@ -235,10 +233,7 @@ impl TestApp {
     /// from trying to access freed nodes.
     pub async fn cleanup(&mut self) {
         if let Some(mut app) = self.bevy_app.take() {
-            let mut binding = app.bind_mut();
-            binding.set_instance_init_func(Box::new(|_| {}));
-            binding.initialize();
-            drop(binding);
+            app.bind_mut().teardown();
         }
         await_frame().await;
     }
@@ -246,11 +241,8 @@ impl TestApp {
 
 impl Drop for TestApp {
     fn drop(&mut self) {
-        // Synchronous fallback if cleanup() wasn't called.
         if let Some(mut app) = self.bevy_app.take() {
-            let mut binding = app.bind_mut();
-            binding.set_instance_init_func(Box::new(|_| {}));
-            binding.initialize();
+            app.bind_mut().teardown();
         }
     }
 }
