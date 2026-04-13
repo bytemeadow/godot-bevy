@@ -373,7 +373,7 @@ fn check_async_test(
         godot::builtin::Variant::nil()
     });
 
-    let mut tree = ctx.scene_tree.get_tree().expect("Scene tree should exist");
+    let mut tree = ctx.scene_tree.get_tree();
     tree.connect_flags("process_frame", &deferred, ConnectFlags::ONE_SHOT);
 }
 
@@ -430,7 +430,7 @@ fn finish_test_run(
     write_exit_code(exit_code);
 
     // Now quit
-    ctx.scene_tree.get_tree().expect("tree").quit();
+    ctx.scene_tree.get_tree().quit();
 }
 
 fn output_json_results(results: Vec<(&str, std::time::Duration, std::time::Duration)>) {

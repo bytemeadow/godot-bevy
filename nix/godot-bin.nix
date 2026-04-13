@@ -27,29 +27,29 @@
   wayland ? null,
 }:
 let
-  version = "4.5.1";
+  version = "4.6.2";
   qualifier = "stable";
 
   sources = {
     # macOS universal binary (works on both x86_64 and aarch64)
     "x86_64-darwin" = {
       url = "https://github.com/godotengine/godot-builds/releases/download/${version}-${qualifier}/Godot_v${version}-${qualifier}_macos.universal.zip";
-      hash = "sha256-ZcJ5WdAqqs/BMex+y5AXm6gEUgDLApgr8r6W0RcBC4o=";
+      hash = "sha256-ZmsqZOS1xZ2w5JdGBbiI63LrfU5g6HDSvmzBlye1CAc=";
       executable = "Godot.app/Contents/MacOS/Godot";
     };
     "aarch64-darwin" = {
       url = "https://github.com/godotengine/godot-builds/releases/download/${version}-${qualifier}/Godot_v${version}-${qualifier}_macos.universal.zip";
-      hash = "sha256-ZcJ5WdAqqs/BMex+y5AXm6gEUgDLApgr8r6W0RcBC4o=";
+      hash = "sha256-ZmsqZOS1xZ2w5JdGBbiI63LrfU5g6HDSvmzBlye1CAc=";
       executable = "Godot.app/Contents/MacOS/Godot";
     };
     "x86_64-linux" = {
       url = "https://github.com/godotengine/godot-builds/releases/download/${version}-${qualifier}/Godot_v${version}-${qualifier}_linux.x86_64.zip";
-      hash = "sha256-AuxT0czNu9nPvMxjU1Oys0NEQRJEoEKLPy+WoMeHiM0=";
+      hash = "sha256-MOa20UHwzVvr1imtHQ7xMk5gCRuyBmLQJrQCuljFmTc=";
       executable = "Godot_v${version}-${qualifier}_linux.x86_64";
     };
     "aarch64-linux" = {
       url = "https://github.com/godotengine/godot-builds/releases/download/${version}-${qualifier}/Godot_v${version}-${qualifier}_linux.arm64.zip";
-      hash = "sha256-SkxtbQYGrMnQD3dVRkUp8SKy/LIhJEdU+JoNAyhwiA8=";
+      hash = "sha256-yRVBVN4UrLHzimyGGPAfQRHsvRzbzs0KUVG+Qt4r0ck=";
       executable = "Godot_v${version}-${qualifier}_linux.arm64";
     };
   };

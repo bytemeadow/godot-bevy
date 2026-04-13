@@ -3,10 +3,11 @@
     "devenv": {
       "locked": {
         "dir": "src/modules",
-        "lastModified": 1753300020,
+        "lastModified": 1776080969,
+        "narHash": "sha256-2uZxF6q0KOIH8tq3r65ZCz7dM+XYP3avtRP8IBq5zYY=",
         "owner": "cachix",
         "repo": "devenv",
-        "rev": "90266818017f7a6885edc75eb4a13b68862675ea",
+        "rev": "8d558a84fa38242a7f13781670fee1a6a8902b48",
         "type": "github"
       },
       "original": {
@@ -17,9 +18,9 @@
       }
     },
     "flake-compat": {
-      "flake": false,
       "locked": {
         "lastModified": 1747046372,
+        "narHash": "sha256-CIVLLkVgvHYbgI2UpXvIIBJ12HWgX+fjA8Xf8PUmqCY=",
         "owner": "edolstra",
         "repo": "flake-compat",
         "rev": "9100a0f413b0c601e0533d1d94ffd501ce2e7885",
@@ -31,67 +32,13 @@
         "type": "github"
       }
     },
-    "flake-compat_2": {
-      "locked": {
-        "lastModified": 1765121682,
-        "owner": "edolstra",
-        "repo": "flake-compat",
-        "rev": "65f23138d8d09a92e30f1e5c87611b23ef451bf3",
-        "type": "github"
-      },
-      "original": {
-        "owner": "edolstra",
-        "repo": "flake-compat",
-        "type": "github"
-      }
-    },
-    "git-hooks": {
-      "inputs": {
-        "flake-compat": "flake-compat",
-        "gitignore": "gitignore",
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1750779888,
-        "owner": "cachix",
-        "repo": "git-hooks.nix",
-        "rev": "16ec914f6fb6f599ce988427d9d94efddf25fe6d",
-        "type": "github"
-      },
-      "original": {
-        "owner": "cachix",
-        "repo": "git-hooks.nix",
-        "type": "github"
-      }
-    },
-    "gitignore": {
-      "inputs": {
-        "nixpkgs": [
-          "git-hooks",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1709087332,
-        "owner": "hercules-ci",
-        "repo": "gitignore.nix",
-        "rev": "637db329424fd7e46cf4185293b9cc8c88c95394",
-        "type": "github"
-      },
-      "original": {
-        "owner": "hercules-ci",
-        "repo": "gitignore.nix",
-        "type": "github"
-      }
-    },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1753934836,
+        "lastModified": 1775888245,
+        "narHash": "sha256-nwASzrRDD1JBEu/o8ekKYEXm/oJW6EMCzCRdrwcLe90=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "8679b16e11becd487b45d568358ddf9d5640d860",
+        "rev": "13043924aaa7375ce482ebe2494338e058282925",
         "type": "github"
       },
       "original": {
@@ -104,6 +51,7 @@
     "nixpkgs-emscripten": {
       "locked": {
         "lastModified": 1732896023,
+        "narHash": "sha256-H5XwF9vdzBvqWxR6WMVOiV/eESB3qFLKexWKtCPAuu0=",
         "owner": "nixos",
         "repo": "nixpkgs",
         "rev": "e255a9090e25aed2486f9fb00e5d645fb342d654",
@@ -118,10 +66,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1765772535,
+        "lastModified": 1751349533,
+        "narHash": "sha256-5XRh0mB06/7WYDLu9ZXsx1GhyvvNVZDtPyg34sUCLJs=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "09b8fda8959d761445f12b55f380d90375a1d6bb",
+        "rev": "bdfd0f2afcf764e531d0960c821ab070a6174b15",
         "type": "github"
       },
       "original": {
@@ -134,12 +83,8 @@
     "root": {
       "inputs": {
         "devenv": "devenv",
-        "git-hooks": "git-hooks",
         "nixpkgs": "nixpkgs",
         "nixpkgs-emscripten": "nixpkgs-emscripten",
-        "pre-commit-hooks": [
-          "git-hooks"
-        ],
         "rust-overlay": "rust-overlay",
         "tracy": "tracy"
       }
@@ -151,10 +96,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1753325142,
+        "lastModified": 1776050130,
+        "narHash": "sha256-/f/6/1WOfBJaGMfqV3VxWD9lpFRbPpF+Cx4MO+0mGok=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "cf608fb54d8854f31d7f7c499e2d2c928af48036",
+        "rev": "3c27f4c92a7d977556dd2c10bb564d9c61b375e9",
         "type": "github"
       },
       "original": {
@@ -165,11 +111,12 @@
     },
     "tracy": {
       "inputs": {
-        "flake-compat": "flake-compat_2",
+        "flake-compat": "flake-compat",
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
         "lastModified": 1751404470,
+        "narHash": "sha256-IEaRA4GiGV8VBep4I/L8yniZ8pyEC+mW/dV8O1H0uhE=",
         "owner": "allyourcodebase",
         "repo": "tracy",
         "rev": "2ffcfc74dd24e77113fb07b3044a3fb2f5c2c325",

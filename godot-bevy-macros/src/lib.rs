@@ -30,8 +30,8 @@ pub fn bevy_app(attr: TokenStream, item: TokenStream) -> TokenStream {
 
         #[gdextension]
         unsafe impl ExtensionLibrary for BevyExtensionLibrary {
-            fn on_level_init(level: godot::prelude::InitLevel) {
-                if level == godot::prelude::InitLevel::Core {
+            fn on_stage_init(stage: godot::prelude::InitStage) {
+                if stage == godot::prelude::InitStage::Core {
 
                     // Store the scene tree configuration
                     let _ = godot_bevy::app::BEVY_APP_CONFIG.set(godot_bevy::app::BevyAppConfig {
@@ -49,8 +49,8 @@ pub fn bevy_app(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
 
-            fn on_level_deinit(_level: godot::prelude::InitLevel) {
-                if _level == godot::prelude::InitLevel::Core {
+            fn on_stage_deinit(stage: godot::prelude::InitStage) {
+                if stage == godot::prelude::InitStage::Core {
                     // Shutdown profiling cleanly
                     // This function handles all feature gating internally
                     godot_bevy::profiling::shutdown_profiler();

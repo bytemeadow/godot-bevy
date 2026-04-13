@@ -99,7 +99,7 @@ impl BevyApp {
         let path = "res://addons/godot-bevy/optimized_scene_tree_watcher.gd";
 
         // Use FileAccess to check if file actually exists (ResourceLoader.exists() may cache)
-        if godot::classes::FileAccess::file_exists(&godot::builtin::GString::from(path)) {
+        if godot::classes::FileAccess::file_exists(path) {
             let mut resource_loader = godot::classes::ResourceLoader::singleton();
 
             // Try to load and instantiate the OptimizedSceneTreeWatcher GDScript class
@@ -134,7 +134,7 @@ impl BevyApp {
         let path = "res://addons/godot-bevy/optimized_bulk_operations.gd";
 
         // Use FileAccess to check if file actually exists
-        if godot::classes::FileAccess::file_exists(&godot::builtin::GString::from(path)) {
+        if godot::classes::FileAccess::file_exists(path) {
             let mut resource_loader = godot::classes::ResourceLoader::singleton();
 
             // Try to load and instantiate the OptimizedBulkOperations GDScript class

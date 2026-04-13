@@ -18,7 +18,7 @@ bevy = { version = "0.18", default-features = false, features = [
   "multi_threaded",
 ] }
 bevy_asset_loader = "0.25"
-godot = "0.4"
+godot = "0.5"
 godot-bevy = { path = "../../../godot-bevy" }
 cargo-godot-lib.workspace = true
 

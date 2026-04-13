@@ -13,7 +13,7 @@ name = "two_way_sync_example"
 [dependencies]
 godot-bevy = { path = "../../../godot-bevy" }
 bevy = { version = "0.18", default-features = false }
-godot = "0.4"
+godot = "0.5"
 cargo-godot-lib.workspace = true
 
 [features]
