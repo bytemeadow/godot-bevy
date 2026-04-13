@@ -66,27 +66,25 @@ impl TestApp {
 
         await_frame().await; // Wait for any previous test cleanup
 
-        let mut bevy_app = godot_bevy::BevyApp::new_alloc();
+        let scene_tree = ctx.scene_tree.get_tree();
+        let root = scene_tree.get_root().expect("Root should exist");
+        let mut bevy_app = root
+            .try_get_node_as::<godot_bevy::BevyApp>("BevyAppSingleton")
+            .expect("BevyAppSingleton autoload should exist");
 
         let setup_mutex = Mutex::new(Some(setup));
 
-        // Configure the app - the library will handle all watcher setup and core plugins
         bevy_app
             .bind_mut()
             .set_instance_init_func(Box::new(move |app: &mut App| {
-                // User setup - take from Mutex to call FnOnce
                 if let Some(setup_fn) = setup_mutex.lock().unwrap().take() {
                     setup_fn(app);
                 }
             }));
 
-        // Add to scene tree (triggers ready() which initializes the app)
-        ctx.scene_tree.clone().add_child(&bevy_app);
+        bevy_app.bind_mut().initialize();
 
-        // Wait for ready() to complete
         await_frame().await;
-
-        // Run one more frame so initial scene tree entities are created
         await_frame().await;
 
         Self {
@@ -230,16 +228,17 @@ impl TestApp {
         &self.ctx
     }
 
-    /// Clean up the TestApp, freeing the BevyApp node.
+    /// Clean up the TestApp, resetting the autoload's BevyApp for the next test.
     ///
     /// This should be called BEFORE calling queue_free() on any Godot nodes
     /// that have entities in the ECS. This prevents transform sync systems
     /// from trying to access freed nodes.
-    ///
-    /// Waits one frame for Godot to process the queue_free.
     pub async fn cleanup(&mut self) {
         if let Some(mut app) = self.bevy_app.take() {
-            app.queue_free();
+            let mut binding = app.bind_mut();
+            binding.set_instance_init_func(Box::new(|_| {}));
+            binding.initialize();
+            drop(binding);
         }
         await_frame().await;
     }
@@ -248,9 +247,10 @@ impl TestApp {
 impl Drop for TestApp {
     fn drop(&mut self) {
         // Synchronous fallback if cleanup() wasn't called.
-        // Prefer calling cleanup().await explicitly.
         if let Some(mut app) = self.bevy_app.take() {
-            app.queue_free();
+            let mut binding = app.bind_mut();
+            binding.set_instance_init_func(Box::new(|_| {}));
+            binding.initialize();
         }
     }
 }

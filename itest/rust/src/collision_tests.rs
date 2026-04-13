@@ -24,12 +24,9 @@ use godot_bevy_test::prelude::*;
 fn find_collision_watcher(
     scene_tree: &Gd<godot::classes::Node>,
 ) -> Option<Gd<godot::classes::Node>> {
-    for child in scene_tree.get_children().iter_shared() {
-        if let Some(watcher) = child.get_node_or_null("CollisionWatcher") {
-            return Some(watcher);
-        }
-    }
-    None
+    let tree = scene_tree.get_tree();
+    let root = tree.get_root()?;
+    root.try_get_node_as::<godot::classes::Node>("BevyAppSingleton/CollisionWatcher")
 }
 
 /// Send a collision event through the CollisionWatcher channel.

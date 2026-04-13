@@ -51,6 +51,77 @@ impl BevyApp {
         self.instance_init_func = Some(func);
     }
 
+    /// Initialize the Bevy app on an already-in-tree node.
+    /// Used by the test harness to initialize the autoload BevyApp
+    /// which skipped initialization in `_ready()` (no init func was set).
+    pub fn initialize(&mut self) {
+        self.app = None;
+        for name in &["SceneTreeWatcher", "OptimizedSceneTreeWatcher", "CollisionWatcher", "InputEventWatcher"] {
+            if let Some(mut child) = self.base().try_get_node_as::<godot::classes::Node>(*name) {
+                self.base_mut().remove_child(&child);
+                child.queue_free();
+            }
+        }
+        self.do_initialize();
+    }
+
+    fn do_initialize(&mut self) {
+        let mut app = App::new();
+
+        let config = BEVY_APP_CONFIG.get().copied().unwrap_or(BevyAppConfig {
+            scene_tree_auto_despawn_children: true,
+        });
+
+        app.add_plugins(crate::plugins::core::GodotBaseCorePlugin)
+            .add_plugins(crate::plugins::scene_tree::GodotSceneTreePlugin {
+                auto_despawn_children: config.scene_tree_auto_despawn_children,
+            });
+
+        if let Some(ref instance_func) = self.instance_init_func {
+            instance_func(&mut app);
+        } else if let Some(app_builder_func) = BEVY_INIT_FUNC.get() {
+            app_builder_func(&mut app);
+        }
+
+        use crate::plugins::scene_tree::SceneTreeMessage;
+        if app
+            .world()
+            .contains_resource::<Messages<SceneTreeMessage>>()
+        {
+            self.register_scene_tree_watcher(&mut app);
+            self.register_optimized_scene_tree_watcher();
+        }
+
+        use crate::plugins::collisions::CollisionStarted;
+        if app
+            .world()
+            .contains_resource::<Messages<CollisionStarted>>()
+        {
+            self.register_collision_watcher(&mut app);
+        }
+
+        use crate::plugins::input::KeyboardInput;
+        if app.world().contains_resource::<Messages<KeyboardInput>>() {
+            self.register_input_event_watcher(&mut app);
+        }
+
+        #[cfg(debug_assertions)]
+        self.cache_bulk_operations(&mut app);
+
+        if app.plugins_state() != PluginsState::Cleaned {
+            while app.plugins_state() == PluginsState::Adding {
+                #[cfg(not(target_arch = "wasm32"))]
+                bevy_tasks::tick_global_task_pools_on_main_thread();
+            }
+
+            app.finish();
+            app.cleanup();
+        }
+
+        app.init_resource::<PhysicsDelta>();
+        self.app = Some(app);
+    }
+
     fn register_scene_tree_watcher(&mut self, app: &mut App) {
         // Check if SceneTreeWatcher already exists (e.g., created by test framework)
         // If so, don't create a new one or replace the event reader
@@ -197,79 +268,12 @@ impl INode for BevyApp {
         #[cfg(debug_assertions)]
         self.register_optimized_bulk_operations();
 
-        // If no init function is provided, don't initialize the Bevy app.
-        // This allows the node to exist purely for GDScript utility methods (e.g., bulk transforms)
-        // while tests create their own BevyApp instances with set_instance_init_func().
         let has_init = self.instance_init_func.is_some() || BEVY_INIT_FUNC.get().is_some();
         if !has_init {
             return;
         }
 
-        let mut app = App::new();
-
-        // Configure GodotCorePlugins based on #[bevy_app] attribute configuration
-        let config = BEVY_APP_CONFIG.get().copied().unwrap_or(BevyAppConfig {
-            scene_tree_auto_despawn_children: true,
-        });
-
-        // Manually add core plugins with configuration
-        app.add_plugins(crate::plugins::core::GodotBaseCorePlugin)
-            .add_plugins(crate::plugins::scene_tree::GodotSceneTreePlugin {
-                auto_despawn_children: config.scene_tree_auto_despawn_children,
-            });
-
-        // Call the init function - use instance function if set, otherwise global
-        if let Some(ref instance_func) = self.instance_init_func {
-            instance_func(&mut app);
-        } else if let Some(app_builder_func) = BEVY_INIT_FUNC.get() {
-            app_builder_func(&mut app);
-        }
-
-        // Create watchers BEFORE app.finish() so PreStartup systems can find them
-        // Check which plugins were added by looking for their resources/events
-
-        // Scene tree plugin check - look for Messages<SceneTreeMessage>
-        use crate::plugins::scene_tree::SceneTreeMessage;
-        if app
-            .world()
-            .contains_resource::<Messages<SceneTreeMessage>>()
-        {
-            self.register_scene_tree_watcher(&mut app);
-            self.register_optimized_scene_tree_watcher();
-        }
-
-        // Collision plugin check - similar approach
-        use crate::plugins::collisions::CollisionStarted;
-        if app
-            .world()
-            .contains_resource::<Messages<CollisionStarted>>()
-        {
-            self.register_collision_watcher(&mut app);
-        }
-
-        // Input event plugin check - check for KeyboardInput as a marker
-        use crate::plugins::input::KeyboardInput;
-        if app.world().contains_resource::<Messages<KeyboardInput>>() {
-            self.register_input_event_watcher(&mut app);
-        }
-
-        // Cache bulk operations node reference for efficient access in debug builds
-        #[cfg(debug_assertions)]
-        self.cache_bulk_operations(&mut app);
-
-        // Finalize plugins - PreStartup systems will now find the watchers
-        if app.plugins_state() != PluginsState::Cleaned {
-            while app.plugins_state() == PluginsState::Adding {
-                #[cfg(not(target_arch = "wasm32"))]
-                bevy_tasks::tick_global_task_pools_on_main_thread();
-            }
-
-            app.finish();
-            app.cleanup();
-        }
-
-        app.init_resource::<PhysicsDelta>();
-        self.app = Some(app);
+        self.do_initialize();
     }
 
     fn process(&mut self, _delta: f64) {

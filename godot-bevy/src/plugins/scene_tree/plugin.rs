@@ -409,14 +409,13 @@ fn find_node_by_name(parent: &Gd<Node>, name: &StringName) -> Option<Gd<Node>> {
 const BEVY_APP_AUTOLOAD_NAME: &str = "BevyAppSingleton";
 
 /// Gets a child node of the BevyAppSingleton autoload by name.
-/// Only falls back to tree search if the autoload itself isn't registered (test environments).
+/// Falls back to tree search if the autoload isn't registered.
 fn get_bevy_app_child(child_name: &str) -> Option<Gd<Node>> {
     // Autoload lookup is cached after first call
     if let Ok(bevy_app) = try_get_autoload_by_name::<Node>(BEVY_APP_AUTOLOAD_NAME) {
         return bevy_app.try_get_node_as::<Node>(child_name);
     }
 
-    // Autoload not registered (test environments) — search the tree
     let scene_tree = Engine::singleton()
         .get_main_loop()
         .and_then(|ml| ml.try_cast::<SceneTree>().ok())?;
