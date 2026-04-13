@@ -119,6 +119,8 @@ linux.debug.x86_64 = "res://../target/debug/libmy_game_tests.so"
 # ... other platforms
 ```
 
+**Important:** The godot-bevy plugin must be enabled (or `BevyAppSingleton` registered as an autoload) in the test project's `project.godot`. `TestApp` uses the autoload to match production node layout.
+
 ### 5. Run Tests
 
 ```bash

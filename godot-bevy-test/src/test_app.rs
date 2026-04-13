@@ -70,7 +70,7 @@ impl TestApp {
         let root = scene_tree.get_root().expect("Root should exist");
         let mut bevy_app = root
             .try_get_node_as::<godot_bevy::BevyApp>("BevyAppSingleton")
-            .expect("BevyAppSingleton autoload should exist");
+            .expect("BevyAppSingleton autoload not found. Enable the godot-bevy plugin in Project Settings > Plugins, or add BevyAppSingleton as an autoload.");
 
         let setup_mutex = Mutex::new(Some(setup));
 
