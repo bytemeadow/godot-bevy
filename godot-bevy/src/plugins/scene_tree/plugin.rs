@@ -413,15 +413,13 @@ const BEVY_APP_AUTOLOAD_NAME: &str = "BevyAppSingleton";
 /// isn't a direct child (e.g. test environments).
 fn get_bevy_app_child(child_name: &str) -> Option<Gd<Node>> {
     // Autoload lookup is cached after first call
-    if let Ok(bevy_app) = try_get_autoload_by_name::<Node>(BEVY_APP_AUTOLOAD_NAME) {
-        if let Some(child) = bevy_app.try_get_node_as::<Node>(child_name) {
-            return Some(child);
-        }
-        // Child not found as direct child — fall through to tree search
+    if let Ok(bevy_app) = try_get_autoload_by_name::<Node>(BEVY_APP_AUTOLOAD_NAME)
+        && let Some(child) = bevy_app.try_get_node_as::<Node>(child_name)
+    {
+        return Some(child);
     }
 
-    // Fallback: search entire tree (for test environments or non-standard layouts)
-    tracing::debug!("Searching tree for {child_name}");
+    tracing::debug!("BevyAppSingleton child '{child_name}' not found via autoload, searching tree");
     let scene_tree = Engine::singleton()
         .get_main_loop()
         .and_then(|ml| ml.try_cast::<SceneTree>().ok())?;
@@ -548,7 +546,15 @@ fn create_scene_tree_entity(
     let scene_root = scene_tree.get().get_root().unwrap();
 
     // CollisionWatcher is optional - only required if GodotCollisionsPlugin is added
-    let collision_watcher = get_bevy_app_child("CollisionWatcher");
+    let collision_watcher = scene_root
+        .try_get_node_as::<Node>("/root/BevyAppSingleton/CollisionWatcher")
+        .or_else(|| scene_root.try_get_node_as::<Node>("BevyAppSingleton/CollisionWatcher"))
+        .or_else(|| {
+            find_node_by_name(
+                &scene_root.clone().upcast(),
+                &StringName::from("CollisionWatcher"),
+            )
+        });
 
     // Collect collision bodies for batched signal connection
     // Tuple: (instance_id as i64, collision_mask as u8)
@@ -714,7 +720,7 @@ fn create_scene_tree_entity(
     if !pending_collision_bodies.is_empty()
         && let Some(ref collision_watcher) = collision_watcher
     {
-        batch_connect_collision_signals(collision_watcher, &pending_collision_bodies);
+        batch_connect_collision_signals(&scene_root, collision_watcher, &pending_collision_bodies);
     }
 }
 
@@ -738,11 +744,16 @@ fn get_inheritance_hierarchy(class_name: &str) -> Vec<String> {
 
 /// Batch connect collision signals using GDScript bulk operations.
 /// Falls back to individual connections if bulk operations node is not available.
-fn batch_connect_collision_signals(collision_watcher: &Gd<Node>, pending_bodies: &[(i64, u8)]) {
+fn batch_connect_collision_signals(
+    scene_root: &Gd<godot::classes::Window>,
+    collision_watcher: &Gd<Node>,
+    pending_bodies: &[(i64, u8)],
+) {
     use godot::builtin::PackedInt64Array;
 
-    // Try to find OptimizedBulkOperations node with the required method
-    let bulk_ops = get_bevy_app_child("OptimizedBulkOperations")
+    let bulk_ops = scene_root
+        .get_node_or_null("BevyAppSingleton/OptimizedBulkOperations")
+        .or_else(|| scene_root.get_node_or_null("/root/BevyAppSingleton/OptimizedBulkOperations"))
         .filter(|node| node.has_method("bulk_connect_collision_signals"));
 
     if let Some(mut bulk_ops) = bulk_ops {
