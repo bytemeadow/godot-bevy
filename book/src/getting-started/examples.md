@@ -3,6 +3,7 @@
 Many additional godot-bevy examples are available in the [examples](https://github.com/bytemeadow/godot-bevy/tree/main/examples) directory. Examples are set up as executable binaries. An example can then be executed using the following cargo command line in the root of the godot-bevy repository:
 
 ```
+cargo build -p platformer-2d-example
 cargo run --bin platformer_2d_example
 ```
 
