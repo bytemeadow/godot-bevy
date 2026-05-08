@@ -142,10 +142,8 @@ fn handle_action_input(mut action_events: MessageReader<ActionInput>) {
             "ui_cancel" if event.pressed => {
                 godot_print!("[GODOT] ❌ UI Cancel action triggered!");
             }
-            "move_left" | "move_right" | "move_up" | "move_down" => {
-                if event.pressed {
-                    godot_print!("[GODOT] 🏃 Movement action: {}", event.action);
-                }
+            "move_left" | "move_right" | "move_up" | "move_down" if event.pressed => {
+                godot_print!("[GODOT] 🏃 Movement action: {}", event.action);
             }
             "jump" => {
                 godot_print!("[GODOT] 🦘 Jump action: {}", state);
@@ -169,29 +167,21 @@ fn handle_gamepad_button_input(mut gamepad_button_events: MessageReader<GamepadB
 
         // Handle common buttons
         match event.button_index {
-            0 => {
+            0 if event.pressed => {
                 // A button (South)
-                if event.pressed {
-                    godot_print!("[GODOT] 🔴 A button pressed - Jump/Confirm!");
-                }
+                godot_print!("[GODOT] 🔴 A button pressed - Jump/Confirm!");
             }
-            1 => {
+            1 if event.pressed => {
                 // B button (East)
-                if event.pressed {
-                    godot_print!("[GODOT] 🔵 B button pressed - Back/Cancel!");
-                }
+                godot_print!("[GODOT] 🔵 B button pressed - Back/Cancel!");
             }
-            2 => {
+            2 if event.pressed => {
                 // X button (West)
-                if event.pressed {
-                    godot_print!("[GODOT] 🟩 X button pressed - Action!");
-                }
+                godot_print!("[GODOT] 🟩 X button pressed - Action!");
             }
-            3 => {
+            3 if event.pressed => {
                 // Y button (North)
-                if event.pressed {
-                    godot_print!("[GODOT] 🟨 Y button pressed - Menu!");
-                }
+                godot_print!("[GODOT] 🟨 Y button pressed - Menu!");
             }
             _ => {}
         }
