@@ -216,7 +216,7 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
         let mut entries: Vec<GodotPropEntry> = Vec::new();
         for attr in &field.attrs {
             if let Some(parsed) = parse_export_fields_attr(attr)? {
-                entries.extend(parsed.entries.into_iter());
+                entries.extend(parsed.entries);
             }
         }
 
