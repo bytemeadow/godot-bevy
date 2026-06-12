@@ -195,6 +195,6 @@ pub struct PlayerBundle {
 pub struct Player;
 ```
 
-The bundle struct and its field is replaced by a single primary component. Bevy's required
+The bundle struct and its fields are replaced by a single primary component. Bevy's required
 components mechanism handles insertion of companions in both the scene-spawned and Bevy-spawned
 paths — no separate bundle type is needed.
