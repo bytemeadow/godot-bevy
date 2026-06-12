@@ -192,11 +192,7 @@ pub fn bevy_bundle(input: DeriveInput) -> syn::Result<TokenStream2> {
         }
     };
 
-    let expanded = quote! {
-        #bundle_impl
-    };
-
-    Ok(expanded)
+    Ok(bundle_impl)
 }
 
 struct ComponentSpec {
