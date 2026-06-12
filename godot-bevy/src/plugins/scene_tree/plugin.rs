@@ -164,6 +164,7 @@ impl Plugin for GodotSceneTreePlugin {
     fn build(&self, app: &mut App) {
         // Auto-register all discovered AutoSyncBundle plugins
         super::autosync::register_all_autosync_bundles(app);
+        super::autosync::register_all_required_components(app);
 
         app.init_non_send_resource::<SceneTreeRefImpl>()
             .init_resource::<NodeEntityIndex>()
