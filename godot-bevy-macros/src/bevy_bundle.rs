@@ -1,7 +1,6 @@
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Error, Token, braced};
 
 // Parse bevy_bundle attribute syntax
@@ -116,91 +115,40 @@ pub fn bevy_bundle(input: DeriveInput) -> syn::Result<TokenStream2> {
         None
     };
 
-    // Auto-generate bundle name from struct name
-    let bundle_name = syn::Ident::new(&format!("{struct_name}Bundle"), struct_name.span());
-
-    // Generate bundle struct
-    let bundle_fields: Vec<_> = attr_args
+    // Generate tuple elements extracting component values from the Godot node
+    let component_constructors: Vec<_> = attr_args
         .components
         .iter()
         .map(|spec| {
             let component_name = &spec.component_name;
-            let last_segment = component_name
-                .segments
-                .last()
-                .expect("component to have at least one path segment");
-            let field_name = last_segment.ident.to_string().to_lowercase();
-            let field_ident = syn::Ident::new(&field_name, component_name.span());
-            quote! {
-                pub #field_ident: #component_name
-            }
-        })
-        .collect();
-
-    let bundle_struct = quote! {
-        #[derive(godot_bevy::bevy_ecs::bundle::Bundle)]
-        pub struct #bundle_name {
-            #(#bundle_fields),*
-        }
-    };
-
-    // Generate implementation for extracting values from the Godot node
-    let bundle_constructor_fields: Vec<_> = attr_args
-        .components
-        .iter()
-        .map(|spec| {
-            let component_name = &spec.component_name;
-            let last_segment = component_name.segments.last()
-                .expect("component to have at least one path segment");
-            let field_name = last_segment.ident.to_string().to_lowercase();
-            let field_ident = syn::Ident::new(&field_name, component_name.span());
-
             match &spec.mapping {
                 ComponentMapping::Default => {
-                    // Marker component with no field mapping - use default
-                    quote! {
-                        #field_ident: #component_name::default()
-                    }
+                    quote! { #component_name::default() }
                 }
                 ComponentMapping::SingleField(source_field) => {
-                    // Component with single field mapping (tuple struct)
-                    // Check if this field has a transform_with attribute
                     if let Some(transformer) = extract_transform_with(source_field) {
-                        quote! {
-                            #field_ident: #component_name(#transformer(node.bind().#source_field.clone()))
-                        }
+                        quote! { #component_name(#transformer(node.bind().#source_field.clone())) }
                     } else {
-                        quote! {
-                            #field_ident: #component_name(node.bind().#source_field.clone())
-                        }
+                        quote! { #component_name(node.bind().#source_field.clone()) }
                     }
                 }
                 ComponentMapping::MultipleFields(field_mappings) => {
-                    // Component with multiple field mappings (struct initialization)
                     let field_inits: Vec<_> = field_mappings
                         .iter()
                         .map(|(bevy_field, godot_field)| {
-                            // Check if this field has a transform_with attribute
                             if let Some(transformer) = extract_transform_with(godot_field) {
-                                quote! {
-                                    #bevy_field: #transformer(node.bind().#godot_field.clone())
-                                }
+                                quote! { #bevy_field: #transformer(node.bind().#godot_field.clone()) }
                             } else {
-                                quote! {
-                                    #bevy_field: node.bind().#godot_field.clone()
-                                }
+                                quote! { #bevy_field: node.bind().#godot_field.clone() }
                             }
                         })
                         .collect();
 
-                    // Avoid Clippy warning: struct update has no effect,
-                    // all the fields in the struct have already been specified
-                    // https://rust-lang.github.io/rust-clippy/master/index.html#needless_update
-                    // It's not possible to determine how many fields the component
-                    // struct has from this macro, so we have to allow the warning.
+                    // It's not possible to determine from this macro whether the
+                    // component struct has unlisted fields, so the struct-update
+                    // syntax may be redundant; allow the lint at the fn level.
                     quote! {
-                        #[allow(clippy::needless_update)]
-                        #field_ident: #component_name {
+                        #component_name {
                             #(#field_inits),*,
                             ..Default::default()
                         }
@@ -210,28 +158,14 @@ pub fn bevy_bundle(input: DeriveInput) -> syn::Result<TokenStream2> {
         })
         .collect();
 
-    let bundle_constructor = quote! {
-        impl #bundle_name {
-            pub fn from_godot_node(node: &godot::obj::Gd<#struct_name>) -> Self {
-                Self {
-                    #(#bundle_constructor_fields),*
-                }
-            }
-        }
-    };
-
-    // Use the first component as a marker to check if the bundle is already added
-    let _first_component = &attr_args.components[0].component_name;
-
-    // Generate the bundle creation function
-    let bundle_name_lower = bundle_name.to_string().to_lowercase();
+    let struct_name_lower = struct_name.to_string().to_lowercase();
     let create_bundle_fn_name = syn::Ident::new(
-        &format!("__create_{bundle_name_lower}_bundle"),
-        bundle_name.span(),
+        &format!("__create_{struct_name_lower}_bundle"),
+        struct_name.span(),
     );
 
-    // Generate the bundle registration (always enabled now)
     let bundle_impl = quote! {
+        #[allow(clippy::needless_update)]
         fn #create_bundle_fn_name(
             commands: &mut godot_bevy::bevy_ecs::system::Commands,
             entity: godot_bevy::bevy_ecs::entity::Entity,
@@ -239,9 +173,10 @@ pub fn bevy_bundle(input: DeriveInput) -> syn::Result<TokenStream2> {
             handle: godot_bevy::interop::GodotNodeHandle,
         ) -> bool {
             // Try to get the node as the correct type
-            if let Some(godot_node) = godot.try_get::<#struct_name>(handle) {
-                let bundle = #bundle_name::from_godot_node(&godot_node);
-                commands.entity(entity).insert(bundle);
+            if let Some(node) = godot.try_get::<#struct_name>(handle) {
+                commands.entity(entity).insert((
+                    #(#component_constructors,)*
+                ));
                 return true;
             }
             false
@@ -258,10 +193,6 @@ pub fn bevy_bundle(input: DeriveInput) -> syn::Result<TokenStream2> {
     };
 
     let expanded = quote! {
-        #bundle_struct
-
-        #bundle_constructor
-
         #bundle_impl
     };
 
@@ -378,6 +309,26 @@ mod tests {
         assert!(
             output_str.contains("MarkerComponent :: default ()"),
             "Should use default for marker components"
+        );
+    }
+
+    #[test]
+    fn test_no_bundle_struct_generated() {
+        let input: DeriveInput = parse_quote! {
+            #[bevy_bundle((TestComponent: test_field), (MarkerComponent))]
+            struct TestNode {
+                test_field: String,
+            }
+        };
+
+        let output = bevy_bundle(input).unwrap().to_string();
+        assert!(
+            !output.contains("struct TestNodeBundle"),
+            "Should not generate a bundle struct"
+        );
+        assert!(
+            output.contains("insert (("),
+            "Should insert a tuple of components"
         );
     }
 
