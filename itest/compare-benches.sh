@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 # Compare benchmarks between the current branch and a base branch (default: main).
 # Uses a git worktree so the working tree stays untouched.
