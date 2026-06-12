@@ -6,6 +6,8 @@
 
 use crate::level_manager::LevelId;
 use bevy::prelude::*;
+use godot::classes::ProjectSettings;
+use godot::obj::Singleton;
 use godot_bevy::prelude::GodotNode;
 
 /// Component representing movement speed in pixels per second
@@ -42,8 +44,17 @@ impl Default for Gravity {
 }
 
 /// Component marking an entity as the player
-#[derive(Component, Debug, Clone, Default, Reflect)]
+#[derive(Component, GodotNode, Debug, Clone, Default, Reflect)]
 #[reflect(Component)]
+#[godot_node(base(CharacterBody2D), class_name(Player2D))]
+#[godot_components(
+    speed(Speed, export_type(f32), default(250.0)),
+    jump_velocity(JumpVelocity, export_type(f32), default(-400.0)),
+    gravity(Gravity, export_type(f32), default(ProjectSettings::singleton()
+        .get_setting("physics/2d/default_gravity")
+        .try_to::<f32>()
+        .unwrap_or(980.0))),
+)]
 pub struct Player;
 
 /// Component marking an entity as a gem
