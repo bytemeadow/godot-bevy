@@ -5,6 +5,7 @@ use syn::{DeriveInput, Meta};
 mod attr;
 mod bundle;
 mod component;
+mod components_attr;
 
 pub fn derive_godot_node(input: DeriveInput) -> syn::Result<TokenStream2> {
     // Prefer explicit derives when available
