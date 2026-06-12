@@ -11,6 +11,7 @@ godot_bevy_test::declare_test_runner!();
 // Test modules
 mod benchmarks;
 mod collision_tests;
+mod input_tests;
 mod real_frame_tests;
 mod scene_tree_tests;
 mod scene_tree_watcher_init_tests;

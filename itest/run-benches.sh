@@ -24,6 +24,11 @@ while [[ $# -gt 0 ]]; do
             INTERNAL=true
             shift
             ;;
+        --filter)
+            # Comma-separated substrings; only matching benchmarks run
+            export BENCHMARK_FILTER="$2"
+            shift 2
+            ;;
         *)
             shift
             ;;
@@ -105,3 +110,5 @@ echo -e "${CYAN}Running benchmarks...${NC}"
 "$GODOT4_BIN" --headless --path "$GODOT_PROJECT_DIR" addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000
 
 echo -e "${GREEN}Benchmarks complete!${NC}"
+echo -e "${YELLOW}Note: numbers shift between runs (often >10% for µs-scale benchmarks)."
+echo -e "To evaluate a change, use ./compare-benches.sh — it interleaves runs and reports noise.${NC}"

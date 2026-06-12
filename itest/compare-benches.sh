@@ -1,12 +1,21 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 # Compare benchmarks between the current branch and a base branch (default: main).
 # Uses a git worktree so the working tree stays untouched.
 #
+# Both builds happen first, then runs are interleaved (base, current, base,
+# current, ...) so thermal drift and background load hit both sides equally.
+# Each side's runs are merged (median of medians) before comparison.
+#
 # Usage:
 #   ./compare-benches.sh              # compare against main
 #   ./compare-benches.sh other-branch # compare against other-branch
+#   ./compare-benches.sh main         # main vs main = noise floor of this machine
+#
+# Environment:
+#   BENCH_ROUNDS=N         interleaved rounds per side (default: 3)
+#   BENCHMARK_FILTER=pat   comma-separated substrings; only matching benchmarks run
 
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
@@ -16,12 +25,15 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 BASE_REF="${1:-main}"
+ROUNDS="${BENCH_ROUNDS:-3}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 WORKTREE_DIR="$REPO_ROOT/.bench-baseline"
 RESULTS_DIR="$SCRIPT_DIR/.bench-results"
+BASELINE_LIB_DIR="$RESULTS_DIR/baseline-lib"
 
-mkdir -p "$RESULTS_DIR"
+rm -rf "$RESULTS_DIR"
+mkdir -p "$RESULTS_DIR" "$BASELINE_LIB_DIR"
 
 # ── Resolve Godot binary ────────────────────────────────────────────
 resolve_godot() {
@@ -39,34 +51,38 @@ resolve_godot() {
     exit 1
 }
 
-# ── Run benchmarks for a given itest directory ──────────────────────
-run_benchmarks() {
-    local itest_dir="$1"
-    local json_out="$2"
-    local label="$3"
-    local godot_dir="$itest_dir/godot"
+# ── Project setup: point .gdextension at a library dir and import ──
+setup_project() {
+    local godot_dir="$1"
+    local lib_dir="$2"
 
-    # Point .gdextension at the shared target dir
     cat > "$godot_dir/itest.gdextension" << EOF
 [configuration]
 entry_symbol = "godot_bevy_itest"
 compatibility_minimum = 4.2
 
 [libraries]
-linux.debug.x86_64 = "$REPO_ROOT/target/release/libgodot_bevy_itest.so"
-linux.release.x86_64 = "$REPO_ROOT/target/release/libgodot_bevy_itest.so"
-windows.debug.x86_64 = "$REPO_ROOT/target/release/godot_bevy_itest.dll"
-windows.release.x86_64 = "$REPO_ROOT/target/release/godot_bevy_itest.dll"
-macos.debug = "$REPO_ROOT/target/release/libgodot_bevy_itest.dylib"
-macos.release = "$REPO_ROOT/target/release/libgodot_bevy_itest.dylib"
-macos.debug.arm64 = "$REPO_ROOT/target/release/libgodot_bevy_itest.dylib"
-macos.release.arm64 = "$REPO_ROOT/target/release/libgodot_bevy_itest.dylib"
+linux.debug.x86_64 = "$lib_dir/libgodot_bevy_itest.so"
+linux.release.x86_64 = "$lib_dir/libgodot_bevy_itest.so"
+windows.debug.x86_64 = "$lib_dir/godot_bevy_itest.dll"
+windows.release.x86_64 = "$lib_dir/godot_bevy_itest.dll"
+macos.debug = "$lib_dir/libgodot_bevy_itest.dylib"
+macos.release = "$lib_dir/libgodot_bevy_itest.dylib"
+macos.debug.arm64 = "$lib_dir/libgodot_bevy_itest.dylib"
+macos.release.arm64 = "$lib_dir/libgodot_bevy_itest.dylib"
 EOF
 
     mkdir -p "$godot_dir/.godot"
     echo "res://itest.gdextension" > "$godot_dir/.godot/extension_list.cfg"
 
     "$GODOT4_BIN" --headless --path "$godot_dir" --import --quit 2>/dev/null || true
+}
+
+# ── Single benchmark run, writing JSON to the given path ───────────
+run_once() {
+    local godot_dir="$1"
+    local json_out="$2"
+    local label="$3"
 
     BENCHMARK_JSON=1 BENCHMARK_JSON_PATH="$json_out" \
         "$GODOT4_BIN" --headless --path "$godot_dir" \
@@ -98,78 +114,79 @@ trap cleanup EXIT
 resolve_godot
 echo -e "${BOLD}Comparing benchmarks: current branch vs ${BASE_REF}${NC}"
 echo -e "  Godot: $GODOT4_BIN"
+echo -e "  Rounds: $ROUNDS per side, interleaved"
+if [ -n "$BENCHMARK_FILTER" ]; then
+    echo -e "  Filter: $BENCHMARK_FILTER"
+fi
 echo ""
 
-# 1. Build & run baseline (base branch via worktree)
-echo -e "${CYAN}━━━ Baseline (${BASE_REF}) ━━━${NC}"
-git -C "$REPO_ROOT" worktree remove "$WORKTREE_DIR" --force 2>/dev/null || true
-git -C "$REPO_ROOT" worktree add "$WORKTREE_DIR" "$BASE_REF"
+# Both workspaces (worktree and repo) emit target/release/libgodot_bevy_itest.*
+# under the shared target dir, and cargo can consider a unit fresh even when the
+# dylib on disk came from the *other* workspace. Clean the local crates before
+# each build so the linked library always matches the source being built.
+clean_local_crates() {
+    local manifest="$1"
+    CARGO_TARGET_DIR="$REPO_ROOT/target" cargo clean --release \
+        -p godot-bevy -p godot-bevy-test -p godot-bevy-itest \
+        --manifest-path "$manifest"
+}
 
-echo -e "${CYAN}Building baseline...${NC}"
+# 1. Build baseline (base branch via detached worktree, shared target dir)
+echo -e "${CYAN}━━━ Building baseline (${BASE_REF}) ━━━${NC}"
+git -C "$REPO_ROOT" worktree remove "$WORKTREE_DIR" --force 2>/dev/null || true
+git -C "$REPO_ROOT" worktree add --detach "$WORKTREE_DIR" "$BASE_REF"
+
+clean_local_crates "$WORKTREE_DIR/itest/rust/Cargo.toml"
 CARGO_TARGET_DIR="$REPO_ROOT/target" cargo build --release \
     --manifest-path "$WORKTREE_DIR/itest/rust/Cargo.toml"
 
-echo -e "${CYAN}Running baseline benchmarks...${NC}"
-run_benchmarks "$WORKTREE_DIR/itest" "$RESULTS_DIR/baseline.json" "baseline"
+# Stash the baseline library: building the current branch would overwrite it
+for lib in libgodot_bevy_itest.so libgodot_bevy_itest.dylib godot_bevy_itest.dll; do
+    if [ -f "$REPO_ROOT/target/release/$lib" ]; then
+        cp "$REPO_ROOT/target/release/$lib" "$BASELINE_LIB_DIR/"
+    fi
+done
 
-# Remove worktree before building current branch (frees the ref)
-git -C "$REPO_ROOT" worktree remove "$WORKTREE_DIR" --force 2>/dev/null || true
-
-# 2. Build & run current branch
+# 2. Build current branch
 echo ""
-echo -e "${CYAN}━━━ Current branch ━━━${NC}"
-echo -e "${CYAN}Building current branch...${NC}"
-cargo build --release --manifest-path "$REPO_ROOT/itest/rust/Cargo.toml"
+echo -e "${CYAN}━━━ Building current branch ━━━${NC}"
+clean_local_crates "$REPO_ROOT/itest/rust/Cargo.toml"
+CARGO_TARGET_DIR="$REPO_ROOT/target" cargo build --release \
+    --manifest-path "$REPO_ROOT/itest/rust/Cargo.toml"
 
-echo -e "${CYAN}Running current branch benchmarks...${NC}"
-run_benchmarks "$SCRIPT_DIR" "$RESULTS_DIR/current.json" "current"
+# 3. Import both Godot projects
+setup_project "$WORKTREE_DIR/itest/godot" "$BASELINE_LIB_DIR"
+setup_project "$SCRIPT_DIR/godot" "$REPO_ROOT/target/release"
 
-# 3. Compare
+# 4. Interleaved runs: base, current, base, current, ...
+for round in $(seq 1 "$ROUNDS"); do
+    echo ""
+    echo -e "${CYAN}━━━ Round ${round}/${ROUNDS}: baseline ━━━${NC}"
+    run_once "$WORKTREE_DIR/itest/godot" \
+        "$RESULTS_DIR/baseline-run${round}.json" "baseline-run${round}"
+
+    echo ""
+    echo -e "${CYAN}━━━ Round ${round}/${ROUNDS}: current ━━━${NC}"
+    run_once "$SCRIPT_DIR/godot" \
+        "$RESULTS_DIR/current-run${round}.json" "current-run${round}"
+done
+
+# 5. Merge each side's runs (median of medians)
+python3 "$REPO_ROOT/.github/scripts/benchmarks-merge.py" \
+    "$RESULTS_DIR/baseline.json" "$RESULTS_DIR"/baseline-run*.json
+python3 "$REPO_ROOT/.github/scripts/benchmarks-merge.py" \
+    "$RESULTS_DIR/current.json" "$RESULTS_DIR"/current-run*.json
+
+# 6. Compare
 echo ""
 echo -e "${CYAN}━━━ Comparison ━━━${NC}"
+# Quiet: the noise-aware table below is the authoritative local summary
 python3 "$REPO_ROOT/.github/scripts/benchmarks-compare.py" \
     "$RESULTS_DIR/baseline.json" \
     "$RESULTS_DIR/current.json" \
-    "$RESULTS_DIR/comparison.json"
+    "$RESULTS_DIR/comparison.json" > /dev/null
 
-# 4. Pretty-print the comparison table
-python3 -c "
-import json, sys
-
-with open('$RESULTS_DIR/comparison.json') as f:
-    data = json.load(f)
-
-s = data['summary']
-print()
-if s['regressions'] > 0:
-    print(f'  \033[31;1m{s[\"regressions\"]} regression(s) detected\033[0m')
-elif s['improvements'] > 0:
-    print(f'  \033[32;1m{s[\"improvements\"]} improvement(s)\033[0m')
-else:
-    print('  Performance is stable — no significant changes')
-print()
-
-name_w = max(len(b['name']) for b in data['benchmarks']) + 2
-print(f\"  {'Benchmark':<{name_w}} {'Current':>12} {'Baseline':>12} {'Change':>12}\")
-print(f\"  {'─'*name_w} {'─'*12} {'─'*12} {'─'*12}\")
-
-for b in data['benchmarks']:
-    current  = b.get('current', '-')
-    baseline = b.get('baseline') or '-'
-    pct      = b.get('change_pct')
-
-    if b['status'] == 'new':
-        change = 'new'
-    elif pct is not None:
-        sign = '+' if pct > 0 else ''
-        icon = {'regression':'🔴','slower':'🟡','faster':'🟢'}.get(b['status'],'')
-        change = f'{icon} {sign}{pct:.1f}%'
-    else:
-        change = ''
-
-    print(f\"  {b['name']:<{name_w}} {current:>12} {baseline:>12} {change:>12}\")
-
-print()
-"
+# 7. Pretty-print the comparison table with per-benchmark noise estimates
+python3 "$SCRIPT_DIR/print-comparison.py" "$RESULTS_DIR"
 
 echo -e "${GREEN}Done.${NC} Raw results in $RESULTS_DIR/"

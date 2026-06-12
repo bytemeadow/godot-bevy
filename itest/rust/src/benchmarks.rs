@@ -30,7 +30,7 @@ use godot_bevy::plugins::transforms::{
     GodotTransformSyncPlugin, GodotTransformSyncPluginExt, TransformSyncMetadata, TransformSyncMode,
 };
 use godot_bevy::watchers::collision_watcher::CollisionWatcher;
-use godot_bevy_test::bench;
+use godot_bevy_test::{bench, measured};
 
 // =============================================================================
 // Transform Sync Benchmarks
@@ -42,7 +42,7 @@ const NODE_COUNT: usize = 1000;
 
 /// Creates a Bevy App configured with transform sync plugin and test entities.
 /// Returns the app and the Godot nodes (to keep them alive).
-fn setup_3d_benchmark_app() -> (App, Vec<Gd<Node3D>>) {
+fn setup_3d_benchmark_app(node_count: usize) -> (App, Vec<Gd<Node3D>>) {
     let mut app = App::new();
 
     // Initialize schedules manually (avoid plugin duplication issues)
@@ -55,9 +55,9 @@ fn setup_3d_benchmark_app() -> (App, Vec<Gd<Node3D>>) {
     // Insert the GodotMainThread resource (required for GodotAccess)
     app.insert_non_send_resource(GodotMainThread);
 
-    let mut nodes: Vec<Gd<Node3D>> = Vec::with_capacity(NODE_COUNT);
+    let mut nodes: Vec<Gd<Node3D>> = Vec::with_capacity(node_count);
 
-    for i in 0..NODE_COUNT {
+    for i in 0..node_count {
         let mut node = Node3D::new_alloc();
         node.set_name(&format!("BenchNode3D_{i}"));
         node.set_position(Vector3::new(i as f32, 0.0, 0.0));
@@ -117,13 +117,8 @@ fn setup_2d_benchmark_app() -> (App, Vec<Gd<Node2D>>) {
 // 3D Transform Sync Benchmarks
 // =============================================================================
 
-/// Benchmark: Write transforms from Bevy to Godot (3D) using actual systems
-///
-/// This runs the real post_update_godot_transforms system that syncs
-/// Bevy transform changes to Godot nodes.
-#[bench(repeat = 3)]
-fn transform_sync_bevy_to_godot_3d() -> i32 {
-    let (mut app, nodes) = setup_3d_benchmark_app();
+fn run_transform_sync_bevy_to_godot_3d(node_count: usize) -> i32 {
+    let (mut app, nodes) = setup_3d_benchmark_app(node_count);
 
     // Modify all Bevy transforms to trigger change detection
     let mut query = app.world_mut().query::<&mut BevyTransform>();
@@ -132,11 +127,53 @@ fn transform_sync_bevy_to_godot_3d() -> i32 {
     }
 
     // Run the Last schedule which contains the sync system
-    app.world_mut().run_schedule(Last);
+    measured(|| app.world_mut().run_schedule(Last));
 
     let result = nodes.len() as i32;
 
     // Cleanup
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+/// Benchmark: Write transforms from Bevy to Godot (3D) using actual systems
+///
+/// This runs the real post_update_godot_transforms system that syncs
+/// Bevy transform changes to Godot nodes.
+#[bench(repeat = 3)]
+fn transform_sync_bevy_to_godot_3d() -> i32 {
+    run_transform_sync_bevy_to_godot_3d(NODE_COUNT)
+}
+
+/// Scaling variants: compare per-size times against the 1000-node default to
+/// spot super-linear growth (5x the nodes should cost roughly 5x the time).
+#[bench(repeat = 3)]
+fn transform_sync_bevy_to_godot_3d_100() -> i32 {
+    run_transform_sync_bevy_to_godot_3d(100)
+}
+
+#[bench(repeat = 3)]
+fn transform_sync_bevy_to_godot_3d_5000() -> i32 {
+    run_transform_sync_bevy_to_godot_3d(5000)
+}
+
+fn run_transform_sync_godot_to_bevy_3d(node_count: usize) -> i32 {
+    let (mut app, nodes) = setup_3d_benchmark_app(node_count);
+
+    // Modify Godot transforms to simulate physics/animation changes
+    for (i, node) in nodes.iter().enumerate() {
+        let mut node = node.clone();
+        node.set_position(Vector3::new(i as f32 * 2.0, i as f32, 0.0));
+    }
+
+    // Run the PreUpdate schedule which contains the sync system
+    measured(|| app.world_mut().run_schedule(PreUpdate));
+
+    let result = nodes.len() as i32;
+
     for node in nodes {
         node.free();
     }
@@ -150,24 +187,12 @@ fn transform_sync_bevy_to_godot_3d() -> i32 {
 /// Godot node transforms into Bevy.
 #[bench(repeat = 3)]
 fn transform_sync_godot_to_bevy_3d() -> i32 {
-    let (mut app, nodes) = setup_3d_benchmark_app();
+    run_transform_sync_godot_to_bevy_3d(NODE_COUNT)
+}
 
-    // Modify Godot transforms to simulate physics/animation changes
-    for (i, node) in nodes.iter().enumerate() {
-        let mut node = node.clone();
-        node.set_position(Vector3::new(i as f32 * 2.0, i as f32, 0.0));
-    }
-
-    // Run the PreUpdate schedule which contains the sync system
-    app.world_mut().run_schedule(PreUpdate);
-
-    let result = nodes.len() as i32;
-
-    for node in nodes {
-        node.free();
-    }
-
-    result
+#[bench(repeat = 3)]
+fn transform_sync_godot_to_bevy_3d_5000() -> i32 {
+    run_transform_sync_godot_to_bevy_3d(5000)
 }
 
 // =============================================================================
@@ -184,7 +209,7 @@ fn transform_sync_bevy_to_godot_2d() -> i32 {
         transform.translation = Vec3::new(i as f32 * 2.0, i as f32, 0.0);
     }
 
-    app.world_mut().run_schedule(Last);
+    measured(|| app.world_mut().run_schedule(Last));
 
     let result = nodes.len() as i32;
 
@@ -205,7 +230,7 @@ fn transform_sync_godot_to_bevy_2d() -> i32 {
         node.set_position(Vector2::new(i as f32 * 2.0, i as f32));
     }
 
-    app.world_mut().run_schedule(PreUpdate);
+    measured(|| app.world_mut().run_schedule(PreUpdate));
 
     let result = nodes.len() as i32;
 
@@ -228,7 +253,7 @@ fn transform_sync_godot_to_bevy_2d() -> i32 {
 /// 3. PostUpdate: Write Bevy transforms back to Godot
 #[bench(repeat = 3)]
 fn transform_sync_roundtrip_3d() -> i32 {
-    let (mut app, nodes) = setup_3d_benchmark_app();
+    let (mut app, nodes) = setup_3d_benchmark_app(NODE_COUNT);
 
     // Simulate Godot physics moving nodes
     for (i, node) in nodes.iter().enumerate() {
@@ -236,19 +261,21 @@ fn transform_sync_roundtrip_3d() -> i32 {
         node.set_position(Vector3::new(i as f32, (i as f32).sin(), 0.0));
     }
 
-    // Phase 1: Sync Godot -> Bevy (PreUpdate)
-    app.world_mut().run_schedule(PreUpdate);
+    measured(|| {
+        // Phase 1: Sync Godot -> Bevy (PreUpdate)
+        app.world_mut().run_schedule(PreUpdate);
 
-    // Phase 2: Simulate game logic modifying transforms
-    let mut query = app.world_mut().query::<&mut BevyTransform>();
-    for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
-        if i % 2 == 0 {
-            transform.translation.y += 10.0;
+        // Phase 2: Simulate game logic modifying transforms
+        let mut query = app.world_mut().query::<&mut BevyTransform>();
+        for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
+            if i % 2 == 0 {
+                transform.translation.y += 10.0;
+            }
         }
-    }
 
-    // Phase 3: Sync Bevy -> Godot (Last)
-    app.world_mut().run_schedule(Last);
+        // Phase 3: Sync Bevy -> Godot (Last)
+        app.world_mut().run_schedule(Last);
+    });
 
     let result = nodes.len() as i32;
 
@@ -270,19 +297,21 @@ fn transform_sync_roundtrip_2d() -> i32 {
         node.set_position(Vector2::new(i as f32, (i as f32).sin()));
     }
 
-    // Phase 1: Sync Godot -> Bevy (PreUpdate)
-    app.world_mut().run_schedule(PreUpdate);
+    measured(|| {
+        // Phase 1: Sync Godot -> Bevy (PreUpdate)
+        app.world_mut().run_schedule(PreUpdate);
 
-    // Phase 2: Simulate game logic modifying transforms
-    let mut query = app.world_mut().query::<&mut BevyTransform>();
-    for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
-        if i % 2 == 0 {
-            transform.translation.y += 10.0;
+        // Phase 2: Simulate game logic modifying transforms
+        let mut query = app.world_mut().query::<&mut BevyTransform>();
+        for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
+            if i % 2 == 0 {
+                transform.translation.y += 10.0;
+            }
         }
-    }
 
-    // Phase 3: Sync Bevy -> Godot (Last)
-    app.world_mut().run_schedule(Last);
+        // Phase 3: Sync Bevy -> Godot (Last)
+        app.world_mut().run_schedule(Last);
+    });
 
     let result = nodes.len() as i32;
 
@@ -312,13 +341,13 @@ fn get_scene_tree() -> Gd<SceneTree> {
 
 /// Creates a mix of Godot nodes for scene tree benchmarking.
 /// Returns nodes attached to the scene tree (required for scene tree plugin).
-fn create_scene_tree_nodes() -> Vec<Gd<Node>> {
+fn create_scene_tree_nodes(node_count: usize) -> Vec<Gd<Node>> {
     let scene_tree = get_scene_tree();
     let root = scene_tree.get_root().expect("Root should exist");
 
-    let mut nodes: Vec<Gd<Node>> = Vec::with_capacity(SCENE_TREE_NODE_COUNT);
+    let mut nodes: Vec<Gd<Node>> = Vec::with_capacity(node_count);
 
-    for i in 0..SCENE_TREE_NODE_COUNT {
+    for i in 0..node_count {
         let node: Gd<Node> = match i % 3 {
             0 => {
                 let mut n = Node3D::new_alloc();
@@ -406,25 +435,18 @@ fn scene_tree_idle_no_messages() -> i32 {
     let (mut app, _sender) = setup_scene_tree_benchmark_app();
 
     const IDLE_FRAMES: usize = 200;
-    for _ in 0..IDLE_FRAMES {
-        app.world_mut().run_schedule(First);
-    }
+    measured(|| {
+        for _ in 0..IDLE_FRAMES {
+            app.world_mut().run_schedule(First);
+        }
+    });
 
     IDLE_FRAMES as i32
 }
 
-/// Benchmark: Process NodeAdded messages with pre-analyzed types (optimized path)
-///
-/// This measures the performance of the `read_scene_tree_messages` system
-/// processing a batch of NodeAdded events. This is the hot path when nodes
-/// are added to the Godot scene tree at runtime.
-///
-/// The benchmark uses pre-analyzed type information (simulating the optimized
-/// GDScript watcher path) which avoids expensive FFI type detection.
-#[bench(repeat = 3)]
-fn scene_tree_process_node_added_optimized() -> i32 {
+fn run_scene_tree_node_added_optimized(node_count: usize) -> i32 {
     let (mut app, sender) = setup_scene_tree_benchmark_app();
-    let nodes = create_scene_tree_nodes();
+    let nodes = create_scene_tree_nodes(node_count);
 
     // Create messages with pre-analyzed types (optimized path)
     let messages = create_node_added_messages(&nodes);
@@ -438,19 +460,40 @@ fn scene_tree_process_node_added_optimized() -> i32 {
     // 1st run: write_scene_tree_messages writes to buffer B, read_scene_tree_messages
     //          reads from buffer A (empty), then message_update_system flips buffers
     // 2nd run: read_scene_tree_messages now reads from buffer A (has messages)
-    app.world_mut().run_schedule(First);
-    app.world_mut().run_schedule(First);
+    measured(|| {
+        app.world_mut().run_schedule(First);
+        app.world_mut().run_schedule(First);
+    });
 
     // Verify entities were created
     let node_index = app.world().resource::<NodeEntityIndex>();
     let result = node_index.len() as i32;
 
     // Cleanup - remove nodes from scene tree
-    for mut node in nodes {
-        node.queue_free();
+    for node in nodes {
+        node.free();
     }
 
     result
+}
+
+/// Benchmark: Process NodeAdded messages with pre-analyzed types (optimized path)
+///
+/// This measures the performance of the `read_scene_tree_messages` system
+/// processing a batch of NodeAdded events. This is the hot path when nodes
+/// are added to the Godot scene tree at runtime.
+///
+/// The benchmark uses pre-analyzed type information (simulating the optimized
+/// GDScript watcher path) which avoids expensive FFI type detection.
+#[bench(repeat = 3)]
+fn scene_tree_process_node_added_optimized() -> i32 {
+    run_scene_tree_node_added_optimized(SCENE_TREE_NODE_COUNT)
+}
+
+/// Scaling variant of the optimized NodeAdded path (5x the default 500 nodes).
+#[bench(repeat = 3)]
+fn scene_tree_process_node_added_optimized_2500() -> i32 {
+    run_scene_tree_node_added_optimized(2500)
 }
 
 /// Benchmark: Process NodeAdded messages without pre-analyzed types (fallback path)
@@ -461,7 +504,7 @@ fn scene_tree_process_node_added_optimized() -> i32 {
 #[bench(repeat = 3)]
 fn scene_tree_process_node_added_fallback() -> i32 {
     let (mut app, sender) = setup_scene_tree_benchmark_app();
-    let nodes = create_scene_tree_nodes();
+    let nodes = create_scene_tree_nodes(SCENE_TREE_NODE_COUNT);
 
     // Create messages WITHOUT pre-analyzed types (fallback path)
     let messages: Vec<SceneTreeMessage> = nodes
@@ -483,16 +526,18 @@ fn scene_tree_process_node_added_fallback() -> i32 {
     }
 
     // Run First schedule twice (message_update_system flips buffers after first run)
-    app.world_mut().run_schedule(First);
-    app.world_mut().run_schedule(First);
+    measured(|| {
+        app.world_mut().run_schedule(First);
+        app.world_mut().run_schedule(First);
+    });
 
     // Verify entities were created
     let node_index = app.world().resource::<NodeEntityIndex>();
     let result = node_index.len() as i32;
 
     // Cleanup
-    for mut node in nodes {
-        node.queue_free();
+    for node in nodes {
+        node.free();
     }
 
     result
@@ -505,7 +550,7 @@ fn scene_tree_process_node_added_fallback() -> i32 {
 #[bench(repeat = 3)]
 fn scene_tree_process_node_renamed_sparse_updates() -> i32 {
     let (mut app, sender) = setup_scene_tree_benchmark_app();
-    let nodes = create_scene_tree_nodes();
+    let nodes = create_scene_tree_nodes(SCENE_TREE_NODE_COUNT);
 
     for msg in create_node_added_messages(&nodes) {
         sender.send(msg).expect("Send should succeed");
@@ -532,14 +577,16 @@ fn scene_tree_process_node_renamed_sparse_updates() -> i32 {
             .expect("Send should succeed");
 
         // message_update_system double-buffering requires two First runs.
-        app.world_mut().run_schedule(First);
-        app.world_mut().run_schedule(First);
+        measured(|| {
+            app.world_mut().run_schedule(First);
+            app.world_mut().run_schedule(First);
+        });
     }
 
     let node_index_len = app.world().resource::<NodeEntityIndex>().len();
 
-    for mut node in nodes {
-        node.queue_free();
+    for node in nodes {
+        node.free();
     }
 
     assert_eq!(node_index_len, SCENE_TREE_NODE_COUNT);
@@ -651,14 +698,16 @@ fn scene_tree_process_collision_bodies_optimized() -> i32 {
     }
 
     // Run First schedule twice (message_update_system flips buffers after first run)
-    app.world_mut().run_schedule(First);
-    app.world_mut().run_schedule(First);
+    measured(|| {
+        app.world_mut().run_schedule(First);
+        app.world_mut().run_schedule(First);
+    });
 
     let node_index = app.world().resource::<NodeEntityIndex>();
     let result = node_index.len() as i32;
 
-    for mut node in nodes {
-        node.queue_free();
+    for node in nodes {
+        node.free();
     }
 
     // Clean up watcher
@@ -699,14 +748,16 @@ fn scene_tree_process_collision_bodies_fallback() -> i32 {
     }
 
     // Run First schedule twice (message_update_system flips buffers after first run)
-    app.world_mut().run_schedule(First);
-    app.world_mut().run_schedule(First);
+    measured(|| {
+        app.world_mut().run_schedule(First);
+        app.world_mut().run_schedule(First);
+    });
 
     let node_index = app.world().resource::<NodeEntityIndex>();
     let result = node_index.len() as i32;
 
-    for mut node in nodes {
-        node.queue_free();
+    for node in nodes {
+        node.free();
     }
 
     // Clean up watcher
@@ -740,12 +791,12 @@ fn setup_collision_processing_benchmark_app()
 }
 
 /// Creates plain Node instances for collision-processing benchmarks.
-fn create_collision_processing_nodes() -> Vec<Gd<Node>> {
+fn create_collision_processing_nodes(node_count: usize) -> Vec<Gd<Node>> {
     let scene_tree = get_scene_tree();
     let root = scene_tree.get_root().expect("Root should exist");
 
-    let mut nodes = Vec::with_capacity(COLLISION_PROCESS_NODE_COUNT + 1);
-    for i in 0..=COLLISION_PROCESS_NODE_COUNT {
+    let mut nodes = Vec::with_capacity(node_count + 1);
+    for i in 0..=node_count {
         let mut node = Node::new_alloc();
         node.set_name(&format!("CollisionProcessNode_{i}"));
         root.clone().add_child(&node);
@@ -769,14 +820,9 @@ fn create_collision_processing_node_added_messages(nodes: &[Gd<Node>]) -> Vec<Sc
         .collect()
 }
 
-/// Benchmark: process a burst of collision start/end messages.
-///
-/// This focuses on `process_godot_collisions` and `CollisionState` update costs
-/// by sending repeated start/end cycles for one origin colliding with many targets.
-#[bench(repeat = 3)]
-fn collisions_process_start_end_burst() -> i32 {
+fn run_collisions_start_end_burst(target_count: usize, cycles: usize) -> i32 {
     let (mut app, scene_sender, collision_sender) = setup_collision_processing_benchmark_app();
-    let nodes = create_collision_processing_nodes();
+    let nodes = create_collision_processing_nodes(target_count);
 
     for msg in create_collision_processing_node_added_messages(&nodes) {
         scene_sender.send(msg).expect("Send should succeed");
@@ -792,7 +838,7 @@ fn collisions_process_start_end_burst() -> i32 {
         .map(|node| GodotNodeHandle::from(node.instance_id()))
         .collect();
 
-    for _ in 0..COLLISION_PROCESS_CYCLES {
+    for _ in 0..cycles {
         for &target in &targets {
             collision_sender
                 .send(RawCollisionMessage {
@@ -813,17 +859,34 @@ fn collisions_process_start_end_burst() -> i32 {
         }
     }
 
-    app.world_mut().run_schedule(PrePhysicsUpdate);
+    measured(|| app.world_mut().run_schedule(PrePhysicsUpdate));
 
     let active = app.world().resource::<CollisionState>().len();
 
-    for mut node in nodes {
-        node.queue_free();
+    for node in nodes {
+        node.free();
     }
 
     // Expect zero active collisions after balanced Started/Ended bursts.
     assert_eq!(active, 0);
-    (COLLISION_PROCESS_NODE_COUNT * COLLISION_PROCESS_CYCLES * 2) as i32
+    (target_count * cycles * 2) as i32
+}
+
+/// Benchmark: process a burst of collision start/end messages.
+///
+/// This focuses on `process_godot_collisions` and `CollisionState` update costs
+/// by sending repeated start/end cycles for one origin colliding with many targets.
+#[bench(repeat = 3)]
+fn collisions_process_start_end_burst() -> i32 {
+    run_collisions_start_end_burst(COLLISION_PROCESS_NODE_COUNT, COLLISION_PROCESS_CYCLES)
+}
+
+/// Scaling variant: 5x the concurrent collision pairs (1000 targets, 40 cycles).
+/// Total message volume matches the default burst, isolating how costs scale
+/// with the size of the active-pair map rather than message count.
+#[bench(repeat = 3)]
+fn collisions_process_start_end_burst_1000() -> i32 {
+    run_collisions_start_end_burst(1000, 40)
 }
 
 // =============================================================================
@@ -877,7 +940,7 @@ fn input_action_checking_many_events_many_actions() -> i32 {
     }
     drop(sender);
 
-    app.world_mut().run_schedule(First);
+    measured(|| app.world_mut().run_schedule(First));
 
     let mut input_map = InputMap::singleton();
     for name in &action_names {
@@ -947,7 +1010,7 @@ fn packed_scene_batch_spawn() -> i32 {
     let mut app = setup_packed_scene_benchmark_app();
 
     // Run PostUpdate which contains the spawn_scene system
-    app.world_mut().run_schedule(PostUpdate);
+    measured(|| app.world_mut().run_schedule(PostUpdate));
 
     let result = PACKED_SCENE_COUNT as i32;
 
@@ -988,7 +1051,7 @@ fn connect_bench_signals(
 
 /// Creates a signal benchmark app with N nodes that have custom "bench_signal" user signals.
 /// Returns the app and the nodes (to keep them alive and for emitting signals).
-fn setup_signal_benchmark_app() -> (App, Vec<Gd<Node>>) {
+fn setup_signal_benchmark_app(node_count: usize) -> (App, Vec<Gd<Node>>) {
     let mut app = App::new();
 
     app.init_schedule(First);
@@ -1004,9 +1067,9 @@ fn setup_signal_benchmark_app() -> (App, Vec<Gd<Node>>) {
         },
     );
 
-    let mut nodes = Vec::with_capacity(SIGNAL_NODE_COUNT);
+    let mut nodes = Vec::with_capacity(node_count);
 
-    for i in 0..SIGNAL_NODE_COUNT {
+    for i in 0..node_count {
         let mut node = Node::new_alloc();
         node.set_name(&format!("BenchSignalNode_{i}"));
         node.add_user_signal("bench_signal");
@@ -1027,6 +1090,34 @@ fn connect_all_bench_signals(app: &mut App) {
     app.world_mut().run_schedule(Last); // Processes pending → actually connects via FFI
 }
 
+fn run_signal_dispatch_throughput(node_count: usize) -> i32 {
+    let (mut app, mut nodes) = setup_signal_benchmark_app(node_count);
+    connect_all_bench_signals(&mut app);
+
+    let signal_name = StringName::from("bench_signal");
+
+    measured(|| {
+        // Emit signals on all nodes (synchronously runs callable closures,
+        // pushing events to the crossbeam channel)
+        for node in &mut nodes {
+            node.emit_signal(&signal_name, &[]);
+        }
+
+        // Drain channel and trigger observers
+        app.world_mut().run_schedule(First);
+    });
+
+    // Verify all signals were dispatched
+    let counter = app.world().resource::<SignalCounter>();
+    assert_eq!(counter.0, node_count as i32);
+
+    for node in nodes {
+        node.free();
+    }
+
+    node_count as i32
+}
+
 /// Benchmark: Signal dispatch throughput (full pipeline)
 ///
 /// Measures the complete signal pipeline per frame:
@@ -1036,31 +1127,13 @@ fn connect_all_bench_signals(app: &mut App) {
 /// 4. world.trigger() fires observer for each event
 #[bench(repeat = 3)]
 fn signal_dispatch_throughput() -> i32 {
-    let (mut app, mut nodes) = setup_signal_benchmark_app();
-    connect_all_bench_signals(&mut app);
+    run_signal_dispatch_throughput(SIGNAL_NODE_COUNT)
+}
 
-    let signal_name = StringName::from("bench_signal");
-
-    // Emit signals on all nodes (synchronously runs callable closures,
-    // pushing events to the crossbeam channel)
-    for node in &mut nodes {
-        node.emit_signal(&signal_name, &[]);
-    }
-
-    // Drain channel and trigger observers
-    app.world_mut().run_schedule(First);
-
-    // Verify all signals were dispatched
-    let counter = app.world().resource::<SignalCounter>();
-    assert_eq!(counter.0, SIGNAL_NODE_COUNT as i32);
-
-    let result = SIGNAL_NODE_COUNT as i32;
-
-    for node in nodes {
-        node.free();
-    }
-
-    result
+/// Scaling variant of signal dispatch (5x the default 200 nodes).
+#[bench(repeat = 3)]
+fn signal_dispatch_throughput_1000() -> i32 {
+    run_signal_dispatch_throughput(1000)
 }
 
 /// Benchmark: Signal connection setup cost (FFI)
@@ -1069,14 +1142,14 @@ fn signal_dispatch_throughput() -> i32 {
 /// 200x Callable::from_fn() creation + 200x node.connect() FFI calls.
 #[bench(repeat = 3)]
 fn signal_connection_setup() -> i32 {
-    let (mut app, nodes) = setup_signal_benchmark_app();
+    let (mut app, nodes) = setup_signal_benchmark_app(SIGNAL_NODE_COUNT);
 
     // Queue connections (runs connect_bench_signals in Update)
     app.add_systems(Update, connect_bench_signals);
     app.world_mut().run_schedule(Update);
 
     // Measure: process pending connections (FFI: Callable creation + node.connect)
-    app.world_mut().run_schedule(Last);
+    measured(|| app.world_mut().run_schedule(Last));
 
     let result = SIGNAL_NODE_COUNT as i32;
 

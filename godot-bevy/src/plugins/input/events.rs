@@ -142,7 +142,7 @@ impl From<godot::global::MouseButton> for MouseButton {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn write_input_messages(
+pub(crate) fn write_input_messages(
     events: NonSendMut<InputEventReader>,
     mut keyboard_events: MessageWriter<KeyboardInput>,
     mut mouse_button_events: MessageWriter<MouseButtonInput>,
