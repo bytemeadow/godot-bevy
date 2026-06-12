@@ -75,7 +75,7 @@ pub use test_app::TestApp;
 pub use test_helpers::Counter;
 
 // Re-export bencher types
-pub use bencher::{BenchResult, metrics, run_benchmark};
+pub use bencher::{BenchResult, measured, metrics, run_benchmark};
 
 // Re-export the macros
 pub use godot_bevy_test_macros::{bench, itest};

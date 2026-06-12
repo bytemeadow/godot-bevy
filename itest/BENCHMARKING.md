@@ -16,6 +16,17 @@ This will:
 2. Run benchmarks in Godot headless mode
 3. Display results with min/median times
 
+### Run a Subset of Benchmarks
+
+```bash
+./run-benches.sh --filter transform_sync        # only transform sync benches
+./run-benches.sh --filter "signal,collision"    # comma-separated, substring match
+```
+
+The filter is a comma-separated list of substrings; a benchmark runs if its
+name contains any of them. It also works as an environment variable
+(`BENCHMARK_FILTER=transform_sync`), including with `compare-benches.sh`.
+
 ### Compare Against a Base Branch
 
 ```bash
@@ -25,40 +36,52 @@ cd itest
 ```
 
 This mirrors what CI does on every PR:
-1. Creates a git worktree for the base branch
-2. Builds and runs benchmarks on the base branch
-3. Builds and runs benchmarks on the current branch
+1. Creates a git worktree for the base branch and builds both branches
+2. Runs benchmarks interleaved (base, current, base, current, ...) so thermal
+   drift and background load hit both sides equally
+3. Merges each side's runs (median of medians)
 4. Prints a comparison table with change percentages
 
 Both builds share `target/` so dependency compilation only happens once.
 Results are saved to `itest/.bench-results/` for further inspection.
+
+`BENCH_ROUNDS` controls how many interleaved rounds run per side (default: 3).
+
+The comparison table includes a `Noise` column: each benchmark's spread of
+per-round medians. Changes within that spread are marked `~` and not counted
+as regressions or improvements — µs-scale benchmarks routinely shift >10%
+between processes, so never judge a change from two standalone
+`run-benches.sh` runs.
 
 ### Example Output
 
 ```
 Benchmark Results:
                                                                     min       median
-itest/rust/src/benchmarks.rs:14
-  transform_sync_bevy_to_godot_3d                                1.58ms       1.62ms
-  transform_sync_godot_to_bevy_3d                                1.40ms       1.44ms
-  transform_sync_bevy_to_godot_2d                                1.52ms       1.56ms
-  transform_sync_godot_to_bevy_2d                                1.36ms       1.40ms
-  transform_sync_roundtrip_3d                                    3.10ms       3.20ms
-  transform_sync_roundtrip_2d                                    2.98ms       3.06ms
-  scene_tree_idle_no_messages                                    0.02ms       0.03ms
-  scene_tree_process_node_added_optimized                        1.80ms       1.92ms
-  scene_tree_process_node_added_fallback                         3.40ms       3.55ms
-  scene_tree_process_node_renamed_sparse_updates                 0.45ms       0.50ms
-  scene_tree_process_collision_bodies_optimized                   1.10ms       1.18ms
-  scene_tree_process_collision_bodies_fallback                    2.20ms       2.35ms
-  collisions_process_start_end_burst                             5.80ms       6.10ms
-  input_action_checking_many_events_many_actions                 0.90ms       0.95ms
-  packed_scene_batch_spawn                                       4.20ms       4.40ms
-  signal_dispatch_throughput                                      0.60ms       0.65ms
-  signal_connection_setup                                        1.20ms       1.30ms
+itest/rust/src/benchmarks.rs:124
+  transform_sync_bevy_to_godot_3d                              119.04µs     123.25µs
+  transform_sync_godot_to_bevy_3d                              173.24µs     179.93µs
+  transform_sync_bevy_to_godot_2d                              122.19µs     127.60µs
+  transform_sync_godot_to_bevy_2d                              135.86µs     138.76µs
+  transform_sync_roundtrip_3d                                  237.78µs     247.32µs
+  transform_sync_roundtrip_2d                                  200.57µs     209.01µs
+  scene_tree_idle_no_messages                                    2.80ms       2.96ms
+  scene_tree_process_node_added_optimized                      684.46µs     708.28µs
+  scene_tree_process_node_added_fallback                       946.71µs     972.68µs
+  scene_tree_process_node_renamed_sparse_updates                 2.24ms       2.39ms
+  scene_tree_process_collision_bodies_optimized                518.07µs     537.44µs
+  scene_tree_process_collision_bodies_fallback                 591.72µs     611.86µs
+  collisions_process_start_end_burst                             7.11ms       7.25ms
+  input_action_checking_many_events_many_actions                 1.38ms       1.42ms
+  packed_scene_batch_spawn                                     159.06µs     189.90µs
+  signal_dispatch_throughput                                    46.42µs      55.57µs
+  signal_connection_setup                                       67.21µs      68.12µs
 
-Benchmarks completed in 85.32s.
+Benchmarks completed in 2.21s.
 ```
+
+Reported times cover only each benchmark's `measured(|| ...)` scope — setup
+and teardown are excluded.
 
 ## What We Benchmark
 
@@ -126,13 +149,17 @@ Every PR automatically runs benchmarks and compares against the `main` branch ba
 3. **Comment on PR** with results table
 4. **Fail if regression** > 10% slowdown detected
 
-### Baseline Updates
+### Baseline Generation
 
-When code is merged to `main`:
-1. Benchmarks run on CI infrastructure
-2. Results saved to `itest/baseline.json`
-3. Baseline automatically committed with metadata
-4. Future PRs compare against this baseline
+There is no stored baseline. Each PR run builds the base branch (via a git
+worktree) and benchmarks it on the same runner, right before benchmarking the
+PR branch. This keeps comparisons hardware-consistent — a stored baseline from
+a different runner or an older toolchain would produce false regressions.
+
+Each side runs twice and the runs are merged (median of medians) to reduce
+noise. The PR's benchmark definitions are used for the baseline build when
+they compile against the base branch, so new benchmarks get baseline numbers
+too.
 
 ## Adding New Benchmarks
 
@@ -141,23 +168,31 @@ When code is merged to `main`:
 Add to `itest/rust/src/benchmarks.rs`:
 
 ```rust
-use godot_bevy_test::bench;
+use godot_bevy_test::{bench, measured};
 
 #[bench(repeat = 3)]  // Optional: custom inner repetitions
 fn my_new_benchmark() -> i32 {
-    // Benchmark code - must return a value to prevent dead-code elimination.
-    // Will be run 3 times internally per iteration,
-    // plus 5 warmup + 21 test runs by the harness.
+    // Setup is NOT timed when you scope the hot section with measured()
+    let mut app = setup_benchmark_app();
 
-    let result = do_expensive_operation();
+    // Only this section contributes to the reported time
+    let result = measured(|| do_expensive_operation(&mut app));
+
+    // Teardown is not timed either
+    cleanup(app);
     result
 }
 ```
 
 **Requirements:**
 - Must return a value (prevents compiler optimization)
+- Wrap the system under test in `measured(|| ...)` so setup/teardown don't
+  dilute the signal (without it, the whole function is timed)
 - Should be deterministic (avoid randomness)
 - Keep runtime reasonable (< 1 second per iteration)
+- Clean up nodes with `node.free()`, not `queue_free()` — benchmarks run
+  synchronously within one frame, so deferred frees accumulate in the scene
+  tree across iterations and skew later benchmarks
 - Test the real plugin/system, not raw FFI (see [CLAUDE.md](../CLAUDE.md) Benchmark Philosophy)
 
 ### 2. Run Locally
@@ -182,7 +217,6 @@ The CI will automatically:
 itest/
 ├── run-benches.sh              # Main entry point
 ├── compare-benches.sh          # A/B comparison (current vs base branch)
-├── baseline.json               # CI-generated baseline
 └── rust/
     └── src/
         └── benchmarks.rs       # All benchmark definitions
@@ -211,6 +245,8 @@ godot-bevy-test/
    - 5 warmup runs
    - 21 test runs (odd number for clean median)
    - Reports min and median (ignores outliers)
+   - Times the `measured(|| ...)` scope when the benchmark uses one,
+     otherwise the whole function
 
 3. **CI workflows**:
    - **`benchmarks.yml`**: Runs benchmarks, checks regressions, saves artifacts
@@ -237,9 +273,9 @@ godot-bevy-test/
 
 **Recommendation**: Use itest benchmarks for CI regression detection, keep perf-test as user-facing demo.
 
-## Baseline Management
+## Result Format
 
-### Format
+Benchmark JSON (produced with `BENCHMARK_JSON=1 BENCHMARK_JSON_PATH=out.json`):
 
 ```json
 {
@@ -251,23 +287,8 @@ godot-bevy-test/
       "min_display": "1.58ms",
       "median_display": "1.59ms"
     }
-  },
-  "ci_metadata": {
-    "commit": "abc123...",
-    "timestamp": "2025-10-16T15:53:12Z",
-    "runner": "GitHub Actions"
   }
 }
-```
-
-### Manual Baseline Update
-
-```bash
-cd itest
-# Run benchmarks with JSON output, then copy the result to baseline.json
-BENCHMARK_JSON=1 BENCHMARK_JSON_PATH=baseline.json ./run-benches.sh
-git add baseline.json
-git commit -m "chore: update benchmark baseline"
 ```
 
 ## Regression Detection

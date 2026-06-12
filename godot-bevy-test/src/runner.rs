@@ -129,6 +129,10 @@ impl TestRunnerImpl {
             file_count
         );
 
+        if let Ok(filter) = std::env::var("BENCHMARK_FILTER") {
+            println!("  Filter: {FMT_CYAN}{filter}{FMT_END}");
+        }
+
         // Print header
         print!("\n{FMT_CYAN}");
         print!("{:60}", "");
@@ -179,12 +183,20 @@ impl TestRunnerImpl {
     }
 
     fn collect_benchmarks(&self) -> (Vec<RustBenchmark>, usize) {
+        // BENCHMARK_FILTER: comma-separated substrings; a benchmark runs if its
+        // name contains any of them. Unset = run everything.
+        let filter = std::env::var("BENCHMARK_FILTER").ok();
         let mut all_files = HashSet::new();
         let mut benchmarks = Vec::new();
 
         godot::sys::plugin_foreach!(__GODOT_BENCH; |bench: &RustBenchmark| {
-            benchmarks.push(*bench);
-            all_files.insert(bench.file);
+            let matches = filter
+                .as_deref()
+                .is_none_or(|f| f.split(',').any(|pat| bench.name.contains(pat.trim())));
+            if matches {
+                benchmarks.push(*bench);
+                all_files.insert(bench.file);
+            }
         });
 
         // Sort for deterministic order

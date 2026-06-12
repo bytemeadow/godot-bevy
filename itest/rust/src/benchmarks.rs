@@ -30,7 +30,7 @@ use godot_bevy::plugins::transforms::{
     GodotTransformSyncPlugin, GodotTransformSyncPluginExt, TransformSyncMetadata, TransformSyncMode,
 };
 use godot_bevy::watchers::collision_watcher::CollisionWatcher;
-use godot_bevy_test::bench;
+use godot_bevy_test::{bench, measured};
 
 // =============================================================================
 // Transform Sync Benchmarks
@@ -132,7 +132,7 @@ fn transform_sync_bevy_to_godot_3d() -> i32 {
     }
 
     // Run the Last schedule which contains the sync system
-    app.world_mut().run_schedule(Last);
+    measured(|| app.world_mut().run_schedule(Last));
 
     let result = nodes.len() as i32;
 
@@ -159,7 +159,7 @@ fn transform_sync_godot_to_bevy_3d() -> i32 {
     }
 
     // Run the PreUpdate schedule which contains the sync system
-    app.world_mut().run_schedule(PreUpdate);
+    measured(|| app.world_mut().run_schedule(PreUpdate));
 
     let result = nodes.len() as i32;
 
@@ -184,7 +184,7 @@ fn transform_sync_bevy_to_godot_2d() -> i32 {
         transform.translation = Vec3::new(i as f32 * 2.0, i as f32, 0.0);
     }
 
-    app.world_mut().run_schedule(Last);
+    measured(|| app.world_mut().run_schedule(Last));
 
     let result = nodes.len() as i32;
 
@@ -205,7 +205,7 @@ fn transform_sync_godot_to_bevy_2d() -> i32 {
         node.set_position(Vector2::new(i as f32 * 2.0, i as f32));
     }
 
-    app.world_mut().run_schedule(PreUpdate);
+    measured(|| app.world_mut().run_schedule(PreUpdate));
 
     let result = nodes.len() as i32;
 
@@ -236,19 +236,21 @@ fn transform_sync_roundtrip_3d() -> i32 {
         node.set_position(Vector3::new(i as f32, (i as f32).sin(), 0.0));
     }
 
-    // Phase 1: Sync Godot -> Bevy (PreUpdate)
-    app.world_mut().run_schedule(PreUpdate);
+    measured(|| {
+        // Phase 1: Sync Godot -> Bevy (PreUpdate)
+        app.world_mut().run_schedule(PreUpdate);
 
-    // Phase 2: Simulate game logic modifying transforms
-    let mut query = app.world_mut().query::<&mut BevyTransform>();
-    for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
-        if i % 2 == 0 {
-            transform.translation.y += 10.0;
+        // Phase 2: Simulate game logic modifying transforms
+        let mut query = app.world_mut().query::<&mut BevyTransform>();
+        for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
+            if i % 2 == 0 {
+                transform.translation.y += 10.0;
+            }
         }
-    }
 
-    // Phase 3: Sync Bevy -> Godot (Last)
-    app.world_mut().run_schedule(Last);
+        // Phase 3: Sync Bevy -> Godot (Last)
+        app.world_mut().run_schedule(Last);
+    });
 
     let result = nodes.len() as i32;
 
@@ -270,19 +272,21 @@ fn transform_sync_roundtrip_2d() -> i32 {
         node.set_position(Vector2::new(i as f32, (i as f32).sin()));
     }
 
-    // Phase 1: Sync Godot -> Bevy (PreUpdate)
-    app.world_mut().run_schedule(PreUpdate);
+    measured(|| {
+        // Phase 1: Sync Godot -> Bevy (PreUpdate)
+        app.world_mut().run_schedule(PreUpdate);
 
-    // Phase 2: Simulate game logic modifying transforms
-    let mut query = app.world_mut().query::<&mut BevyTransform>();
-    for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
-        if i % 2 == 0 {
-            transform.translation.y += 10.0;
+        // Phase 2: Simulate game logic modifying transforms
+        let mut query = app.world_mut().query::<&mut BevyTransform>();
+        for (i, mut transform) in query.iter_mut(app.world_mut()).enumerate() {
+            if i % 2 == 0 {
+                transform.translation.y += 10.0;
+            }
         }
-    }
 
-    // Phase 3: Sync Bevy -> Godot (Last)
-    app.world_mut().run_schedule(Last);
+        // Phase 3: Sync Bevy -> Godot (Last)
+        app.world_mut().run_schedule(Last);
+    });
 
     let result = nodes.len() as i32;
 
@@ -406,9 +410,11 @@ fn scene_tree_idle_no_messages() -> i32 {
     let (mut app, _sender) = setup_scene_tree_benchmark_app();
 
     const IDLE_FRAMES: usize = 200;
-    for _ in 0..IDLE_FRAMES {
-        app.world_mut().run_schedule(First);
-    }
+    measured(|| {
+        for _ in 0..IDLE_FRAMES {
+            app.world_mut().run_schedule(First);
+        }
+    });
 
     IDLE_FRAMES as i32
 }
@@ -438,16 +444,18 @@ fn scene_tree_process_node_added_optimized() -> i32 {
     // 1st run: write_scene_tree_messages writes to buffer B, read_scene_tree_messages
     //          reads from buffer A (empty), then message_update_system flips buffers
     // 2nd run: read_scene_tree_messages now reads from buffer A (has messages)
-    app.world_mut().run_schedule(First);
-    app.world_mut().run_schedule(First);
+    measured(|| {
+        app.world_mut().run_schedule(First);
+        app.world_mut().run_schedule(First);
+    });
 
     // Verify entities were created
     let node_index = app.world().resource::<NodeEntityIndex>();
     let result = node_index.len() as i32;
 
     // Cleanup - remove nodes from scene tree
-    for mut node in nodes {
-        node.queue_free();
+    for node in nodes {
+        node.free();
     }
 
     result
@@ -483,16 +491,18 @@ fn scene_tree_process_node_added_fallback() -> i32 {
     }
 
     // Run First schedule twice (message_update_system flips buffers after first run)
-    app.world_mut().run_schedule(First);
-    app.world_mut().run_schedule(First);
+    measured(|| {
+        app.world_mut().run_schedule(First);
+        app.world_mut().run_schedule(First);
+    });
 
     // Verify entities were created
     let node_index = app.world().resource::<NodeEntityIndex>();
     let result = node_index.len() as i32;
 
     // Cleanup
-    for mut node in nodes {
-        node.queue_free();
+    for node in nodes {
+        node.free();
     }
 
     result
@@ -532,14 +542,16 @@ fn scene_tree_process_node_renamed_sparse_updates() -> i32 {
             .expect("Send should succeed");
 
         // message_update_system double-buffering requires two First runs.
-        app.world_mut().run_schedule(First);
-        app.world_mut().run_schedule(First);
+        measured(|| {
+            app.world_mut().run_schedule(First);
+            app.world_mut().run_schedule(First);
+        });
     }
 
     let node_index_len = app.world().resource::<NodeEntityIndex>().len();
 
-    for mut node in nodes {
-        node.queue_free();
+    for node in nodes {
+        node.free();
     }
 
     assert_eq!(node_index_len, SCENE_TREE_NODE_COUNT);
@@ -651,14 +663,16 @@ fn scene_tree_process_collision_bodies_optimized() -> i32 {
     }
 
     // Run First schedule twice (message_update_system flips buffers after first run)
-    app.world_mut().run_schedule(First);
-    app.world_mut().run_schedule(First);
+    measured(|| {
+        app.world_mut().run_schedule(First);
+        app.world_mut().run_schedule(First);
+    });
 
     let node_index = app.world().resource::<NodeEntityIndex>();
     let result = node_index.len() as i32;
 
-    for mut node in nodes {
-        node.queue_free();
+    for node in nodes {
+        node.free();
     }
 
     // Clean up watcher
@@ -699,14 +713,16 @@ fn scene_tree_process_collision_bodies_fallback() -> i32 {
     }
 
     // Run First schedule twice (message_update_system flips buffers after first run)
-    app.world_mut().run_schedule(First);
-    app.world_mut().run_schedule(First);
+    measured(|| {
+        app.world_mut().run_schedule(First);
+        app.world_mut().run_schedule(First);
+    });
 
     let node_index = app.world().resource::<NodeEntityIndex>();
     let result = node_index.len() as i32;
 
-    for mut node in nodes {
-        node.queue_free();
+    for node in nodes {
+        node.free();
     }
 
     // Clean up watcher
@@ -813,12 +829,12 @@ fn collisions_process_start_end_burst() -> i32 {
         }
     }
 
-    app.world_mut().run_schedule(PrePhysicsUpdate);
+    measured(|| app.world_mut().run_schedule(PrePhysicsUpdate));
 
     let active = app.world().resource::<CollisionState>().len();
 
-    for mut node in nodes {
-        node.queue_free();
+    for node in nodes {
+        node.free();
     }
 
     // Expect zero active collisions after balanced Started/Ended bursts.
@@ -877,7 +893,7 @@ fn input_action_checking_many_events_many_actions() -> i32 {
     }
     drop(sender);
 
-    app.world_mut().run_schedule(First);
+    measured(|| app.world_mut().run_schedule(First));
 
     let mut input_map = InputMap::singleton();
     for name in &action_names {
@@ -947,7 +963,7 @@ fn packed_scene_batch_spawn() -> i32 {
     let mut app = setup_packed_scene_benchmark_app();
 
     // Run PostUpdate which contains the spawn_scene system
-    app.world_mut().run_schedule(PostUpdate);
+    measured(|| app.world_mut().run_schedule(PostUpdate));
 
     let result = PACKED_SCENE_COUNT as i32;
 
@@ -1041,14 +1057,16 @@ fn signal_dispatch_throughput() -> i32 {
 
     let signal_name = StringName::from("bench_signal");
 
-    // Emit signals on all nodes (synchronously runs callable closures,
-    // pushing events to the crossbeam channel)
-    for node in &mut nodes {
-        node.emit_signal(&signal_name, &[]);
-    }
+    measured(|| {
+        // Emit signals on all nodes (synchronously runs callable closures,
+        // pushing events to the crossbeam channel)
+        for node in &mut nodes {
+            node.emit_signal(&signal_name, &[]);
+        }
 
-    // Drain channel and trigger observers
-    app.world_mut().run_schedule(First);
+        // Drain channel and trigger observers
+        app.world_mut().run_schedule(First);
+    });
 
     // Verify all signals were dispatched
     let counter = app.world().resource::<SignalCounter>();
@@ -1076,7 +1094,7 @@ fn signal_connection_setup() -> i32 {
     app.world_mut().run_schedule(Update);
 
     // Measure: process pending connections (FFI: Callable creation + node.connect)
-    app.world_mut().run_schedule(Last);
+    measured(|| app.world_mut().run_schedule(Last));
 
     let result = SIGNAL_NODE_COUNT as i32;
 
