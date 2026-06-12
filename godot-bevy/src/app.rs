@@ -51,10 +51,8 @@ impl BevyApp {
         self.instance_init_func = Some(func);
     }
 
-    /// Initialize the Bevy app on an already-in-tree node.
-    /// Used by the test harness to initialize the autoload BevyApp
-    /// which skipped initialization in `_ready()` (no init func was set).
-    pub fn initialize(&mut self) {
+    /// Tear down the Bevy app and remove all watchers.
+    pub fn teardown(&mut self) {
         self.app = None;
         for name in &[
             "SceneTreeWatcher",
@@ -67,6 +65,16 @@ impl BevyApp {
                 child.queue_free();
             }
         }
+    }
+
+    /// Initialize the Bevy app on an already-in-tree node.
+    /// No-ops if neither `set_instance_init_func()` nor `#[bevy_app]` has been set.
+    pub fn initialize(&mut self) {
+        let has_init = self.instance_init_func.is_some() || BEVY_INIT_FUNC.get().is_some();
+        if !has_init {
+            return;
+        }
+        self.teardown();
         self.do_initialize();
     }
 
