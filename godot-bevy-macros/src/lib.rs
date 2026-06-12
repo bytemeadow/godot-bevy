@@ -207,7 +207,7 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
 /// - Use `export_type` to specify an alternate Godot-compatible type
 /// - Use `transform_with` to provide a conversion function from the Godot type to the field type
 /// - Use `default` to provide an initial value to the exported Godot field.
-#[proc_macro_derive(GodotNode, attributes(godot_export, godot_node, export_fields))]
+#[proc_macro_derive(GodotNode, attributes(godot_export, godot_node, export_fields, godot_components))]
 pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
     let parsed: DeriveInput = parse_macro_input!(input as DeriveInput);
     derive_godot_node(parsed)
