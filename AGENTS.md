@@ -339,6 +339,12 @@ Located in `itest/rust/src/benchmarks.rs`:
 | `transform_sync_roundtrip_3d` | Full frame: PreUpdate → game logic → Last |
 | `transform_sync_roundtrip_2d` | Full frame: PreUpdate → game logic → Last |
 
+The full suite (23 benchmarks: scene tree, collisions, input, packed scenes,
+signals) is documented in `itest/BENCHMARKING.md`. Size-suffixed variants
+(e.g. `transform_sync_bevy_to_godot_3d_5000`) rerun a system at a different
+entity count — compare against the default size to catch super-linear (O(n²))
+scaling that a single size hides.
+
 ### Adding New Benchmarks
 
 When adding benchmarks:

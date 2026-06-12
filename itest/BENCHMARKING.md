@@ -58,26 +58,32 @@ between processes, so never judge a change from two standalone
 ```
 Benchmark Results:
                                                                     min       median
-itest/rust/src/benchmarks.rs:124
-  transform_sync_bevy_to_godot_3d                              119.04µs     123.25µs
-  transform_sync_godot_to_bevy_3d                              173.24µs     179.93µs
-  transform_sync_bevy_to_godot_2d                              122.19µs     127.60µs
-  transform_sync_godot_to_bevy_2d                              135.86µs     138.76µs
-  transform_sync_roundtrip_3d                                  237.78µs     247.32µs
-  transform_sync_roundtrip_2d                                  200.57µs     209.01µs
-  scene_tree_idle_no_messages                                    2.80ms       2.96ms
-  scene_tree_process_node_added_optimized                      684.46µs     708.28µs
-  scene_tree_process_node_added_fallback                       946.71µs     972.68µs
-  scene_tree_process_node_renamed_sparse_updates                 2.24ms       2.39ms
-  scene_tree_process_collision_bodies_optimized                518.07µs     537.44µs
-  scene_tree_process_collision_bodies_fallback                 591.72µs     611.86µs
-  collisions_process_start_end_burst                             7.11ms       7.25ms
-  input_action_checking_many_events_many_actions                 1.38ms       1.42ms
-  packed_scene_batch_spawn                                     159.06µs     189.90µs
-  signal_dispatch_throughput                                    46.42µs      55.57µs
-  signal_connection_setup                                       67.21µs      68.12µs
+itest/rust/src/benchmarks.rs:146
+  transform_sync_bevy_to_godot_3d                             118.58µs     120.64µs
+  transform_sync_bevy_to_godot_3d_100                          16.82µs      18.07µs
+  transform_sync_bevy_to_godot_3d_5000                        566.57µs     579.96µs
+  transform_sync_godot_to_bevy_3d                             172.71µs     175.80µs
+  transform_sync_godot_to_bevy_3d_5000                        829.90µs     847.15µs
+  transform_sync_bevy_to_godot_2d                             119.32µs     122.35µs
+  transform_sync_godot_to_bevy_2d                             131.79µs     134.21µs
+  transform_sync_roundtrip_3d                                 225.57µs     239.72µs
+  transform_sync_roundtrip_2d                                 184.85µs     200.83µs
+  scene_tree_idle_no_messages                                   2.59ms       2.65ms
+  scene_tree_process_node_added_optimized                     678.80µs     688.19µs
+  scene_tree_process_node_added_optimized_2500                  2.70ms       3.11ms
+  scene_tree_process_node_added_fallback                      917.07µs     924.35µs
+  scene_tree_process_node_renamed_sparse_updates                1.66ms       2.03ms
+  scene_tree_process_collision_bodies_optimized               426.56µs     474.18µs
+  scene_tree_process_collision_bodies_fallback                490.19µs     498.86µs
+  collisions_process_start_end_burst                            5.60ms       5.74ms
+  collisions_process_start_end_burst_1000                       5.22ms       5.40ms
+  input_action_checking_many_events_many_actions                1.13ms       1.14ms
+  packed_scene_batch_spawn                                    157.26µs     158.67µs
+  signal_dispatch_throughput                                   43.83µs      46.69µs
+  signal_dispatch_throughput_1000                             152.29µs     154.74µs
+  signal_connection_setup                                      64.47µs      66.33µs
 
-Benchmarks completed in 2.21s.
+Benchmarks completed in 3.92s.
 ```
 
 Reported times cover only each benchmark's `measured(|| ...)` scope — setup
@@ -85,22 +91,34 @@ and teardown are excluded.
 
 ## What We Benchmark
 
-The suite contains **17 benchmarks** across six categories. Every benchmark runs the real godot-bevy systems (plugins, schedules, ECS queries) rather than raw FFI calls, so regressions in actual user-facing code are caught.
+The suite contains **23 benchmarks** across six categories. Every benchmark runs the real godot-bevy systems (plugins, schedules, ECS queries) rather than raw FFI calls, so regressions in actual user-facing code are caught.
 
-### Transform Synchronization (6 benchmarks, 1000 entities)
+### Scaling Variants
+
+Size-suffixed benchmarks (`_100`, `_1000`, `_2500`, `_5000`) rerun a system at
+a different entity count than its default-named sibling. Comparing per-size
+times reveals scaling behavior a single size can't: 5x the entities should
+cost roughly 5x the time — a much larger ratio means super-linear (e.g. O(n²))
+growth, and an optimization that only helps at one size shows up as a skewed
+ratio.
+
+### Transform Synchronization (9 benchmarks, 1000 entities unless suffixed)
 
 These benchmarks measure the real `GodotTransformSyncPlugin` systems that sync transforms between Bevy ECS and Godot nodes.
 
 | Benchmark | What It Tests |
 |-----------|---------------|
 | `transform_sync_bevy_to_godot_3d` | Bevy->Godot 3D sync (Last schedule) |
+| `transform_sync_bevy_to_godot_3d_100` | Scaling variant (100 nodes) |
+| `transform_sync_bevy_to_godot_3d_5000` | Scaling variant (5000 nodes) |
 | `transform_sync_godot_to_bevy_3d` | Godot->Bevy 3D sync (PreUpdate schedule) |
+| `transform_sync_godot_to_bevy_3d_5000` | Scaling variant (5000 nodes) |
 | `transform_sync_bevy_to_godot_2d` | Bevy->Godot 2D sync (Last schedule) |
 | `transform_sync_godot_to_bevy_2d` | Godot->Bevy 2D sync (PreUpdate schedule) |
 | `transform_sync_roundtrip_3d` | Full frame: PreUpdate -> game logic -> Last (3D) |
 | `transform_sync_roundtrip_2d` | Full frame: PreUpdate -> game logic -> Last (2D) |
 
-### Scene Tree Processing (5 benchmarks, 500 nodes)
+### Scene Tree Processing (6 benchmarks, 500 nodes unless suffixed)
 
 These benchmarks measure the `GodotSceneTreePlugin` systems that process node-added, renamed, and collision-body messages from Godot.
 
@@ -108,16 +126,18 @@ These benchmarks measure the `GodotSceneTreePlugin` systems that process node-ad
 |-----------|---------------|
 | `scene_tree_idle_no_messages` | Per-frame overhead when stable (200 frames) |
 | `scene_tree_process_node_added_optimized` | NodeAdded with pre-analyzed types |
+| `scene_tree_process_node_added_optimized_2500` | Scaling variant (2500 nodes) |
 | `scene_tree_process_node_added_fallback` | NodeAdded with FFI type detection |
 | `scene_tree_process_node_renamed_sparse_updates` | Sparse rename messages (80 frames) |
 | `scene_tree_process_collision_bodies_optimized` | Area3D with collision signals (optimized path, 100 nodes) |
 
-### Collision Processing (2 benchmarks)
+### Collision Processing (3 benchmarks)
 
 | Benchmark | What It Tests |
 |-----------|---------------|
 | `scene_tree_process_collision_bodies_fallback` | Area3D with collision signals (fallback FFI path, 100 nodes) |
 | `collisions_process_start_end_burst` | Burst start/end events (200 nodes x 200 cycles) |
+| `collisions_process_start_end_burst_1000` | Scaling variant: 5x concurrent pairs, same message volume (1000 x 40) |
 
 ### Input Action Checking (1 benchmark)
 
@@ -131,11 +151,12 @@ These benchmarks measure the `GodotSceneTreePlugin` systems that process node-ad
 |-----------|---------------|
 | `packed_scene_batch_spawn` | Batch spawn 100 instances (per-frame cache) |
 
-### Signal System (2 benchmarks, 200 nodes)
+### Signal System (3 benchmarks, 200 nodes unless suffixed)
 
 | Benchmark | What It Tests |
 |-----------|---------------|
 | `signal_dispatch_throughput` | Full emit -> drain -> trigger pipeline |
+| `signal_dispatch_throughput_1000` | Scaling variant (1000 nodes) |
 | `signal_connection_setup` | FFI cost of 200 Callable+connect calls |
 
 ## CI Integration
@@ -369,7 +390,6 @@ for node in nodes {
 
 - [ ] Benchmark asset loading performance
 - [ ] Add audio system benchmarks (deferred: <100 concurrent sounds is not a realistic bottleneck)
-- [ ] Compare different entity counts (scaling)
 - [ ] Add memory usage tracking
 - [ ] Benchmark parallel ECS systems
 
