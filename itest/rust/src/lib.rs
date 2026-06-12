@@ -10,6 +10,7 @@ godot_bevy_test::declare_test_runner!();
 
 // Test modules
 mod autosync_match_tests;
+mod autosync_tests;
 mod benchmarks;
 mod collision_tests;
 mod input_tests;
