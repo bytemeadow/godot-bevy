@@ -56,6 +56,7 @@ fn test_godot_components_from_scene(ctx: &TestContext) -> godot::task::TaskHandl
         let mut node = AutoSyncPlayerNode::new_alloc();
         node.set_name("AutoSyncPlayer");
         // Editor-set value via the exported property, before entering the tree.
+        // "speed" must match the prop name declared in #[godot_components(speed(..))].
         node.set("speed", &99.0f32.to_variant());
         ctx_clone
             .scene_tree
@@ -89,7 +90,7 @@ fn test_godot_components_from_scene(ctx: &TestContext) -> godot::task::TaskHandl
         });
 
         app.cleanup().await;
-        node.free();
+        node.queue_free();
     })
 }
 
@@ -103,6 +104,8 @@ fn test_godot_components_bevy_spawn_defaults(ctx: &TestContext) -> godot::task::
     godot::task::spawn(async move {
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
 
+        // No update() needed: required components are applied synchronously by
+        // Bevy's ECS at spawn time, not across a Godot frame.
         let entity = app.with_world_mut(|world| world.spawn(AutoSyncPlayer).id());
 
         app.with_world(|world| {
