@@ -40,10 +40,50 @@ pub fn derive_godot_node(input: DeriveInput) -> syn::Result<TokenStream2> {
         _ => false,
     };
 
-    if derives_bundle || (!derives_component && has_export_fields) {
+    let is_bundle_mode = derives_bundle || (!derives_component && has_export_fields);
+
+    let has_godot_components = input
+        .attrs
+        .iter()
+        .any(|a| a.path().is_ident("godot_components"));
+
+    if is_bundle_mode && has_godot_components {
+        return Err(syn::Error::new_spanned(
+            &input,
+            "`#[godot_components]` requires deriving GodotNode on a Component, not a Bundle. \
+             Bundle mode is deprecated; see the `#[godot_components]` documentation for the migration.",
+        ));
+    }
+
+    if is_bundle_mode {
         bundle::godot_node_bundle_impl(input)
     } else {
         // Component flow expects TokenStream2 of DeriveInput
         component::component_as_godot_node_impl(input.to_token_stream())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::parse_quote;
+
+    #[test]
+    fn godot_components_on_bundle_mode_is_error() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Bundle, GodotNode)]
+            #[godot_node(base(Node2D), class_name(PlayerNode))]
+            #[godot_components(speed(Speed, export_type(f32)))]
+            struct PlayerBundle {
+                #[export_fields(value(export_type(f32)))]
+                speed: Speed,
+            }
+        };
+
+        let err = derive_godot_node(input).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("`#[godot_components]` requires deriving GodotNode on a Component")
+        );
     }
 }

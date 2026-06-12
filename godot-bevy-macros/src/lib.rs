@@ -145,6 +145,11 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+/// Creates Bevy components from a Godot node class's exported fields (godot-first path).
+///
+/// Components are inserted directly onto the entity when a node of this class enters
+/// the scene tree. (Historical note: this derive used to emit a `<Name>Bundle` struct;
+/// it now inserts the components as a tuple and no bundle type is generated.)
 #[proc_macro_derive(BevyBundle, attributes(bevy_bundle))]
 pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
@@ -166,6 +171,11 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
 /// - `class_name` (Default: `<struct_name>BevyComponent`) Name of generated Godot class.
 ///
 /// ## Annotating structs that derive `Bundle`
+///
+/// > **Deprecated:** bundle mode requires a user-authored bundle struct, a pattern
+/// > Bevy has replaced with required components. Prefer deriving `GodotNode` on a
+/// > `Component` with `#[godot_components(...)]` (below). Bundle mode keeps working
+/// > for now and will emit compile-time deprecation warnings in a future release.
 ///
 /// Bundle component fields can be annotated with `#[export_fields(...)]` to expose them to Godot.
 /// The `export_fields` attribute takes a list of component field entries:
@@ -200,6 +210,39 @@ pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
 ///
 /// See the [export configuration attributes for](#export-configuration-attributes)
 /// for export parameter details.
+///
+/// ## Companion components: `#[godot_components(...)]`
+///
+/// Components deriving `GodotNode` can declare *companion components* — separate,
+/// reusable Bevy components populated from the generated Godot node's exports and
+/// registered as [required components](https://docs.rs/bevy/latest/bevy/ecs/component/derive.Component.html#required-components):
+///
+/// ```ignore
+/// #[derive(Component, GodotNode, Default)]
+/// #[godot_node(base(CharacterBody2D), class_name(Player2D))]
+/// #[godot_components(
+///     (Grounded),                                       // marker: no export, Default::default()
+///     speed(Speed, export_type(f32), default(250.0)),   // newtype: one export named `speed`
+///     stats(Stats {                                     // struct: one export per listed field,
+///         current(export_type(i32), default(100)),      //   the rest from Stats::default()
+///         max(export_type(i32)),
+///     }),
+/// )]
+/// pub struct Player;
+/// ```
+///
+/// When the node enters the scene tree, the entity receives `Player` plus every
+/// companion built from the node's exported values. When you `commands.spawn(Player)`
+/// from Bevy code, the companions are inserted with the declared `default(...)` values
+/// (passed through `transform_with` when configured) — defaults are defined once and
+/// stay consistent between the Godot editor and Bevy.
+///
+/// `export_type` is required for each exported entry: the macro only sees the
+/// companion's type name, not its fields. Companion components must implement
+/// `Default`. Do not also list a companion in Bevy's own `#[require(...)]` on the
+/// same component — Bevy rejects duplicate direct registrations. Note that
+/// `default(...)` expressions also run as required-component constructors, which
+/// Bevy may invoke from any thread when you spawn from Bevy code.
 ///
 /// ## Export configuration attributes
 ///
