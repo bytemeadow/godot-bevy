@@ -2,7 +2,7 @@
 //!
 //! This module defines reusable components that can be used across different
 //! entity types (players, enemies, etc.) to avoid duplication when using
-//! the BevyComponent macro.
+//! the `GodotNode` macro.
 
 use crate::level_manager::LevelId;
 use bevy::prelude::*;
@@ -43,7 +43,9 @@ impl Default for Gravity {
     }
 }
 
-/// Component marking an entity as the player
+/// Component marking an entity as the player. Also defines the `Player2D` Godot
+/// node class with exported `speed`, `jump_velocity`, and `gravity` fields, each
+/// inserted as a companion component when the node enters the scene tree.
 #[derive(Component, GodotNode, Debug, Clone, Default, Reflect)]
 #[reflect(Component)]
 #[godot_node(base(CharacterBody2D), class_name(Player2D))]
