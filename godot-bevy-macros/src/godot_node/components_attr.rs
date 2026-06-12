@@ -33,7 +33,7 @@ pub struct GodotComponentsAttr {
     pub entries: Vec<CompanionEntry>,
 }
 
-// Debug impl required so tests can call `.unwrap_err()` on `Result<GodotComponentsAttr, _>`.
+// Debug impl required so tests can call `.unwrap()` on `Result<GodotComponentsAttr, _>`.
 impl std::fmt::Debug for GodotComponentsAttr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "GodotComponentsAttr({} entries)", self.entries.len())
@@ -138,6 +138,7 @@ impl Parse for CompanionEntry {
                     "Unexpected tokens after struct companion fields",
                 ));
             }
+            // Struct companions expose one Godot property per field, so the outer `prop` name is not stored.
             return Ok(CompanionEntry::Struct { component, fields });
         }
 
@@ -217,7 +218,12 @@ mod tests {
         let result = parse2::<GodotComponentsAttr>(quote! {
             speed(Speed, default(250.0))
         });
-        assert!(result.unwrap_err().to_string().contains("Missing export_type"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Missing export_type")
+        );
     }
 
     #[test]
@@ -225,7 +231,12 @@ mod tests {
         let result = parse2::<GodotComponentsAttr>(quote! {
             stats(Stats { current(default(100)) })
         });
-        assert!(result.unwrap_err().to_string().contains("Missing export_type"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Missing export_type")
+        );
     }
 
     #[test]
@@ -254,6 +265,19 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .contains("at least one field")
+        );
+    }
+
+    #[test]
+    fn struct_companion_with_trailing_tokens_is_error() {
+        let result = parse2::<GodotComponentsAttr>(quote! {
+            stats(Stats { current(export_type(i32)) } extra)
+        });
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unexpected tokens after struct companion fields")
         );
     }
 }
