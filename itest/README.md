@@ -102,25 +102,17 @@ This ensures we're testing **real integration**, not mocked behavior.
 
 ## Current Tests
 
-**real_frame_tests.rs** - Frame progression (4 tests)
-- Update/PhysicsUpdate schedules
-- Entity persistence
-- Frame pacing
+| Module | Covers |
+|--------|--------|
+| `real_frame_tests.rs` | Update/PhysicsUpdate schedules, frame pacing |
+| `scene_tree_tests.rs` | Entity creation/cleanup, renames, reparenting, NodeEntityIndex |
+| `scene_tree_watcher_init_tests.rs` | Watcher initialization, no duplicate watchers |
+| `transform_sync_tests.rs` | OneWay/TwoWay/disabled sync modes |
+| `collision_tests.rs` | Collision state tracking, started/ended observers |
+| `signal_tests.rs` | Signal connection and dispatch to observers |
+| `input_tests.rs` | Keyboard/action/mouse events, Bevy ButtonInput bridge |
 
-**scene_tree_tests.rs** - Scene tree integration (6 tests)
-- Node added creates entity
-- SceneTreeEvent::NodeAdded event
-- Node removal cleanup
-- Node renamed event
-- ProtectedNodeEntity prevents despawn
-- GodotNodeHandle validity
-
-**transform_sync_tests.rs** - Transform synchronization (4 tests)
-- OneWay mode (Bevy→Godot)
-- TwoWay mode (Godot→Bevy and bidirectional)
-- Disabled mode
-
-**Total: 14 tests, all passing ✅**
+Run `./run-tests.sh` for the authoritative list and count.
 
 ## Architecture: How Tests Work with Production Code
 

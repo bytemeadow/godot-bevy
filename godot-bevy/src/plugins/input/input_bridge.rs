@@ -2,6 +2,7 @@ use bevy_app::{App, First, Last, Plugin};
 use bevy_ecs::{
     entity::Entity,
     message::{MessageReader, MessageWriter},
+    schedule::IntoScheduleConfigs,
     system::ResMut,
 };
 use bevy_input::{
@@ -38,7 +39,11 @@ impl Plugin for BevyInputBridgePlugin {
                     bridge_mouse_motion,
                     bridge_mouse_scroll,
                     bridge_pan_gesture,
-                ),
+                )
+                    // Godot input messages are written and buffer-swapped within
+                    // First; without this ordering the bridge can run outside the
+                    // one-frame window where they are readable and drop input.
+                    .after(super::events::write_input_messages),
             )
             .add_systems(Last, clear_keyboard_input);
     }
