@@ -543,6 +543,42 @@ fn scene_tree_process_node_added_fallback() -> i32 {
     result
 }
 
+/// Benchmark: NodeAdded processing when the world already holds many entities.
+/// Adding a few nodes to a 10k-entity world exposes per-batch costs that scale
+/// with world size rather than batch size (e.g. a full entity-map rebuild).
+#[bench(repeat = 3)]
+fn scene_tree_process_node_added_populated_world() -> i32 {
+    const EXISTING_ENTITIES: usize = 10_000;
+    const ADDED_NODES: usize = 10;
+
+    let (mut app, sender) = setup_scene_tree_benchmark_app();
+
+    // Synthetic handle-bearing entities to give the message-processing scan
+    // many rows to walk.
+    for i in 0..EXISTING_ENTITIES {
+        let handle = GodotNodeHandle::from(InstanceId::from_i64(1_000_000 + i as i64));
+        app.world_mut().spawn(handle);
+    }
+
+    let nodes = create_scene_tree_nodes(ADDED_NODES);
+    for msg in create_node_added_messages(&nodes) {
+        sender.send(msg).expect("Send should succeed");
+    }
+
+    measured(|| {
+        app.world_mut().run_schedule(First);
+        app.world_mut().run_schedule(First);
+    });
+
+    let result = app.world().resource::<NodeEntityIndex>().len() as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
 /// Benchmark: Process sparse NodeRenamed messages on an already-populated index.
 ///
 /// This captures per-frame overhead for tiny scene-tree updates after startup,

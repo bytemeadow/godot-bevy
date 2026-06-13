@@ -91,7 +91,7 @@ and teardown are excluded.
 
 ## What We Benchmark
 
-The suite contains **23 benchmarks** across six categories. Every benchmark runs the real godot-bevy systems (plugins, schedules, ECS queries) rather than raw FFI calls, so regressions in actual user-facing code are caught.
+The suite contains **24 benchmarks** across six categories. Every benchmark runs the real godot-bevy systems (plugins, schedules, ECS queries) rather than raw FFI calls, so regressions in actual user-facing code are caught.
 
 ### Scaling Variants
 
@@ -118,7 +118,7 @@ These benchmarks measure the real `GodotTransformSyncPlugin` systems that sync t
 | `transform_sync_roundtrip_3d` | Full frame: PreUpdate -> game logic -> Last (3D) |
 | `transform_sync_roundtrip_2d` | Full frame: PreUpdate -> game logic -> Last (2D) |
 
-### Scene Tree Processing (6 benchmarks, 500 nodes unless suffixed)
+### Scene Tree Processing (7 benchmarks, 500 nodes unless suffixed)
 
 These benchmarks measure the `GodotSceneTreePlugin` systems that process node-added, renamed, and collision-body messages from Godot.
 
@@ -128,6 +128,7 @@ These benchmarks measure the `GodotSceneTreePlugin` systems that process node-ad
 | `scene_tree_process_node_added_optimized` | NodeAdded with pre-analyzed types |
 | `scene_tree_process_node_added_optimized_2500` | Scaling variant (2500 nodes) |
 | `scene_tree_process_node_added_fallback` | NodeAdded with FFI type detection |
+| `scene_tree_process_node_added_populated_world` | Adding 10 nodes to a world with 10k existing entities (exposes per-batch costs that scale with world size, not batch size) |
 | `scene_tree_process_node_renamed_sparse_updates` | Sparse rename messages (80 frames) |
 | `scene_tree_process_collision_bodies_optimized` | Area3D with collision signals (optimized path, 100 nodes) |
 
