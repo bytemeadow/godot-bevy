@@ -80,8 +80,7 @@ struct CompanionExport {
     transform_with: Option<syn::Path>,
 }
 
-/// Flattens companion entries into the list of Godot properties they require.
-/// Markers contribute none; newtypes one; struct companions one per field.
+/// Flattens companions to their Godot exports: markers none, newtype one, struct one per field.
 fn companion_exports(companions: &[CompanionEntry]) -> Vec<CompanionExport> {
     let mut exports = Vec::new();
     for entry in companions {
@@ -176,8 +175,7 @@ fn parse_field(field: &syn::Field) -> syn::Result<ComponentField> {
     })
 }
 
-/// The Bevy-side default for a companion export: the export-type default
-/// expression, passed through transform_with when configured.
+/// Bevy-side default for a companion: its export default, run through transform_with if set.
 fn companion_default_value(config: &ExportConfig) -> TokenStream2 {
     let export_type = config.export_type.as_ref().expect("validated by parser");
     let default = config
@@ -305,8 +303,7 @@ pub fn component_as_godot_node_impl(input: TokenStream2) -> syn::Result<TokenStr
         })
         .collect::<Vec<TokenStream2>>();
 
-    // Companion components contribute their own Godot exports + init defaults,
-    // and one bevy_bundle spec each so autosync inserts them on the entity.
+    // Companions add their own exports, init defaults, and a bevy_bundle spec for autosync insertion.
     let companion_export_list = companion_exports(&companions);
 
     let mut seen_prop_names: std::collections::HashSet<String> =
@@ -395,8 +392,7 @@ pub fn component_as_godot_node_impl(input: TokenStream2) -> syn::Result<TokenStr
         }
     };
 
-    // Register companions as Bevy required components so pure-Bevy `spawn(#struct_name)`
-    // also gets them with the declared defaults.
+    // Register companions as required components so pure-Bevy spawns get the declared defaults too.
     let required_registration = if companions.is_empty() {
         quote!()
     } else {

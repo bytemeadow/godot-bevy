@@ -144,9 +144,7 @@ pub fn bevy_bundle(input: DeriveInput) -> syn::Result<TokenStream2> {
                         })
                         .collect();
 
-                    // It's not possible to determine from this macro whether the
-                    // component struct has unlisted fields, so the struct-update
-                    // syntax may be redundant; allow the lint at the fn level.
+                    // ..Default may be redundant if all fields are listed; allow the lint fn-wide.
                     quote! {
                         #component_name {
                             #(#field_inits),*,

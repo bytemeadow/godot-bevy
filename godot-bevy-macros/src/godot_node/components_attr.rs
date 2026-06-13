@@ -21,8 +21,7 @@ pub enum CompanionEntry {
     Newtype {
         prop: Ident,
         component: Path,
-        // Boxed: ExportConfig is large (three Option<syn> fields), and boxing it
-        // keeps CompanionEntry's variants similarly sized (clippy::large_enum_variant).
+        // Boxed to keep CompanionEntry's variants similar in size (clippy::large_enum_variant).
         config: Box<ExportConfig>,
     },
     Struct {
