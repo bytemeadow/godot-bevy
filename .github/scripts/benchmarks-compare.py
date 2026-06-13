@@ -1,8 +1,17 @@
+from __future__ import annotations
+
 import argparse
 import json
+import math
 import os
+import statistics
 import sys
 from pathlib import Path
+
+# A change must exceed this many standard errors of the per-round medians to
+# count as a real regression/improvement (~95% confidence), in addition to the
+# magnitude thresholds below. Without per-round data this gate is disabled.
+SIGNIFICANCE_SIGMA = 2.0
 
 
 def create_argument_parser() -> argparse.ArgumentParser:
@@ -15,7 +24,61 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "output_file", help="Path to the output json file for the comparison results"
     )
+    parser.add_argument(
+        "--baseline-runs",
+        nargs="+",
+        default=[],
+        help="Per-round baseline JSON files (enables noise-aware gating)",
+    )
+    parser.add_argument(
+        "--current-runs",
+        nargs="+",
+        default=[],
+        help="Per-round current JSON files (enables noise-aware gating)",
+    )
     return parser
+
+
+def load_round_medians(paths: list[str]) -> dict[str, list[float]]:
+    """Collect per-round median_ns for each benchmark across the given files."""
+    runs: dict[str, list[float]] = {}
+    for path in paths:
+        try:
+            with open(path) as f:
+                data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            continue
+        for name, d in data.get("benchmarks", {}).items():
+            try:
+                runs.setdefault(name, []).append(float(d["median_ns"]))
+            except (KeyError, ValueError, TypeError):
+                pass
+    return runs
+
+
+def relative_stderr(values: list[float]) -> float | None:
+    """Standard error of the mean as a fraction of the median (or None if <2)."""
+    if len(values) < 2:
+        return None
+    mid = statistics.median(values)
+    if not mid:
+        return None
+    return (statistics.stdev(values) / math.sqrt(len(values))) / abs(mid)
+
+
+def change_noise(base_runs, curr_runs, name) -> float | None:
+    """1-sigma standard error of the change (percent), combining both sides."""
+    present = [
+        se
+        for se in (
+            relative_stderr(base_runs.get(name, [])),
+            relative_stderr(curr_runs.get(name, [])),
+        )
+        if se is not None
+    ]
+    if not present:
+        return None
+    return math.sqrt(sum(se * se for se in present)) * 100
 
 
 def main(args: list[str]) -> None:
@@ -24,6 +87,9 @@ def main(args: list[str]) -> None:
     bench_results_path = Path(parsed_args.bench_results)
     baseline_path = Path(parsed_args.baseline)
     output_file_path = Path(parsed_args.output_file)
+
+    base_runs = load_round_medians(parsed_args.baseline_runs)
+    curr_runs = load_round_medians(parsed_args.current_runs)
 
     try:
         with open(bench_results_path) as f:
@@ -71,6 +137,7 @@ def main(args: list[str]) -> None:
             "current": curr_data.get("median_display", "N/A"),
             "baseline": None,
             "change_pct": None,
+            "noise_pct": None,
             "status": "new",
         }
 
@@ -85,17 +152,27 @@ def main(args: list[str]) -> None:
                     change_pct = ((current_ns - baseline_ns) / baseline_ns) * 100
                     entry["change_pct"] = change_pct
 
-                    if change_pct > 10:
+                    # Noise-aware gating: a change only counts as a regression or
+                    # improvement when it also exceeds the per-round measurement
+                    # noise. Without per-round data, noise is None and every change
+                    # is treated as significant (legacy behavior).
+                    noise = change_noise(base_runs, curr_runs, name)
+                    entry["noise_pct"] = noise
+                    significant = noise is None or abs(change_pct) > (
+                        SIGNIFICANCE_SIGMA * noise
+                    )
+
+                    if change_pct > 10 and significant:
                         entry["status"] = "regression"
                         comparison["summary"]["regressions"] += 1
-                    elif change_pct > 5:
+                    elif change_pct > 5 and significant:
                         entry["status"] = "slower"
-                    elif change_pct < -5:
+                    elif change_pct < -5 and significant:
                         entry["status"] = "faster"
                         comparison["summary"]["improvements"] += 1
                     else:
                         entry["status"] = "neutral"
-            except:
+            except Exception:
                 pass
         else:
             comparison["summary"]["new"] += 1

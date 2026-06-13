@@ -54,8 +54,8 @@ jobs:
               comment += `> **Performance is stable** - no significant changes\n\n`;
             }
 
-            comment += '| Benchmark | PR | Base | Change |\n';
-            comment += '|-----------|-----|------|--------|\n';
+            comment += '| Benchmark | PR | Base | Change | Noise |\n';
+            comment += '|-----------|-----|------|--------|-------|\n';
 
             for (const bench of comparison.benchmarks) {
               let changeStr = '';
@@ -73,13 +73,15 @@ jobs:
               }
 
               const baseline = bench.baseline || '-';
-              comment += `| \`${bench.name}\` | ${bench.current} | ${baseline} | ${changeStr} |\n`;
+              const noiseStr = (bench.noise_pct != null) ? `±${bench.noise_pct.toFixed(1)}%` : '-';
+              comment += `| \`${bench.name}\` | ${bench.current} | ${baseline} | ${changeStr} | ${noiseStr} |\n`;
             }
 
             comment += '\n<details>\n<summary>About these benchmarks</summary>\n\n';
-            comment += '- Baseline and PR benchmarks run on the **same machine** in a single CI job\n';
-            comment += '- Each side runs twice; reported numbers use merged medians across runs\n';
-            comment += '- Regression threshold: >10%, Caution: >5%, Improvement: <-5%\n';
+            comment += '- Baseline and PR benchmarks run on the **same machine**, interleaved (base, PR, base, PR, ...) so runner load hits both sides equally\n';
+            comment += '- Each side runs several rounds; reported numbers use merged medians across rounds\n';
+            comment += '- A change is flagged only when it exceeds **2× the standard error** of the per-round medians (the Noise column), so noisy micro-benchmarks do not trip false regressions\n';
+            comment += '- Magnitude thresholds: regression >10%, caution >5%, improvement <-5%\n';
             comment += '</details>\n';
 
             const { data: comments } = await github.rest.issues.listComments({

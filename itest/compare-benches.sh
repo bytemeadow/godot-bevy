@@ -131,14 +131,27 @@ clean_local_crates() {
         --manifest-path "$manifest"
 }
 
-# 1. Build baseline (base branch via detached worktree, shared target dir)
+# 1. Build baseline (base branch via detached worktree, shared target dir).
+#    Build it with the *current* branch's benchmarks.rs so benchmarks added in
+#    this branch still get a baseline number; fall back to the base branch's own
+#    benchmarks.rs if that doesn't compile against the base library.
 echo -e "${CYAN}━━━ Building baseline (${BASE_REF}) ━━━${NC}"
 git -C "$REPO_ROOT" worktree remove "$WORKTREE_DIR" --force 2>/dev/null || true
 git -C "$REPO_ROOT" worktree add --detach "$WORKTREE_DIR" "$BASE_REF"
 
+BENCH_SRC="itest/rust/src/benchmarks.rs"
+cp "$WORKTREE_DIR/$BENCH_SRC" "$WORKTREE_DIR/$BENCH_SRC.orig"
+cp "$REPO_ROOT/$BENCH_SRC" "$WORKTREE_DIR/$BENCH_SRC"
+
 clean_local_crates "$WORKTREE_DIR/itest/rust/Cargo.toml"
-CARGO_TARGET_DIR="$REPO_ROOT/target" cargo build --release \
-    --manifest-path "$WORKTREE_DIR/itest/rust/Cargo.toml"
+if ! CARGO_TARGET_DIR="$REPO_ROOT/target" cargo build --release \
+    --manifest-path "$WORKTREE_DIR/itest/rust/Cargo.toml"; then
+    echo -e "${YELLOW}Current benchmarks.rs does not build on ${BASE_REF}; using base benchmarks.${NC}"
+    cp "$WORKTREE_DIR/$BENCH_SRC.orig" "$WORKTREE_DIR/$BENCH_SRC"
+    clean_local_crates "$WORKTREE_DIR/itest/rust/Cargo.toml"
+    CARGO_TARGET_DIR="$REPO_ROOT/target" cargo build --release \
+        --manifest-path "$WORKTREE_DIR/itest/rust/Cargo.toml"
+fi
 
 # Stash the baseline library: building the current branch would overwrite it
 for lib in libgodot_bevy_itest.so libgodot_bevy_itest.dylib godot_bevy_itest.dll; do
@@ -177,6 +190,14 @@ python3 "$REPO_ROOT/.github/scripts/benchmarks-merge.py" \
 python3 "$REPO_ROOT/.github/scripts/benchmarks-merge.py" \
     "$RESULTS_DIR/current.json" "$RESULTS_DIR"/current-run*.json
 
+# Assert the current run produced every benchmark defined in the source
+# (skipped under BENCHMARK_FILTER, which runs a subset on purpose).
+if [ -z "$BENCHMARK_FILTER" ]; then
+    python3 "$REPO_ROOT/.github/scripts/benchmarks-assert-names.py" \
+        "$REPO_ROOT/itest/rust/src/benchmarks.rs" \
+        "$RESULTS_DIR/current.json"
+fi
+
 # 6. Compare
 echo ""
 echo -e "${CYAN}━━━ Comparison ━━━${NC}"
@@ -184,7 +205,9 @@ echo -e "${CYAN}━━━ Comparison ━━━${NC}"
 python3 "$REPO_ROOT/.github/scripts/benchmarks-compare.py" \
     "$RESULTS_DIR/baseline.json" \
     "$RESULTS_DIR/current.json" \
-    "$RESULTS_DIR/comparison.json" > /dev/null
+    "$RESULTS_DIR/comparison.json" \
+    --baseline-runs "$RESULTS_DIR"/baseline-run*.json \
+    --current-runs "$RESULTS_DIR"/current-run*.json > /dev/null
 
 # 7. Pretty-print the comparison table with per-benchmark noise estimates
 python3 "$SCRIPT_DIR/print-comparison.py" "$RESULTS_DIR"
