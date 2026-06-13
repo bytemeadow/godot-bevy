@@ -10,6 +10,9 @@ godot_bevy_test::declare_test_runner!();
 
 // Test modules
 mod autosync_match_tests;
+// Gated: its autosync node types would otherwise inflate the benchmark binary's
+// AutoSyncBundleRegistry and skew the scene-tree node-added benchmarks.
+#[cfg(feature = "autosync-tests")]
 mod autosync_tests;
 mod benchmarks;
 mod collision_tests;
