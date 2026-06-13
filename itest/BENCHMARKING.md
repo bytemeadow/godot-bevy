@@ -47,11 +47,17 @@ Results are saved to `itest/.bench-results/` for further inspection.
 
 `BENCH_ROUNDS` controls how many interleaved rounds run per side (default: 3).
 
-The comparison table includes a `Noise` column: each benchmark's spread of
-per-round medians. Changes within that spread are marked `~` and not counted
-as regressions or improvements — µs-scale benchmarks routinely shift >10%
-between processes, so never judge a change from two standalone
-`run-benches.sh` runs.
+The comparison table includes a `Noise` column: the **standard error of the
+measured change**, derived from the spread of per-round medians on each side. A
+change must exceed **2× that standard error** (~95% confidence) to count as a
+regression or improvement; smaller changes are marked `~`. Because the standard
+error divides by √(rounds), running more rounds *tightens* the band — so for a
+noisy benchmark, bump `BENCH_ROUNDS` (e.g. `BENCH_ROUNDS=6`) to resolve a
+borderline result, rather than re-rolling the dice. (This replaced an earlier
+max−min spread metric, which wrongly *widened* with more rounds and could mask a
+real change behind one outlier round.) µs-scale benchmarks routinely shift >10%
+between processes, so never judge a change from two standalone `run-benches.sh`
+runs — always use `compare-benches.sh`.
 
 ### Example Output
 
