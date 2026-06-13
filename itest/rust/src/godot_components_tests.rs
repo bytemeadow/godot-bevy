@@ -1,15 +1,15 @@
 /*
- * Autosync integration tests
+ * Integration tests for the `#[godot_components]` feature: scene-spawned nodes
+ * populate companion components from exports, and Bevy-side spawns get the
+ * declared required-component defaults.
  *
- * Covers the godot-first path (BevyBundle) and the component-first path
- * (GodotNode + #[godot_components]): scene-spawned nodes populate components
- * from exports, and Bevy-side spawns get required-component defaults.
+ * The BevyBundle autosync match/miss behavior is covered by autosync_match_tests.
  */
 
 use bevy::prelude::*;
 use godot::obj::NewAlloc;
 use godot::prelude::*;
-use godot_bevy::prelude::{BevyBundle, GodotNode};
+use godot_bevy::prelude::GodotNode;
 use godot_bevy_test::prelude::*;
 
 #[derive(Component, Debug, PartialEq, Clone)]
@@ -33,16 +33,6 @@ pub struct TestGrounded;
     speed(TestSpeed, export_type(f32), default(250.0)),
 )]
 pub struct AutoSyncPlayer;
-
-#[derive(Component, Debug, Default, PartialEq, Clone)]
-pub struct TestMarker;
-
-#[derive(GodotClass, BevyBundle)]
-#[class(init, base=Node2D)]
-#[bevy_bundle((TestMarker))]
-pub struct AutoSyncMarkerNode {
-    base: Base<Node2D>,
-}
 
 /// A scene-spawned node should populate the primary component plus its
 /// companions, with the newtype companion carrying the editor-set export value.
@@ -121,28 +111,5 @@ fn test_godot_components_bevy_spawn_defaults(ctx: &TestContext) -> godot::task::
         });
 
         app.cleanup().await;
-    })
-}
-
-/// A hand-authored `#[derive(GodotClass, BevyBundle)]` node with a single-marker
-/// tuple bundle should still insert that component after Task 1's change.
-#[itest(async)]
-fn test_bevy_bundle_tuple_insertion(ctx: &TestContext) -> godot::task::TaskHandle {
-    let ctx_clone = ctx.clone();
-
-    godot::task::spawn(async move {
-        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
-
-        let (node, entity) = app.add_node::<AutoSyncMarkerNode>("MarkerNode").await;
-
-        app.with_world(|world| {
-            assert!(
-                world.get::<TestMarker>(entity).is_some(),
-                "BevyBundle component inserted"
-            );
-        });
-
-        app.cleanup().await;
-        node.free();
     })
 }
