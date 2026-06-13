@@ -5,8 +5,8 @@ pub mod relationship;
 
 // Re-export main components
 pub use autosync::{
-    AutoSyncBundleRegistry, BundleCreatorFn, GodotRequiredComponents, RequiredComponentsRegistrarFn,
-    register_all_autosync_bundles, register_all_required_components,
+    AutoSyncBundleRegistry, BundleCreatorFn, GodotRequiredComponents,
+    RequiredComponentsRegistrarFn, register_all_autosync_bundles, register_all_required_components,
 };
 pub use plugin::{
     GodotSceneTreePlugin, Groups, NodeEntityIndex, ProtectedNodeEntity, SceneTreeConfig,
