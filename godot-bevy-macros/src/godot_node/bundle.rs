@@ -380,6 +380,7 @@ pub fn godot_node_bundle_impl(input: DeriveInput) -> syn::Result<TokenStream2> {
         godot_bevy::inventory::submit! {
             godot_bevy::prelude::AutoSyncBundleRegistry {
                 godot_class_name: stringify!(#godot_node_name),
+                godot_class_id_fn: || <#godot_node_name as godot::prelude::GodotClass>::class_id(),
                 create_bundle_fn: #create_bundle_fn_name,
             }
         }
