@@ -422,8 +422,8 @@ mod tests {
             "registry submit should set godot_class_id_fn"
         );
         assert!(
-            output.contains("class_id"),
-            "should call GodotClass::class_id()"
+            output.contains("GodotClass") && output.contains("class_id ()"),
+            "should emit the GodotClass::class_id() call, not just the field name"
         );
     }
 }
