@@ -195,6 +195,30 @@ fn transform_sync_godot_to_bevy_3d_5000() -> i32 {
     run_transform_sync_godot_to_bevy_3d(5000)
 }
 
+/// Benchmark: Godot->Bevy 3D sync when only 1% of nodes moved. pre_update polls
+/// every synced entity regardless, so this costs ~the same as the dense variant
+/// — the cost is O(synced), not O(moved). Metric for a notification-driven read.
+#[bench(repeat = 3)]
+fn transform_sync_godot_to_bevy_3d_sparse() -> i32 {
+    let (mut app, nodes) = setup_3d_benchmark_app(NODE_COUNT);
+
+    // Move only the first 10 of 1000 nodes.
+    for (i, node) in nodes.iter().take(10).enumerate() {
+        let mut node = node.clone();
+        node.set_position(Vector3::new(i as f32 * 3.0, 1.0, 0.0));
+    }
+
+    measured(|| app.world_mut().run_schedule(PreUpdate));
+
+    let result = nodes.len() as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
 // =============================================================================
 // 2D Transform Sync Benchmarks
 // =============================================================================

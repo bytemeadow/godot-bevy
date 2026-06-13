@@ -97,7 +97,7 @@ and teardown are excluded.
 
 ## What We Benchmark
 
-The suite contains **24 benchmarks** across six categories. Every benchmark runs the real godot-bevy systems (plugins, schedules, ECS queries) rather than raw FFI calls, so regressions in actual user-facing code are caught.
+The suite contains **25 benchmarks** across six categories. Every benchmark runs the real godot-bevy systems (plugins, schedules, ECS queries) rather than raw FFI calls, so regressions in actual user-facing code are caught.
 
 ### Scaling Variants
 
@@ -119,6 +119,7 @@ These benchmarks measure the real `GodotTransformSyncPlugin` systems that sync t
 | `transform_sync_bevy_to_godot_3d_5000` | Scaling variant (5000 nodes) |
 | `transform_sync_godot_to_bevy_3d` | Godot->Bevy 3D sync (PreUpdate schedule) |
 | `transform_sync_godot_to_bevy_3d_5000` | Scaling variant (5000 nodes) |
+| `transform_sync_godot_to_bevy_3d_sparse` | 1000 nodes, only 10 moved (quantifies polling unchanged transforms) |
 | `transform_sync_bevy_to_godot_2d` | Bevy->Godot 2D sync (Last schedule) |
 | `transform_sync_godot_to_bevy_2d` | Godot->Bevy 2D sync (PreUpdate schedule) |
 | `transform_sync_roundtrip_3d` | Full frame: PreUpdate -> game logic -> Last (3D) |
