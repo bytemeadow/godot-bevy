@@ -1,4 +1,5 @@
 use super::attr::{GodotNodeAttrArgs, KeyValue};
+use super::components_attr::{CompanionEntry, ExportConfig, GodotComponentsAttr};
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
@@ -71,6 +72,43 @@ impl Parse for GodotExportAttrArgs {
     }
 }
 
+/// A single Godot `#[export]` property derived from a companion entry.
+struct CompanionExport {
+    prop: syn::Ident,
+    export_type: syn::Type,
+    default_expr: Option<syn::Expr>,
+    transform_with: Option<syn::Path>,
+}
+
+/// Flattens companions to their Godot exports: markers none, newtype one, struct one per field.
+fn companion_exports(companions: &[CompanionEntry]) -> Vec<CompanionExport> {
+    let mut exports = Vec::new();
+    for entry in companions {
+        match entry {
+            CompanionEntry::Marker { .. } => {}
+            CompanionEntry::Newtype { prop, config, .. } => {
+                exports.push(CompanionExport {
+                    prop: prop.clone(),
+                    export_type: config.export_type.clone().expect("validated by parser"),
+                    default_expr: config.default_expr.clone(),
+                    transform_with: config.transform_with.clone(),
+                });
+            }
+            CompanionEntry::Struct { fields, .. } => {
+                for (field_name, config) in fields {
+                    exports.push(CompanionExport {
+                        prop: field_name.clone(),
+                        export_type: config.export_type.clone().expect("validated by parser"),
+                        default_expr: config.default_expr.clone(),
+                        transform_with: config.transform_with.clone(),
+                    });
+                }
+            }
+        }
+    }
+    exports
+}
+
 fn get_godot_export_type(field: &ComponentField) -> TokenStream2 {
     field
         .export_attribute
@@ -137,6 +175,20 @@ fn parse_field(field: &syn::Field) -> syn::Result<ComponentField> {
     })
 }
 
+/// Bevy-side default for a companion: its export default, run through transform_with if set.
+fn companion_default_value(config: &ExportConfig) -> TokenStream2 {
+    let export_type = config.export_type.as_ref().expect("validated by parser");
+    let default = config
+        .default_expr
+        .as_ref()
+        .map(|expr| quote!(#expr))
+        .unwrap_or(quote!(#export_type::default()));
+    match &config.transform_with {
+        Some(transform) => quote!(#transform(#default)),
+        None => default,
+    }
+}
+
 pub fn component_as_godot_node_impl(input: TokenStream2) -> syn::Result<TokenStream2> {
     let input = parse2::<DeriveInput>(input)?;
 
@@ -159,6 +211,24 @@ pub fn component_as_godot_node_impl(input: TokenStream2) -> syn::Result<TokenStr
                     godot_node_attr = Some(parse2::<GodotNodeAttrArgs>(meta_list.tokens.clone())?);
                 }
                 _ => return Err(syn::Error::new(attr.span(), "Expected a list of arguments")),
+            }
+        }
+    }
+
+    let mut companions: Vec<CompanionEntry> = Vec::new();
+    for attr in &input.attrs {
+        if attr.path().is_ident("godot_components") {
+            match &attr.meta {
+                Meta::List(meta_list) => {
+                    let parsed = parse2::<GodotComponentsAttr>(meta_list.tokens.clone())?;
+                    companions.extend(parsed.entries);
+                }
+                _ => {
+                    return Err(syn::Error::new(
+                        attr.span(),
+                        "Expected a list of entries: #[godot_components((Marker), prop(Comp, export_type(T)), ...)]",
+                    ));
+                }
             }
         }
     }
@@ -233,14 +303,74 @@ pub fn component_as_godot_node_impl(input: TokenStream2) -> syn::Result<TokenStr
         })
         .collect::<Vec<TokenStream2>>();
 
-    let bevy_bundle_init = if field_names.is_empty() {
-        quote! {
-            #[bevy_bundle( (#struct_name) )]
+    // Companions add their own exports, init defaults, and a bevy_bundle spec for autosync insertion.
+    let companion_export_list = companion_exports(&companions);
+
+    let mut seen_prop_names: std::collections::HashSet<String> =
+        field_names.iter().map(|f| f.to_string()).collect();
+    for export in &companion_export_list {
+        if !seen_prop_names.insert(export.prop.to_string()) {
+            return Err(syn::Error::new(
+                export.prop.span(),
+                format!("Duplicate exported property `{}`", export.prop),
+            ));
         }
+    }
+
+    let mut godot_node_fields = godot_node_fields;
+    for export in &companion_export_list {
+        let prop = &export.prop;
+        let export_type = &export.export_type;
+        godot_node_fields.push(if let Some(transform) = &export.transform_with {
+            let transform_lit = syn::LitStr::new(
+                transform.to_token_stream().to_string().as_str(),
+                transform.span(),
+            );
+            quote_spanned! {transform.span()=>
+                #[export]
+                #[bevy_bundle(transform_with=#transform_lit)]
+                #prop: #export_type
+            }
+        } else {
+            quote_spanned! {export_type.span()=>
+                #[export]
+                #prop: #export_type
+            }
+        });
+    }
+
+    let mut default_export_fields = default_export_fields;
+    for export in &companion_export_list {
+        let prop = &export.prop;
+        let export_type = &export.export_type;
+        let default = export
+            .default_expr
+            .as_ref()
+            .map(|expr| quote!(#expr))
+            .unwrap_or(quote!(#export_type::default()));
+        default_export_fields.push(quote! { #prop: #default });
+    }
+
+    let mut bundle_specs: Vec<TokenStream2> = Vec::new();
+    bundle_specs.push(if field_names.is_empty() {
+        quote!( (#struct_name) )
     } else {
-        quote! {
-            #[bevy_bundle( (#struct_name{ #(#field_names: #field_names),* }) )]
-        }
+        quote!( (#struct_name { #(#field_names: #field_names),* }) )
+    });
+    for entry in &companions {
+        bundle_specs.push(match entry {
+            CompanionEntry::Marker { component } => quote!( (#component) ),
+            CompanionEntry::Newtype {
+                prop, component, ..
+            } => quote!( (#component: #prop) ),
+            CompanionEntry::Struct { component, fields } => {
+                let names: Vec<&syn::Ident> = fields.iter().map(|(name, _)| name).collect();
+                quote!( (#component { #(#names: #names),* }) )
+            }
+        });
+    }
+    let bevy_bundle_init = quote! {
+        #[bevy_bundle( #(#bundle_specs),* )]
     };
 
     let godot_node_struct = quote! {
@@ -262,7 +392,70 @@ pub fn component_as_godot_node_impl(input: TokenStream2) -> syn::Result<TokenStr
         }
     };
 
-    Ok(godot_node_struct)
+    // Register companions as required components so pure-Bevy spawns get the declared defaults too.
+    let required_registration = if companions.is_empty() {
+        quote!()
+    } else {
+        let registrations: Vec<TokenStream2> = companions
+            .iter()
+            .map(|entry| match entry {
+                CompanionEntry::Marker { component } => quote! {
+                    world.register_required_components::<#struct_name, #component>();
+                },
+                CompanionEntry::Newtype {
+                    component, config, ..
+                } => {
+                    let value = companion_default_value(config);
+                    quote! {
+                        world.register_required_components_with::<#struct_name, #component>(
+                            || #component(#value)
+                        );
+                    }
+                }
+                CompanionEntry::Struct { component, fields } => {
+                    let field_inits: Vec<TokenStream2> = fields
+                        .iter()
+                        .map(|(name, config)| {
+                            let value = companion_default_value(config);
+                            quote! { #name: #value }
+                        })
+                        .collect();
+                    quote! {
+                        world.register_required_components_with::<#struct_name, #component>(
+                            || #component {
+                                #(#field_inits,)*
+                                ..::core::default::Default::default()
+                            }
+                        );
+                    }
+                }
+            })
+            .collect();
+
+        let registrar_fn_name = format_ident!(
+            "__register_required_components_for_{}",
+            struct_name.to_string().to_lowercase()
+        );
+
+        quote! {
+            #[allow(clippy::needless_update)]
+            fn #registrar_fn_name(world: &mut godot_bevy::bevy_ecs::world::World) {
+                #(#registrations)*
+            }
+
+            godot_bevy::inventory::submit! {
+                godot_bevy::prelude::GodotRequiredComponents {
+                    component_name: stringify!(#struct_name),
+                    registrar_fn: #registrar_fn_name,
+                }
+            }
+        }
+    };
+
+    Ok(quote! {
+        #godot_node_struct
+        #required_registration
+    })
 }
 
 #[cfg(test)]
@@ -381,5 +574,139 @@ mod tests {
 
         let result = component_as_godot_node_impl(input.into_token_stream());
         assert!(result.is_ok(), "Syntax should parse successfully");
+    }
+
+    #[test]
+    fn test_godot_components_codegen() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode)]
+            #[godot_node(base(CharacterBody2D), class_name(PlayerNode))]
+            #[godot_components(
+                (Grounded),
+                speed(Speed, export_type(f32), default(250.0)),
+                stats(Stats { current(export_type(i32), default(100)), max(export_type(i32)) }),
+            )]
+            pub struct Player;
+        };
+
+        let output = component_as_godot_node_impl(input.into_token_stream())
+            .unwrap()
+            .to_string();
+
+        assert!(output.contains("# [export] speed : f32"));
+        assert!(output.contains("# [export] current : i32"));
+        assert!(output.contains("# [export] max : i32"));
+        assert!(output.contains("speed : 250.0"));
+        assert!(output.contains("current : 100"));
+        assert!(output.contains("max : i32 :: default ()"));
+        assert!(output.contains("(Player)"));
+        assert!(output.contains("(Grounded)"));
+        assert!(output.contains("(Speed : speed)"));
+        assert!(output.contains("(Stats { current : current , max : max })"));
+    }
+
+    #[test]
+    fn test_godot_components_transform_with() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode)]
+            #[godot_node(base(Node2D), class_name(PlayerNode))]
+            #[godot_components(
+                speed(Speed, export_type(f32), transform_with(to_speed)),
+            )]
+            pub struct Player;
+        };
+
+        let output = component_as_godot_node_impl(input.into_token_stream())
+            .unwrap()
+            .to_string();
+
+        assert!(output.contains("# [bevy_bundle (transform_with = \"to_speed\")]"));
+    }
+
+    #[test]
+    fn test_godot_components_duplicate_property_is_error() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode)]
+            #[godot_node(base(Node2D), class_name(PlayerNode))]
+            #[godot_components(
+                speed(Speed, export_type(f32)),
+            )]
+            pub struct Player {
+                #[godot_export]
+                pub speed: f32,
+            }
+        };
+
+        let err = component_as_godot_node_impl(input.into_token_stream()).unwrap_err();
+        assert!(err.to_string().contains("Duplicate exported property"));
+    }
+
+    #[test]
+    fn test_godot_components_composes_with_godot_export_fields() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode)]
+            #[godot_node(base(Node2D), class_name(PlayerNode))]
+            #[godot_components(
+                speed(Speed, export_type(f32), default(250.0)),
+            )]
+            pub struct Player {
+                #[godot_export(default(1.0))]
+                pub scale_factor: f32,
+            }
+        };
+
+        let output = component_as_godot_node_impl(input.into_token_stream())
+            .unwrap()
+            .to_string();
+
+        assert!(output.contains("# [export] scale_factor : f32"));
+        assert!(output.contains("# [export] speed : f32"));
+        assert!(output.contains("(Player { scale_factor : scale_factor })"));
+        assert!(output.contains("(Speed : speed)"));
+    }
+
+    #[test]
+    fn test_godot_components_required_registration() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode)]
+            #[godot_node(base(Node2D), class_name(PlayerNode))]
+            #[godot_components(
+                (Grounded),
+                speed(Speed, export_type(f32), default(250.0)),
+                boost(Boost, export_type(f32), default(2.0), transform_with(to_boost)),
+                stats(Stats { current(export_type(i32), default(100)), max(export_type(i32)) }),
+            )]
+            pub struct Player;
+        };
+
+        let output = component_as_godot_node_impl(input.into_token_stream())
+            .unwrap()
+            .to_string();
+
+        assert!(output.contains("register_required_components :: < Player , Grounded > ()"));
+        assert!(output.contains(
+            "register_required_components_with :: < Player , Speed > (|| Speed (250.0))"
+        ));
+        assert!(output.contains(
+            "register_required_components_with :: < Player , Boost > (|| Boost (to_boost (2.0)))"
+        ));
+        assert!(output.contains("register_required_components_with :: < Player , Stats >"));
+        assert!(output.contains("current : 100"));
+        assert!(output.contains("GodotRequiredComponents"));
+    }
+
+    #[test]
+    fn test_no_companions_no_required_registration() {
+        let input: DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode)]
+            #[godot_node(base(Node2D), class_name(PlayerNode))]
+            pub struct Player;
+        };
+
+        let output = component_as_godot_node_impl(input.into_token_stream())
+            .unwrap()
+            .to_string();
+
+        assert!(!output.contains("GodotRequiredComponents"));
     }
 }

@@ -1,6 +1,14 @@
 # Property Mapping from Godot to Bevy
 
+> **Note:** `BevyBundle` is the older godot-first approach — you write the Godot
+> `GodotClass` manually and annotate it. For new code, prefer the
+> [`#[godot_components]` approach](./nodes-from-components-and-bundles.md) which
+> defines everything on a single Bevy component and works in both godot-first and
+> bevy-first workflows.
+
 The `BevyBundle` macro allows you to attach Bevy Components to Custom Godot nodes.
+Components are inserted directly from the node's exported properties; no separate bundle
+type is generated.
 It supports several ways to map Godot node properties to Bevy components:
 
 #### Default Component Creation

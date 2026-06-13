@@ -124,6 +124,8 @@ echo ""
 # under the shared target dir, and cargo can consider a unit fresh even when the
 # dylib on disk came from the *other* workspace. Clean the local crates before
 # each build so the linked library always matches the source being built.
+# godot-bevy-macros is included so the proc-macro is rebuilt per branch too,
+# otherwise new macro features won't resolve when the baseline built first.
 clean_local_crates() {
     local manifest="$1"
     CARGO_TARGET_DIR="$REPO_ROOT/target" cargo clean --release \

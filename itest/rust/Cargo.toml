@@ -13,6 +13,10 @@ name = "godot_bevy_itest"
 
 [features]
 default = []
+# Integration tests that register autosync node types. Opt-in so the benchmark
+# binary (built without it) keeps an empty AutoSyncBundleRegistry, keeping
+# scene-tree node-added numbers comparable to the base branch.
+autosync-tests = []
 
 [dependencies]
 godot = { workspace = true, features = ["__trace"] }

@@ -30,8 +30,9 @@ done
 echo -e "${CYAN}Building godot-bevy-itest ($BUILD_TYPE)...${NC}"
 
 # Build the Rust library
+# autosync-tests is test-only; benchmark builds omit it to keep the registry empty.
 cd "$(dirname "$0")/rust"
-cargo build $CARGO_BUILD_FLAGS
+cargo build $CARGO_BUILD_FLAGS --features autosync-tests
 
 cd ..
 
