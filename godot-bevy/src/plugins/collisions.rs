@@ -66,7 +66,9 @@ use bevy_ecs::{
 use crossbeam_channel::Receiver;
 use godot::prelude::*;
 use parking_lot::Mutex;
-use std::collections::{HashMap, HashSet};
+// foldhash, not SipHash: small Entity-tuple keys don't need DoS resistance,
+// and SipHash's cost shows up in the collision burst benchmark.
+use bevy_platform::collections::{HashMap, HashSet};
 use tracing::trace;
 
 // Collision signal constants

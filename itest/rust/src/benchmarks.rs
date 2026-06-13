@@ -195,6 +195,30 @@ fn transform_sync_godot_to_bevy_3d_5000() -> i32 {
     run_transform_sync_godot_to_bevy_3d(5000)
 }
 
+/// Benchmark: Godot->Bevy 3D sync when only 1% of nodes moved. pre_update polls
+/// every synced entity regardless, so this costs ~the same as the dense variant
+/// — the cost is O(synced), not O(moved). Metric for a notification-driven read.
+#[bench(repeat = 3)]
+fn transform_sync_godot_to_bevy_3d_sparse() -> i32 {
+    let (mut app, nodes) = setup_3d_benchmark_app(NODE_COUNT);
+
+    // Move only the first 10 of 1000 nodes.
+    for (i, node) in nodes.iter().take(10).enumerate() {
+        let mut node = node.clone();
+        node.set_position(Vector3::new(i as f32 * 3.0, 1.0, 0.0));
+    }
+
+    measured(|| app.world_mut().run_schedule(PreUpdate));
+
+    let result = nodes.len() as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
 // =============================================================================
 // 2D Transform Sync Benchmarks
 // =============================================================================
@@ -536,6 +560,42 @@ fn scene_tree_process_node_added_fallback() -> i32 {
     let result = node_index.len() as i32;
 
     // Cleanup
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+/// Benchmark: NodeAdded processing when the world already holds many entities.
+/// Adding a few nodes to a 10k-entity world exposes per-batch costs that scale
+/// with world size rather than batch size (e.g. a full entity-map rebuild).
+#[bench(repeat = 3)]
+fn scene_tree_process_node_added_populated_world() -> i32 {
+    const EXISTING_ENTITIES: usize = 10_000;
+    const ADDED_NODES: usize = 10;
+
+    let (mut app, sender) = setup_scene_tree_benchmark_app();
+
+    // Synthetic handle-bearing entities to give the message-processing scan
+    // many rows to walk.
+    for i in 0..EXISTING_ENTITIES {
+        let handle = GodotNodeHandle::from(InstanceId::from_i64(1_000_000 + i as i64));
+        app.world_mut().spawn(handle);
+    }
+
+    let nodes = create_scene_tree_nodes(ADDED_NODES);
+    for msg in create_node_added_messages(&nodes) {
+        sender.send(msg).expect("Send should succeed");
+    }
+
+    measured(|| {
+        app.world_mut().run_schedule(First);
+        app.world_mut().run_schedule(First);
+    });
+
+    let result = app.world().resource::<NodeEntityIndex>().len() as i32;
+
     for node in nodes {
         node.free();
     }

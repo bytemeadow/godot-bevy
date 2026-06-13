@@ -13,10 +13,12 @@ use bevy_app::{App, First, Plugin, PreStartup};
 use bevy_ecs::{
     component::Component,
     entity::Entity,
+    lifecycle::HookContext,
     message::{Message, MessageReader, MessageWriter, message_update_system},
     prelude::{Name, ReflectComponent, ReflectResource, Resource},
     schedule::IntoScheduleConfigs,
     system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam},
+    world::DeferredWorld,
 };
 use bevy_reflect::Reflect;
 use godot::classes::ClassDb;
@@ -29,15 +31,17 @@ use godot::{
     prelude::GodotConvert,
 };
 use parking_lot::Mutex;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::rc::Rc;
 use tracing::{debug, trace, warn};
 
 /// A resource that maintains an O(1) lookup from Godot `InstanceId` to Bevy `Entity`.
 ///
-/// This index is automatically maintained by the scene tree plugin as entities are
-/// added and removed. Use this for efficient collision handling, signal routing,
-/// and any scenario where you need to find the Bevy entity for a Godot node.
+/// Kept complete for every entity with a `GodotNodeHandle` — scene-tree,
+/// packed-scene, or user-spawned — via component hooks. Use it to find the Bevy
+/// entity for a Godot node (collision handling, signal routing, etc.).
 ///
 /// # Example
 ///
@@ -178,6 +182,13 @@ impl Plugin for GodotSceneTreePlugin {
                     read_scene_tree_messages.before(message_update_system),
                 ),
             );
+
+        // Hooks keep NodeEntityIndex complete in O(1) per change, so message
+        // processing resolves entities through it instead of an O(world) scan.
+        app.world_mut()
+            .register_component_hooks::<GodotNodeHandle>()
+            .on_insert(on_godot_node_handle_insert)
+            .on_replace(on_godot_node_handle_replace);
     }
 }
 
@@ -509,6 +520,29 @@ impl SceneTreeMessageReader {
     }
 }
 
+/// Index a `GodotNodeHandle` when it is added or changed, from any source. A hook
+/// keeps `NodeEntityIndex` complete in O(1) per change — an `Added`-filtered
+/// system would instead scan the whole archetype every frame.
+fn on_godot_node_handle_insert(mut world: DeferredWorld, ctx: HookContext) {
+    let Some(handle) = world.get::<GodotNodeHandle>(ctx.entity).copied() else {
+        return;
+    };
+    world
+        .resource_mut::<NodeEntityIndex>()
+        .insert(handle.instance_id(), ctx.entity);
+}
+
+/// Fires before a `GodotNodeHandle` is overwritten or removed, while the old
+/// handle is still readable, so its stale index entry can be evicted.
+fn on_godot_node_handle_replace(mut world: DeferredWorld, ctx: HookContext) {
+    let Some(handle) = world.get::<GodotNodeHandle>(ctx.entity).copied() else {
+        return;
+    };
+    world
+        .resource_mut::<NodeEntityIndex>()
+        .remove(handle.instance_id());
+}
+
 fn write_scene_tree_messages(
     message_reader: Res<SceneTreeMessageReader>,
     mut message_writer: MessageWriter<SceneTreeMessage>,
@@ -534,11 +568,8 @@ fn create_scene_tree_entity(
     node_index: &mut NodeEntityIndex,
     godot: &mut GodotAccess,
 ) {
-    // Make InstanceId to entity mapping for efficient random access (only needed during this function)
-    let mut godot_entity_map = entities
-        .iter()
-        .map(|(reference, ent, protected)| (reference.instance_id(), (ent, protected)))
-        .collect::<HashMap<_, _>>();
+    // Resolve entities via the complete NodeEntityIndex (in-loop inserts below
+    // plus the GodotNodeHandle hooks), avoiding an O(world) scan per batch.
     let scene_root = scene_tree.get().get_root().unwrap();
 
     // CollisionWatcher is optional - only required if GodotCollisionsPlugin is added
@@ -562,7 +593,7 @@ fn create_scene_tree_entity(
         } = message;
         let instance_id = node_id.instance_id();
         let node_handle = node_id;
-        let entity_info = godot_entity_map.get(&instance_id).cloned();
+        let existing_entity = node_index.get(instance_id);
 
         match message_type {
             SceneTreeMessageType::NodeAdded => {
@@ -571,7 +602,7 @@ fn create_scene_tree_entity(
                     continue;
                 }
 
-                let mut new_entity_commands = if let Some((ent, _)) = entity_info {
+                let mut new_entity_commands = if let Some(ent) = existing_entity {
                     commands.entity(ent)
                 } else {
                     commands.spawn_empty()
@@ -591,7 +622,9 @@ fn create_scene_tree_entity(
                         // Fall back to getting node-type from node if not provided by message
                         .unwrap_or_else(|| node.get_class().to_string())
                         .as_str(),
-                ) {
+                )
+                .iter()
+                {
                     add_node_type_markers_from_string(
                         &mut new_entity_commands,
                         class_name.as_str(),
@@ -634,10 +667,6 @@ fn create_scene_tree_entity(
                 component_registry.add_to_entity(&mut new_entity_commands, &mut node_accessor);
 
                 let new_entity = new_entity_commands.id();
-                godot_entity_map.insert(
-                    instance_id,
-                    (new_entity, entity_info.and_then(|(_, protected)| protected)),
-                );
                 node_index.insert(instance_id, new_entity);
 
                 // Try to add any registered bundles for this node type
@@ -649,19 +678,19 @@ fn create_scene_tree_entity(
                 if let Some(parent_id) = parent_id
                     && parent_id != scene_root.instance_id()
                 {
-                    if let Some((parent_entity, _)) = godot_entity_map.get(&parent_id) {
+                    if let Some(parent_entity) = node_index.get(parent_id) {
                         commands
                             .entity(new_entity)
-                            .insert(super::relationship::GodotChildOf(*parent_entity));
+                            .insert(super::relationship::GodotChildOf(parent_entity));
                     } else {
                         warn!(target: "godot_scene_tree_messages",
-                            "Parent entity with ID {} not found in godot_entity_map. This might indicate a missing or incorrect mapping. Path={}",
+                            "Parent entity with ID {} not found in NodeEntityIndex. This might indicate a missing or incorrect mapping. Path={}",
                             parent_id, node.get_path());
                     }
                 }
             }
             SceneTreeMessageType::NodeRemoved => {
-                if let Some((ent, prot_opt)) = entity_info {
+                if let Some(ent) = existing_entity {
                     // Check if node is being reparented vs truly removed
                     // During reparenting, the node is temporarily removed from old parent
                     // but still exists in the scene tree (has a parent)
@@ -677,14 +706,17 @@ fn create_scene_tree_entity(
                             "Node is being reparented, preserving entity");
                         // Don't remove from ent_mapping - entity still valid
                     } else {
-                        // Node is truly being removed (freed or despawned)
-                        let protected = prot_opt.is_some();
+                        // Truly removed. Read protected from the world; same-batch
+                        // spawns aren't queryable yet but are never protected.
+                        let protected = entities
+                            .get(ent)
+                            .map(|(_, _, prot)| prot.is_some())
+                            .unwrap_or(false);
                         if !protected {
                             commands.entity(ent).despawn();
                         } else {
                             _strip_godot_components(commands, ent);
                         }
-                        godot_entity_map.remove(&instance_id);
                         node_index.remove(instance_id);
                     }
                 } else {
@@ -693,7 +725,7 @@ fn create_scene_tree_entity(
                 }
             }
             SceneTreeMessageType::NodeRenamed => {
-                if let Some((ent, _)) = entity_info {
+                if let Some(ent) = existing_entity {
                     let name = node_name
                         .unwrap_or_else(|| godot.get::<Node>(node_handle).get_name().to_string());
                     commands.entity(ent).insert(Name::from(name));
@@ -712,22 +744,34 @@ fn create_scene_tree_entity(
     }
 }
 
-fn get_inheritance_hierarchy(class_name: &str) -> Vec<String> {
-    let class_db = ClassDb::singleton();
-    let mut hierarchy = Vec::new();
-
-    // Initialize a local mutable variable to track the "current" class name
-    let mut current_class = StringName::from(class_name);
-
-    while !current_class.is_empty() {
-        // Convert to String for the return vector
-        hierarchy.push(current_class.to_string());
-
-        // Update current_class to its parent
-        current_class = class_db.get_parent_class(&current_class);
+/// Inheritance chain for a Godot class (class then ancestors). Memoized per
+/// class name: the chain is static and scenes have few distinct classes, so we
+/// walk `ClassDb` once per class, not per node; `Rc` avoids reallocating on hits.
+/// Main-thread only (holds `GodotAccess`), so the thread-local cache is lock-free.
+fn get_inheritance_hierarchy(class_name: &str) -> Rc<Vec<String>> {
+    thread_local! {
+        static CACHE: RefCell<HashMap<String, Rc<Vec<String>>>> = RefCell::new(HashMap::new());
     }
 
-    hierarchy
+    CACHE.with(|cache| {
+        if let Some(hierarchy) = cache.borrow().get(class_name) {
+            return hierarchy.clone();
+        }
+
+        let class_db = ClassDb::singleton();
+        let mut hierarchy = Vec::new();
+        let mut current_class = StringName::from(class_name);
+        while !current_class.is_empty() {
+            hierarchy.push(current_class.to_string());
+            current_class = class_db.get_parent_class(&current_class);
+        }
+
+        let hierarchy = Rc::new(hierarchy);
+        cache
+            .borrow_mut()
+            .insert(class_name.to_string(), hierarchy.clone());
+        hierarchy
+    })
 }
 
 /// Batch connect collision signals using GDScript bulk operations.

@@ -7,6 +7,7 @@ use bevy_ecs::{
 use bevy_math::Vec2;
 use bevy_reflect::Reflect;
 use godot::{
+    builtin::{Array, StringName},
     classes::{
         InputEvent as GodotInputEvent, InputEventJoypadButton, InputEventJoypadMotion,
         InputEventKey, InputEventMouseButton, InputEventMouseMotion, InputEventPanGesture,
@@ -153,12 +154,16 @@ pub(crate) fn write_input_messages(
     mut gamepad_axis_events: MessageWriter<GamepadAxisInput>,
     mut pan_gesture_events: MessageWriter<PanGestureInput>,
 ) {
+    // Fetch once per frame, not per event: get_actions() is an allocating FFI
+    // call and the action set is stable within a frame.
+    let actions = InputMap::singleton().get_actions();
+
     for (event_type, input_event) in events.0.try_iter() {
         trace!("Processing {:?} input event", event_type);
 
         match event_type {
             InputEventType::Normal => {
-                check_action_events(&input_event, &mut action_events);
+                check_action_events(&input_event, &mut action_events, &actions);
                 extract_mouse_motion_events(input_event, &mut mouse_motion_events);
             }
             InputEventType::Unhandled => {
@@ -284,10 +289,8 @@ fn extract_basic_input_events(
 fn check_action_events(
     input_event: &Gd<GodotInputEvent>,
     action_events: &mut MessageWriter<ActionInput>,
+    actions: &Array<StringName>,
 ) {
-    let input_map = InputMap::singleton();
-    let actions = input_map.get_actions();
-
     for action_name in actions.iter_shared() {
         if input_event.is_action(&action_name) {
             let pressed = input_event.is_action_pressed(&action_name);

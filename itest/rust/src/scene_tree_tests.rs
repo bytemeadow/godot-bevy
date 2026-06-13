@@ -358,3 +358,61 @@ fn test_node_entity_index_updated_on_remove(ctx: &TestContext) -> godot::task::T
         app.cleanup().await;
     })
 }
+
+/// A packed-scene spawn (handle attached outside the scene-tree plugin) must
+/// reconcile to its existing entity on NodeAdded, never spawn a duplicate — the
+/// invariant the naive "route lookups through NodeEntityIndex" change broke.
+#[itest(async)]
+fn test_packed_scene_spawn_reconciles_to_single_entity(
+    ctx: &TestContext,
+) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        // GodotCorePlugins (what the test app uses) does not include assets, so
+        // add the packed scene plugin and its asset dependency explicitly.
+        let mut app = TestApp::new(&ctx_clone, |app| {
+            app.add_plugins(GodotAssetsPlugin);
+            app.add_plugins(GodotPackedScenePlugin);
+        })
+        .await;
+
+        // spawn_scene (PostUpdate) instantiates the node, add_child's it, and
+        // attaches a GodotNodeHandle to THIS entity; the resulting node_added
+        // signal yields a NodeAdded message processed next First.
+        let scene_entity = app.with_world_mut(|world| {
+            world
+                .spawn(GodotScene::from_path("res://test_spawn_scene.tscn"))
+                .id()
+        });
+
+        // Enough frames for spawn -> add_child -> node_added -> reconciliation.
+        app.updates(5).await;
+
+        let handle = app
+            .with_world_mut(|world| world.get::<GodotNodeHandle>(scene_entity).copied())
+            .expect("spawned scene entity should have a GodotNodeHandle");
+
+        let count = app.with_world_mut(|world| {
+            let mut q = world.query::<&GodotNodeHandle>();
+            q.iter(world)
+                .filter(|h| h.instance_id() == handle.instance_id())
+                .count()
+        });
+
+        assert_eq!(
+            count, 1,
+            "expected exactly one entity for the spawned node, found {count} (duplicate = reconciliation broke)"
+        );
+
+        println!("✓ packed-scene spawn reconciles to a single entity");
+
+        // Free the spawned node so it does not leak into later tests.
+        if let Ok(mut node) = Gd::<godot::classes::Node>::try_from_instance_id(handle.instance_id())
+        {
+            node.queue_free();
+        }
+        app.updates(2).await;
+        app.cleanup().await;
+    })
+}

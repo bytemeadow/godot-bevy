@@ -47,11 +47,17 @@ Results are saved to `itest/.bench-results/` for further inspection.
 
 `BENCH_ROUNDS` controls how many interleaved rounds run per side (default: 3).
 
-The comparison table includes a `Noise` column: each benchmark's spread of
-per-round medians. Changes within that spread are marked `~` and not counted
-as regressions or improvements — µs-scale benchmarks routinely shift >10%
-between processes, so never judge a change from two standalone
-`run-benches.sh` runs.
+The comparison table includes a `Noise` column: the **standard error of the
+measured change**, derived from the spread of per-round medians on each side. A
+change must exceed **2× that standard error** (~95% confidence) to count as a
+regression or improvement; smaller changes are marked `~`. Because the standard
+error divides by √(rounds), running more rounds *tightens* the band — so for a
+noisy benchmark, bump `BENCH_ROUNDS` (e.g. `BENCH_ROUNDS=6`) to resolve a
+borderline result, rather than re-rolling the dice. (This replaced an earlier
+max−min spread metric, which wrongly *widened* with more rounds and could mask a
+real change behind one outlier round.) µs-scale benchmarks routinely shift >10%
+between processes, so never judge a change from two standalone `run-benches.sh`
+runs — always use `compare-benches.sh`.
 
 ### Example Output
 
@@ -91,7 +97,7 @@ and teardown are excluded.
 
 ## What We Benchmark
 
-The suite contains **23 benchmarks** across six categories. Every benchmark runs the real godot-bevy systems (plugins, schedules, ECS queries) rather than raw FFI calls, so regressions in actual user-facing code are caught.
+The suite contains **25 benchmarks** across six categories. Every benchmark runs the real godot-bevy systems (plugins, schedules, ECS queries) rather than raw FFI calls, so regressions in actual user-facing code are caught.
 
 ### Scaling Variants
 
@@ -113,12 +119,13 @@ These benchmarks measure the real `GodotTransformSyncPlugin` systems that sync t
 | `transform_sync_bevy_to_godot_3d_5000` | Scaling variant (5000 nodes) |
 | `transform_sync_godot_to_bevy_3d` | Godot->Bevy 3D sync (PreUpdate schedule) |
 | `transform_sync_godot_to_bevy_3d_5000` | Scaling variant (5000 nodes) |
+| `transform_sync_godot_to_bevy_3d_sparse` | 1000 nodes, only 10 moved (quantifies polling unchanged transforms) |
 | `transform_sync_bevy_to_godot_2d` | Bevy->Godot 2D sync (Last schedule) |
 | `transform_sync_godot_to_bevy_2d` | Godot->Bevy 2D sync (PreUpdate schedule) |
 | `transform_sync_roundtrip_3d` | Full frame: PreUpdate -> game logic -> Last (3D) |
 | `transform_sync_roundtrip_2d` | Full frame: PreUpdate -> game logic -> Last (2D) |
 
-### Scene Tree Processing (6 benchmarks, 500 nodes unless suffixed)
+### Scene Tree Processing (7 benchmarks, 500 nodes unless suffixed)
 
 These benchmarks measure the `GodotSceneTreePlugin` systems that process node-added, renamed, and collision-body messages from Godot.
 
@@ -128,6 +135,7 @@ These benchmarks measure the `GodotSceneTreePlugin` systems that process node-ad
 | `scene_tree_process_node_added_optimized` | NodeAdded with pre-analyzed types |
 | `scene_tree_process_node_added_optimized_2500` | Scaling variant (2500 nodes) |
 | `scene_tree_process_node_added_fallback` | NodeAdded with FFI type detection |
+| `scene_tree_process_node_added_populated_world` | Adding 10 nodes to a world with 10k existing entities (exposes per-batch costs that scale with world size, not batch size) |
 | `scene_tree_process_node_renamed_sparse_updates` | Sparse rename messages (80 frames) |
 | `scene_tree_process_collision_bodies_optimized` | Area3D with collision signals (optimized path, 100 nodes) |
 
