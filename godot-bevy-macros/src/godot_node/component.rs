@@ -597,15 +597,12 @@ mod tests {
             .unwrap()
             .to_string();
 
-        // Companion exports on the generated Godot class
         assert!(output.contains("# [export] speed : f32"));
         assert!(output.contains("# [export] current : i32"));
         assert!(output.contains("# [export] max : i32"));
-        // init() defaults
         assert!(output.contains("speed : 250.0"));
         assert!(output.contains("current : 100"));
         assert!(output.contains("max : i32 :: default ()"));
-        // bevy_bundle attr lowers companions into the insert
         assert!(output.contains("(Player)"));
         assert!(output.contains("(Grounded)"));
         assert!(output.contains("(Speed : speed)"));
