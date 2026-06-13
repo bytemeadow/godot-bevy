@@ -616,15 +616,14 @@ fn create_scene_tree_entity(
                     .insert(node_id)
                     .insert(Name::from(node_name));
 
-                // Add node type marker components
-                for class_name in get_inheritance_hierarchy(
+                // Compute the class hierarchy once; reused for markers and autosync.
+                let class_hierarchy = get_inheritance_hierarchy(
                     node_type
                         // Fall back to getting node-type from node if not provided by message
                         .unwrap_or_else(|| node.get_class().to_string())
                         .as_str(),
-                )
-                .iter()
-                {
+                );
+                for class_name in class_hierarchy.iter() {
                     add_node_type_markers_from_string(
                         &mut new_entity_commands,
                         class_name.as_str(),
@@ -670,7 +669,13 @@ fn create_scene_tree_entity(
                 node_index.insert(instance_id, new_entity);
 
                 // Try to add any registered bundles for this node type
-                super::autosync::try_add_bundles_for_node(commands, new_entity, godot, node_handle);
+                super::autosync::try_add_bundles_for_node(
+                    commands,
+                    new_entity,
+                    godot,
+                    node_handle,
+                    class_hierarchy.as_slice(),
+                );
 
                 // Add GodotChildOf relationship to mirror Godot's scene tree hierarchy
                 let parent_id = parent_id_from_gdscript

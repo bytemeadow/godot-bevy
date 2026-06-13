@@ -127,7 +127,7 @@ echo ""
 clean_local_crates() {
     local manifest="$1"
     CARGO_TARGET_DIR="$REPO_ROOT/target" cargo clean --release \
-        -p godot-bevy -p godot-bevy-test -p godot-bevy-itest \
+        -p godot-bevy -p godot-bevy-macros -p godot-bevy-test -p godot-bevy-itest \
         --manifest-path "$manifest"
 }
 

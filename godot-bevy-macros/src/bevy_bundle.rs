@@ -251,6 +251,7 @@ pub fn bevy_bundle(input: DeriveInput) -> syn::Result<TokenStream2> {
         godot_bevy::inventory::submit! {
             godot_bevy::prelude::AutoSyncBundleRegistry {
                 godot_class_name: stringify!(#struct_name),
+                godot_class_id_fn: || <#struct_name as godot::prelude::GodotClass>::class_id(),
                 create_bundle_fn: #create_bundle_fn_name,
             }
         }
@@ -403,6 +404,26 @@ mod tests {
         assert!(
             output.contains("node . bind () . test_field . clone ()"),
             "Should access the field correctly"
+        );
+    }
+
+    #[test]
+    fn test_registers_godot_class_id_fn() {
+        let input: DeriveInput = parse_quote! {
+            #[bevy_bundle((MarkerComponent))]
+            struct TestNode {
+                test_field: String,
+            }
+        };
+
+        let output = bevy_bundle(input).unwrap().to_string();
+        assert!(
+            output.contains("godot_class_id_fn"),
+            "registry submit should set godot_class_id_fn"
+        );
+        assert!(
+            output.contains("GodotClass") && output.contains("class_id ()"),
+            "should emit the GodotClass::class_id() call, not just the field name"
         );
     }
 }
