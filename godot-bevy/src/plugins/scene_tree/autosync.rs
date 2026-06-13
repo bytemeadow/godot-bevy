@@ -16,11 +16,8 @@ use crate::interop::{GodotAccess, GodotNodeHandle};
 /// Function type for creating bundles from Godot nodes
 pub type BundleCreatorFn = fn(&mut Commands, Entity, &mut GodotAccess, GodotNodeHandle) -> bool;
 
-/// Registry entry for auto-sync bundles using the inventory crate.
-///
-/// Plumbing constructed only by the `BevyBundle`/`GodotNode` derive macros via
-/// `inventory::submit!`; not intended for manual construction. The macro needs a
-/// stable path to it, hence `pub`, but it is not part of the stable public API.
+/// Registry entry for auto-sync bundles, constructed only by the derive macros
+/// via `inventory::submit!` — `pub` for the macro path, not stable public API.
 #[doc(hidden)]
 pub struct AutoSyncBundleRegistry {
     /// The bundle struct's name — human-readable, used in trace logs.
