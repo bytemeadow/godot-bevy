@@ -25,6 +25,7 @@ use godot_bevy::plugins::scene_tree::{
     GodotSceneTreePlugin, NodeEntityIndex, SceneTreeMessage, SceneTreeMessageReader,
     SceneTreeMessageType,
 };
+use godot_bevy::prelude::BevyBundle;
 use godot_bevy::plugins::signals::{GodotSignals, GodotSignalsPlugin};
 use godot_bevy::plugins::transforms::{
     GodotTransformSyncPlugin, GodotTransformSyncPluginExt, TransformSyncMetadata, TransformSyncMode,
@@ -651,6 +652,122 @@ fn scene_tree_process_node_renamed_sparse_updates() -> i32 {
 
     assert_eq!(node_index_len, SCENE_TREE_NODE_COUNT);
     SCENE_TREE_SPARSE_RENAME_FRAMES as i32
+}
+
+// =============================================================================
+// Autosync Benchmarks
+// =============================================================================
+// These benchmarks measure the performance of node-added processing when the
+// autosync registry is populated with registered types. Defined inline so the
+// benchmark comparison harness (which copies only this file onto the base branch)
+// exercises both the iterate-all and class-keyed lookup paths.
+
+// --- Autosync benchmark fixtures -------------------------------------------
+// 15 registered autosync node types. Defined inline (not a separate module) so
+// the benchmark comparison — which copies only benchmarks.rs onto the base
+// branch — exercises both the iterate-all and class-keyed lookup paths.
+// These register globally, so the other scene-tree node-added benchmarks also
+// run against a populated registry (a realistic, consistent baseline shift).
+macro_rules! bench_autosync_types {
+    ($($node:ident => $marker:ident),* $(,)?) => {
+        $(
+            #[derive(bevy::prelude::Component, Default)]
+            pub struct $marker;
+
+            #[derive(godot::prelude::GodotClass, BevyBundle)]
+            #[class(init, base=Node2D)]
+            #[bevy_bundle(($marker))]
+            pub struct $node {
+                base: godot::prelude::Base<godot::classes::Node2D>,
+            }
+        )*
+    };
+}
+
+bench_autosync_types!(
+    BenchAutosyncNode0 => BenchMarker0,
+    BenchAutosyncNode1 => BenchMarker1,
+    BenchAutosyncNode2 => BenchMarker2,
+    BenchAutosyncNode3 => BenchMarker3,
+    BenchAutosyncNode4 => BenchMarker4,
+    BenchAutosyncNode5 => BenchMarker5,
+    BenchAutosyncNode6 => BenchMarker6,
+    BenchAutosyncNode7 => BenchMarker7,
+    BenchAutosyncNode8 => BenchMarker8,
+    BenchAutosyncNode9 => BenchMarker9,
+    BenchAutosyncNode10 => BenchMarker10,
+    BenchAutosyncNode11 => BenchMarker11,
+    BenchAutosyncNode12 => BenchMarker12,
+    BenchAutosyncNode13 => BenchMarker13,
+    BenchAutosyncNode14 => BenchMarker14,
+);
+
+/// Drive node-added processing with the autosync registry populated.
+/// `matching = false` adds plain Node2D (matches nothing — the common case,
+/// the worst case for iterate-all). `matching = true` adds a registered type
+/// (guards that the matched/hit path is not regressed).
+fn run_autosync_node_added(node_count: usize, matching: bool) -> i32 {
+    let (mut app, sender) = setup_scene_tree_benchmark_app();
+    let scene_tree = get_scene_tree();
+    let root = scene_tree.get_root().expect("Root should exist");
+
+    let mut nodes: Vec<Gd<Node>> = Vec::with_capacity(node_count);
+    for i in 0..node_count {
+        let node: Gd<Node> = if matching {
+            let mut n = BenchAutosyncNode0::new_alloc();
+            n.set_name(&format!("BenchAutosyncMatch_{i}"));
+            n.upcast()
+        } else {
+            let mut n = Node2D::new_alloc();
+            n.set_name(&format!("BenchAutosyncMiss_{i}"));
+            n.upcast()
+        };
+        root.clone().add_child(&node);
+        nodes.push(node);
+    }
+
+    let messages: Vec<SceneTreeMessage> = nodes
+        .iter()
+        .map(|node| SceneTreeMessage {
+            node_id: GodotNodeHandle::from(node.instance_id()),
+            message_type: SceneTreeMessageType::NodeAdded,
+            node_type: Some(node.get_class().to_string()),
+            node_name: Some(node.get_name().to_string()),
+            parent_id: node.get_parent().map(|p| p.instance_id()),
+            collision_mask: Some(0),
+            groups: Some(vec![]),
+        })
+        .collect();
+
+    for msg in messages {
+        sender.send(msg).expect("Send should succeed");
+    }
+
+    // Two First runs: see scene_tree_process_node_added_optimized for why.
+    measured(|| {
+        app.world_mut().run_schedule(First);
+        app.world_mut().run_schedule(First);
+    });
+
+    let result = app.world().resource::<NodeEntityIndex>().len() as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+/// Node-added with 15 autosync types registered, nodes matching none.
+#[bench(repeat = 3)]
+fn scene_tree_node_added_autosync_unmatched() -> i32 {
+    run_autosync_node_added(SCENE_TREE_NODE_COUNT, false)
+}
+
+/// Node-added with 15 autosync types registered, nodes matching one.
+#[bench(repeat = 3)]
+fn scene_tree_node_added_autosync_matched() -> i32 {
+    run_autosync_node_added(SCENE_TREE_NODE_COUNT, true)
 }
 
 // =============================================================================
