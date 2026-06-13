@@ -29,8 +29,10 @@ use godot::{
     prelude::GodotConvert,
 };
 use parking_lot::Mutex;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::rc::Rc;
 use tracing::{debug, trace, warn};
 
 /// A resource that maintains an O(1) lookup from Godot `InstanceId` to Bevy `Entity`.
@@ -591,7 +593,9 @@ fn create_scene_tree_entity(
                         // Fall back to getting node-type from node if not provided by message
                         .unwrap_or_else(|| node.get_class().to_string())
                         .as_str(),
-                ) {
+                )
+                .iter()
+                {
                     add_node_type_markers_from_string(
                         &mut new_entity_commands,
                         class_name.as_str(),
@@ -712,22 +716,34 @@ fn create_scene_tree_entity(
     }
 }
 
-fn get_inheritance_hierarchy(class_name: &str) -> Vec<String> {
-    let class_db = ClassDb::singleton();
-    let mut hierarchy = Vec::new();
-
-    // Initialize a local mutable variable to track the "current" class name
-    let mut current_class = StringName::from(class_name);
-
-    while !current_class.is_empty() {
-        // Convert to String for the return vector
-        hierarchy.push(current_class.to_string());
-
-        // Update current_class to its parent
-        current_class = class_db.get_parent_class(&current_class);
+/// Inheritance chain for a Godot class (class then ancestors). Memoized per
+/// class name: the chain is static and scenes have few distinct classes, so we
+/// walk `ClassDb` once per class, not per node; `Rc` avoids reallocating on hits.
+/// Main-thread only (holds `GodotAccess`), so the thread-local cache is lock-free.
+fn get_inheritance_hierarchy(class_name: &str) -> Rc<Vec<String>> {
+    thread_local! {
+        static CACHE: RefCell<HashMap<String, Rc<Vec<String>>>> = RefCell::new(HashMap::new());
     }
 
-    hierarchy
+    CACHE.with(|cache| {
+        if let Some(hierarchy) = cache.borrow().get(class_name) {
+            return hierarchy.clone();
+        }
+
+        let class_db = ClassDb::singleton();
+        let mut hierarchy = Vec::new();
+        let mut current_class = StringName::from(class_name);
+        while !current_class.is_empty() {
+            hierarchy.push(current_class.to_string());
+            current_class = class_db.get_parent_class(&current_class);
+        }
+
+        let hierarchy = Rc::new(hierarchy);
+        cache
+            .borrow_mut()
+            .insert(class_name.to_string(), hierarchy.clone());
+        hierarchy
+    })
 }
 
 /// Batch connect collision signals using GDScript bulk operations.
