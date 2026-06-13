@@ -25,11 +25,11 @@ use godot_bevy::plugins::scene_tree::{
     GodotSceneTreePlugin, NodeEntityIndex, SceneTreeMessage, SceneTreeMessageReader,
     SceneTreeMessageType,
 };
-use godot_bevy::prelude::BevyBundle;
 use godot_bevy::plugins::signals::{GodotSignals, GodotSignalsPlugin};
 use godot_bevy::plugins::transforms::{
     GodotTransformSyncPlugin, GodotTransformSyncPluginExt, TransformSyncMetadata, TransformSyncMode,
 };
+use godot_bevy::prelude::BevyBundle;
 use godot_bevy::watchers::collision_watcher::CollisionWatcher;
 use godot_bevy_test::{bench, measured};
 
