@@ -657,17 +657,12 @@ fn scene_tree_process_node_renamed_sparse_updates() -> i32 {
 // =============================================================================
 // Autosync Benchmarks
 // =============================================================================
-// These benchmarks measure the performance of node-added processing when the
-// autosync registry is populated with registered types. Defined inline so the
-// benchmark comparison harness (which copies only this file onto the base branch)
-// exercises both the iterate-all and class-keyed lookup paths.
-
-// --- Autosync benchmark fixtures -------------------------------------------
-// 15 registered autosync node types. Defined inline (not a separate module) so
-// the benchmark comparison — which copies only benchmarks.rs onto the base
-// branch — exercises both the iterate-all and class-keyed lookup paths.
-// These register globally, so the other scene-tree node-added benchmarks also
-// run against a populated registry (a realistic, consistent baseline shift).
+// 15 registered autosync types, defined inline because the comparison harness
+// copies only this file onto the base branch — so both the iterate-all and
+// class-keyed lookup paths get exercised. They register globally, so the other
+// scene-tree node-added benchmarks also run against a populated registry (an
+// intended, consistent baseline shift). Only Node0 is instantiated below; the
+// rest exist purely to size the registry.
 macro_rules! bench_autosync_types {
     ($($node:ident => $marker:ident),* $(,)?) => {
         $(
