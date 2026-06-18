@@ -18,6 +18,7 @@
     - [Property Mapping (BevyBundle)](./scene-tree/custom-nodes/property-mapping-with-bevy-bundle.md)
     - [Nodes from Components and Bundles](scene-tree/custom-nodes/nodes-from-components-and-bundles.md)
   - [Spawning Scenes](scene-tree/spawning-scenes.md)
+  - [Godot to Bevy Communication](scene-tree/godot-to-bevy-communication.md)
 
 ---
 

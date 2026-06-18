@@ -25,6 +25,7 @@ pub use debugger::{DebuggerConfig, GodotDebuggerPlugin};
 #[cfg(feature = "godot_bevy_log")]
 pub use godot_bevy_logger::GodotBevyLogPlugin;
 pub use input::{BevyInputBridgePlugin, GodotInputEventPlugin};
+#[allow(deprecated)]
 pub use mailbox::{GodotMailboxMessage, GodotMailboxPlugin, GodotMailboxSet};
 pub use packed_scene::GodotPackedScenePlugin;
 pub use scene_tree::GodotSceneTreePlugin;
