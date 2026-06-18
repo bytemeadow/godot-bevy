@@ -11,6 +11,7 @@ use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
 use bevy_app::{App, PluginsState};
 use bevy_ecs::message::Messages;
 use crossbeam_channel::unbounded;
+use godot::obj::WithBaseField;
 use godot::prelude::*;
 use std::sync::OnceLock;
 
@@ -258,6 +259,16 @@ impl BevyApp {
             app.init_non_send_resource::<BulkOperationsCache>();
         }
     }
+
+    /// Allows access to the Bevy App object for this BevyApp.
+    /// Useful for communicating with Bevy systems from Godot nodes.
+    pub fn bevy_app_access(&mut self, func: impl FnOnce(&mut App)) {
+        if let Some(app) = self.app.as_mut() {
+            func(app);
+        } else {
+            tracing::warn!("BevyApp not yet initialized or panicked");
+        }
+    }
 }
 
 #[godot_api]
@@ -338,4 +349,53 @@ impl INode for BevyApp {
             resume_unwind(e);
         }
     }
+}
+
+/// Allows access to the Bevy App object for the BevyApp located in the `BevyAppSingleton` autoload node.
+/// This is useful for communicating with Bevy systems from Godot nodes.
+///
+/// Parameters:
+/// - `node`: Typically `&self.base()` of the calling node. The node must be attached to the scene tree for node path resolution to work.
+/// - `func`: A closure that will be passed a mutable reference to the Bevy App.
+///
+/// This example shows how to use `with_bevy_app_singleton` from a custom Button node to trigger a Bevy event:
+/// ```rust,ignore
+/// use bevy::prelude::Event;
+/// use godot::classes::{Button, IButton};
+/// use godot::obj::{Base, WithBaseField, WithUserSignals};
+/// use godot::prelude::{GodotClass, godot_api};
+/// use godot_bevy::app::with_bevy_app_singleton;
+///
+/// #[derive(Event)]
+/// pub struct StartGameEvent;
+///
+/// #[derive(GodotClass)]
+/// #[class(base=Button, init)]
+/// pub struct StartGameButton {
+///     base: Base<Button>,
+/// }
+///
+/// #[godot_api]
+/// impl IButton for StartGameButton {
+///     fn ready(&mut self) {
+///         self.signals()
+///             .pressed()
+///             .connect_self(Self::on_button_pressed);
+///     }
+/// }
+///
+/// #[godot_api]
+/// impl StartGameButton {
+///     pub fn on_button_pressed(&mut self) {
+///         with_bevy_app_singleton(&self.base(), |app| {
+///             app.world_mut().trigger(StartGameEvent);
+///         });
+///     }
+/// }
+/// ```
+pub fn with_bevy_app_singleton(node: &Node, func: impl FnOnce(&mut App)) {
+    let Some(mut bevy_app) = node.try_get_node_as::<BevyApp>("/root/BevyAppSingleton") else {
+        return;
+    };
+    bevy_app.bind_mut().bevy_app_access(func);
 }

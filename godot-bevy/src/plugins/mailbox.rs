@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use crate::interop::{GodotAccess, GodotNodeHandle};
 use crate::plugins::core::PhysicsUpdate;
 use bevy_app::{App, Plugin};
@@ -11,6 +12,7 @@ use std::marker::PhantomData;
 
 /// Marker set for Godot mailbox drain systems.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+#[deprecated(note = "Use `with_bevy_app_singleton()` for simpler and more functional API.")]
 pub enum GodotMailboxSet {
     /// Reads script-side mailbox state from Godot nodes and emits Bevy messages.
     Drain,
@@ -21,6 +23,7 @@ pub enum GodotMailboxSet {
 /// A message type decides how to read and clear its own script-side mailbox fields.
 /// This allows bridging legacy script writes into typed ECS messages without coupling
 /// games to stringly-typed ad-hoc systems.
+#[deprecated(note = "Use `with_bevy_app_singleton()` for simpler and more functional API.")]
 pub trait GodotMailboxMessage: Message + Send + Sync + Sized + 'static {
     /// Reads this message from a Godot node (if pending), and clears pending data as needed.
     fn drain_from_node(node: &mut Node, source: GodotNodeHandle) -> Option<Self>;
@@ -29,6 +32,7 @@ pub trait GodotMailboxMessage: Message + Send + Sync + Sized + 'static {
 /// Generic plugin that drains mailbox messages from Godot nodes with marker `Marker`.
 ///
 /// This plugin runs in [`PhysicsUpdate`] and writes messages of type `T`.
+#[deprecated(note = "Use `with_bevy_app_singleton()` for simpler and more functional API.")]
 pub struct GodotMailboxPlugin<T, Marker>
 where
     T: GodotMailboxMessage,
@@ -62,6 +66,7 @@ where
     }
 }
 
+#[deprecated(note = "Use `with_bevy_app_singleton()` for simpler and more functional API.")]
 fn drain_mailbox_messages<T, Marker>(
     nodes: Query<&GodotNodeHandle, With<Marker>>,
     mut writer: MessageWriter<T>,
