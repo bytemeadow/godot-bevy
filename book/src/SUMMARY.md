@@ -4,6 +4,7 @@
 
 - [Getting Started](./getting-started/index.md)
   - [Installation](./getting-started/installation.md)
+    - [Cargo Run Godot](./getting-started/gdenv.md)
   - [Basic Concepts](./getting-started/basic-concepts.md)
   - [Plugin System](./getting-started/plugins.md)
   - [Examples](./getting-started/examples.md)
