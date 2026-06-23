@@ -45,6 +45,42 @@ impl BevyApp {
         self.app.as_mut()
     }
 
+    /// Resolve the conventional autoload singleton `/root/BevyAppSingleton`, if
+    /// present and of type `BevyApp`. Returns `None` in the editor, before the
+    /// autoload exists, or when there is no live scene tree.
+    pub fn try_singleton() -> Option<Gd<BevyApp>> {
+        godot::classes::Engine::singleton()
+            .get_main_loop()?
+            .try_cast::<godot::classes::SceneTree>()
+            .ok()?
+            .get_root()?
+            .try_get_node_as::<BevyApp>("BevyAppSingleton")
+    }
+
+    /// Typed send into THIS instance's ECS. No-op (warn) if app not live.
+    pub fn send_event_typed<T>(&self, event: T)
+    where
+        T: bevy_ecs::event::Event + Clone + Send + 'static,
+        for<'a> T::Trigger<'a>: Default,
+    {
+        let Some(bevy_app) = self.get_app() else {
+            tracing::warn!("BevyApp::send_event_typed called with no live App; event dropped");
+            return;
+        };
+        let Some(sender) = bevy_app
+            .world()
+            .get_resource::<crate::plugins::signals::SignalSender>()
+        else {
+            tracing::warn!("BevyApp::send_event_typed: no signal channel; event dropped");
+            return;
+        };
+        let boxed: Box<dyn crate::plugins::signals::SignalDispatch> =
+            Box::new(crate::plugins::signals::SignalEnvelope { event });
+        if sender.0.send(boxed).is_err() {
+            tracing::warn!("BevyApp::send_event_typed: channel receiver gone; event dropped");
+        }
+    }
+
     /// Set a per-instance init function (for tests)
     /// This allows each BevyApp instance to have its own configuration
     pub fn set_instance_init_func(&mut self, func: Box<dyn Fn(&mut App) + Send + Sync>) {
@@ -256,6 +292,54 @@ impl BevyApp {
         } else {
             // Initialize empty cache so systems don't need to check for resource existence
             app.init_non_send_resource::<BulkOperationsCache>();
+        }
+    }
+}
+
+#[godot_api]
+impl BevyApp {
+    /// Dispatch a registered Godot event into the ECS by name.
+    /// `payload` may be `null` (nil) for unit events. No-op (logged) if this app
+    /// is not live (pre-init / after teardown / editor), the name is
+    /// unregistered, or the mapper rejects the payload. Never panics across FFI.
+    /// `&self` (not `&mut self`) so a mapper that re-enters this node does not
+    /// double-mutably-borrow.
+    #[func]
+    fn send_event(&self, name: GString, payload: Variant) {
+        use crate::plugins::event_bridge::GodotEventRegistry;
+        use crate::plugins::signals::SignalSender;
+
+        let Some(app) = self.app.as_ref() else {
+            tracing::warn!("BevyApp::send_event({name}) called with no live App; ignored");
+            return;
+        };
+        let world = app.world();
+        let Some(registry) = world.get_resource::<GodotEventRegistry>() else {
+            tracing::warn!("BevyApp::send_event: GodotEventBridgePlugin not added; ignored");
+            return;
+        };
+        let key = name.to_string();
+        let Some(mapper) = registry.mappers.get(&key) else {
+            if registry.warner.lock().should_log(&key) {
+                tracing::warn!(
+                    "BevyApp::send_event: unknown event {key:?}; registered: {:?}",
+                    registry.mappers.keys().collect::<Vec<_>>()
+                );
+            }
+            return;
+        };
+        let Some(boxed) = mapper(payload) else {
+            if registry.warner.lock().should_log(&key) {
+                tracing::warn!("BevyApp::send_event: mapper rejected payload for {key:?}");
+            }
+            return;
+        };
+        let Some(sender) = world.get_resource::<SignalSender>() else {
+            tracing::warn!("BevyApp::send_event: no signal channel; ignored");
+            return;
+        };
+        if sender.0.send(boxed).is_err() {
+            tracing::warn!("BevyApp::send_event: channel receiver gone; ignored");
         }
     }
 }

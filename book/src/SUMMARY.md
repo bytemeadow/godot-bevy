@@ -59,7 +59,7 @@
 ---
 
 - [Project Transition Patterns](./project-transition/index.md)
-  - [Transitional Mailbox Bridge (Godot -> Bevy Messages)](./project-transition/transitional-mailbox-bridge.md)
+  - [Godot to Bevy Event Bridge](./project-transition/event-bridge.md)
 
 ---
 
