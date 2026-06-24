@@ -24,22 +24,15 @@ pub(crate) trait SignalDispatch: Send {
     fn trigger_in_world(self: Box<Self>, world: &mut bevy_ecs::world::World);
 }
 
-/// System set containing both drains of the shared signal/event channel:
-/// `drain_and_trigger_signals` in `First` (process / display rate) and in
-/// `PrePhysicsUpdate` (before each physics tick).
+/// The channel drains run in this set, in `First` (process) and in
+/// `PrePhysicsUpdate` (pre-physics). Order a system around delivery with
+/// `.after(SignalDrainSet::Drain)`.
 ///
-/// Order against delivery with `.after(SignalDrainSet::Drain)` for systems that
-/// read state mutated by an `On<T>` observer.
-///
-/// BEHAVIORAL CHANGE (dual drain): signals enqueued before a frame's
-/// `physics_process` are now delivered in `PrePhysicsUpdate` — same physics
-/// frame — instead of only in the upcoming `First` (process). The `First` drain
-/// is retained so delivery never drops; only the schedule a given event lands in
-/// can vary with frame timing (display-Hz vs physics-Hz). See the event-bridge
-/// book page for the migration note.
+/// The pre-physics drain is what lets a signal enqueued before `physics_process`
+/// reach physics the same frame; `First` catches anything enqueued after, so
+/// nothing is dropped.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SignalDrainSet {
-    /// Drains the signal channel and triggers `On<T>` observers.
     Drain,
 }
 
@@ -100,12 +93,9 @@ fn ensure_signal_connection_queue(app: &mut App) {
     }
 }
 
-/// Install the shared per-instance signal/event channel and its drain exactly
-/// once per App. Idempotent: guarded on `SignalSender` already existing, so
-/// multiple plugins (`GodotSignalsPlugin`, the event bridge) may call it.
-///
-/// The channel lives in this App's own world, so there is exactly one channel
-/// per `BevyApp` instance.
+/// Installs the signal/event channel and its drains, once per App (idempotent —
+/// guarded on `SignalSender`, so both `GodotSignalsPlugin` and the event bridge
+/// can call it). The channel lives in this App's own world: one per `BevyApp`.
 pub(crate) fn ensure_signal_channel(app: &mut App) {
     if app.world().contains_resource::<SignalSender>() {
         return;
@@ -120,10 +110,8 @@ pub(crate) fn ensure_signal_channel(app: &mut App) {
         drain_and_trigger_signals.in_set(SignalDrainSet::Drain),
     );
 
-    // Dual drain: process-time (display rate) AND pre-physics. The pre-physics
-    // drain makes items enqueued before this frame's physics_process visible to
-    // this frame's PhysicsUpdate (same-frame). Both share SignalDrainSet so user
-    // systems can order against delivery deterministically.
+    // Second drain, pre-physics: items enqueued before this frame's
+    // physics_process reach PhysicsUpdate the same frame, not just at process time.
     app.add_systems(
         crate::plugins::core::PrePhysicsUpdate,
         drain_and_trigger_signals.in_set(SignalDrainSet::Drain),

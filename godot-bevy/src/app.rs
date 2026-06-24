@@ -45,9 +45,8 @@ impl BevyApp {
         self.app.as_mut()
     }
 
-    /// Resolve the conventional autoload singleton `/root/BevyAppSingleton`, if
-    /// present and of type `BevyApp`. Returns `None` in the editor, before the
-    /// autoload exists, or when there is no live scene tree.
+    /// Resolves the `/root/BevyAppSingleton` autoload — `None` in the editor or
+    /// before the autoload exists.
     pub fn try_singleton() -> Option<Gd<BevyApp>> {
         godot::classes::Engine::singleton()
             .get_main_loop()?
@@ -57,10 +56,8 @@ impl BevyApp {
             .try_get_node_as::<BevyApp>("BevyAppSingleton")
     }
 
-    /// Typed send into THIS instance's ECS. No-op (warn) if app not live.
-    ///
-    /// This is the natural Rust method form: `app.bind().send_event(MyEvent { .. })`.
-    /// For the free-function form, use `godot_bevy::send_event(&app, event)`.
+    /// The method form of the free `godot_bevy::send_event(&app, ev)`. No-op
+    /// (warn) if this app isn't live.
     pub fn send_event<T>(&self, event: T)
     where
         T: bevy_ecs::event::Event + Clone + Send + 'static,
@@ -301,12 +298,10 @@ impl BevyApp {
 
 #[godot_api]
 impl BevyApp {
-    /// Dispatch a registered Godot event into the ECS by name.
-    /// `payload` may be `null` (nil) for unit events. No-op (logged) if this app
-    /// is not live (pre-init / after teardown / editor), the name is
-    /// unregistered, or the mapper rejects the payload. Never panics across FFI.
-    /// `&self` (not `&mut self`) so a mapper that re-enters this node does not
-    /// double-mutably-borrow.
+    /// GDScript entry point: fires a registered event by name, `payload` as its
+    /// arg (`null` for unit events). No-op + warn on an unknown name or rejected
+    /// payload; never panics across FFI. `&self`, not `&mut self`, so a mapper
+    /// that re-enters this node can't double-borrow it.
     #[func(rename = send_event)]
     fn gd_send_event(&self, name: GString, payload: Variant) {
         use crate::plugins::event_bridge::GodotEventRegistry;

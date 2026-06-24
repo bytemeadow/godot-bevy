@@ -10,22 +10,17 @@ use godot::prelude::Variant;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 
-/// Mapper from a GDScript `send_event` payload `Variant` to a typed event.
-/// Return `None` to reject/skip a malformed payload (drain logs a warning).
+/// Decodes a GDScript payload into a typed event; return `None` to reject it.
 pub type GodotEventMapper<T> = Box<dyn Fn(Variant) -> Option<T> + Send + Sync>;
 
-/// Per-name decaying log gate. A mis-wired high-frequency producer
-/// (e.g. a GDScript `_process` calling `send_event` with a typo every frame)
-/// must not flood the log. `should_log` returns `true` the first time a name is
-/// seen and then only on power-of-two counts (1, 2, 4, 8, ...).
+/// Per-name log gate so one mis-wired producer can't flood the log: a name logs
+/// on power-of-two counts (1, 2, 4, 8, ...) and is swallowed in between.
 #[derive(Default)]
 pub(crate) struct RateLimitedWarner {
     seen: HashMap<String, u64>,
 }
 
 impl RateLimitedWarner {
-    /// Record one occurrence of `name`; return whether this occurrence should be
-    /// logged. True when the post-increment count is a power of two (1, 2, 4, 8, ...).
     pub(crate) fn should_log(&mut self, name: &str) -> bool {
         let count = self.seen.entry(name.to_string()).or_insert(0);
         *count += 1;
@@ -33,9 +28,9 @@ impl RateLimitedWarner {
     }
 }
 
-/// Name → type-erased mapper registry. Populated by `AddGodotEventAppExt::add_godot_event`;
-/// read by the GDScript `send_event` func. `warner` rate-limits unknown-name /
-/// rejected-payload log noise even under `&self` (immutable) access.
+/// Name → mapper, filled by `add_godot_event` and read by the GDScript
+/// `send_event` func. `warner` is a `Mutex` so that `&self` func can still
+/// rate-limit its warnings.
 #[derive(Resource, Default)]
 pub(crate) struct GodotEventRegistry {
     pub(crate) mappers:
@@ -43,11 +38,10 @@ pub(crate) struct GodotEventRegistry {
     pub(crate) warner: Mutex<RateLimitedWarner>,
 }
 
-/// Register typed Godot→Bevy event mappings on a Bevy [`App`].
+/// Registers `name -> event` decoders for the GDScript `send_event`.
 pub trait AddGodotEventAppExt {
-    /// Register a `name -> event` mapping for the GDScript `send_event(name, payload)`.
-    /// Ensures the signal channel + drains exist. Re-registering the same `name`
-    /// overwrites the prior mapper (last-wins; logged at `debug!`).
+    /// Registers a decoder for `send_event("name", payload)`, and installs the
+    /// channel + drains. Re-registering a `name` replaces it (last-wins).
     fn add_godot_event<T>(
         &mut self,
         name: &str,
@@ -57,9 +51,8 @@ pub trait AddGodotEventAppExt {
         T: Event + Clone + Send + 'static,
         for<'a> T::Trigger<'a>: Default;
 
-    /// Convenience for events implementing [`godot::prelude::FromGodot`] (transparent newtypes).
-    /// Registers `|payload| payload.try_to::<T>().ok()` — no closure needed.
-    /// Re-registering the same `name` overwrites the prior mapper (last-wins).
+    /// Like `add_godot_event`, but for `FromGodot` types (transparent newtypes) —
+    /// the decode is `try_to::<T>()`, so you skip the mapper closure.
     fn add_godot_event_from<T>(&mut self, name: &str) -> &mut Self
     where
         T: Event + Clone + Send + 'static + godot::prelude::FromGodot,
@@ -99,11 +92,10 @@ impl AddGodotEventAppExt for App {
     }
 }
 
-/// Enables the Godot -> Bevy event bridge: installs the shared signal channel +
-/// drains and inserts the `GodotEventRegistry`. The Rust `send_event(&app, ..)`
-/// free fn works with any plugin that installs the channel (this or
-/// `GodotSignalsPlugin`); the GDScript `#[func] send_event` additionally needs
-/// this plugin's registry plus `add_godot_event` registrations.
+/// Installs the signal channel + drains and the event registry. The Rust
+/// `send_event(&app, ..)` only needs the channel (this or `GodotSignalsPlugin`
+/// provides it); the GDScript `send_event` also needs this plugin's registry,
+/// which you fill with `add_godot_event`.
 #[derive(Default)]
 pub struct GodotEventBridgePlugin;
 
@@ -114,20 +106,12 @@ impl Plugin for GodotEventBridgePlugin {
     }
 }
 
-/// Send a Bevy event into the ECS of a specific `BevyApp` node, from any Godot
-/// custom-node Rust code, without access to the App/World. Delivered to `On<T>`
-/// observers on the next channel drain of THAT app (next physics tick or next
-/// process frame, whichever comes first).
-///
-/// Use `BevyApp::try_singleton()` for the autoload/single-app case, or pass a
-/// specific instance for multi-app setups.
-///
-/// No-op + `warn!` if the node's App is not live (pre-init, after `teardown`,
-/// after an in-frame panic, or in the editor) or has no signal channel.
-///
-/// NOTE ON ORDERING: this is for callers OUTSIDE the ECS. It enqueues; it is
-/// NOT `commands.trigger()` — the event is delivered on the NEXT drain, one
-/// drain later. In-system code should prefer `Commands::trigger`.
+/// Sends a typed event into a specific `BevyApp`'s ECS from Godot Rust code. It
+/// reaches `On<T>` observers on the next drain — it enqueues, it doesn't
+/// `trigger` synchronously, so code already inside a system wants
+/// `Commands::trigger` instead. No-op (with a `warn!`) if the app isn't live or
+/// has no channel. Resolve `app` with `BevyApp::try_singleton()`, or pass a
+/// specific instance.
 pub fn send_event<T>(app: &Gd<BevyApp>, event: T)
 where
     T: Event + Clone + Send + 'static,

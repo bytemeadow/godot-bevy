@@ -18,15 +18,14 @@ struct Tick;
 
 #[derive(Resource, Default)]
 struct Timing {
-    /// Set by the observer when the Tick event triggers.
     fired_in_observer: bool,
     /// Set by a PhysicsUpdate reader IF the observer flag was already set when
     /// the reader ran this physics frame. Proves same-frame physics delivery.
     seen_by_physics_this_frame: bool,
     /// How many times the observer fired (no-double-fire control).
     observer_count: u32,
-    /// True only for the physics frame in which the observer flag was first
-    /// observed; reset every physics frame for per-frame assertions.
+    /// What `fired_in_observer` was when this frame's PhysicsUpdate reader ran --
+    /// lets a test tell same-frame delivery from next-frame.
     seen_this_physics_frame_only: bool,
 }
 
@@ -76,7 +75,7 @@ fn event_bridge_timing_pre_physics_same_frame(ctx: &TestContext) -> godot::task:
                 timing.fired_in_observer = true;
                 timing.observer_count += 1;
             });
-            // Runs inside physics_process, AFTER PrePhysicsUpdate's drain. If the
+            // Runs inside physics_process, after PrePhysicsUpdate's drain -- if the
             // drain fired the observer this frame, the flag is already set here.
             app.add_systems(PhysicsUpdate, |mut timing: ResMut<Timing>| {
                 let already = timing.fired_in_observer;
@@ -90,8 +89,8 @@ fn event_bridge_timing_pre_physics_same_frame(ctx: &TestContext) -> godot::task:
 
         let mut button = connect_tick_button(&mut app, "PrePhysicsTickButton").await;
 
-        // Enqueue BEFORE physics runs: emit_signal calls the Callable
-        // synchronously, putting the Tick envelope into the channel now.
+        // Enqueue before physics runs: emit_signal calls the Callable
+        // synchronously, so the Tick envelope is in the channel now.
         button.emit_signal("pressed", &[]);
 
         // Drive one physics frame: PrePhysicsUpdate (drain) then PhysicsUpdate (reader).
@@ -133,11 +132,11 @@ fn event_bridge_timing_post_physics_next_frame(ctx: &TestContext) -> godot::task
 
         let mut button = connect_tick_button(&mut app, "PostPhysicsTickButton").await;
 
-        // Advance one physics frame with NOTHING queued, so this frame's physics
-        // tick has already run by the time physics_update() returns.
+        // Advance one physics frame with nothing queued, so this frame's tick
+        // has already run by the time physics_update() returns.
         app.physics_update().await;
 
-        // Enqueue AFTER that physics tick. The just-elapsed tick cannot have seen it.
+        // Enqueue after that physics tick -- the just-elapsed tick can't have seen it.
         button.emit_signal("pressed", &[]);
 
         let seen_by_prior_tick =
@@ -178,9 +177,9 @@ fn event_bridge_no_double_fire(ctx: &TestContext) -> godot::task::TaskHandle {
 
         let mut button = connect_tick_button(&mut app, "NoDoubleFireButton").await;
 
-        // Enqueue exactly one item, then run BOTH a render frame (First drain)
-        // and a physics frame (PrePhysicsUpdate drain). try_iter removes items,
-        // so whichever drain runs first consumes it; the other finds it gone.
+        // Enqueue one item, then run both a render frame (First drain) and a
+        // physics frame (PrePhysicsUpdate drain). try_iter removes items, so
+        // whichever drain runs first consumes it; the other finds it gone.
         button.emit_signal("pressed", &[]);
         app.update().await;
         app.physics_update().await;
@@ -220,7 +219,7 @@ fn singleton_node(ctx: &TestContext) -> godot::obj::Gd<BevyApp> {
         .expect("BevyAppSingleton autoload should exist")
 }
 
-/// §9.1 — node-scoped send_event delivers to an On<Damage> observer.
+/// Node-scoped send_event delivers to an On<Damage> observer.
 #[itest(async)]
 fn test_send_event_rust_node_scoped(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -279,7 +278,7 @@ fn test_send_event_via_try_singleton(ctx: &TestContext) -> godot::task::TaskHand
     })
 }
 
-/// §9.7 — after teardown, send_event is a no-op (app dead, no panic).
+/// After teardown, send_event is a no-op (app dead, no panic).
 #[itest(async)]
 fn test_send_event_after_teardown_noop(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -297,19 +296,15 @@ fn test_send_event_after_teardown_noop(ctx: &TestContext) -> godot::task::TaskHa
 
         let node = singleton_node(&ctx_clone);
 
-        // Sanity: confirm the observer fires while the app is live.
+        // Sanity-check the observer fires before we tear down.
         godot_bevy::send_event(&node, Damage { amount: 1 });
         app.update().await;
         assert_ne!(witness.load(SeqCst), 0, "observer must fire on a live app");
-
-        // Reset before the teardown sequence.
         witness.store(0, SeqCst);
 
-        // Kill the app: get_app() now returns None.
         node.clone().bind_mut().teardown();
         assert!(node.bind().get_app().is_none(), "teardown clears the App");
 
-        // Must warn + no-op — the observer must NOT fire (zombie-sender guard).
         godot_bevy::send_event(&node, Damage { amount: 42 });
         assert_eq!(
             witness.load(SeqCst),
@@ -317,12 +312,12 @@ fn test_send_event_after_teardown_noop(ctx: &TestContext) -> godot::task::TaskHa
             "no delivery after teardown — zombie sender must not fire the observer"
         );
 
-        // cleanup() takes the harness's handle (already torn down — safe).
+        // cleanup() takes the harness's handle, already torn down — safe.
         app.cleanup().await;
     })
 }
 
-/// §9.7 — a BevyApp with no signal channel (GodotCorePlugins only) no-ops.
+/// A BevyApp with no signal channel (GodotCorePlugins only) no-ops.
 #[itest(async)]
 fn test_send_event_no_channel_noop(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -341,10 +336,9 @@ fn test_send_event_no_channel_noop(ctx: &TestContext) -> godot::task::TaskHandle
         .await;
 
         let node = singleton_node(&ctx_clone);
-        // Warns "no signal channel"; no panic.
         godot_bevy::send_event(&node, Damage { amount: 5 });
 
-        // Drive the world; the observer must NOT fire (no channel means no delivery).
+        // Drive the world; the observer must not fire -- no channel, no delivery.
         app.update().await;
 
         let got = app.with_world(|w| w.resource::<Received>().0);
@@ -354,15 +348,13 @@ fn test_send_event_no_channel_noop(ctx: &TestContext) -> godot::task::TaskHandle
     })
 }
 
-/// §9.7 — a never-initialized BevyApp node (get_app() == None) no-ops.
+/// A never-initialized BevyApp node (get_app() == None) no-ops.
 #[itest(async)]
 fn test_send_event_no_live_app_noop(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
     godot::task::spawn(async move {
-        // Fresh node, never initialize()'d -> app is None. There is no world and
-        // therefore no observer to witness delivery; the meaningful property here is
-        // process-survival: send_event must not panic or abort across FFI.
-        // Structural guarantee: no world ⇒ no delivery.
+        // Never initialized, so the app is None -- no world, so nothing to witness
+        // delivery. All this test can prove is that send_event survives (no FFI panic).
         let mut node = BevyApp::new_alloc();
         node.set_name("BevyAppUninitialized");
         let mut scene_tree = ctx_clone.scene_tree.clone();
@@ -370,7 +362,6 @@ fn test_send_event_no_live_app_noop(ctx: &TestContext) -> godot::task::TaskHandl
 
         assert!(node.bind().get_app().is_none(), "uninitialized app is None");
 
-        // Warns "App is not live"; no panic.
         godot_bevy::send_event(&node, Damage { amount: 3 });
 
         // Synchronous cleanup: remove from tree then free (deferred queue_free()
@@ -380,8 +371,9 @@ fn test_send_event_no_live_app_noop(ctx: &TestContext) -> godot::task::TaskHandl
     })
 }
 
-/// §9.2 — two live BevyApp instances; each event lands in the RIGHT app.
-/// Regression guard for the removed process-global sender slot (§1.1).
+/// Two live BevyApp instances; each event lands in its own app. Guards
+/// node-scoping -- a single global sender would route both to whichever app
+/// initialized last.
 #[itest(async)]
 fn test_send_event_multi_live_app(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -420,11 +412,10 @@ fn test_send_event_multi_live_app(ctx: &TestContext) -> godot::task::TaskHandle 
         // Let B settle (process() runs its First drain just like A).
         app_a.update().await;
 
-        // Each event targets a specific instance.
         godot_bevy::send_event(&node_a, Damage { amount: 1 });
         godot_bevy::send_event(&node_b, Damage { amount: 2 });
 
-        // Drain both: app_a.update() drives every BevyApp's process() this frame.
+        // Two updates so both apps' First drains have run.
         app_a.update().await;
         app_a.update().await;
 
@@ -459,7 +450,7 @@ struct DamageI64 {
     amount: i64,
 }
 
-/// §9.3 — GDScript `send_event` with a dict payload delivers to an On<DamageI64> observer.
+/// GDScript `send_event` with a dict payload delivers to an On<DamageI64> observer.
 #[itest(async)]
 fn test_send_event_dict_payload(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -505,7 +496,7 @@ fn test_send_event_dict_payload(ctx: &TestContext) -> godot::task::TaskHandle {
 #[godot(transparent)]
 struct Volume(f64);
 
-/// §9.4 — GDScript `send_event` with a newtype payload via `add_godot_event_from`.
+/// GDScript `send_event` with a newtype payload via `add_godot_event_from`.
 #[itest(async)]
 fn test_send_event_from_newtype(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -539,7 +530,7 @@ fn test_send_event_from_newtype(ctx: &TestContext) -> godot::task::TaskHandle {
 #[derive(Event, Debug, Clone)]
 struct GameOver;
 
-/// §9.5 — GDScript `send_event` with null payload fires a unit event.
+/// GDScript `send_event` with null payload fires a unit event.
 #[itest(async)]
 fn test_send_event_unit_via_null(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -694,10 +685,8 @@ fn test_send_event_unknown_name_spam_is_rate_limited(ctx: &TestContext) -> godot
         .await;
 
         let mut bridge = bridge_node(&ctx_clone.scene_tree);
-        // 200 unknown-name calls: the warner rate-limits the warn! (logged on
-        // power-of-two counts only) so the log is not flooded; crucially, none
-        // of these panic across FFI and none deliver. The decay math itself is
-        // proven by the Phase 2 unit tests; here we assert survival + no delivery.
+        // 200 unknown-name calls -- assert no panic and no delivery. The warner's
+        // power-of-two decay is covered by the RateLimitedWarner unit tests.
         for _ in 0..200 {
             bridge.call("send_event", &["nope".to_variant(), Variant::nil()]);
         }
@@ -719,7 +708,7 @@ struct Heal {
     amount: i64,
 }
 
-/// §9.8 — two registered names produce two independent event types; both observers fire.
+/// Two registered names produce two independent event types; both observers fire.
 #[itest(async)]
 fn test_send_event_multiple_names(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -785,7 +774,7 @@ struct EvA;
 #[derive(Event, Debug, Clone)]
 struct EvB;
 
-/// §9.8 — registering the same name twice: last registration wins (EvA overwritten by EvB).
+/// Registering the same name twice: last registration wins (EvA overwritten by EvB).
 #[itest(async)]
 fn test_send_event_same_name_last_wins(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -800,7 +789,6 @@ fn test_send_event_same_name_last_wins(ctx: &TestContext) -> godot::task::TaskHa
         let mut app = TestApp::new(&ctx_clone, |app| {
             app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<Seen>();
-            // Register "x" -> EvA first, then overwrite "x" -> EvB.
             app.add_godot_event::<EvA>("x", |_p| Some(EvA));
             app.add_godot_event::<EvB>("x", |_p| Some(EvB));
             app.add_observer(|_t: On<EvA>, mut s: ResMut<Seen>| s.a = true);
@@ -824,9 +812,10 @@ fn test_send_event_same_name_last_wins(ctx: &TestContext) -> godot::task::TaskHa
     })
 }
 
-/// §3.2 — `BevyApp::send_event` (method form) delivers to an `On<Damage>` observer.
-/// Regression guard: if a shadowing `#[func] send_event` ever returns, this test FAILS TO
-/// COMPILE (it would resolve to the private GString/Variant func instead of this method).
+/// `BevyApp::send_event` (method form) delivers to an `On<Damage>` observer.
+/// This is also the guard for the name collision: if a `#[func] send_event`
+/// ever shadows this method, the call below resolves to the private
+/// `GString`/`Variant` func and the test stops compiling.
 #[itest(async)]
 fn test_send_event_method_form_delivers(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -859,18 +848,12 @@ fn test_send_event_method_form_delivers(ctx: &TestContext) -> godot::task::TaskH
     })
 }
 
-/// §3.4 validation — mapper re-enters `send_event` on the same BevyApp node during decode.
+/// A mapper re-enters `send_event` on the same BevyApp node during decode.
 ///
-/// The `#[func] send_event` takes `&self` (shared borrow), so a synchronous call to
-/// `send_event` from within a mapper invoked by that same `send_event` does NOT
-/// cause a double-mutable-borrow panic. We prove this by:
-///
-/// 1. Capturing only the `InstanceId` of the BevyApp node in the "outer" mapper
-///    (`InstanceId` is `Copy + Send + Sync`).
-/// 2. Inside the mapper, recovering the node via `try_from_instance_id` and calling
-///    `.call("send_event", …)` on it — a genuine synchronous re-entry into the
-///    same `#[func]`.
-/// 3. Asserting no panic + both events delivered.
+/// `send_event`'s `#[func]` takes `&self`, so this synchronous re-entry can't
+/// double-mutably-borrow the node, and so doesn't panic. The mapper captures the
+/// node's `InstanceId` (not the `Gd`, which isn't `Send + Sync`) and recovers it
+/// to make the nested call.
 #[itest(async)]
 fn test_send_event_reentrant_mapper(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
