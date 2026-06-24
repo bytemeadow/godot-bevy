@@ -27,9 +27,14 @@ struct Damage { amount: i32 }
 impl Enemy {
     #[func]
     fn take_hit(&mut self, amount: i32) {
-        // Resolve the autoload singleton; warn + no-op if it isn't live.
+        // Free-function form — explicit, works anywhere you have a Gd<BevyApp>.
         if let Some(app) = BevyApp::try_singleton() {
             godot_bevy::send_event(&app, Damage { amount });
+        }
+
+        // Method form — equally natural, compiles to the same channel enqueue.
+        if let Some(app) = BevyApp::try_singleton() {
+            app.bind().send_event(Damage { amount });
         }
     }
 }

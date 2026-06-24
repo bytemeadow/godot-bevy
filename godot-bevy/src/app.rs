@@ -58,26 +58,29 @@ impl BevyApp {
     }
 
     /// Typed send into THIS instance's ECS. No-op (warn) if app not live.
-    pub fn send_event_typed<T>(&self, event: T)
+    ///
+    /// This is the natural Rust method form: `app.bind().send_event(MyEvent { .. })`.
+    /// For the free-function form, use `godot_bevy::send_event(&app, event)`.
+    pub fn send_event<T>(&self, event: T)
     where
         T: bevy_ecs::event::Event + Clone + Send + 'static,
         for<'a> T::Trigger<'a>: Default,
     {
         let Some(bevy_app) = self.get_app() else {
-            tracing::warn!("BevyApp::send_event_typed called with no live App; event dropped");
+            tracing::warn!("BevyApp::send_event called with no live App; event dropped");
             return;
         };
         let Some(sender) = bevy_app
             .world()
             .get_resource::<crate::plugins::signals::SignalSender>()
         else {
-            tracing::warn!("BevyApp::send_event_typed: no signal channel; event dropped");
+            tracing::warn!("BevyApp::send_event: no signal channel; event dropped");
             return;
         };
         let boxed: Box<dyn crate::plugins::signals::SignalDispatch> =
             Box::new(crate::plugins::signals::SignalEnvelope { event });
         if sender.0.send(boxed).is_err() {
-            tracing::warn!("BevyApp::send_event_typed: channel receiver gone; event dropped");
+            tracing::warn!("BevyApp::send_event: channel receiver gone; event dropped");
         }
     }
 
@@ -304,8 +307,8 @@ impl BevyApp {
     /// unregistered, or the mapper rejects the payload. Never panics across FFI.
     /// `&self` (not `&mut self`) so a mapper that re-enters this node does not
     /// double-mutably-borrow.
-    #[func]
-    fn send_event(&self, name: GString, payload: Variant) {
+    #[func(rename = send_event)]
+    fn gd_send_event(&self, name: GString, payload: Variant) {
         use crate::plugins::event_bridge::GodotEventRegistry;
         use crate::plugins::signals::SignalSender;
 

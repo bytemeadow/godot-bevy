@@ -824,9 +824,11 @@ fn test_send_event_same_name_last_wins(ctx: &TestContext) -> godot::task::TaskHa
     })
 }
 
-/// §3.2 — `BevyApp::send_event_typed` delivers to an `On<Damage>` observer.
+/// §3.2 — `BevyApp::send_event` (method form) delivers to an `On<Damage>` observer.
+/// Regression guard: if a shadowing `#[func] send_event` ever returns, this test FAILS TO
+/// COMPILE (it would resolve to the private GString/Variant func instead of this method).
 #[itest(async)]
-fn test_send_event_typed_delivers(ctx: &TestContext) -> godot::task::TaskHandle {
+fn test_send_event_method_form_delivers(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
     godot::task::spawn(async move {
         #[derive(Resource, Default)]
@@ -841,15 +843,16 @@ fn test_send_event_typed_delivers(ctx: &TestContext) -> godot::task::TaskHandle 
         })
         .await;
 
+        // Natural method form — must resolve to the typed Rust method, not the GDScript #[func].
         let singleton = singleton_node(&ctx_clone);
-        singleton.bind().send_event_typed(Damage { amount: 11 });
+        singleton.bind().send_event(Damage { amount: 13 });
 
         app.update().await;
 
         let got = app.with_world(|w| w.resource::<Received>().0);
         assert_eq!(
-            got, 11,
-            "send_event_typed should deliver to On<Damage> observer"
+            got, 13,
+            "app.bind().send_event(ev) should deliver to On<Damage> observer"
         );
 
         app.cleanup().await;
