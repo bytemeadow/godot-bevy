@@ -45,6 +45,42 @@ impl BevyApp {
         self.app.as_mut()
     }
 
+    /// Resolves the `/root/BevyAppSingleton` autoload — `None` in the editor or
+    /// before the autoload exists.
+    pub fn try_singleton() -> Option<Gd<BevyApp>> {
+        godot::classes::Engine::singleton()
+            .get_main_loop()?
+            .try_cast::<godot::classes::SceneTree>()
+            .ok()?
+            .get_root()?
+            .try_get_node_as::<BevyApp>("BevyAppSingleton")
+    }
+
+    /// The method form of the free `godot_bevy::send_event(&app, ev)`. No-op
+    /// (warn) if this app isn't live.
+    pub fn send_event<T>(&self, event: T)
+    where
+        T: bevy_ecs::event::Event + Clone + Send + 'static,
+        for<'a> T::Trigger<'a>: Default,
+    {
+        let Some(bevy_app) = self.get_app() else {
+            tracing::warn!("BevyApp::send_event called with no live App; event dropped");
+            return;
+        };
+        let Some(sender) = bevy_app
+            .world()
+            .get_resource::<crate::plugins::signals::SignalSender>()
+        else {
+            tracing::warn!("BevyApp::send_event: no signal channel; event dropped");
+            return;
+        };
+        let boxed: Box<dyn crate::plugins::signals::SignalDispatch> =
+            Box::new(crate::plugins::signals::SignalEnvelope { event });
+        if sender.0.send(boxed).is_err() {
+            tracing::warn!("BevyApp::send_event: channel receiver gone; event dropped");
+        }
+    }
+
     /// Set a per-instance init function (for tests)
     /// This allows each BevyApp instance to have its own configuration
     pub fn set_instance_init_func(&mut self, func: Box<dyn Fn(&mut App) + Send + Sync>) {
@@ -256,6 +292,52 @@ impl BevyApp {
         } else {
             // Initialize empty cache so systems don't need to check for resource existence
             app.init_non_send_resource::<BulkOperationsCache>();
+        }
+    }
+}
+
+#[godot_api]
+impl BevyApp {
+    /// GDScript entry point: fires a registered event by name, `payload` as its
+    /// arg (`null` for unit events). No-op + warn on an unknown name or rejected
+    /// payload; never panics across FFI. `&self`, not `&mut self`, so a mapper
+    /// that re-enters this node can't double-borrow it.
+    #[func(rename = send_event)]
+    fn gd_send_event(&self, name: GString, payload: Variant) {
+        use crate::plugins::event_bridge::GodotEventRegistry;
+        use crate::plugins::signals::SignalSender;
+
+        let Some(app) = self.app.as_ref() else {
+            tracing::warn!("BevyApp::send_event({name}) called with no live App; ignored");
+            return;
+        };
+        let world = app.world();
+        let Some(registry) = world.get_resource::<GodotEventRegistry>() else {
+            tracing::warn!("BevyApp::send_event: GodotEventBridgePlugin not added; ignored");
+            return;
+        };
+        let key = name.to_string();
+        let Some(mapper) = registry.mappers.get(&key) else {
+            if registry.warner.lock().should_log(&key) {
+                tracing::warn!(
+                    "BevyApp::send_event: unknown event {key:?}; registered: {:?}",
+                    registry.mappers.keys().collect::<Vec<_>>()
+                );
+            }
+            return;
+        };
+        let Some(boxed) = mapper(payload) else {
+            if registry.warner.lock().should_log(&key) {
+                tracing::warn!("BevyApp::send_event: mapper rejected payload for {key:?}");
+            }
+            return;
+        };
+        let Some(sender) = world.get_resource::<SignalSender>() else {
+            tracing::warn!("BevyApp::send_event: no signal channel; ignored");
+            return;
+        };
+        if sender.0.send(boxed).is_err() {
+            tracing::warn!("BevyApp::send_event: channel receiver gone; ignored");
         }
     }
 }

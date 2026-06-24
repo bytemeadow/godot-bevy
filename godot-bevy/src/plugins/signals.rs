@@ -1,5 +1,6 @@
 use crate::interop::{GodotAccess, GodotNodeHandle};
 use bevy_app::{App, First, Last, Plugin};
+use bevy_ecs::schedule::{IntoScheduleConfigs, SystemSet};
 use bevy_ecs::{
     component::Component,
     entity::Entity,
@@ -23,9 +24,21 @@ pub(crate) trait SignalDispatch: Send {
     fn trigger_in_world(self: Box<Self>, world: &mut bevy_ecs::world::World);
 }
 
+/// The channel drains run in this set, in `First` (process) and in
+/// `PrePhysicsUpdate` (pre-physics). Order a system around delivery with
+/// `.after(SignalDrainSet::Drain)`.
+///
+/// The pre-physics drain is what lets a signal enqueued before `physics_process`
+/// reach physics the same frame; `First` catches anything enqueued after, so
+/// nothing is dropped.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SignalDrainSet {
+    Drain,
+}
+
 /// Envelope that carries a signal event for observer triggering
-struct SignalEnvelope<T: Event + Clone + Send + 'static> {
-    event: T,
+pub(crate) struct SignalEnvelope<T: Event + Clone + Send + 'static> {
+    pub(crate) event: T,
 }
 
 impl<T: Event + Clone + Send + 'static> SignalDispatch for SignalEnvelope<T>
@@ -78,6 +91,31 @@ fn ensure_signal_connection_queue(app: &mut App) {
             // during Update are applied same-frame (ready for next frame's signals)
             .add_systems(Last, process_pending_signal_connections);
     }
+}
+
+/// Installs the signal/event channel and its drains, once per App (idempotent —
+/// guarded on `SignalSender`, so both `GodotSignalsPlugin` and the event bridge
+/// can call it). The channel lives in this App's own world: one per `BevyApp`.
+pub(crate) fn ensure_signal_channel(app: &mut App) {
+    if app.world().contains_resource::<SignalSender>() {
+        return;
+    }
+    let (sender, receiver) = crossbeam_channel::unbounded::<Box<dyn SignalDispatch>>();
+    app.world_mut().insert_resource(SignalSender(sender));
+    app.world_mut()
+        .insert_resource(SignalReceiver::new(receiver));
+
+    app.add_systems(
+        First,
+        drain_and_trigger_signals.in_set(SignalDrainSet::Drain),
+    );
+
+    // Second drain, pre-physics: items enqueued before this frame's
+    // physics_process reach PhysicsUpdate the same frame, not just at process time.
+    app.add_systems(
+        crate::plugins::core::PrePhysicsUpdate,
+        drain_and_trigger_signals.in_set(SignalDrainSet::Drain),
+    );
 }
 
 fn process_pending_signal_connections(
@@ -181,17 +219,7 @@ where
 {
     fn build(&self, app: &mut App) {
         ensure_signal_connection_queue(app);
-
-        // Install global signal channel and drain system once
-        if !app.world().contains_resource::<SignalSender>() {
-            let (sender, receiver) = crossbeam_channel::unbounded::<Box<dyn SignalDispatch>>();
-            app.world_mut().insert_resource(SignalSender(sender));
-            app.world_mut()
-                .insert_resource(SignalReceiver::new(receiver));
-
-            // Drain signals and trigger observers
-            app.add_systems(First, drain_and_trigger_signals);
-        }
+        ensure_signal_channel(app);
 
         // Per-T deferred connection processor
         app.add_systems(First, process_deferred_signal_connections::<T>);
@@ -199,7 +227,7 @@ where
 }
 
 /// Exclusive system to drain signal queue and trigger observers
-fn drain_and_trigger_signals(world: &mut bevy_ecs::world::World) {
+pub(crate) fn drain_and_trigger_signals(world: &mut bevy_ecs::world::World) {
     // Collect first to avoid overlapping mutable borrows of `world`
     let mut pending: Vec<Box<dyn SignalDispatch>> = Vec::new();
     if let Some(receiver) = world.get_resource::<SignalReceiver>() {
@@ -523,6 +551,52 @@ pub type TypedDeferredSignalConnections<T> = DeferredSignalConnections<T>;
 /// Backwards compatibility alias
 #[deprecated(note = "Use DeferredConnection instead")]
 pub type TypedDeferredConnection<T> = DeferredConnection<T>;
+
+#[cfg(test)]
+mod phase1_dual_drain_tests {
+    use super::*;
+    use crate::plugins::core::PrePhysicsUpdate;
+    use bevy_app::App;
+    use bevy_ecs::prelude::*;
+    use bevy_ecs::schedule::Schedule;
+
+    #[derive(Event, Clone)]
+    struct TestEv(u32);
+
+    #[derive(Resource, Default)]
+    struct Seen(u32);
+
+    fn build() -> App {
+        let mut app = App::new();
+        // PrePhysicsUpdate is normally added by GodotBaseCorePlugin; add it here.
+        app.add_schedule(Schedule::new(PrePhysicsUpdate));
+        ensure_signal_channel(&mut app);
+        app.init_resource::<Seen>();
+        app.add_observer(|t: On<TestEv>, mut s: ResMut<Seen>| s.0 = t.event().0);
+        app
+    }
+
+    fn enqueue(app: &App, ev: TestEv) {
+        let sender = app.world().resource::<SignalSender>();
+        sender
+            .0
+            .send(Box::new(SignalEnvelope { event: ev }))
+            .unwrap();
+    }
+
+    #[test]
+    fn pre_physics_drain_triggers_observer() {
+        let mut app = build();
+        enqueue(&app, TestEv(7));
+        // Run ONLY PrePhysicsUpdate — no First, no Update.
+        app.world_mut().run_schedule(PrePhysicsUpdate);
+        assert_eq!(
+            app.world().resource::<Seen>().0,
+            7,
+            "PrePhysicsUpdate drain should trigger the observer"
+        );
+    }
+}
 
 /// Type-erased deferred connections for internal use
 #[doc(hidden)]
