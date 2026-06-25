@@ -34,6 +34,10 @@ pub struct BevyApp {
     // If set, this takes precedence over the global BEVY_INIT_FUNC
     #[allow(clippy::type_complexity)]
     instance_init_func: Option<Box<dyn Fn(&mut App) + Send + Sync>>,
+    // Set true after the first app.update() runs Bevy Startup. Godot runs the
+    // physics for-loop before process() within one frame, so the first
+    // physics callback can precede Startup; the driver must skip until then.
+    has_run_update: bool,
 }
 
 impl BevyApp {
@@ -267,6 +271,7 @@ impl INode for BevyApp {
             base,
             app: Default::default(),
             instance_init_func: None,
+            has_run_update: false,
         }
     }
 
@@ -310,6 +315,7 @@ impl INode for BevyApp {
             eprintln!("bevy app update panicked");
             resume_unwind(e);
         }
+        self.has_run_update = true;
     }
 
     fn physics_process(&mut self, delta: f32) {
@@ -318,17 +324,26 @@ impl INode for BevyApp {
         if godot::classes::Engine::singleton().is_editor_hint() {
             return;
         }
+        // Startup runs only on the first app.update() (in process()); Godot runs
+        // the physics for-loop before process() within one frame, so the first
+        // physics callback can precede Startup. Skip until the world is built.
+        if !self.has_run_update {
+            return;
+        }
 
         if let Some(app) = self.app.as_mut()
             && let Err(e) = catch_unwind(AssertUnwindSafe(|| {
-                // Update physics delta resource with Godot's delta
-                app.world_mut().resource_mut::<PhysicsDelta>().delta_seconds = delta;
+                // Drive Bevy's standard FixedMain on Godot's authoritative clock.
+                crate::plugins::fixed_schedule::run_godot_fixed_main(
+                    app.world_mut(),
+                    std::time::Duration::from_secs_f64(delta as f64),
+                );
 
-                // Run only our physics-specific schedule
+                // (parallel, removed in Stage 4) legacy custom physics schedules
+                app.world_mut().resource_mut::<PhysicsDelta>().delta_seconds = delta;
                 app.world_mut().run_schedule(PrePhysicsUpdate);
                 app.world_mut().run_schedule(PhysicsUpdate);
 
-                // Mark physics frame end for profiling
                 crate::profiling::secondary_frame_mark("physics");
             }))
         {
