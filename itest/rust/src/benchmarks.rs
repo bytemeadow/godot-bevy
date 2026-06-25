@@ -10,7 +10,7 @@ use godot::classes::{Area3D, Engine, InputEventKey, InputMap, Node, Node2D, Node
 use godot::global::Key;
 use godot::obj::{NewAlloc, Singleton};
 use godot::prelude::*;
-use godot_bevy::bevy_app::{App, First, Last, PostUpdate, PreUpdate, Update};
+use godot_bevy::bevy_app::{App, First, FixedFirst, Last, PostUpdate, PreUpdate, Update};
 use godot_bevy::bevy_math::Vec3;
 use godot_bevy::bevy_transform::components::Transform as BevyTransform;
 use godot_bevy::interop::{GodotMainThread, GodotNodeHandle, Node2DMarker, Node3DMarker};
@@ -18,7 +18,7 @@ use godot_bevy::plugins::collisions::{
     CollisionMessageReader, CollisionMessageType, CollisionState, GodotCollisionsPlugin,
     RawCollisionMessage,
 };
-use godot_bevy::plugins::core::{PrePhysicsUpdate, SceneTreeComponentRegistry};
+use godot_bevy::plugins::core::SceneTreeComponentRegistry;
 use godot_bevy::plugins::input::{GodotInputEventPlugin, InputEventReader, InputEventType};
 use godot_bevy::plugins::packed_scene::{GodotPackedScenePlugin, GodotScene};
 use godot_bevy::plugins::scene_tree::{
@@ -947,7 +947,7 @@ fn setup_collision_processing_benchmark_app()
     let mut app = App::new();
     app.init_schedule(First);
     app.init_schedule(PreUpdate);
-    app.init_schedule(PrePhysicsUpdate);
+    app.init_schedule(FixedFirst);
 
     app.insert_non_send(GodotMainThread);
     app.init_resource::<SceneTreeComponentRegistry>();
@@ -1031,7 +1031,7 @@ fn run_collisions_start_end_burst(target_count: usize, cycles: usize) -> i32 {
         }
     }
 
-    measured(|| app.world_mut().run_schedule(PrePhysicsUpdate));
+    measured(|| app.world_mut().run_schedule(FixedFirst));
 
     let active = app.world().resource::<CollisionState>().len();
 

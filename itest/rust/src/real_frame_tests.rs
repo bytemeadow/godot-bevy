@@ -37,9 +37,9 @@ fn test_update_runs_on_real_frames(ctx: &TestContext) -> godot::task::TaskHandle
     })
 }
 
-/// Test PhysicsUpdate runs on physics frames
+/// Test FixedUpdate runs on physics frames
 #[itest(async)]
-fn test_physics_update_runs(ctx: &TestContext) -> godot::task::TaskHandle {
+fn test_fixed_update_runs_each_frame(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
 
     godot::task::spawn(async move {
@@ -51,12 +51,9 @@ fn test_physics_update_runs(ctx: &TestContext) -> godot::task::TaskHandle {
             struct PhysicsCounter(Counter);
 
             app.insert_resource(PhysicsCounter(c.clone()));
-            app.add_systems(
-                godot_bevy::prelude::PhysicsUpdate,
-                |c: Res<PhysicsCounter>| {
-                    c.0.increment();
-                },
-            );
+            app.add_systems(FixedUpdate, |c: Res<PhysicsCounter>| {
+                c.0.increment();
+            });
         })
         .await;
 
@@ -64,10 +61,7 @@ fn test_physics_update_runs(ctx: &TestContext) -> godot::task::TaskHandle {
         app.updates(10).await;
         let end = counter.get();
 
-        assert!(
-            end > start,
-            "PhysicsUpdate should run, got {start} -> {end}"
-        );
+        assert!(end > start, "FixedUpdate should run, got {start} -> {end}");
 
         app.cleanup().await;
     })

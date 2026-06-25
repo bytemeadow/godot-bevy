@@ -1,12 +1,9 @@
 #![allow(clippy::type_complexity)]
 
 use bevy::prelude::*;
-use godot_bevy::{
-    plugins::core::PhysicsDelta,
-    prelude::{
-        godot_prelude::{ExtensionLibrary, gdextension, godot_print},
-        *,
-    },
+use godot_bevy::prelude::{
+    godot_prelude::{ExtensionLibrary, gdextension, godot_print},
+    *,
 };
 
 #[bevy_app]
@@ -26,8 +23,7 @@ impl Plugin for TimingTestPlugin {
             .add_systems(Update, update_system)
             .add_systems(FixedUpdate, fixed_update_system)
             .add_systems(PostUpdate, post_update_system)
-            .add_systems(Last, last_schedule_system)
-            .add_systems(PhysicsUpdate, physics_update_system);
+            .add_systems(Last, last_schedule_system);
     }
 }
 
@@ -40,7 +36,6 @@ struct ProcessCallCounter {
 #[derive(Resource, Default)]
 struct TimingStats {
     update_runs: u32,
-    physics_update_runs: u32,
     fixed_update_runs: u32,
     first_schedule_runs: u32,
 }
@@ -48,7 +43,9 @@ struct TimingStats {
 fn setup_timing_test() {
     godot_print!("🚀 Timing Test Started!");
     godot_print!("📊 Watching for timing behavior...");
-    godot_print!("⏱️  app.update() runs in process(), PhysicsUpdate runs in physics_process()");
+    godot_print!(
+        "⏱️  app.update() runs in process(); FixedUpdate runs in physics_process() on Godot's clock"
+    );
 }
 
 fn first_schedule_system(
@@ -102,16 +99,22 @@ fn update_system(mut stats: ResMut<TimingStats>, time: Res<Time>) {
     }
 }
 
-fn fixed_update_system(mut stats: ResMut<TimingStats>, time: Res<Time>) {
+fn fixed_update_system(
+    mut stats: ResMut<TimingStats>,
+    mut counter: ResMut<ProcessCallCounter>,
+    time: Res<Time>,
+) {
     stats.fixed_update_runs += 1;
+    counter.physics_process_calls += 1;
 
-    // FixedUpdate runs as part of app.update(), maintaining its own timing
-    if stats.fixed_update_runs.is_multiple_of(128) {
-        // Every ~2 seconds at 64Hz
+    // FixedUpdate now ticks on Godot's authoritative physics clock (default 60 Hz).
+    // Res<Time>.delta_secs() is Godot's physics delta — one clock, not two.
+    if stats.fixed_update_runs.is_multiple_of(60) {
         godot_print!(
-            "🔧 FixedUpdate Run #{}: Time: {:.2}s (Bevy's internal 64Hz timing)",
+            "⚡ FixedUpdate #{}: physics_process_calls: {}, Godot delta: {:.4}s",
             stats.fixed_update_runs,
-            time.elapsed_secs()
+            counter.physics_process_calls,
+            time.delta_secs(),
         );
     }
 }
@@ -128,31 +131,10 @@ fn post_update_system(time: Res<Time>) {
 fn last_schedule_system(stats: Res<TimingStats>, time: Res<Time>) {
     if time.elapsed_secs() % 6.0 < 0.017 {
         godot_print!(
-            "🏁 Last Schedule: Update runs: {}, Physics runs: {}, Fixed updates: {}, Time: {:.2}s",
+            "🏁 Last Schedule: Update runs: {}, Fixed updates: {}, Time: {:.2}s",
             stats.update_runs,
-            stats.physics_update_runs,
             stats.fixed_update_runs,
             time.elapsed_secs()
-        );
-    }
-}
-
-fn physics_update_system(
-    mut stats: ResMut<TimingStats>,
-    mut counter: ResMut<ProcessCallCounter>,
-    physics_delta: Res<PhysicsDelta>,
-) {
-    stats.physics_update_runs += 1;
-    counter.physics_process_calls += 1;
-
-    // This runs in physics_process() at Godot's physics framerate
-    if stats.physics_update_runs.is_multiple_of(60) {
-        // Every second at 60Hz physics
-        godot_print!(
-            "⚡ PhysicsUpdate #{}: physics_process_calls: {}, Time: {:.2}s",
-            stats.physics_update_runs,
-            counter.physics_process_calls,
-            physics_delta.delta_seconds
         );
     }
 }
