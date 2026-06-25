@@ -326,7 +326,6 @@ impl INode for BevyApp {
 
         if let Some(app) = self.app.as_mut()
             && let Err(e) = catch_unwind(AssertUnwindSafe(|| {
-                // Drive Bevy's standard FixedMain on Godot's authoritative clock.
                 crate::plugins::fixed_schedule::run_godot_fixed_main(
                     app.world_mut(),
                     std::time::Duration::from_secs_f64(delta as f64),

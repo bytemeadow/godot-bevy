@@ -286,7 +286,6 @@ fn post_update_godot_transforms_bulk(
     // Read once per system run to avoid per-entity FFI.
     let fti_enabled = physics_interpolation_enabled();
 
-    // Tracks handles for first-write nodes that need reset_physics_interpolation.
     let mut first_write_handles: Vec<GodotNodeHandle> = Vec::new();
 
     // Collect raw transform data (no FFI allocations)
@@ -304,7 +303,6 @@ fn post_update_godot_transforms_bulk(
 
         let is_first_write = metadata.last_sync_tick.is_none();
         if is_first_write {
-            // Mark the write tick so this only fires once per node.
             metadata.last_sync_tick = Some(change_tick.this_run());
             if fti_enabled {
                 first_write_handles.push(*reference);
@@ -412,8 +410,7 @@ fn post_update_godot_transforms_bulk(
         }
     }
 
-    // Reset physics interpolation for nodes written for the first time.
-    // Called after the bulk write so the reset applies to the just-set transform.
+    // Reset physics interpolation after the bulk write, so it applies to the just-set transform.
     for handle in first_write_handles {
         godot.get::<Node>(handle).reset_physics_interpolation();
     }
@@ -459,7 +456,6 @@ fn post_update_godot_transforms_individual(
         }
 
         if is_first_write {
-            // Mark the write tick so the reset only fires once per node.
             metadata.last_sync_tick = Some(change_tick.this_run());
             if fti_enabled {
                 godot.get::<Node>(*reference).reset_physics_interpolation();
