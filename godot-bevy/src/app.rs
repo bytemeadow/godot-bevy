@@ -319,9 +319,7 @@ impl INode for BevyApp {
         if godot::classes::Engine::singleton().is_editor_hint() {
             return;
         }
-        // Startup runs only on the first app.update() (in process()); Godot runs
-        // the physics for-loop before process() within one frame, so the first
-        // physics callback can precede Startup. Skip until the world is built.
+        // Skip until the first app.update() ran Startup (see has_run_update).
         if !self.has_run_update {
             return;
         }

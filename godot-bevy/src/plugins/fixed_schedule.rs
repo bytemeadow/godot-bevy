@@ -10,7 +10,7 @@ use bevy_time::{Fixed, Time, Virtual};
 
 /// Remove Bevy's in-`_process` fixed-timestep loop so `FixedMain` is driven
 /// exclusively from Godot's `_physics_process`. Without this, `FixedUpdate` also
-/// ticks (at Bevy's ~64 Hz virtual rate) inside `app.update()`.
+/// ticks at Bevy's internal virtual rate inside `app.update()`.
 pub(crate) fn neutralize_in_process_fixed_loop(app: &mut App) {
     let run_fixed = RunFixedMainLoop.intern();
     app.world_mut()

@@ -284,11 +284,7 @@ fn post_update_godot_transforms_bulk(
     let mut scales_2d = Vec::with_capacity(entity_count);
 
     // Read once per system run to avoid per-entity FFI.
-    let fti_enabled = Engine::singleton()
-        .get_main_loop()
-        .and_then(|ml| ml.try_cast::<SceneTree>().ok())
-        .map(|tree| tree.is_physics_interpolation_enabled())
-        .unwrap_or(false);
+    let fti_enabled = physics_interpolation_enabled();
 
     // Tracks handles for first-write nodes that need reset_physics_interpolation.
     let mut first_write_handles: Vec<GodotNodeHandle> = Vec::new();
@@ -437,11 +433,7 @@ fn post_update_godot_transforms_individual(
     godot: &mut GodotAccess,
 ) {
     // Read once per system run to avoid per-entity FFI.
-    let fti_enabled = Engine::singleton()
-        .get_main_loop()
-        .and_then(|ml| ml.try_cast::<SceneTree>().ok())
-        .map(|tree| tree.is_physics_interpolation_enabled())
-        .unwrap_or(false);
+    let fti_enabled = physics_interpolation_enabled();
 
     for (transform_ref, reference, mut metadata, (node2d, node3d)) in entities.iter_mut() {
         // Check if we have sync information for this entity
@@ -474,4 +466,13 @@ fn post_update_godot_transforms_individual(
             }
         }
     }
+}
+
+/// Whether Godot's project-wide physics interpolation is enabled.
+fn physics_interpolation_enabled() -> bool {
+    Engine::singleton()
+        .get_main_loop()
+        .and_then(|ml| ml.try_cast::<SceneTree>().ok())
+        .map(|tree| tree.is_physics_interpolation_enabled())
+        .unwrap_or(false)
 }
