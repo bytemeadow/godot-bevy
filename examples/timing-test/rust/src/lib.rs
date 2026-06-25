@@ -56,9 +56,7 @@ fn first_schedule_system(
     stats.first_schedule_runs += 1;
     counter.app_update_calls += 1;
 
-    // Log every few runs to show execution frequency
     if stats.first_schedule_runs.is_multiple_of(60) {
-        // Every second at 60fps
         godot_print!(
             "🔍 DEBUG: First Schedule #{}: app_update_calls: {}, Time: {:.2}s",
             stats.first_schedule_runs,
@@ -67,9 +65,7 @@ fn first_schedule_system(
         );
     }
 
-    // Original periodic logging
     if stats.first_schedule_runs.is_multiple_of(120) {
-        // Every 2 seconds at 60fps
         godot_print!(
             "📺 First Schedule Run #{}: Time: {:.2}s (runs in app.update())",
             stats.first_schedule_runs,

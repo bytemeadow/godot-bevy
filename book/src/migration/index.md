@@ -2,6 +2,7 @@
 
 This section contains migration guides for various versions.
 
+- [v0.11 to v0.12](./v0.11-to-v0.12.md)
 - [v0.10 to v0.11](./v0.10-to-v0.11.md)
 - [v0.9 to v0.10](./v0.9-to-v0.10.md)
 - [v0.8 to v0.9](./v0.8-to-v0.9.md)
