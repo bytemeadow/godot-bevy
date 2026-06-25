@@ -1,9 +1,5 @@
-use crate::plugins::core::PrePhysicsUpdate;
 use crate::plugins::{
-    collisions::CollisionMessageReader,
-    core::{PhysicsDelta, PhysicsUpdate},
-    input::InputEventReader,
-    scene_tree::SceneTreeMessageReader,
+    collisions::CollisionMessageReader, input::InputEventReader, scene_tree::SceneTreeMessageReader,
 };
 use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
@@ -135,7 +131,6 @@ impl BevyApp {
             app.cleanup();
         }
 
-        app.init_resource::<PhysicsDelta>();
         self.app = Some(app);
     }
 
@@ -338,11 +333,6 @@ impl INode for BevyApp {
                     app.world_mut(),
                     std::time::Duration::from_secs_f64(delta as f64),
                 );
-
-                // (parallel, removed in Stage 4) legacy custom physics schedules
-                app.world_mut().resource_mut::<PhysicsDelta>().delta_seconds = delta;
-                app.world_mut().run_schedule(PrePhysicsUpdate);
-                app.world_mut().run_schedule(PhysicsUpdate);
 
                 crate::profiling::secondary_frame_mark("physics");
             }))
