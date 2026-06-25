@@ -16,7 +16,8 @@ use bevy_transform::components::Transform as BevyTransform;
 use godot::builtin::{PackedInt64Array, VarDictionary};
 #[cfg(debug_assertions)]
 use godot::classes::Object;
-use godot::classes::{Node2D, Node3D};
+use godot::classes::{Engine, Node, Node2D, Node3D, SceneTree};
+use godot::obj::Singleton;
 #[cfg(debug_assertions)]
 use godot::prelude::{Gd, ToGodot};
 
@@ -219,7 +220,7 @@ pub fn post_update_godot_transforms(
         (
             Ref<BevyTransform>,
             &GodotNodeHandle,
-            &TransformSyncMetadata,
+            &mut TransformSyncMetadata,
             AnyOf<(&Node2DMarker, &Node3DMarker)>,
         ),
         Changed<BevyTransform>,
@@ -229,7 +230,7 @@ pub fn post_update_godot_transforms(
 ) {
     if let Some(bulk_ops) = bulk_ops_cache.get() {
         let _bulk_span = tracing::info_span!("using_bulk_optimization").entered();
-        post_update_godot_transforms_bulk(change_tick, entities, bulk_ops);
+        post_update_godot_transforms_bulk(change_tick, entities, bulk_ops, &mut godot);
         return;
     }
     post_update_godot_transforms_individual(change_tick, entities, &mut godot);
@@ -243,7 +244,7 @@ pub fn post_update_godot_transforms(
         (
             Ref<BevyTransform>,
             &GodotNodeHandle,
-            &TransformSyncMetadata,
+            &mut TransformSyncMetadata,
             AnyOf<(&Node2DMarker, &Node3DMarker)>,
         ),
         Changed<BevyTransform>,
@@ -260,12 +261,13 @@ fn post_update_godot_transforms_bulk(
         (
             Ref<BevyTransform>,
             &GodotNodeHandle,
-            &TransformSyncMetadata,
+            &mut TransformSyncMetadata,
             AnyOf<(&Node2DMarker, &Node3DMarker)>,
         ),
         Changed<BevyTransform>,
     >,
     mut batch_singleton: Gd<Object>,
+    godot: &mut GodotAccess,
 ) {
     let _span = tracing::info_span!("bulk_data_preparation_optimized").entered();
 
@@ -281,9 +283,19 @@ fn post_update_godot_transforms_bulk(
     let mut rotations_2d = Vec::with_capacity(entity_count);
     let mut scales_2d = Vec::with_capacity(entity_count);
 
+    // Read once per system run to avoid per-entity FFI.
+    let fti_enabled = Engine::singleton()
+        .get_main_loop()
+        .and_then(|ml| ml.try_cast::<SceneTree>().ok())
+        .map(|tree| tree.is_physics_interpolation_enabled())
+        .unwrap_or(false);
+
+    // Tracks handles for first-write nodes that need reset_physics_interpolation.
+    let mut first_write_handles: Vec<GodotNodeHandle> = Vec::new();
+
     // Collect raw transform data (no FFI allocations)
     let _collect_span = tracing::info_span!("collect_raw_arrays").entered();
-    for (transform_ref, reference, metadata, (node2d, node3d)) in entities.iter_mut() {
+    for (transform_ref, reference, mut metadata, (node2d, node3d)) in entities.iter_mut() {
         // Check if we have sync information for this entity
         if let Some(sync_tick) = metadata.last_sync_tick
             && !transform_ref
@@ -292,6 +304,15 @@ fn post_update_godot_transforms_bulk(
         {
             // This change was from our Godot sync, skip it
             continue;
+        }
+
+        let is_first_write = metadata.last_sync_tick.is_none();
+        if is_first_write {
+            // Mark the write tick so this only fires once per node.
+            metadata.last_sync_tick = Some(change_tick.this_run());
+            if fti_enabled {
+                first_write_handles.push(*reference);
+            }
         }
 
         let instance_id = reference.instance_id();
@@ -394,6 +415,12 @@ fn post_update_godot_transforms_bulk(
             );
         }
     }
+
+    // Reset physics interpolation for nodes written for the first time.
+    // Called after the bulk write so the reset applies to the just-set transform.
+    for handle in first_write_handles {
+        godot.get::<Node>(handle).reset_physics_interpolation();
+    }
 }
 
 fn post_update_godot_transforms_individual(
@@ -402,15 +429,21 @@ fn post_update_godot_transforms_individual(
         (
             Ref<BevyTransform>,
             &GodotNodeHandle,
-            &TransformSyncMetadata,
+            &mut TransformSyncMetadata,
             AnyOf<(&Node2DMarker, &Node3DMarker)>,
         ),
         Changed<BevyTransform>,
     >,
     godot: &mut GodotAccess,
 ) {
-    // Original individual FFI approach
-    for (transform_ref, reference, metadata, (node2d, node3d)) in entities.iter_mut() {
+    // Read once per system run to avoid per-entity FFI.
+    let fti_enabled = Engine::singleton()
+        .get_main_loop()
+        .and_then(|ml| ml.try_cast::<SceneTree>().ok())
+        .map(|tree| tree.is_physics_interpolation_enabled())
+        .unwrap_or(false);
+
+    for (transform_ref, reference, mut metadata, (node2d, node3d)) in entities.iter_mut() {
         // Check if we have sync information for this entity
         if let Some(sync_tick) = metadata.last_sync_tick
             && !transform_ref
@@ -421,6 +454,8 @@ fn post_update_godot_transforms_individual(
             continue;
         }
 
+        let is_first_write = metadata.last_sync_tick.is_none();
+
         if node2d.is_some() {
             let _span = tracing::info_span!("individual_ffi_call_2d").entered();
             let mut obj = godot.get::<Node2D>(*reference);
@@ -429,6 +464,14 @@ fn post_update_godot_transforms_individual(
             let _span = tracing::info_span!("individual_ffi_call_3d").entered();
             let mut obj = godot.get::<Node3D>(*reference);
             obj.set_transform(transform_ref.to_godot_transform());
+        }
+
+        if is_first_write {
+            // Mark the write tick so the reset only fires once per node.
+            metadata.last_sync_tick = Some(change_tick.this_run());
+            if fti_enabled {
+                godot.get::<Node>(*reference).reset_physics_interpolation();
+            }
         }
     }
 }

@@ -208,6 +208,48 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
     })
 }
 
+/// Test that spawning a synced node at a non-origin position does not produce
+/// a one-tick interpolation slide from the origin when physics interpolation is
+/// enabled. reset_physics_interpolation() must be called on the first Bevy→Godot
+/// write after the node is registered so the engine treats the set position as
+/// the canonical starting point.
+#[itest(async)]
+fn test_spawn_resets_physics_interpolation(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        ctx_clone
+            .scene_tree
+            .get_tree()
+            .set_physics_interpolation_enabled(true);
+
+        let mut app = TestApp::new(&ctx_clone, |app| {
+            app.add_plugins(GodotTransformSyncPlugin::default());
+        })
+        .await;
+
+        let (node, entity) = app.add_node::<godot::classes::Node2D>("Spawned").await;
+        app.with_world_mut(|w| {
+            w.get_mut::<Transform>(entity).unwrap().translation =
+                bevy::math::Vec3::new(500.0, 300.0, 0.0);
+        });
+        app.physics_update().await;
+
+        // With reset on the first post-spawn write, the rendered/global transform
+        // is the set value immediately -- no interpolation slide from origin.
+        let pos = node.get_position();
+        assert!(
+            (pos.x - 500.0).abs() < 0.5 && (pos.y - 300.0).abs() < 0.5,
+            "expected position ~(500, 300) after first write with FTI enabled, got {pos:?}"
+        );
+
+        app.cleanup().await;
+        ctx_clone
+            .scene_tree
+            .get_tree()
+            .set_physics_interpolation_enabled(false);
+    })
+}
+
 /// Test that sync can be disabled
 #[itest(async)]
 fn test_transform_sync_disabled(ctx: &TestContext) -> godot::task::TaskHandle {
