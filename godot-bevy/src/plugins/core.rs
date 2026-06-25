@@ -169,7 +169,7 @@ impl Plugin for GodotBaseCorePlugin {
             .add_plugins(bevy_diagnostic::FrameCountPlugin)
             .add_plugins(bevy_diagnostic::DiagnosticsPlugin)
             .init_resource::<PhysicsDelta>()
-            .init_non_send_resource::<GodotMainThread>()
+            .init_non_send::<GodotMainThread>()
             .init_resource::<SceneTreeComponentRegistry>()
             .add_observer(on_godot_node_handle_removed);
 

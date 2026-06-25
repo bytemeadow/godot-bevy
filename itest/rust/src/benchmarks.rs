@@ -54,7 +54,7 @@ fn setup_3d_benchmark_app(node_count: usize) -> (App, Vec<Gd<Node3D>>) {
     app.add_plugins(GodotTransformSyncPlugin::default().with_sync_mode(TransformSyncMode::TwoWay));
 
     // Insert the GodotMainThread resource (required for GodotAccess)
-    app.insert_non_send_resource(GodotMainThread);
+    app.insert_non_send(GodotMainThread);
 
     let mut nodes: Vec<Gd<Node3D>> = Vec::with_capacity(node_count);
 
@@ -89,7 +89,7 @@ fn setup_2d_benchmark_app() -> (App, Vec<Gd<Node2D>>) {
 
     // Add transform sync plugin
     app.add_plugins(GodotTransformSyncPlugin::default().with_sync_mode(TransformSyncMode::TwoWay));
-    app.insert_non_send_resource(GodotMainThread);
+    app.insert_non_send(GodotMainThread);
 
     let mut nodes: Vec<Gd<Node2D>> = Vec::with_capacity(NODE_COUNT);
 
@@ -435,7 +435,7 @@ fn setup_scene_tree_benchmark_app() -> (App, mpsc::Sender<SceneTreeMessage>) {
     app.init_schedule(PreUpdate);
 
     // Insert required resources (normally added by GodotBaseCorePlugin)
-    app.insert_non_send_resource(GodotMainThread);
+    app.insert_non_send(GodotMainThread);
     app.init_resource::<SceneTreeComponentRegistry>();
 
     // Create a channel for injecting messages BEFORE adding the plugin
@@ -949,7 +949,7 @@ fn setup_collision_processing_benchmark_app()
     app.init_schedule(PreUpdate);
     app.init_schedule(PrePhysicsUpdate);
 
-    app.insert_non_send_resource(GodotMainThread);
+    app.insert_non_send(GodotMainThread);
     app.init_resource::<SceneTreeComponentRegistry>();
 
     let (scene_sender, scene_receiver) = mpsc::unbounded::<SceneTreeMessage>();
@@ -1077,10 +1077,10 @@ fn setup_input_action_benchmark_app() -> (App, InputActionBenchSender, Vec<Strin
     let mut app = App::new();
 
     app.init_schedule(First);
-    app.insert_non_send_resource(GodotMainThread);
+    app.insert_non_send(GodotMainThread);
 
     app.add_plugins(GodotInputEventPlugin);
-    app.insert_non_send_resource(InputEventReader(receiver));
+    app.insert_non_send(InputEventReader(receiver));
 
     let mut input_map = InputMap::singleton();
     let mut action_names = Vec::with_capacity(INPUT_ACTION_COUNT);
@@ -1139,7 +1139,7 @@ fn setup_packed_scene_benchmark_app() -> App {
     app.init_schedule(First);
     app.init_schedule(PostUpdate);
 
-    app.insert_non_send_resource(GodotMainThread);
+    app.insert_non_send(GodotMainThread);
     app.init_resource::<SceneTreeComponentRegistry>();
 
     // Scene tree plugin provides SceneTreeRef (needed by spawn_scene)
@@ -1231,7 +1231,7 @@ fn setup_signal_benchmark_app(node_count: usize) -> (App, Vec<Gd<Node>>) {
     app.init_schedule(Last);
 
     app.add_plugins(GodotSignalsPlugin::<BenchSignalEvent>::default());
-    app.insert_non_send_resource(GodotMainThread);
+    app.insert_non_send(GodotMainThread);
     app.init_resource::<SignalCounter>();
     app.add_observer(
         |_: On<BenchSignalEvent>, mut counter: ResMut<SignalCounter>| {

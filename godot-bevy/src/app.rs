@@ -156,7 +156,7 @@ impl BevyApp {
         input_event_watcher.bind_mut().notification_channel = Some(sender);
         input_event_watcher.set_name("InputEventWatcher");
         self.base_mut().add_child(&input_event_watcher);
-        app.insert_non_send_resource(InputEventReader(receiver));
+        app.insert_non_send(InputEventReader(receiver));
     }
 
     fn register_collision_watcher(&mut self, app: &mut App) {
@@ -251,11 +251,11 @@ impl BevyApp {
             .get_node_or_null("OptimizedBulkOperations")
             .map(|n| n.upcast::<godot::classes::Object>())
         {
-            app.insert_non_send_resource(BulkOperationsCache::new(node));
+            app.insert_non_send(BulkOperationsCache::new(node));
             tracing::debug!("Cached OptimizedBulkOperations node reference");
         } else {
             // Initialize empty cache so systems don't need to check for resource existence
-            app.init_non_send_resource::<BulkOperationsCache>();
+            app.init_non_send::<BulkOperationsCache>();
         }
     }
 }

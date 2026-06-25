@@ -78,7 +78,9 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
         let (contains, colliding_with_a) = app.with_world_mut(|world| {
             let mut system_state: bevy::ecs::system::SystemState<Collisions> =
                 bevy::ecs::system::SystemState::new(world);
-            let collisions = system_state.get(world);
+            let collisions = system_state
+                .get(world)
+                .expect("system params should be valid in test");
             let contains = collisions.contains(entity_a, entity_b);
             let colliding: Vec<Entity> = collisions.colliding_with(entity_a).to_vec();
             (contains, colliding)
@@ -106,7 +108,9 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
         let still_contains = app.with_world_mut(|world| {
             let mut system_state: bevy::ecs::system::SystemState<Collisions> =
                 bevy::ecs::system::SystemState::new(world);
-            let collisions = system_state.get(world);
+            let collisions = system_state
+                .get(world)
+                .expect("system params should be valid in test");
             collisions.contains(entity_a, entity_b)
         });
 

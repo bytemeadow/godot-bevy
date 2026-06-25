@@ -354,7 +354,7 @@ fn process_play_command(
     output: &mut AudioOutput,
     godot: &mut GodotAccess,
 ) -> Option<SoundId> {
-    let audio_stream = if let Some(asset) = assets.get_mut(&play_cmd.handle) {
+    let audio_stream = if let Some(mut asset) = assets.get_mut(&play_cmd.handle) {
         asset.try_cast::<AudioStream>()
     } else {
         // Asset not ready yet, re-queue for next frame
