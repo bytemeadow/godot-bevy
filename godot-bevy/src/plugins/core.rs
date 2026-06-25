@@ -173,6 +173,12 @@ impl Plugin for GodotBaseCorePlugin {
             .init_resource::<SceneTreeComponentRegistry>()
             .add_observer(on_godot_node_handle_removed);
 
+        // FixedMain is driven from Godot's _physics_process (see app.rs).
+        // Strip Bevy's render-rate accumulator loop so FixedMain does not also
+        // tick during _process. TimePlugin stays: time_system in First keeps
+        // Time<Real>/Virtual advancing each _process for Update-rate systems.
+        crate::plugins::fixed_schedule::neutralize_in_process_fixed_loop(app);
+
         // Add the PhysicsUpdate schedule
         app.add_schedule(Schedule::new(PrePhysicsUpdate));
         app.add_schedule(Schedule::new(PhysicsUpdate));
