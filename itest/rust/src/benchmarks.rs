@@ -10,7 +10,9 @@ use godot::classes::{Area3D, Engine, InputEventKey, InputMap, Node, Node2D, Node
 use godot::global::Key;
 use godot::obj::{NewAlloc, Singleton};
 use godot::prelude::*;
-use godot_bevy::bevy_app::{App, First, FixedFirst, Last, PostUpdate, PreUpdate, Update};
+use godot_bevy::bevy_app::{
+    App, First, FixedFirst, FixedLast, Last, PostUpdate, PreUpdate, Update,
+};
 use godot_bevy::bevy_math::Vec3;
 use godot_bevy::bevy_transform::components::Transform as BevyTransform;
 use godot_bevy::interop::{GodotMainThread, GodotNodeHandle, Node2DMarker, Node3DMarker};
@@ -48,7 +50,7 @@ fn setup_3d_benchmark_app(node_count: usize) -> (App, Vec<Gd<Node3D>>) {
 
     // Initialize schedules manually (avoid plugin duplication issues)
     app.init_schedule(PreUpdate);
-    app.init_schedule(Last);
+    app.init_schedule(FixedLast);
 
     // Add transform sync plugin
     app.add_plugins(GodotTransformSyncPlugin::default().with_sync_mode(TransformSyncMode::TwoWay));
@@ -85,7 +87,7 @@ fn setup_2d_benchmark_app() -> (App, Vec<Gd<Node2D>>) {
 
     // Initialize schedules manually (avoid plugin duplication issues)
     app.init_schedule(PreUpdate);
-    app.init_schedule(Last);
+    app.init_schedule(FixedLast);
 
     // Add transform sync plugin
     app.add_plugins(GodotTransformSyncPlugin::default().with_sync_mode(TransformSyncMode::TwoWay));
@@ -127,8 +129,8 @@ fn run_transform_sync_bevy_to_godot_3d(node_count: usize) -> i32 {
         transform.translation = Vec3::new(i as f32 * 2.0, i as f32, 0.0);
     }
 
-    // Run the Last schedule which contains the sync system
-    measured(|| app.world_mut().run_schedule(Last));
+    // Run FixedLast which contains the Bevy->Godot write system
+    measured(|| app.world_mut().run_schedule(FixedLast));
 
     let result = nodes.len() as i32;
 
@@ -234,7 +236,7 @@ fn transform_sync_bevy_to_godot_2d() -> i32 {
         transform.translation = Vec3::new(i as f32 * 2.0, i as f32, 0.0);
     }
 
-    measured(|| app.world_mut().run_schedule(Last));
+    measured(|| app.world_mut().run_schedule(FixedLast));
 
     let result = nodes.len() as i32;
 
@@ -298,8 +300,8 @@ fn transform_sync_roundtrip_3d() -> i32 {
             }
         }
 
-        // Phase 3: Sync Bevy -> Godot (Last)
-        app.world_mut().run_schedule(Last);
+        // Phase 3: Sync Bevy -> Godot (FixedLast — physics rate)
+        app.world_mut().run_schedule(FixedLast);
     });
 
     let result = nodes.len() as i32;
@@ -334,8 +336,8 @@ fn transform_sync_roundtrip_2d() -> i32 {
             }
         }
 
-        // Phase 3: Sync Bevy -> Godot (Last)
-        app.world_mut().run_schedule(Last);
+        // Phase 3: Sync Bevy -> Godot (FixedLast — physics rate)
+        app.world_mut().run_schedule(FixedLast);
     });
 
     let result = nodes.len() as i32;

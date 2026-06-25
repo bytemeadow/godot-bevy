@@ -49,8 +49,9 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         })
         .await;
 
-        // Wait for Bevy transform to sync to Godot node
-        app.update().await;
+        // Wait for Bevy transform to sync to Godot node.
+        // The write runs in FixedLast (physics rate), so we need a physics tick.
+        app.physics_update().await;
 
         let pos = node.get_position();
         let rot = node.get_rotation();
@@ -166,9 +167,12 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         // Move Godot node (tests Godot→Bevy sync)
         godot_node.set_position(Vector2::new(20.0, 0.0));
 
-        // Run several frames so the Bevy-controlled node accumulates
-        // enough movement for a meaningful assertion.
-        app.updates(4).await;
+        // Run several physics ticks so the Bevy-controlled node accumulates
+        // enough movement for a meaningful assertion. The write runs in
+        // FixedLast, so physics_update() is required to flush it.
+        for _ in 0..4 {
+            app.physics_update().await;
+        }
 
         let bevy_end = bevy_node.get_position().x;
 

@@ -1,4 +1,4 @@
-use bevy_app::{App, Last, Plugin, PreUpdate};
+use bevy_app::{App, FixedLast, Plugin, PreUpdate};
 use bevy_ecs::{schedule::IntoScheduleConfigs, system::Res};
 use bevy_transform::components::Transform;
 use godot::classes::{Node2D, Node3D};
@@ -56,9 +56,12 @@ impl Plugin for GodotTransformSyncPlugin {
                 pre_update_godot_transforms.run_if(transform_sync_twoway_enabled),
             );
 
-            // Add systems that sync bevy -> godot transforms when one or two-way syncing enabled
+            // Bevy -> Godot write at physics rate (once per fixed tick). This is
+            // the cadence Godot's physics interpolation requires; rendering
+            // between ticks is smoothed by the engine when the user enables
+            // physics/common/physics_interpolation.
             app.add_systems(
-                Last,
+                FixedLast,
                 post_update_godot_transforms.run_if(transform_sync_enabled),
             );
         }
