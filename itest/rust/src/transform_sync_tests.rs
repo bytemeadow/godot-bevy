@@ -208,20 +208,23 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
     })
 }
 
-/// Regression test for the TwoWay self-change guard across the process/physics
-/// schedule boundary.
+/// Regression test for the TwoWay self-change guard across the `_process` /
+/// `_physics_process` boundary.
 ///
-/// The Bevy->Godot write runs in `FixedLast` (physics tick) while the Godot->Bevy
-/// read-back runs in `FixedFirst` of the same `FixedMain` pass. The guard
-/// (`TransformSyncMetadata.last_sync_tick`) must recognize a value that was read
-/// FROM Godot as our own change and suppress the echo write -- otherwise the write
-/// stamps `last_sync_tick` as a first write and (with FTI) resets interpolation,
-/// or echoes a stale Bevy value back over the Godot-origin position.
+/// The Godot→Bevy read-back runs in `PreUpdate` (render rate, driven by `_process`),
+/// while the Bevy→Godot write runs in `FixedLast` (physics tick, driven by
+/// `_physics_process`). These are on different schedules and different clocks.
+/// The guard (`TransformSyncMetadata.last_sync_tick`) uses tick-absolute comparison
+/// (`is_newer_than`) so it correctly recognises a value that was read FROM Godot as
+/// our own change and suppresses the echo write -- even though the read and write
+/// happen in different schedule passes. Without the guard the write would echo the
+/// Godot-origin position back, potentially resetting physics interpolation or
+/// overwriting a Godot-driven position with a stale Bevy value.
 ///
-/// We set the node purely from Godot (no Bevy-side editor), run physics ticks, and
-/// assert the Godot value is picked up by Bevy AND the node is not disturbed by an
-/// echo. A two-substep variant runs `physics_update()` twice to exercise multiple
-/// `FixedMain` passes against a single Godot move.
+/// We set the node purely from Godot (no Bevy system touches this Transform), run
+/// physics ticks, and assert the Godot value is picked up by Bevy AND the node is
+/// not disturbed by an echo. A two-substep variant runs `physics_update()` twice to
+/// exercise multiple `FixedLast` passes against a single Godot move.
 #[itest(async)]
 fn test_twoway_no_echo_back_across_fixed_boundary(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -245,8 +248,8 @@ fn test_twoway_no_echo_back_across_fixed_boundary(ctx: &TestContext) -> godot::t
         // (Bevy->Godot) must suppress the echo and leave the node where Godot put it.
         node.set_position(Vector2::new(42.0, 17.0));
 
-        // One FixedMain pass: read-back (FixedFirst) into Bevy, write (FixedLast)
-        // should suppress the echo.
+        // One physics tick: read-back (PreUpdate) already recorded the Godot value,
+        // so the write (FixedLast) should suppress the echo.
         app.physics_update().await;
 
         let bevy_x = app.with_world_mut(|world| {
@@ -269,7 +272,7 @@ fn test_twoway_no_echo_back_across_fixed_boundary(ctx: &TestContext) -> godot::t
             pos_after_one.y
         );
 
-        // Second pass: another FixedMain pass against the same (now settled) Godot
+        // Second pass: another physics tick against the same (now settled) Godot
         // value. The guard must still suppress -- no echo, no stale overwrite.
         app.physics_update().await;
 
@@ -352,15 +355,17 @@ fn test_twoway_godot_and_bevy_coexist(ctx: &TestContext) -> godot::task::TaskHan
             pos.x
         );
         // Bevy's y edits must survive (not clobbered by the read-back reading y=... from Godot).
+        // The loop runs 6 physics_update() calls, each triggering at least one Update frame
+        // (+1.0 y), so y must be >= 5.0 -- well clear of a partial-clobber regression.
         assert!(
-            pos.y > 2.0,
-            "Bevy-driven y must accumulate and reach Godot, expected >2, got {:.1}",
+            pos.y >= 5.0,
+            "Bevy-driven y must accumulate and reach Godot, expected >=5, got {:.1}",
             pos.y
         );
         // Bevy must track the Godot-driven x.
         assert!(
-            bevy_y > 2.0,
-            "Bevy entity y should reflect its own accumulating edits, got {bevy_y:.1}"
+            bevy_y >= 5.0,
+            "Bevy entity y should reflect its own accumulating edits, expected >=5, got {bevy_y:.1}"
         );
 
         println!(
