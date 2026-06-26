@@ -5,7 +5,7 @@ use crate::interop::{GodotAccess, GodotNodeHandle};
 use crate::plugins::transforms::{IntoBevyTransform, IntoGodotTransform, IntoGodotTransform2D};
 use bevy_ecs::change_detection::{DetectChanges, Ref};
 use bevy_ecs::entity::Entity;
-use bevy_ecs::query::{AnyOf, Changed};
+use bevy_ecs::query::{AnyOf, Changed, QueryFilter};
 #[cfg(debug_assertions)]
 use bevy_ecs::system::NonSendMut;
 use bevy_ecs::system::{Query, SystemChangeTick};
@@ -25,14 +25,17 @@ use super::change_filter::TransformSyncMetadata;
 
 #[cfg(debug_assertions)]
 #[tracing::instrument]
-pub fn pre_update_godot_transforms(
-    entities: Query<(
-        Entity,
-        &mut BevyTransform,
-        &GodotNodeHandle,
-        &mut TransformSyncMetadata,
-        AnyOf<(&Node2DMarker, &Node3DMarker)>,
-    )>,
+pub fn pre_update_godot_transforms<F: QueryFilter>(
+    entities: Query<
+        (
+            Entity,
+            &mut BevyTransform,
+            &GodotNodeHandle,
+            &mut TransformSyncMetadata,
+            AnyOf<(&Node2DMarker, &Node3DMarker)>,
+        ),
+        F,
+    >,
     mut godot: GodotAccess,
     bulk_ops_cache: NonSendMut<BulkOperationsCache>,
 ) {
@@ -46,35 +49,41 @@ pub fn pre_update_godot_transforms(
 
 #[cfg(not(debug_assertions))]
 #[tracing::instrument]
-pub fn pre_update_godot_transforms(
-    entities: Query<(
-        Entity,
-        &mut BevyTransform,
-        &GodotNodeHandle,
-        &mut TransformSyncMetadata,
-        AnyOf<(&Node2DMarker, &Node3DMarker)>,
-    )>,
+pub fn pre_update_godot_transforms<F: QueryFilter>(
+    entities: Query<
+        (
+            Entity,
+            &mut BevyTransform,
+            &GodotNodeHandle,
+            &mut TransformSyncMetadata,
+            AnyOf<(&Node2DMarker, &Node3DMarker)>,
+        ),
+        F,
+    >,
     mut godot: GodotAccess,
 ) {
     pre_update_godot_transforms_individual(entities, &mut godot);
 }
 
 #[cfg(debug_assertions)]
-fn pre_update_godot_transforms_bulk(
-    mut entities: Query<(
-        Entity,
-        &mut BevyTransform,
-        &GodotNodeHandle,
-        &mut TransformSyncMetadata,
-        AnyOf<(&Node2DMarker, &Node3DMarker)>,
-    )>,
+fn pre_update_godot_transforms_bulk<F: QueryFilter>(
+    mut entities: Query<
+        (
+            Entity,
+            &mut BevyTransform,
+            &GodotNodeHandle,
+            &mut TransformSyncMetadata,
+            AnyOf<(&Node2DMarker, &Node3DMarker)>,
+        ),
+        F,
+    >,
     mut batch_singleton: Gd<Object>,
 ) {
     let _span = tracing::info_span!("bulk_read_preparation").entered();
 
     // Collect entity info for 3D and 2D nodes separately
     // Pre-allocate with entity count to avoid reallocations
-    let entity_count = entities.iter().len();
+    let entity_count = entities.iter().count();
     let mut entities_3d: Vec<(Entity, i64)> = Vec::with_capacity(entity_count);
     let mut entities_2d: Vec<(Entity, i64)> = Vec::with_capacity(entity_count);
 
@@ -174,14 +183,17 @@ fn pre_update_godot_transforms_bulk(
     }
 }
 
-fn pre_update_godot_transforms_individual(
-    mut entities: Query<(
-        Entity,
-        &mut BevyTransform,
-        &GodotNodeHandle,
-        &mut TransformSyncMetadata,
-        AnyOf<(&Node2DMarker, &Node3DMarker)>,
-    )>,
+fn pre_update_godot_transforms_individual<F: QueryFilter>(
+    mut entities: Query<
+        (
+            Entity,
+            &mut BevyTransform,
+            &GodotNodeHandle,
+            &mut TransformSyncMetadata,
+            AnyOf<(&Node2DMarker, &Node3DMarker)>,
+        ),
+        F,
+    >,
     godot: &mut GodotAccess,
 ) {
     for (_, mut bevy_transform, reference, mut metadata, (node2d, node3d)) in entities.iter_mut() {
@@ -214,7 +226,7 @@ fn pre_update_godot_transforms_individual(
 
 #[cfg(debug_assertions)]
 #[tracing::instrument]
-pub fn post_update_godot_transforms(
+pub fn post_update_godot_transforms<F: QueryFilter>(
     change_tick: SystemChangeTick,
     entities: Query<
         (
@@ -223,7 +235,7 @@ pub fn post_update_godot_transforms(
             &mut TransformSyncMetadata,
             AnyOf<(&Node2DMarker, &Node3DMarker)>,
         ),
-        Changed<BevyTransform>,
+        (Changed<BevyTransform>, F),
     >,
     mut godot: GodotAccess,
     bulk_ops_cache: NonSendMut<BulkOperationsCache>,
@@ -238,7 +250,7 @@ pub fn post_update_godot_transforms(
 
 #[cfg(not(debug_assertions))]
 #[tracing::instrument]
-pub fn post_update_godot_transforms(
+pub fn post_update_godot_transforms<F: QueryFilter>(
     change_tick: SystemChangeTick,
     entities: Query<
         (
@@ -247,7 +259,7 @@ pub fn post_update_godot_transforms(
             &mut TransformSyncMetadata,
             AnyOf<(&Node2DMarker, &Node3DMarker)>,
         ),
-        Changed<BevyTransform>,
+        (Changed<BevyTransform>, F),
     >,
     mut godot: GodotAccess,
 ) {
@@ -255,7 +267,7 @@ pub fn post_update_godot_transforms(
 }
 
 #[cfg(debug_assertions)]
-fn post_update_godot_transforms_bulk(
+fn post_update_godot_transforms_bulk<F: QueryFilter>(
     change_tick: SystemChangeTick,
     mut entities: Query<
         (
@@ -264,7 +276,7 @@ fn post_update_godot_transforms_bulk(
             &mut TransformSyncMetadata,
             AnyOf<(&Node2DMarker, &Node3DMarker)>,
         ),
-        Changed<BevyTransform>,
+        (Changed<BevyTransform>, F),
     >,
     mut batch_singleton: Gd<Object>,
     godot: &mut GodotAccess,
@@ -416,7 +428,7 @@ fn post_update_godot_transforms_bulk(
     }
 }
 
-fn post_update_godot_transforms_individual(
+fn post_update_godot_transforms_individual<F: QueryFilter>(
     change_tick: SystemChangeTick,
     mut entities: Query<
         (
@@ -425,7 +437,7 @@ fn post_update_godot_transforms_individual(
             &mut TransformSyncMetadata,
             AnyOf<(&Node2DMarker, &Node3DMarker)>,
         ),
-        Changed<BevyTransform>,
+        (Changed<BevyTransform>, F),
     >,
     godot: &mut GodotAccess,
 ) {

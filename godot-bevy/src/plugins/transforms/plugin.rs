@@ -53,7 +53,7 @@ impl Plugin for GodotTransformSyncPlugin {
             // Add systems that sync godot -> bevy transforms when two-way syncing enabled
             app.add_systems(
                 PreUpdate,
-                pre_update_godot_transforms.run_if(transform_sync_twoway_enabled),
+                pre_update_godot_transforms::<()>.run_if(transform_sync_twoway_enabled),
             );
 
             // Bevy -> Godot write at physics rate (once per fixed tick). This is
@@ -62,7 +62,7 @@ impl Plugin for GodotTransformSyncPlugin {
             // physics/common/physics_interpolation.
             app.add_systems(
                 FixedLast,
-                post_update_godot_transforms.run_if(transform_sync_enabled),
+                post_update_godot_transforms::<()>.run_if(transform_sync_enabled),
             );
         }
     }

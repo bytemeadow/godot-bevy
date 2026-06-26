@@ -90,12 +90,11 @@ impl Plugin for ParticleRainPlugin {
                 )
                     .chain(),
             )
-            // Movement systems
+            // Movement runs on the physics clock; its Bevy→Godot sync writes in
+            // FixedLast, so driving it from FixedUpdate keeps it interpolation-compatible.
             .add_systems(
-                Update,
-                (particle_movement,)
-                    .run_if(|state: Res<SimulationState>| state.is_running)
-                    .after(sync_container_params),
+                FixedUpdate,
+                (particle_movement,).run_if(|state: Res<SimulationState>| state.is_running),
             );
 
         // Add custom transform sync systems for Particle entities only
