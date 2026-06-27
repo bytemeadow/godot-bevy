@@ -7,6 +7,7 @@ pub mod audio;
 pub mod collisions;
 pub mod core;
 pub mod debugger;
+pub mod fixed_schedule;
 #[cfg(feature = "godot_bevy_log")]
 pub mod godot_bevy_logger;
 pub mod input;

@@ -57,7 +57,9 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
 
             let mut system_state: bevy::ecs::system::SystemState<GodotSignals<TestSignalFired>> =
                 bevy::ecs::system::SystemState::new(world);
-            let signals = system_state.get(world);
+            let signals = system_state
+                .get(world)
+                .expect("system params should be valid in test");
 
             signals.connect(handle, "pressed", None, |_args, _handle, _entity| {
                 Some(TestSignalFired {
@@ -117,7 +119,9 @@ fn test_connect_object_signal(ctx: &TestContext) -> godot::task::TaskHandle {
         app.with_world_mut(|world| {
             let mut system_state: bevy::ecs::system::SystemState<GodotSignals<NodeAdded>> =
                 bevy::ecs::system::SystemState::new(world);
-            let signals = system_state.get(world);
+            let signals = system_state
+                .get(world)
+                .expect("system params should be valid in test");
 
             signals.connect_object(scene_tree, "node_added", |_args| Some(NodeAdded));
 
@@ -192,7 +196,9 @@ fn test_multiple_signal_connections(ctx: &TestContext) -> godot::task::TaskHandl
 
             let mut system_state: bevy::ecs::system::SystemState<GodotSignals<TestSignalFired>> =
                 bevy::ecs::system::SystemState::new(world);
-            let signals = system_state.get(world);
+            let signals = system_state
+                .get(world)
+                .expect("system params should be valid in test");
 
             if let Some(handle) = button1_handle {
                 signals.connect(handle, "pressed", None, |_args, _handle, _entity| {

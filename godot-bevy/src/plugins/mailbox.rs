@@ -1,6 +1,5 @@
 use crate::interop::{GodotAccess, GodotNodeHandle};
-use crate::plugins::core::PhysicsUpdate;
-use bevy_app::{App, Plugin};
+use bevy_app::{App, FixedFirst, Plugin};
 use bevy_ecs::component::Component;
 use bevy_ecs::message::{Message, MessageWriter};
 use bevy_ecs::prelude::Query;
@@ -28,7 +27,7 @@ pub trait GodotMailboxMessage: Message + Send + Sync + Sized + 'static {
 
 /// Generic plugin that drains mailbox messages from Godot nodes with marker `Marker`.
 ///
-/// This plugin runs in [`PhysicsUpdate`] and writes messages of type `T`.
+/// This plugin runs in [`FixedFirst`] and writes messages of type `T`.
 pub struct GodotMailboxPlugin<T, Marker>
 where
     T: GodotMailboxMessage,
@@ -56,7 +55,7 @@ where
 {
     fn build(&self, app: &mut App) {
         app.add_message::<T>().add_systems(
-            PhysicsUpdate,
+            FixedFirst,
             drain_mailbox_messages::<T, Marker>.in_set(GodotMailboxSet::Drain),
         );
     }

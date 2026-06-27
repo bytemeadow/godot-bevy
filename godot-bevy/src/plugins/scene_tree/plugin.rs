@@ -165,7 +165,7 @@ impl Plugin for GodotSceneTreePlugin {
         // Auto-register all discovered AutoSyncBundle plugins
         super::autosync::register_all_autosync_bundles(app);
 
-        app.init_non_send_resource::<SceneTreeRefImpl>()
+        app.init_non_send::<SceneTreeRefImpl>()
             .init_resource::<NodeEntityIndex>()
             .insert_resource(SceneTreeConfig {
                 auto_despawn_children: self.auto_despawn_children,
@@ -188,7 +188,9 @@ impl Plugin for GodotSceneTreePlugin {
         app.world_mut()
             .register_component_hooks::<GodotNodeHandle>()
             .on_insert(on_godot_node_handle_insert)
-            .on_replace(on_godot_node_handle_replace);
+            // 0.19 renamed the replace hook to `on_discard` (fires when the component
+            // is about to be dropped via replace/remove); same semantics as before.
+            .on_discard(on_godot_node_handle_replace);
     }
 }
 

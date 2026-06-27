@@ -11,22 +11,22 @@ version.workspace = true
 
 [dependencies]
 # Core Bevy sub-crates (required)
-bevy_app = {version = "0.18", default-features = false}
-bevy_asset = {version = "0.18", default-features = false}
-bevy_diagnostic = {version = "0.18", default-features = false}
-bevy_ecs = {version = "0.18", default-features = false, features = ["multi_threaded", "bevy_reflect"]}
-bevy_input = {version = "0.18", default-features = false, features = ["gestures", "keyboard", "mouse"]}
-bevy_math = {version = "0.18", default-features = false}
-bevy_platform = {version = "0.18", default-features = false, features = ["alloc"]}
-bevy_reflect = {version = "0.18", default-features = false}
-bevy_tasks = {version = "0.18", default-features = false, features = ["multi_threaded"]}
-bevy_time = {version = "0.18", default-features = false}
-bevy_transform = {version = "0.18", default-features = false, features = ["bevy-support"]}
-bevy_utils = {version = "0.18", default-features = false, features = ["debug"]}
+bevy_app = {version = "0.19", default-features = false}
+bevy_asset = {version = "0.19", default-features = false}
+bevy_diagnostic = {version = "0.19", default-features = false}
+bevy_ecs = {version = "0.19", default-features = false, features = ["multi_threaded", "bevy_reflect"]}
+bevy_input = {version = "0.19", default-features = false, features = ["gestures", "keyboard", "mouse"]}
+bevy_math = {version = "0.19", default-features = false}
+bevy_platform = {version = "0.19", default-features = false, features = ["alloc"]}
+bevy_reflect = {version = "0.19", default-features = false}
+bevy_tasks = {version = "0.19", default-features = false, features = ["multi_threaded"]}
+bevy_time = {version = "0.19", default-features = false}
+bevy_transform = {version = "0.19", default-features = false, features = ["bevy-support"]}
+bevy_utils = {version = "0.19", default-features = false, features = ["debug"]}
 
 # Optional Bevy sub-crates (feature-gated)
-bevy_gilrs = {version = "0.18", default-features = false, optional = true}
-bevy_log = {version = "0.18", default-features = false, optional = true}
+bevy_gilrs = {version = "0.19", default-features = false, optional = true}
+bevy_log = {version = "0.19", default-features = false, optional = true}
 
 chrono = {version = "0.4", optional = true}
 crossbeam-channel = "0.5"

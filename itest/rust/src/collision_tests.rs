@@ -3,12 +3,12 @@
  *
  * Tests the full collision pipeline through real Godot frames:
  * - CollisionWatcher receives collision events via channel
- * - Godot calls _physics_process() → PrePhysicsUpdate runs
+ * - Godot calls _physics_process() → FixedFirst runs
  * - process_godot_collisions drains channel → updates CollisionState
  * - trigger_collision_observers reads CollisionState → fires observers
  * - Collisions SystemParam provides query access
  *
- * Frame strategy: Collision processing runs in PrePhysicsUpdate, which only
+ * Frame strategy: Collision processing runs in FixedFirst, which only
  * executes during Godot's _physics_process(). Since a render frame can have
  * 0 physics ticks, we use app.physics_update() which waits for the
  * physics_frame signal (guaranteeing a tick will run) then process_frame
@@ -78,7 +78,9 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
         let (contains, colliding_with_a) = app.with_world_mut(|world| {
             let mut system_state: bevy::ecs::system::SystemState<Collisions> =
                 bevy::ecs::system::SystemState::new(world);
-            let collisions = system_state.get(world);
+            let collisions = system_state
+                .get(world)
+                .expect("system params should be valid in test");
             let contains = collisions.contains(entity_a, entity_b);
             let colliding: Vec<Entity> = collisions.colliding_with(entity_a).to_vec();
             (contains, colliding)
@@ -106,7 +108,9 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
         let still_contains = app.with_world_mut(|world| {
             let mut system_state: bevy::ecs::system::SystemState<Collisions> =
                 bevy::ecs::system::SystemState::new(world);
-            let collisions = system_state.get(world);
+            let collisions = system_state
+                .get(world)
+                .expect("system params should be valid in test");
             collisions.contains(entity_a, entity_b)
         });
 

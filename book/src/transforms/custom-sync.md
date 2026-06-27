@@ -240,10 +240,12 @@ add_transform_sync_systems! {
 
 ### Automatic System Registration
 
-The macro automatically registers systems in the appropriate schedules:
-- `bevy_to_godot` systems run in the `Last` schedule
-- `godot_to_bevy` systems run in the `PreUpdate` schedule
+Custom sync registers the same shared sync systems as auto sync, just restricted to your query filter, so the schedules match exactly:
+- `bevy_to_godot` (Bevy → Godot write) runs in `FixedLast` — the physics rate, which is what Godot's physics interpolation expects
+- `godot_to_bevy` (Godot → Bevy read) runs in `PreUpdate`
 - Bidirectional sync (no prefix) runs in both schedules
+
+Because it shares the auto-sync implementation, custom sync also performs the physics-interpolation reset on an entity's first write, keeping it interpolation-compatible.
 
 ### 2D and 3D Support
 

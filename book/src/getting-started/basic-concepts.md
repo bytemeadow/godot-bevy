@@ -105,7 +105,7 @@ disable that behavior with the `scene_tree_auto_despawn_children` attribute:
 #[bevy_app(scene_tree_auto_despawn_children = false)]
 fn build_app(app: &mut App) {
     // Children can outlive their parents (useful for pooling or custom lifetimes)
-    app.add_plugins(PhysicsPlugins::new(PhysicsUpdate));
+    app.add_plugins(PhysicsPlugins::new(FixedUpdate));
 }
 ```
 

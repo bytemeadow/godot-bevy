@@ -164,7 +164,9 @@ fn test_node_handle_validity(ctx: &TestContext) -> godot::task::TaskHandle {
 
             let mut system_state: bevy::ecs::system::SystemState<GodotAccess> =
                 bevy::ecs::system::SystemState::new(world);
-            let mut godot = system_state.get_mut(world);
+            let mut godot = system_state
+                .get_mut(world)
+                .expect("system params should be valid in test");
 
             let matched = if let Some(gd_node) = godot.try_get::<godot::classes::Node2D>(handle) {
                 let pos = gd_node.get_position();

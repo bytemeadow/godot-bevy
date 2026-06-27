@@ -1,9 +1,5 @@
-use crate::plugins::core::PrePhysicsUpdate;
 use crate::plugins::{
-    collisions::CollisionMessageReader,
-    core::{PhysicsDelta, PhysicsUpdate},
-    input::InputEventReader,
-    scene_tree::SceneTreeMessageReader,
+    collisions::CollisionMessageReader, input::InputEventReader, scene_tree::SceneTreeMessageReader,
 };
 use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
@@ -34,6 +30,10 @@ pub struct BevyApp {
     // If set, this takes precedence over the global BEVY_INIT_FUNC
     #[allow(clippy::type_complexity)]
     instance_init_func: Option<Box<dyn Fn(&mut App) + Send + Sync>>,
+    // Set true after the first app.update() runs Bevy Startup. Godot runs the
+    // physics for-loop before process() within one frame, so the first
+    // physics callback can precede Startup; the driver must skip until then.
+    has_run_update: bool,
 }
 
 impl BevyApp {
@@ -131,7 +131,6 @@ impl BevyApp {
             app.cleanup();
         }
 
-        app.init_resource::<PhysicsDelta>();
         self.app = Some(app);
     }
 
@@ -156,7 +155,7 @@ impl BevyApp {
         input_event_watcher.bind_mut().notification_channel = Some(sender);
         input_event_watcher.set_name("InputEventWatcher");
         self.base_mut().add_child(&input_event_watcher);
-        app.insert_non_send_resource(InputEventReader(receiver));
+        app.insert_non_send(InputEventReader(receiver));
     }
 
     fn register_collision_watcher(&mut self, app: &mut App) {
@@ -251,11 +250,11 @@ impl BevyApp {
             .get_node_or_null("OptimizedBulkOperations")
             .map(|n| n.upcast::<godot::classes::Object>())
         {
-            app.insert_non_send_resource(BulkOperationsCache::new(node));
+            app.insert_non_send(BulkOperationsCache::new(node));
             tracing::debug!("Cached OptimizedBulkOperations node reference");
         } else {
             // Initialize empty cache so systems don't need to check for resource existence
-            app.init_non_send_resource::<BulkOperationsCache>();
+            app.init_non_send::<BulkOperationsCache>();
         }
     }
 }
@@ -267,6 +266,7 @@ impl INode for BevyApp {
             base,
             app: Default::default(),
             instance_init_func: None,
+            has_run_update: false,
         }
     }
 
@@ -310,6 +310,7 @@ impl INode for BevyApp {
             eprintln!("bevy app update panicked");
             resume_unwind(e);
         }
+        self.has_run_update = true;
     }
 
     fn physics_process(&mut self, delta: f32) {
@@ -318,17 +319,18 @@ impl INode for BevyApp {
         if godot::classes::Engine::singleton().is_editor_hint() {
             return;
         }
+        // Skip until the first app.update() ran Startup (see has_run_update).
+        if !self.has_run_update {
+            return;
+        }
 
         if let Some(app) = self.app.as_mut()
             && let Err(e) = catch_unwind(AssertUnwindSafe(|| {
-                // Update physics delta resource with Godot's delta
-                app.world_mut().resource_mut::<PhysicsDelta>().delta_seconds = delta;
+                crate::plugins::fixed_schedule::run_godot_fixed_main(
+                    app.world_mut(),
+                    std::time::Duration::from_secs_f64(delta as f64),
+                );
 
-                // Run only our physics-specific schedule
-                app.world_mut().run_schedule(PrePhysicsUpdate);
-                app.world_mut().run_schedule(PhysicsUpdate);
-
-                // Mark physics frame end for profiling
                 crate::profiling::secondary_frame_mark("physics");
             }))
         {

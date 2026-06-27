@@ -19,6 +19,10 @@ config/icon="res://icon.svg"
 
 BevyAppSingleton="*res://bevy_app_singleton.tscn"
 
+[physics]
+
+common/physics_interpolation=true
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

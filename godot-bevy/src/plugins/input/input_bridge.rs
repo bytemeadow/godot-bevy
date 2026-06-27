@@ -13,6 +13,7 @@ use bevy_input::{
         MouseButton as BevyMouseButton, MouseButtonInput as BevyMouseButtonInput,
         MouseMotion as BevyMouseMotion, MouseScrollUnit, MouseWheel as BevyMouseWheel,
     },
+    touch::TouchPhase,
 };
 
 use crate::plugins::input::events::{
@@ -120,6 +121,8 @@ fn bridge_mouse_scroll(
                     y: message.factor,
                     unit: MouseScrollUnit::Line,
                     window: Entity::PLACEHOLDER,
+                    // Godot delivers discrete wheel ticks; mouse wheels always report Moved.
+                    phase: TouchPhase::Moved,
                 });
             }
             GodotMouseButton::WheelDown => {
@@ -128,6 +131,8 @@ fn bridge_mouse_scroll(
                     y: -message.factor,
                     unit: MouseScrollUnit::Line,
                     window: Entity::PLACEHOLDER,
+                    // Godot delivers discrete wheel ticks; mouse wheels always report Moved.
+                    phase: TouchPhase::Moved,
                 });
             }
             GodotMouseButton::WheelLeft => {
@@ -136,6 +141,8 @@ fn bridge_mouse_scroll(
                     y: 0.0,
                     unit: MouseScrollUnit::Line,
                     window: Entity::PLACEHOLDER,
+                    // Godot delivers discrete wheel ticks; mouse wheels always report Moved.
+                    phase: TouchPhase::Moved,
                 });
             }
             GodotMouseButton::WheelRight => {
@@ -144,6 +151,8 @@ fn bridge_mouse_scroll(
                     y: 0.0,
                     unit: MouseScrollUnit::Line,
                     window: Entity::PLACEHOLDER,
+                    // Godot delivers discrete wheel ticks; mouse wheels always report Moved.
+                    phase: TouchPhase::Moved,
                 });
             }
             _ => {} // Ignore non-wheel buttons
