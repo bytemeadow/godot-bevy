@@ -2,16 +2,16 @@
 
 This example demonstrates the timing behavior of godot-bevy integration, showing how Bevy schedules run within Godot's frame callbacks.
 
-> 📖 **For detailed information about timing and schedules**, see [docs/TIMING_AND_SCHEDULES.md](../../docs/TIMING_AND_SCHEDULES.md)
+> 📖 **For detailed information about timing and schedules**, see the [Frame Execution Model](https://bytemeadow.github.io/godot-bevy-book?page=timing/index.html) book chapter.
 
 ## What This Example Tests
 
 This example helps you understand:
 
-- **When different Bevy schedules execute** (First, PreUpdate, Update, FixedUpdate, PostUpdate, Last, PhysicsUpdate)
+- **When different Bevy schedules execute** (First, PreUpdate, Update, FixedUpdate, PostUpdate, Last)
 - **How often each schedule runs** relative to Godot's frame rate
 - **The relationship between visual frames and physics frames**
-- **How Bevy's FixedUpdate maintains consistent timing**
+- **How FixedUpdate runs on Godot's physics clock**
 
 ## What You'll See
 
@@ -19,33 +19,32 @@ The example logs periodic messages showing:
 
 ```
 🚀 Timing Test Started!
-📺 First Schedule Run #120: Time: 2.00s (runs in app.update())
-🔄 PreUpdate running at 3.00s (part of app.update())
-📋 Update running at 4.00s (part of app.update())
-🔧 FixedUpdate Run #128: Time: 2.03s (Bevy's internal 64Hz timing)
-📤 PostUpdate running at 5.00s (part of app.update())
-🏁 Last Schedule: Update runs: 722, Physics runs: 365, Fixed updates: 384, Time: 6.00s
-⚡ PhysicsUpdate Run #60: Time: 1.00s (runs in physics_process())
+📊 Watching for timing behavior...
+⏱️  prefix (First/PreUpdate) + FixedUpdate run in physics_process; suffix (Update/PostUpdate/Last) runs in process
+🔍 DEBUG: First Schedule #60: prefix_runs: 60, Time: 1.00s
+📺 First Schedule Run #120: Time: 2.00s (First runs in the physics_process prefix)
+🔄 PreUpdate at 3.00s (prefix_runs: 180)
+📋 Update running at 4.00s (Update runs in the process suffix)
+⚡ FixedUpdate #60: physics_process_calls: 60, Godot delta: 0.0167s
+📤 PostUpdate running at 5.00s (PostUpdate runs in the process suffix)
+🏁 Last Schedule: Update runs: 360, Fixed updates: 360, Time: 6.00s
 ```
 
 ## Key Observations
 
 ### Frame Rates
 - **Visual frames**: Run at your display's refresh rate (60-144 FPS)
-- **Physics frames**: Run at Godot's physics tick rate (usually 60 Hz)
-- **FixedUpdate**: Maintains Bevy's internal timing (64 Hz by default)
+- **Physics frames**: Run at Godot's physics tick rate (default 60 Hz)
+- **FixedUpdate**: Ticks on Godot's authoritative physics clock — one clock, not two. `Res<Time>.delta_secs()` in a `FixedUpdate` system is Godot's physics delta.
 
 ### Schedule Usage Guidelines
 
 ```rust
-// For general game logic, UI, rendering - runs in visual frames
+// For general game logic, UI, rendering - runs in visual frames (_process)
 app.add_systems(Update, gameplay_system);
 
-// For gameplay logic, AI - Bevy's built-in fixed timestep
+// For physics/deterministic logic - runs on Godot's physics clock (_physics_process)
 app.add_systems(FixedUpdate, physics_simulation);
-
-// For Godot-specific physics - synchronized with Godot's physics
-app.add_systems(PhysicsUpdate, godot_movement_system);
 ```
 
 ## Running This Example
@@ -64,8 +63,7 @@ app.add_systems(PhysicsUpdate, godot_movement_system);
 ## Understanding the Output
 
 - **High visual frame rates** (100+ FPS) are normal and indicate good performance
-- **FixedUpdate** may run 0, 1, or 2+ times per visual frame to maintain consistent timing
-- **PhysicsUpdate** runs independently at Godot's physics rate
+- **FixedUpdate** may run 0, 1, or 2+ times per visual frame depending on the physics-to-display rate ratio
 - **Timing consistency** shows that each schedule runs when expected
 
 This example is particularly useful for:
@@ -76,13 +74,7 @@ This example is particularly useful for:
 
 ### Scheduling Relationships
 
-**No Strong Ordering Guarantees**: `PhysicsUpdate` and the visual frame schedules (`First`, `PreUpdate`, `Update`, etc.) run independently. A physics frame might execute:
-- Before a visual frame starts
-- Between `PreUpdate` and `Update`
-- After `Last` completes
-- Multiple times between visual frames (if physics rate > visual rate)
+godot-bevy splits Bevy's `Main` schedule across Godot's two callbacks: the prefix (`First`, `PreUpdate`, `StateTransition`) and `FixedMain` run in `_physics_process`; the suffix (`Update`, `PostUpdate`, `Last`) runs in `_process`. This gives native Bevy ordering across a render frame:
 
-**Data Synchronization**: Changes made in one schedule are visible in others, but with frame delays:
-- Transform changes in `PhysicsUpdate` → visible in next visual frame's `Update`
-- Transform changes in `Update` → visible in same or next `PhysicsUpdate`
-- The transform sync systems (`PreUpdate`/`Last`) handle the bidirectional synchronization
+- `PreUpdate` runs before the fixed steps, so input and Godot→ECS transform reads are visible to `FixedUpdate` the same frame.
+- Transform changes written in `FixedLast` are read back into ECS by the next render frame's `PreUpdate`.

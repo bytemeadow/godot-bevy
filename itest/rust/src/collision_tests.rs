@@ -71,7 +71,7 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
             "Started",
         );
 
-        // Wait for a physics tick + render frame so PrePhysicsUpdate drains
+        // Wait for a physics tick + render frame so FixedFirst drains
         // the channel and updates CollisionState.
         app.physics_update().await;
 
@@ -159,7 +159,7 @@ fn test_collision_started_observer_from_system(ctx: &TestContext) -> godot::task
         );
 
         // physics_update() guarantees a physics tick runs, which processes
-        // the collision and triggers the observer in the same PrePhysicsUpdate.
+        // the collision and triggers the observer in the same FixedFirst.
         app.physics_update().await;
 
         let count = app.with_world(|world| world.resource::<CollisionCount>().0);

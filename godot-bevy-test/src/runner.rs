@@ -496,9 +496,9 @@ const FMT_END: &str = "\x1b[0m";
 /// Helper function to wait for the next Godot process frame.
 ///
 /// The `process_frame` signal fires after all `_physics_process()` calls
-/// but before `_process()` calls for that frame. When this resolves,
-/// any PrePhysicsUpdate/PhysicsUpdate schedules have run, but the visual
-/// schedules (First, Update, Last, etc.) have not yet run for this frame.
+/// but before `_process()` calls for that frame. When this resolves, the
+/// Main prefix (First/PreUpdate/StateTransition) and any FixedMain steps have
+/// run, but the suffix (Update/PostUpdate/Last) has not yet run for this frame.
 pub async fn await_frame() {
     let tree = Engine::singleton()
         .get_main_loop()

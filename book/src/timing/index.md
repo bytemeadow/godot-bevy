@@ -2,17 +2,41 @@
 
 Understanding how godot-bevy integrates with Godot's frame timing is crucial for building performant games.
 
-## Two Types of Frames
+## Two Godot Callbacks, One Bevy Frame
+
+godot-bevy splits Bevy's standard `Main` schedule across Godot's two frame callbacks at the fixed-loop boundary. `app.update()` is never called in production: the prefix and the fixed loop run in `_physics_process`, and the suffix runs in `_process`.
+
+### Physics Frames (`_physics_process`)
+
+The **prefix** of the main schedule plus the fixed loop run here, on Godot's physics clock.
+
+**What runs:**
+- `First`
+- `PreUpdate` (reads Godot → ECS transforms)
+- `StateTransition`
+- `FixedMain` (zero or more times per render frame)
+  - `FixedFirst`
+  - `FixedPreUpdate`
+  - `FixedUpdate` (your physics logic)
+  - `FixedPostUpdate`
+  - `FixedLast` (writes ECS → Godot transforms at physics rate)
+
+The prefix (`First` → `StateTransition`) runs once per render frame, on the first physics step; `FixedMain` runs once per physics step.
+
+**Frequency:** Godot's physics tick rate (default 60 Hz)
+
+**Use for:**
+- Physics calculations
+- Movement that needs to sync with Godot physics
+- Collision detection
+- Anything that must run at a fixed, deterministic rate
 
 ### Visual Frames (`_process`)
 
-Visual frames run at your display's refresh rate and drive the main Bevy update cycle.
+The **suffix** of the main schedule runs here, then `clear_trackers` fires once for the whole render frame.
 
-**What runs:** The complete `app.update()` cycle
-- `First`
-- `PreUpdate` (reads Godot → ECS transforms)
+**What runs:**
 - `Update`
-- `FixedMain` (zero or more times — see below)
 - `PostUpdate`
 - `Last`
 
@@ -24,53 +48,38 @@ Visual frames run at your display's refresh rate and drive the main Bevy update 
 - Rendering-related systems
 - Most gameplay code
 
-### Physics Frames (`_physics_process`)
-
-Physics frames run at Godot's fixed physics tick rate and drive Bevy's `FixedMain` schedule.
-
-**What runs:** The complete `FixedMain` schedule
-- `FixedFirst`
-- `FixedPreUpdate`
-- `FixedUpdate` (your physics logic)
-- `FixedPostUpdate`
-- `FixedLast` (writes ECS → Godot transforms at physics rate)
-
-**Frequency:** Godot's physics tick rate (default 60 Hz)
-
-**Use for:**
-- Physics calculations
-- Movement that needs to sync with Godot physics
-- Collision detection
-- Anything that must run at a fixed, deterministic rate
+On a render frame with no physics step, the prefix runs in `_process` before the suffix, so a frame is never skipped.
 
 ## Schedule Execution Order
 
-### Visual Frame
-
-```
-Visual Frame Start
-    ├── First
-    ├── PreUpdate  (reads Godot → ECS transforms)
-    ├── Update     (your visual-rate logic)
-    ├── FixedMain  (driven by _physics_process, not here)
-    ├── PostUpdate
-    └── Last
-Visual Frame End
-```
-
-### Physics Frame
+### Physics Frame (`_physics_process`)
 
 ```
 Physics Frame Start
-    ├── FixedFirst
-    ├── FixedPreUpdate
-    ├── FixedUpdate   (your physics/fixed logic)
-    ├── FixedPostUpdate
-    └── FixedLast     (writes ECS → Godot transforms)
+    ├── First           ┐
+    ├── PreUpdate       │ prefix: once per render frame (reads Godot → ECS)
+    ├── StateTransition ┘
+    └── FixedMain       (once per physics step)
+        ├── FixedFirst
+        ├── FixedPreUpdate
+        ├── FixedUpdate     (your physics/fixed logic)
+        ├── FixedPostUpdate
+        └── FixedLast       (writes ECS → Godot transforms)
 Physics Frame End
 ```
 
-Physics frames run on Godot's authoritative clock, independently of visual frames. They can execute before, between, or after visual frames.
+### Visual Frame (`_process`)
+
+```
+Visual Frame Start
+    ├── Update     (your visual-rate logic)
+    ├── PostUpdate
+    ├── Last
+    └── clear_trackers (once per render frame)
+Visual Frame End
+```
+
+Physics steps run on Godot's authoritative clock: each render frame drives the prefix and 0, 1, or N `FixedMain` steps in `_physics_process` before the suffix runs in `_process` — a deterministic order, not independent schedules.
 
 ## Frame Rate Relationships
 
@@ -174,7 +183,7 @@ fn physics_system(time: Res<Time>) {
 
 ### Don't expect immediate cross-schedule visibility
 
-Data written in `FixedLast` (Godot transforms) won't be visible to the next `_process` `PreUpdate` read until the following visual frame.
+Godot transforms written in `FixedLast` aren't read back into ECS until the next render frame's `PreUpdate` (which runs in the physics prefix).
 
 ## Performance Considerations
 

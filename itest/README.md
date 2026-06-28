@@ -95,7 +95,7 @@ node.queue_free();
 1. Tests are async Godot tasks (`godot::task::spawn`)
 2. `app.update().await` waits for a Godot frame signal
 3. During await, Godot's main loop progresses
-4. Godot calls `BevyApp::process()`, which runs Bevy's `app.update()`
+4. Godot calls `BevyApp::process()`, which runs the Main suffix (`Update`/`PostUpdate`/`Last`) + `clear_trackers`
 5. Test resumes after frame completes
 
 This ensures we're testing **real integration**, not mocked behavior.
@@ -104,7 +104,7 @@ This ensures we're testing **real integration**, not mocked behavior.
 
 | Module | Covers |
 |--------|--------|
-| `real_frame_tests.rs` | Update/PhysicsUpdate schedules, frame pacing |
+| `real_frame_tests.rs` | Update/FixedUpdate schedules, frame pacing |
 | `scene_tree_tests.rs` | Entity creation/cleanup, renames, reparenting, NodeEntityIndex |
 | `scene_tree_watcher_init_tests.rs` | Watcher initialization, no duplicate watchers |
 | `transform_sync_tests.rs` | OneWay/TwoWay/disabled sync modes |

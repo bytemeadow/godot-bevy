@@ -42,9 +42,11 @@ cargo build --release --manifest-path examples/{example}/rust/Cargo.toml
 
 **BevyApp** (`godot-bevy/src/app.rs`): The central bridge between Godot and Bevy. This Godot node (`BevyApp`) hosts the entire Bevy App instance and coordinates between Godot's frame lifecycle and Bevy's ECS update cycles.
 
-**Dual Schedule System**: The library runs two separate Bevy schedules:
-- `Update` schedule runs during Godot's `_process()` at display framerate
-- `PhysicsUpdate` schedule runs during Godot's `_physics_process()` at fixed physics rate (60Hz)
+**Split-Main Schedule**: The library drives Bevy's standard `Main` schedule across Godot's two frame callbacks:
+- The prefix (`First`, `PreUpdate`, `StateTransition`) and `FixedMain` run during Godot's `_physics_process()` (its fixed physics clock, default 60Hz)
+- The suffix (`Update`, `PostUpdate`, `Last`) runs during Godot's `_process()` at display framerate
+
+There is no `PhysicsUpdate` schedule -- fixed-rate logic goes in `FixedUpdate`.
 
 **Bridge System** (`godot-bevy/src/bridge/`): Manages bidirectional communication between Godot nodes and Bevy entities:
 - `GodotNodeHandle` - Bevy component that provides access to Godot nodes from ECS

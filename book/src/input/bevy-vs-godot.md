@@ -316,11 +316,13 @@ actions.axis("move_left", "move_right")                              // [-1.0, 1
 actions.vector("move_left", "move_right", "move_up", "move_down")   // Vec2
 ```
 
-If you add custom `First` systems that read `GodotActions`, order them after the poll:
+The process snapshot is polled in `Update` (the `GodotInputSet` set). `Update` systems that read `GodotActions` must run after the poll:
 
 ```rust
-app.add_systems(First, my_system.after(GodotInputSet));
+app.add_systems(Update, my_system.after(GodotInputSet));
 ```
+
+`FixedUpdate` readers need no ordering -- the fixed-schedule driver refreshes the physics snapshot before `FixedMain` runs.
 
 **Limitations:**
 

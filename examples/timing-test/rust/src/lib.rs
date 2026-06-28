@@ -30,7 +30,7 @@ impl Plugin for TimingTestPlugin {
 #[derive(Resource, Default)]
 struct ProcessCallCounter {
     physics_process_calls: u32,
-    app_update_calls: u32,
+    prefix_runs: u32,
 }
 
 #[derive(Resource, Default)]
@@ -44,7 +44,7 @@ fn setup_timing_test() {
     godot_print!("🚀 Timing Test Started!");
     godot_print!("📊 Watching for timing behavior...");
     godot_print!(
-        "⏱️  app.update() runs in process(); FixedUpdate runs in physics_process() on Godot's clock"
+        "⏱️  prefix (First/PreUpdate) + FixedUpdate run in physics_process; suffix (Update/PostUpdate/Last) runs in process"
     );
 }
 
@@ -54,20 +54,20 @@ fn first_schedule_system(
     time: Res<Time>,
 ) {
     stats.first_schedule_runs += 1;
-    counter.app_update_calls += 1;
+    counter.prefix_runs += 1;
 
     if stats.first_schedule_runs.is_multiple_of(60) {
         godot_print!(
-            "🔍 DEBUG: First Schedule #{}: app_update_calls: {}, Time: {:.2}s",
+            "🔍 DEBUG: First Schedule #{}: prefix_runs: {}, Time: {:.2}s",
             stats.first_schedule_runs,
-            counter.app_update_calls,
+            counter.prefix_runs,
             time.elapsed_secs()
         );
     }
 
     if stats.first_schedule_runs.is_multiple_of(120) {
         godot_print!(
-            "📺 First Schedule Run #{}: Time: {:.2}s (runs in app.update())",
+            "📺 First Schedule Run #{}: Time: {:.2}s (First runs in the physics_process prefix)",
             stats.first_schedule_runs,
             time.elapsed_secs()
         );
@@ -77,9 +77,9 @@ fn first_schedule_system(
 fn pre_update_system(time: Res<Time>, counter: Res<ProcessCallCounter>) {
     if time.elapsed_secs() % 3.0 < 0.017 {
         godot_print!(
-            "🔄 PreUpdate at {:.2}s (app_update_calls: {})",
+            "🔄 PreUpdate at {:.2}s (prefix_runs: {})",
             time.elapsed_secs(),
-            counter.app_update_calls
+            counter.prefix_runs
         );
     }
 }
@@ -89,7 +89,7 @@ fn update_system(mut stats: ResMut<TimingStats>, time: Res<Time>) {
 
     if time.elapsed_secs() % 4.0 < 0.017 {
         godot_print!(
-            "📋 Update running at {:.2}s (part of app.update())",
+            "📋 Update running at {:.2}s (Update runs in the process suffix)",
             time.elapsed_secs()
         );
     }
@@ -118,7 +118,7 @@ fn fixed_update_system(
 fn post_update_system(time: Res<Time>) {
     if time.elapsed_secs() % 5.0 < 0.017 {
         godot_print!(
-            "📤 PostUpdate running at {:.2}s (part of app.update())",
+            "📤 PostUpdate running at {:.2}s (PostUpdate runs in the process suffix)",
             time.elapsed_secs()
         );
     }
