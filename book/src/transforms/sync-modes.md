@@ -43,12 +43,42 @@ Full bidirectional synchronization between ECS and Godot.
 - ✅ Changes in either system are reflected
 - ✅ Works with Godot animations
 - ✅ Supports hybrid architectures
+- ✅ Per-axis co-authorship -- Godot and Bevy can drive different axes of the same node
+- ✅ Bevy reads the latest Godot value *before* your systems run (read in `PreUpdate`)
 - ❌ Highest performance cost
 
 **Use when:**
 - Migrating from GDScript to ECS
 - Using Godot's AnimationPlayer
 - Mixing ECS and GDScript logic
+
+#### Co-authorship semantics
+
+The Godot→Bevy read runs in `PreUpdate` (before your systems), so a node moved from
+Godot -- by GDScript, an `AnimationPlayer`, or physics -- is visible to Bevy systems the
+same frame. The Bevy→Godot write runs in `FixedLast` and pushes only what Bevy changed,
+tracked against a per-entity value shadow. So a single node can be co-authored **per axis**:
+
+```gdscript
+# quad.gd -- Godot drives x
+func _process(_dt): position.x = sin(t) * 100.0
+```
+```rust
+// Bevy drives y; x stays whatever Godot set it to
+fn move_y(mut q: Query<&mut Transform, With<Quad>>) {
+    for mut t in &mut q { t.translation.y = cos(time) * 100.0; }
+}
+```
+
+What this guarantees and what it doesn't:
+
+- **Translation and scale** are co-authored **per component** (`x`/`y`/`z` independently).
+- **Rotation** is whole -- quaternion components aren't independently meaningful, so rotation
+  is authored by one side at a time (2D rotation is a single angle anyway).
+- If **both sides change the same axis in the same frame**, Bevy wins.
+- A value authored in Godot's **idle phase** (`_process`, `AnimationPlayer` in idle) is seen
+  by Bevy the next frame, since Bevy reads in the physics phase -- the same one-frame
+  relationship any Godot `_physics_process` reader has with an idle-phase writer.
 
 ## Configuration
 
@@ -190,6 +220,25 @@ fn check_sync_mode(
 3. **Benchmark your game** - Measure actual performance impact
 4. **Document your choice** - Help team members understand the architecture
 
+## Render interpolation
+
+godot-bevy drives `FixedMain` directly from Godot's `_physics_process`, so `Time<Fixed>::overstep_fraction()` is always `0.0` -- there is no fractional leftover between the physics clock and the render clock. Interpolation plugins that read this value to ease between fixed steps -- `bevy_transform_interpolation`, avian's `PhysicsInterpolationPlugin` -- will snap positions on every frame rather than smooth them. Neither is supported.
+
+Use Godot's built-in physics interpolation instead:
+
+**Project Settings → Physics → Common → Physics Interpolation** = `true`
+
+or in `project.godot`:
+
+```ini
+[physics]
+common/physics_interpolation=true
+```
+
+When a node teleports (respawn, warp), call `reset_physics_interpolation()` on it immediately after moving so Godot doesn't interpolate through the jump.
+
+The same caveat applies to overstep-based camera-smoothing systems placed in the `BeforeFixedMainLoop` / `AfterFixedMainLoop` sets, and to `bevy_gizmos`' fixed gizmo-context -- both are untested and unsupported under Godot-owned physics. In practice this is largely moot since godot-bevy renders through Godot rather than `bevy_render`.
+
 ## Troubleshooting
 
 ### "Transform changes not visible"
@@ -204,5 +253,7 @@ fn check_sync_mode(
 
 ### "Godot animations not affecting ECS"
 - Enable TwoWay mode for animated entities
-- Ensure transforms aren't being overwritten by ECS systems
-- Check system execution order
+- An ECS system writing the **same axis** the animation drives will win the conflict (Bevy-wins);
+  let each side own different axes, or move that ECS logic off the animated axis. ECS writing
+  *other* axes is fine -- co-authorship is per-axis (see above).
+- For rotation specifically, only one side should author it (rotation is whole, not per-axis)

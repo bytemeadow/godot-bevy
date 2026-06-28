@@ -40,8 +40,23 @@ impl Plugin for GodotTransformSyncPlugin {
                 entity.insert(node2d.get_transform().to_bevy_transform());
             }
         })
-        // Register metadata component with default - this avoids the 1-frame delay
-        .register_scene_tree_component::<TransformSyncMetadata>();
+        // Seed the shadow from the node at registration so shadow == Transform ==
+        // Godot at spawn (written_once == false). This closes the clobber window for
+        // a user authoring in Startup/First before the first read, and avoids a
+        // spurious frame-1 Changed.
+        .register_scene_tree_component_with_init::<TransformSyncMetadata, _>(|entity, node| {
+            let shadow = if let Some(node3d) = node.try_get::<Node3D>() {
+                node3d.get_transform().to_bevy_transform()
+            } else if let Some(node2d) = node.try_get::<Node2D>() {
+                node2d.get_transform().to_bevy_transform()
+            } else {
+                Transform::default()
+            };
+            entity.insert(TransformSyncMetadata {
+                shadow,
+                written_once: false,
+            });
+        });
 
         // Register the transform configuration resource with the plugin's config
         app.insert_resource(GodotTransformConfig {
@@ -50,7 +65,10 @@ impl Plugin for GodotTransformSyncPlugin {
 
         // Only add automatic sync systems if auto_sync is enabled
         if self.auto_sync {
-            // Add systems that sync godot -> bevy transforms when two-way syncing enabled
+            // Godot→Bevy read runs in PreUpdate, before both the fixed phase
+            // (FixedUpdate logic + FixedLast write) and the Update suffix, so Bevy
+            // logic sees Godot's value the same frame -- the brownfield guarantee.
+            // The value shadow guard makes this safe read-before-write.
             app.add_systems(
                 PreUpdate,
                 pre_update_godot_transforms::<()>.run_if(transform_sync_twoway_enabled),

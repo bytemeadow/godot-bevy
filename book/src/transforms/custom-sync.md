@@ -245,7 +245,7 @@ Custom sync registers the same shared sync systems as auto sync, just restricted
 - `godot_to_bevy` (Godot → Bevy read) runs in `PreUpdate`
 - Bidirectional sync (no prefix) runs in both schedules
 
-Because it shares the auto-sync implementation, custom sync also performs the physics-interpolation reset on an entity's first write, keeping it interpolation-compatible.
+Custom sync resets physics interpolation on an entity's first write, so freshly spawned nodes don't slide from their old position.
 
 ### 2D and 3D Support
 
