@@ -139,9 +139,9 @@ impl Plugin for GodotBaseCorePlugin {
             .init_resource::<SceneTreeComponentRegistry>()
             .add_observer(on_godot_node_handle_removed);
 
-        // Remove the in-process fixed loop; FixedMain is driven from _physics_process instead.
-        // TimePlugin stays so Time<Real>/Virtual still advances each _process for Update systems.
-        crate::plugins::fixed_schedule::neutralize_in_process_fixed_loop(app);
+        // Keeps RunFixedMainLoop's Before/After anchor sets live for ecosystem plugins
+        // (e.g. leafwing). TimePlugin stays so Time<Real>/Virtual still advance in _process.
+        crate::plugins::fixed_schedule::host_fixed_main_loop(app);
     }
 }
 

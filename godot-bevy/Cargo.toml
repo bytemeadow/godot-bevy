@@ -68,6 +68,10 @@ experimental-godot-api = ["godot/experimental-godot-api"]
 # Uses api-custom-json to avoid cross-compilation issues with struct sizes.
 experimental-wasm = ["godot/experimental-wasm", "godot/lazy-function-tables", "godot/api-custom-json"]
 experimental-wasm-nothreads = ["experimental-wasm", "godot/experimental-wasm-nothreads"]
+# test-only: emits a per-frame bevy_frame_complete signal so the itest harness
+# can await a true end-of-frame boundary. never enable in production builds.
+test-frame-signal = []
 
 [dev-dependencies]
+bevy_state = {version = "0.19", default-features = false, features = ["bevy_app"]}
 criterion = {version = "0.5", features = ["html_reports"]}
