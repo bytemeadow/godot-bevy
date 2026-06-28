@@ -3,6 +3,7 @@ pub use crate::interop::*;
 pub use crate::node_tree_view::{NodeTreeView, NodeTreeViewError};
 #[cfg(feature = "godot_bevy_log")]
 pub use crate::plugins::godot_bevy_logger::GodotBevyLogPlugin;
+#[allow(deprecated)]
 pub use crate::plugins::{
     GodotCorePlugins,
     GodotDefaultPlugins,

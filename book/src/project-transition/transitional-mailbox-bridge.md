@@ -1,4 +1,9 @@
-# Transitional Mailbox Bridge (Godot -> Bevy Messages)
+# (Deprecated) Transitional Mailbox Bridge (Godot -> Bevy Messages)
+
+The mailbox bridge plugin has been replaced with a simpler and more flexible API. You can read more about it here: [Godot to Bevy Communication](../scene-tree/godot-to-bevy-communication.md).
+
+
+## Overview
 
 This pattern is for teams migrating existing Godot/GDScript gameplay into `godot-bevy`.
 
