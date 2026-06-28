@@ -5,7 +5,7 @@ This file provides guidance to AI coding agents (Claude Code, Cursor, etc.) when
 ## Working Principles
 
 - **Aim for simplicity.** Prefer the smallest change that solves the problem. Avoid speculative abstraction, extra layers, and configuration that isn't needed yet. Match the style, naming, and comment density of the surrounding code rather than introducing new patterns.
-- **Run a deslop pass after work.** Once a change is functionally complete, review the diff and strip the slop: redundant or obvious comments, dead code, unused imports, leftover scaffolding, over-engineered helpers, and verbose phrasing. The repo's `/simplify` command does exactly this — run it (or do the equivalent by hand) before considering work done.
+- **Run a deslop pass after work.** Once a change is functionally complete, review the diff and strip the slop: redundant or obvious comments (especially session-narrative like "now that…"/"previously…"), dead code, unused imports, leftover scaffolding, over-engineered helpers, and verbose phrasing. The repo's `deslop` skill (`.claude/skills/deslop`) does exactly this — run it (or do the equivalent by hand) before considering work done.
 
 ## Project Overview
 
