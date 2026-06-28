@@ -23,10 +23,8 @@ members = [
 ]
 # Temporarily excluded pending Bevy 0.19 support in third-party ecosystem crates.
 # Move each back into `members` once its deps ship a 0.19-compatible release:
-#   input-event-demo    -> leafwing-input-manager, bevy_enhanced_input
 #   avian-physics-demo  -> avian3d (Mode B: Bevy/avian owns physics -- shelved)
 exclude = [
-  "examples/input-event-demo/rust",
   "examples/avian-physics-demo/rust",
 ]
 resolver = "2"
