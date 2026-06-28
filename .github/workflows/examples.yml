@@ -42,10 +42,6 @@ jobs:
       - uses: dorny/paths-filter@v3
         id: filter
         with:
-          # NOTE: avian-physics-demo, dodge-the-creeps-2d, and platformer-2d are
-          # temporarily disabled pending Bevy 0.19 support in their third-party deps
-          # (avian3d, bevy_asset_loader). Re-add their filters once those crates ship
-          # 0.19-compatible releases and they're moved back into the workspace `members`.
           filters: |
             perf-test:
               - 'godot-bevy/**'
@@ -57,6 +53,18 @@ jobs:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
               - 'examples/simple-node2d-movement/**'
+              - '.github/workflows/examples.yml'
+              - 'Cargo.toml'
+            dodge-the-creeps-2d:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/dodge-the-creeps-2d/**'
+              - '.github/workflows/examples.yml'
+              - 'Cargo.toml'
+            platformer-2d:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/platformer-2d/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
 
@@ -116,9 +124,7 @@ jobs:
           if-no-files-found: warn
 
   # Export examples for all platforms (requires libraries from build).
-  # NOTE: currently a no-op — its only examples (dodge-the-creeps-2d, platformer-2d)
-  # are temporarily gated out above pending Bevy 0.19 ecosystem support, so the `if`
-  # below evaluates false and this job is skipped until they're re-enabled.
+  # Runs when dodge-the-creeps-2d or platformer-2d changed.
   export:
     name: export (${{ matrix.example }})
     runs-on: macos-latest

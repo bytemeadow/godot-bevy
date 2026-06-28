@@ -18,18 +18,16 @@ members = [
   "examples/simple-node2d-movement/rust",
   "examples/perf-test/rust",
   "examples/two-way-sync-demo/rust",
+  "examples/dodge-the-creeps-2d/rust",
+  "examples/platformer-2d/rust",
 ]
 # Temporarily excluded pending Bevy 0.19 support in third-party ecosystem crates.
 # Move each back into `members` once its deps ship a 0.19-compatible release:
-#   avian-physics-demo  -> avian3d, bevy_asset_loader
-#   dodge-the-creeps-2d -> bevy_asset_loader
-#   platformer-2d       -> bevy_asset_loader
 #   input-event-demo    -> leafwing-input-manager, bevy_enhanced_input
+#   avian-physics-demo  -> avian3d (Mode B: Bevy/avian owns physics -- shelved)
 exclude = [
-  "examples/avian-physics-demo/rust",
-  "examples/dodge-the-creeps-2d/rust",
   "examples/input-event-demo/rust",
-  "examples/platformer-2d/rust",
+  "examples/avian-physics-demo/rust",
 ]
 resolver = "2"
 

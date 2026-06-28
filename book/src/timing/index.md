@@ -146,7 +146,7 @@ common/physics_interpolation=true
 
 When a node teleports (respawn, warp), call `reset_physics_interpolation()` on it immediately after moving so Godot doesn't interpolate through the jump.
 
-> **Note:** Bevy-side interpolation plugins (e.g. `bevy_interpolation`) and rollback netcode are not supported in godot-bevy's transform sync path — use Godot's built-in interpolation instead.
+> **Note:** Bevy-side interpolation plugins (e.g. avian's `PhysicsInterpolationPlugin`, `bevy_transform_interpolation`) and rollback netcode (`bevy_ggrs`) are not supported in godot-bevy's transform sync path — use Godot's built-in interpolation instead.
 
 ## Common Pitfalls
 

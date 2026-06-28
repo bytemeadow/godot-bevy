@@ -1,5 +1,10 @@
 # Avian Physics Demo
 
+> **Status: excluded from workspace and CI.** This demo represents Mode B (Bevy/avian owns
+> physics), which is shelved. avian3d's Bevy 0.19 compatibility is unconfirmed, and Mode B
+> itself is deferred pending a design revisit. Re-enable once avian ships a Bevy 0.19-compatible
+> release and Mode B is back on the roadmap.
+
 This is a simple demonstration of a cube falling onto a static platform. We've
 disabled Godot's built-in Physics and instead use [Jondolf/avian: ECS-driven 2D and 3D physics engine for the Bevy game engine.](https://github.com/Jondolf/avian)
 

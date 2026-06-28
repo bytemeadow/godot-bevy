@@ -4,16 +4,16 @@ use crate::{
     nodes::player::Player as GodotPlayerNode,
 };
 use bevy::prelude::{
-    App, Commands, Component, Entity, Handle, IntoScheduleConfigs, Name, NextState, OnEnter,
-    OnExit, Plugin, Query, Res, ResMut, Resource, Result, Transform, Update, With, Without,
-    in_state,
+    App, Commands, Component, Entity, FixedUpdate, Handle, IntoScheduleConfigs, Name, NextState,
+    OnEnter, OnExit, Plugin, Query, Res, ResMut, Resource, Result, Time, Transform, Update, With,
+    Without, in_state,
 };
 use bevy_asset_loader::asset_collection::AssetCollection;
 use godot::{
     builtin::{StringName, Vector2},
     classes::{Input, Node2D},
 };
-use godot_bevy::{plugins::core::PhysicsDelta, prelude::*};
+use godot_bevy::prelude::*;
 
 #[derive(AssetCollection, Resource, Debug)]
 pub struct PlayerAssets {
@@ -30,13 +30,10 @@ impl Plugin for PlayerPlugin {
                 Update,
                 check_player_death.run_if(in_state(GameState::InGame)),
             )
-            .add_systems(
-                PhysicsUpdate,
-                move_player.run_if(in_state(GameState::InGame)),
-            )
+            .add_systems(FixedUpdate, move_player.run_if(in_state(GameState::InGame)))
             .add_systems(OnEnter(GameState::Countdown), setup_player)
             .add_systems(
-                PhysicsUpdate,
+                FixedUpdate,
                 move_player.run_if(in_state(GameState::Countdown)),
             );
     }
@@ -115,7 +112,7 @@ fn move_player(
         &mut Transform,
         &mut AnimationState,
     )>,
-    physics_delta: Res<PhysicsDelta>,
+    time: Res<Time>,
     mut godot: GodotAccess,
 ) -> Result {
     if let Ok((player_data, screen_cache, mut transform, mut anim_state)) = player.single_mut() {
@@ -155,8 +152,8 @@ fn move_player(
         }
 
         // Transform update using cached screen size
-        transform.translation.x += velocity.x * physics_delta.delta_seconds;
-        transform.translation.y += velocity.y * physics_delta.delta_seconds;
+        transform.translation.x += velocity.x * time.delta_secs();
+        transform.translation.y += velocity.y * time.delta_secs();
         transform.translation.x = transform.translation.x.clamp(0., screen_cache.size.x);
         transform.translation.y = transform.translation.y.clamp(0., screen_cache.size.y);
     }

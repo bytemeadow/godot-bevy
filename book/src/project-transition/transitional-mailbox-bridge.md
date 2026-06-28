@@ -33,7 +33,7 @@ For new gameplay, prefer:
 - `GodotMailboxPlugin<T, Marker>`
 - `GodotMailboxSet::Drain`
 
-The plugin runs in `FixedUpdate`, queries entities with `Marker` + `GodotNodeHandle`,
+The plugin runs in `FixedFirst`, queries entities with `Marker` + `GodotNodeHandle`,
 calls `T::drain_from_node(...)`, and writes `T` when present.
 
 ## Example
@@ -77,10 +77,7 @@ impl GodotMailboxMessage for PlayerDamageRequest {
 struct PlayerMarker;
 
 app.add_plugins(GodotMailboxPlugin::<PlayerDamageRequest, PlayerMarker>::default())
-    .add_systems(
-        FixedUpdate,
-        apply_damage_requests.after(GodotMailboxSet::Drain),
-    );
+    .add_systems(FixedUpdate, apply_damage_requests);
 ```
 
 ## Migration guidance

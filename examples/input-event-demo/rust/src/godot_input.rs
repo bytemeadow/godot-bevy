@@ -3,8 +3,8 @@ use godot::global::Key;
 use godot_bevy::prelude::godot_prelude::godot_print;
 
 use godot_bevy::plugins::input::{
-    ActionInput, GamepadAxisInput, GamepadButtonInput, KeyboardInput, MouseButton,
-    MouseButtonInput, MouseMotion, TouchInput,
+    ActionInput, GamepadAxisInput, GamepadButtonInput, GodotKeyboardInput, GodotMouseButton,
+    GodotMouseButtonInput, GodotMouseMotion, TouchInput,
 };
 
 pub struct GodotInputPlugin;
@@ -26,7 +26,7 @@ impl Plugin for GodotInputPlugin {
     }
 }
 
-fn handle_keyboard_input(mut keyboard_events: MessageReader<KeyboardInput>) {
+fn handle_keyboard_input(mut keyboard_events: MessageReader<GodotKeyboardInput>) {
     for event in keyboard_events.read() {
         let key_name = format!("{:?}", event.keycode);
         let state = if event.pressed { "pressed" } else { "released" };
@@ -56,7 +56,7 @@ fn handle_keyboard_input(mut keyboard_events: MessageReader<KeyboardInput>) {
     }
 }
 
-fn handle_mouse_button_input(mut mouse_button_events: MessageReader<MouseButtonInput>) {
+fn handle_mouse_button_input(mut mouse_button_events: MessageReader<GodotMouseButtonInput>) {
     for event in mouse_button_events.read() {
         let button_name = format!("{:?}", event.button);
         let state = if event.pressed { "pressed" } else { "released" };
@@ -71,16 +71,16 @@ fn handle_mouse_button_input(mut mouse_button_events: MessageReader<MouseButtonI
 
         // Special handling for different buttons
         match event.button {
-            MouseButton::Left if event.pressed => {
+            GodotMouseButton::Left if event.pressed => {
                 godot_print!("[GODOT] 👆 Left click - Select/Attack!");
             }
-            MouseButton::Right if event.pressed => {
+            GodotMouseButton::Right if event.pressed => {
                 godot_print!("[GODOT] 👉 Right click - Context menu!");
             }
-            MouseButton::WheelUp => {
+            GodotMouseButton::WheelUp => {
                 godot_print!("[GODOT] 🔼 Scroll up - Zoom in!");
             }
-            MouseButton::WheelDown => {
+            GodotMouseButton::WheelDown => {
                 godot_print!("[GODOT] 🔽 Scroll down - Zoom out!");
             }
             _ => {}
@@ -88,7 +88,7 @@ fn handle_mouse_button_input(mut mouse_button_events: MessageReader<MouseButtonI
     }
 }
 
-fn handle_mouse_motion(mut mouse_motion_events: MessageReader<MouseMotion>) {
+fn handle_mouse_motion(mut mouse_motion_events: MessageReader<GodotMouseMotion>) {
     for event in mouse_motion_events.read() {
         // Only log significant mouse movements to avoid spam
         if event.delta.length() > 5.0 {

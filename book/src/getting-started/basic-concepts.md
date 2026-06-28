@@ -64,8 +64,7 @@ fn movement_system(
     mut query: Query<&mut Transform, With<Player>>,
 ) {
     for mut transform in query.iter_mut() {
-        transform.translation.x += 
-            100.0 * time.delta_seconds();
+        transform.translation.x += 100.0 * time.delta_secs();
     }
 }
 ```
