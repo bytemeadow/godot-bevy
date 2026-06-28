@@ -6,9 +6,9 @@
  * ButtonInput<KeyCode>, so a regression there yields zero reads in both crates:
  *
  * - leafwing-input-manager (pull-style ActionState): probed in both Update and
- *   FixedUpdate. The FixedUpdate probe is the load-bearing one -- leafwing swaps
- *   its fixed-input buffer in the Before/AfterFixedMainLoop anchors that
- *   godot-bevy hosts via host_fixed_main_loop specifically for ecosystem crates.
+ *   FixedUpdate, so a fixed-clock reader also sees the input. leafwing keeps a
+ *   separate fixed-input buffer via the Before/AfterFixedMainLoop anchors that
+ *   godot-bevy hosts (host_fixed_main_loop) for ecosystem crates.
  * - bevy_enhanced_input (push-style observer): an On<Fire<Jump>> global observer,
  *   the path that previously exposed a godot-bevy bug.
  *
@@ -52,10 +52,9 @@ fn analyze_log(
 
 /// leafwing-input-manager reads `ButtonInput<KeyCode>` (populated by the bridge)
 /// via its `CentralInputStore`. Verify `ActionState` sees the press/release edges
-/// in both the Update clock and the FixedUpdate clock. The FixedUpdate read is the
-/// one that exercises leafwing's swap_to_fixed_update / swap_to_update systems,
-/// which only run because godot-bevy keeps RunFixedMainLoop's Before/After anchors
-/// live.
+/// in both the Update clock and the FixedUpdate clock. The FixedUpdate read also
+/// covers leafwing's fixed-input buffer (swap_to_fixed_update / swap_to_update),
+/// which run in the RunFixedMainLoop Before/After anchors godot-bevy keeps live.
 #[itest(async)]
 fn test_leafwing_action_state_both_clocks(ctx: &TestContext) -> godot::task::TaskHandle {
     use leafwing_input_manager::prelude::*;

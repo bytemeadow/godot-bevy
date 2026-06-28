@@ -495,10 +495,13 @@ const FMT_END: &str = "\x1b[0m";
 
 /// Helper function to wait for the next Godot process frame.
 ///
-/// The `process_frame` signal fires after all `_physics_process()` calls
-/// but before `_process()` calls for that frame. When this resolves, the
-/// Main prefix (First/PreUpdate/StateTransition) and any FixedMain steps have
-/// run, but the suffix (Update/PostUpdate/Last) has not yet run for this frame.
+/// The `process_frame` signal fires after all `_physics_process()` calls but
+/// before `_process()` for that frame, so the suffix (Update/PostUpdate/Last)
+/// has not yet run when this resolves. The Main prefix
+/// (First/PreUpdate/StateTransition) + FixedMain have run too -- except on a
+/// 0-physics-step frame, where the prefix runs in the `_process` fallback after
+/// this fires. The itest harness pins `--fixed-fps 60` (one step per frame), so
+/// the prefix has always run there.
 pub async fn await_frame() {
     let tree = Engine::singleton()
         .get_main_loop()

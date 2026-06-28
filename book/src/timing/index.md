@@ -12,10 +12,10 @@ The **prefix** of the main schedule plus the fixed loop run here, on Godot's phy
 
 **What runs:**
 - `First`
-- `PreUpdate` (reads Godot → ECS transforms)
+- `PreUpdate` (reads Godot → ECS transforms, once per render frame)
 - `StateTransition`
 - `FixedMain` (zero or more times per render frame)
-  - `FixedFirst`
+  - `FixedFirst` (TwoWay: re-reads Godot → ECS per physics step, steps 2..N)
   - `FixedPreUpdate`
   - `FixedUpdate` (your physics logic)
   - `FixedPostUpdate`
@@ -60,7 +60,7 @@ Physics Frame Start
     ├── PreUpdate       │ prefix: once per render frame (reads Godot → ECS)
     ├── StateTransition ┘
     └── FixedMain       (once per physics step)
-        ├── FixedFirst
+        ├── FixedFirst      (TwoWay: re-reads Godot → ECS, steps 2..N)
         ├── FixedPreUpdate
         ├── FixedUpdate     (your physics/fixed logic)
         ├── FixedPostUpdate
@@ -195,6 +195,6 @@ Godot transforms written in `FixedLast` aren't read back into ECS until the next
 
 1. **Visual frames** vary widely (30–144+ FPS)
 2. **FixedUpdate** runs at a constant rate driven by Godot's physics clock
-3. Transform syncing from ECS → Godot happens in `FixedLast`; Godot → ECS happens in `PreUpdate`
+3. Transform syncing from ECS → Godot happens in `FixedLast`; Godot → ECS happens in `PreUpdate` (and per physics step in `FixedFirst` under TwoWay)
 
 > **Note:** Scene tree entities are initialized during `PreStartup`, before any `Startup` systems run. You can safely query Godot scene entities in `Startup` systems. See [Scene Tree Initialization and Timing](../scene-tree/timing.md) for details.
