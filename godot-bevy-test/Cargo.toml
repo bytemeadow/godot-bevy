@@ -9,6 +9,9 @@ keywords.workspace = true
 categories.workspace = true
 license.workspace = true
 
+[features]
+test-frame-signal = ["godot-bevy/test-frame-signal"]
+
 [dependencies]
 godot = { workspace = true, features = ["__trace"] }
 godot-bevy = { workspace = true }

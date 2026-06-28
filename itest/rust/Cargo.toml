@@ -13,6 +13,7 @@ name = "godot_bevy_itest"
 
 [features]
 default = []
+test-frame-signal = ["godot-bevy/test-frame-signal", "godot-bevy-test/test-frame-signal"]
 
 [dependencies]
 godot = { workspace = true, features = ["__trace"] }

@@ -31,7 +31,7 @@ echo -e "${CYAN}Building godot-bevy-itest ($BUILD_TYPE)...${NC}"
 
 # Build the Rust library
 cd "$(dirname "$0")/rust"
-cargo build $CARGO_BUILD_FLAGS
+cargo build $CARGO_BUILD_FLAGS --features test-frame-signal
 
 cd ..
 
@@ -108,9 +108,13 @@ export GODOT_TEST_EXIT_CODE_PATH="$EXIT_CODE_FILE"
 # Clean up any previous exit code file
 rm -f "$EXIT_CODE_FILE"
 
-# Run tests in headless mode
+# Run tests in headless mode.
+# --fixed-fps 60 pins Godot's frame delta so physics steps exactly once per render
+# frame and the whole schedule is reproducible (deterministic itests). This is
+# test-determinism only -- do NOT add it to run-benches.sh/compare-benches.sh, which
+# are synchronous and Instant-timed and gain nothing from it.
 echo -e "${CYAN}Running integration tests...${NC}"
-"$GODOT4_BIN" --headless --path "$GODOT_PROJECT_DIR" --quit-after 5000
+"$GODOT4_BIN" --headless --fixed-fps 60 --path "$GODOT_PROJECT_DIR" --quit-after 5000
 
 # Read the exit code from the file written by tests
 if [ -f "$EXIT_CODE_FILE" ]; then

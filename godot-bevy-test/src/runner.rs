@@ -530,3 +530,13 @@ pub async fn await_frames(count: u32) {
         await_frame().await;
     }
 }
+
+/// Wait for the BevyApp to finish a full render frame (suffix + clear_trackers).
+/// Returns the number of physics steps that ran that frame. Requires the
+/// `test-frame-signal` feature.
+#[cfg(feature = "test-frame-signal")]
+pub async fn await_bevy_frame(app: &godot::obj::Gd<godot_bevy::BevyApp>) -> i64 {
+    let signal = godot::builtin::Signal::from_object_signal(app, "bevy_frame_complete");
+    let args = signal.to_future::<(i64,)>().await;
+    args.0
+}
