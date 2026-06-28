@@ -270,7 +270,12 @@ fn twoway_nstep_accumulates_every_godot_move() {
 fn idle_frame_reads_via_preupdate_fallback() {
     let (mut app, entity) = wired_app(TransformSyncMode::TwoWay, true);
 
-    app.world_mut().get_mut::<GodotNode>(entity).unwrap().0.translation.y = 5.0;
+    app.world_mut()
+        .get_mut::<GodotNode>(entity)
+        .unwrap()
+        .0
+        .translation
+        .y = 5.0;
     frame(&mut app, 0, |_, _| {});
 
     let bevy = bevy_translation(&app, entity);
