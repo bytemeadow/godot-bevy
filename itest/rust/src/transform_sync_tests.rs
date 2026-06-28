@@ -80,7 +80,7 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         );
 
         app.cleanup().await;
-        node.queue_free();
+        node.free();
     })
 }
 
@@ -122,7 +122,7 @@ fn test_godot_to_bevy_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         println!("✓ Godot→Bevy transform sync: {initial_x:.1} → {synced_x:.1}");
 
         app.cleanup().await;
-        node.queue_free();
+        node.free();
     })
 }
 
@@ -203,23 +203,25 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         );
 
         app.cleanup().await;
-        bevy_node.queue_free();
-        godot_node.queue_free();
+        bevy_node.free();
+        godot_node.free();
     })
 }
 
 /// Regression test for the TwoWay self-change guard across the `_process` /
 /// `_physics_process` boundary.
 ///
-/// The Godot→Bevy read-back runs in `PreUpdate` (render rate, driven by `_process`),
-/// while the Bevy→Godot write runs in `FixedLast` (physics tick, driven by
-/// `_physics_process`). These are on different schedules and different clocks.
-/// The guard (`TransformSyncMetadata.last_sync_tick`) uses tick-absolute comparison
-/// (`is_newer_than`) so it correctly recognises a value that was read FROM Godot as
-/// our own change and suppresses the echo write -- even though the read and write
-/// happen in different schedule passes. Without the guard the write would echo the
-/// Godot-origin position back, potentially resetting physics interpolation or
-/// overwriting a Godot-driven position with a stale Bevy value.
+/// The Godot→Bevy read-back runs in `PreUpdate` (before the fixed steps), while
+/// the Bevy→Godot write runs in `FixedLast`. The guard is a value shadow
+/// (`TransformSyncMetadata.shadow`): the write pushes only when the Bevy value
+/// differs from the last-synced shadow, so a value that was read FROM Godot (and
+/// stored as the shadow) is recognised as not-Bevy-authored and the echo write is
+/// suppressed. Being value-based, the guard is order-independent -- no
+/// read-after-write requirement.
+///
+/// Without the guard the write would echo the Godot-origin position back,
+/// potentially resetting physics interpolation or overwriting a Godot-driven
+/// position with a stale Bevy value.
 ///
 /// We set the node purely from Godot (no Bevy system touches this Transform), run
 /// physics ticks, and assert the Godot value is picked up by Bevy AND the node is
@@ -290,7 +292,7 @@ fn test_twoway_no_echo_back_across_fixed_boundary(ctx: &TestContext) -> godot::t
         );
 
         app.cleanup().await;
-        node.queue_free();
+        node.free();
     })
 }
 
@@ -374,7 +376,7 @@ fn test_twoway_godot_and_bevy_coexist(ctx: &TestContext) -> godot::task::TaskHan
         );
 
         app.cleanup().await;
-        node.queue_free();
+        node.free();
     })
 }
 
@@ -413,6 +415,7 @@ fn test_spawn_resets_physics_interpolation(ctx: &TestContext) -> godot::task::Ta
         );
 
         app.cleanup().await;
+        node.free();
         ctx_clone
             .scene_tree
             .get_tree()
@@ -476,6 +479,59 @@ fn test_transform_sync_disabled(ctx: &TestContext) -> godot::task::TaskHandle {
         );
 
         app.cleanup().await;
-        node.queue_free();
+        node.free();
+    })
+}
+
+/// Brownfield guarantee: a Bevy system sees a Godot-authored transform in the SAME
+/// frame it runs. The TwoWay read lands in `PreUpdate` (before logic), so an `Update`
+/// system observes Godot's latest value this frame -- not next frame. If the read ran
+/// after the write, the system would observe the stale value and this would fail.
+#[itest(async)]
+fn test_twoway_read_before_logic(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        #[derive(Resource, Default)]
+        struct Observed(f32);
+
+        let mut node = godot::classes::Node2D::new_alloc();
+        node.set_name("ReadBeforeLogicNode");
+        node.set_position(Vector2::new(0.0, 0.0));
+        ctx_clone.scene_tree.clone().add_child(&node);
+        let node_id = node.instance_id();
+
+        let mut app = TestApp::new(&ctx_clone, move |app| {
+            app.add_plugins(GodotTransformSyncPlugin::default());
+            app.insert_resource(GodotTransformConfig::two_way());
+            app.init_resource::<Observed>();
+            // Record what the Bevy value is when Update logic runs.
+            app.add_systems(
+                Update,
+                move |q: Query<(&GodotNodeHandle, &Transform)>, mut obs: ResMut<Observed>| {
+                    for (h, t) in q.iter() {
+                        if h.instance_id() == node_id {
+                            obs.0 = t.translation.x;
+                        }
+                    }
+                },
+            );
+        })
+        .await;
+
+        // Author x purely from Godot, then advance one frame. The PreUpdate read must
+        // land it in Bevy before the Update system runs that same frame.
+        node.set_position(Vector2::new(99.0, 0.0));
+        app.update().await;
+
+        let observed = app.with_world(|w| w.resource::<Observed>().0);
+        assert!(
+            (observed - 99.0).abs() < 0.1,
+            "Update logic must see the Godot-authored x the same frame (read-before-logic); got {observed:.1}"
+        );
+
+        println!("✓ TwoWay read-before-logic: Update saw Godot x={observed:.1} same frame");
+
+        app.cleanup().await;
+        node.free();
     })
 }

@@ -57,8 +57,8 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
         })
         .await;
 
-        let (mut area_a, entity_a) = app.add_node::<godot::classes::Area2D>("CollisionA").await;
-        let (mut area_b, entity_b) = app.add_node::<godot::classes::Area2D>("CollisionB").await;
+        let (area_a, entity_a) = app.add_node::<godot::classes::Area2D>("CollisionA").await;
+        let (area_b, entity_b) = app.add_node::<godot::classes::Area2D>("CollisionB").await;
 
         let mut watcher = find_collision_watcher(&ctx_clone.scene_tree)
             .expect("CollisionWatcher should exist when GodotCollisionsPlugin is added");
@@ -120,8 +120,8 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
         );
 
         app.cleanup().await;
-        area_a.queue_free();
-        area_b.queue_free();
+        area_a.free();
+        area_b.free();
     })
 }
 
@@ -145,8 +145,8 @@ fn test_collision_started_observer_from_system(ctx: &TestContext) -> godot::task
         })
         .await;
 
-        let (mut area_a, _entity_a) = app.add_node::<godot::classes::Area2D>("ObsStartA").await;
-        let (mut area_b, _entity_b) = app.add_node::<godot::classes::Area2D>("ObsStartB").await;
+        let (area_a, _entity_a) = app.add_node::<godot::classes::Area2D>("ObsStartA").await;
+        let (area_b, _entity_b) = app.add_node::<godot::classes::Area2D>("ObsStartB").await;
 
         let mut watcher =
             find_collision_watcher(&ctx_clone.scene_tree).expect("CollisionWatcher should exist");
@@ -170,8 +170,8 @@ fn test_collision_started_observer_from_system(ctx: &TestContext) -> godot::task
         );
 
         app.cleanup().await;
-        area_a.queue_free();
-        area_b.queue_free();
+        area_a.free();
+        area_b.free();
     })
 }
 
@@ -195,8 +195,8 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
         })
         .await;
 
-        let (mut area_a, _entity_a) = app.add_node::<godot::classes::Area2D>("ObsEndA").await;
-        let (mut area_b, _entity_b) = app.add_node::<godot::classes::Area2D>("ObsEndB").await;
+        let (area_a, _entity_a) = app.add_node::<godot::classes::Area2D>("ObsEndA").await;
+        let (area_b, _entity_b) = app.add_node::<godot::classes::Area2D>("ObsEndB").await;
 
         let mut watcher =
             find_collision_watcher(&ctx_clone.scene_tree).expect("CollisionWatcher should exist");
@@ -229,7 +229,7 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
         );
 
         app.cleanup().await;
-        area_a.queue_free();
-        area_b.queue_free();
+        area_a.free();
+        area_b.free();
     })
 }
