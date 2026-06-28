@@ -96,10 +96,17 @@ macro_rules! add_transform_sync_systems {
             $crate::bevy_app::PreUpdate,
             $crate::plugins::transforms::sync_systems::pre_update_godot_transforms::<$godot_to_bevy_query>,
         );
-        $app.add_systems(
-            $crate::bevy_app::FixedFirst,
-            $crate::plugins::transforms::sync_systems::pre_update_godot_transforms::<$godot_to_bevy_query>.run_if($crate::plugins::fixed_schedule::not_first_fixed_step),
-        );
+        {
+            // `.run_if` resolves via `IntoScheduleConfigs`; bring it into scope so the
+            // macro compiles for callers who only `use godot_bevy::prelude::*` (the
+            // prelude namespaces bevy_ecs's prelude rather than globbing it).
+            use $crate::prelude::bevy_ecs_prelude::IntoScheduleConfigs as _;
+            $app.add_systems(
+                $crate::bevy_app::FixedFirst,
+                $crate::plugins::transforms::sync_systems::pre_update_godot_transforms::<$godot_to_bevy_query>
+                    .run_if($crate::plugins::fixed_schedule::not_first_fixed_step),
+            );
+        }
     };
 }
 
@@ -126,3 +133,25 @@ impl GodotTransformSyncPluginExt for crate::plugins::transforms::GodotTransformS
 
 // Re-export the macro at the crate level
 pub use add_transform_sync_systems;
+
+#[cfg(test)]
+mod tests {
+    // Regression guard for the `godot_to_bevy:`/bidirectional arm: its `.run_if(...)`
+    // resolves via `IntoScheduleConfigs`, so the macro must pull the trait into scope
+    // itself. We import only what a minimal external caller needs -- deliberately NOT
+    // `IntoScheduleConfigs` -- so a missing in-macro import fails this compile.
+    use crate::bevy_app::App;
+    use crate::bevy_ecs::prelude::{Component, With};
+
+    #[derive(Component)]
+    struct PhysicsActor;
+
+    #[test]
+    fn godot_to_bevy_arm_resolves_run_if_without_trait_import() {
+        let mut app = App::new();
+        crate::add_transform_sync_systems! {
+            app,
+            PhysicsResults = godot_to_bevy: With<PhysicsActor>,
+        }
+    }
+}

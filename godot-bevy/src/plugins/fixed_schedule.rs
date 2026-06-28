@@ -80,18 +80,25 @@ pub(crate) fn host_fixed_main_loop(app: &mut App) {
     );
 }
 
-/// Exclusive driver: advance `Time<Fixed>` by the stashed Godot delta, swap the
-/// generic `Time` to Fixed for the `FixedMain` run, then restore Virtual so the
-/// Before/After anchors run under `Res<Time> == Virtual` (mirrors stock
-/// `run_fixed_main_schedule`).
+/// Exclusive driver: set `Time<Fixed>`'s timestep to the stashed Godot delta and
+/// advance by it, swap the generic `Time` to Fixed for the `FixedMain` run, then
+/// restore Virtual so the Before/After anchors run under `Res<Time> == Virtual`
+/// (mirrors stock `run_fixed_main_schedule`).
 ///
-/// `advance_by` maintains `Time::<Fixed>::delta()`/`elapsed()` from Godot's
-/// physics clock; it does not touch the Fixed timestep, so `timestep()` keeps
-/// Bevy's 64Hz default and `overstep_fraction()` stays 0. Neither is driven --
-/// Godot owns fixed-step interpolation.
+/// Setting the timestep each step keeps `delta()`, `elapsed()`, and `timestep()`
+/// all tracking Godot's physics clock -- a runtime physics-rate change is picked
+/// up automatically. `overstep_fraction()` is 0 because each step advances exactly
+/// one timestep: Godot owns fixed-step interpolation, not Bevy's accumulator.
 fn godot_fixed_driver(world: &mut World) {
     let delta = world.resource::<GodotFixedDelta>().0;
-    world.resource_mut::<Time<Fixed>>().advance_by(delta);
+    let mut fixed = world.resource_mut::<Time<Fixed>>();
+    // Godot passes delta 0 when Engine.time_scale == 0 (freeze/hitstop); set_timestep
+    // panics on zero, so skip it -- the timestep keeps its last value and advance_by(0)
+    // is a no-op.
+    if !delta.is_zero() {
+        fixed.set_timestep(delta);
+    }
+    fixed.advance_by(delta);
     *world.resource_mut::<Time>() = world.resource::<Time<Fixed>>().as_generic();
     // Set active=Physics + refresh physics snapshot (no-op if GodotActions absent).
     crate::plugins::input::actions::poll_physics_actions(world);
@@ -239,6 +246,21 @@ mod tests {
 
         run_godot_fixed_main(app.world_mut(), dt);
         assert_eq!(app.world().resource::<Seen>().runs, 2);
+    }
+
+    #[test]
+    fn zero_delta_step_does_not_panic() {
+        // Godot passes delta 0 when Engine.time_scale == 0 (freeze/hitstop). The driver
+        // must skip set_timestep (which panics on zero), not tear the app down.
+        let mut app = hosted_app();
+        run_godot_fixed_main(app.world_mut(), Duration::from_secs_f64(1.0 / 60.0));
+        let before = app.world().resource::<Time<Fixed>>().timestep();
+        run_godot_fixed_main(app.world_mut(), Duration::ZERO);
+        assert_eq!(
+            app.world().resource::<Time<Fixed>>().timestep(),
+            before,
+            "timestep retains its last value across a time_scale==0 frame"
+        );
     }
 
     #[test]
