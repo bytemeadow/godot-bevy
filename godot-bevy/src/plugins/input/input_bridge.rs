@@ -1,14 +1,13 @@
-use bevy_app::{App, First, Last, Plugin};
+use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
     entity::Entity,
     message::{MessageReader, MessageWriter},
     schedule::IntoScheduleConfigs,
-    system::ResMut,
 };
 use bevy_input::{
-    ButtonInput, ButtonState, InputPlugin,
+    ButtonState, InputPlugin,
     gestures::PanGesture as BevyPanGesture,
-    keyboard::KeyCode,
+    keyboard::{Key, KeyCode, KeyboardInput as BevyKeyboardInput, NativeKey, NativeKeyCode},
     mouse::{
         MouseButton as BevyMouseButton, MouseButtonInput as BevyMouseButtonInput,
         MouseMotion as BevyMouseMotion, MouseScrollUnit, MouseWheel as BevyMouseWheel,
@@ -17,19 +16,17 @@ use bevy_input::{
 };
 
 use crate::plugins::input::events::{
-    KeyboardInput as GodotKeyboardInput, MouseButton as GodotMouseButton,
-    MouseButtonInput as GodotMouseButtonInput, MouseMotion as GodotMouseMotion,
+    GodotKeyboardInput, GodotMouseButton, GodotMouseButtonInput, GodotMouseMotion,
     PanGestureInput as GodotPanGestureInput,
 };
 
 /// Plugin that bridges godot-bevy's input messages to Bevy's standard input resources.
-// This plugin automatically includes GodotInputEventPlugin as a dependency.
+/// Automatically includes `GodotInputEventPlugin`.
 #[derive(Default)]
 pub struct BevyInputBridgePlugin;
 
 impl Plugin for BevyInputBridgePlugin {
     fn build(&self, app: &mut App) {
-        // Add the dependency - we need Godot input events to bridge them
         app.add_plugins(super::events::GodotInputEventPlugin)
             .add_plugins(InputPlugin)
             .add_systems(
@@ -45,24 +42,43 @@ impl Plugin for BevyInputBridgePlugin {
                     // First; without this ordering the bridge can run outside the
                     // one-frame window where they are readable and drop input.
                     .after(super::events::write_input_messages),
-            )
-            .add_systems(Last, clear_keyboard_input);
+            );
     }
 }
 
 fn bridge_keyboard_input(
     mut keyboard_messages: MessageReader<GodotKeyboardInput>,
-    mut key_code_input: ResMut<ButtonInput<KeyCode>>,
+    mut bevy_keyboard_events: MessageWriter<BevyKeyboardInput>,
 ) {
-    for message in keyboard_messages.read() {
-        // Convert Godot Key to Bevy KeyCode
-        if let Some(bevy_key_code) = godot_key_to_bevy_keycode(message.keycode) {
-            if message.pressed {
-                key_code_input.press(bevy_key_code);
+    for msg in keyboard_messages.read() {
+        let key_code = godot_key_to_bevy_keycode(msg.keycode)
+            .unwrap_or(KeyCode::Unidentified(NativeKeyCode::Unidentified));
+
+        let (logical_key, text) = if msg.unicode != 0 {
+            if let Some(ch) = char::from_u32(msg.unicode) {
+                let s = ch.to_string();
+                (Key::Character(s.clone().into()), Some(s.into()))
             } else {
-                key_code_input.release(bevy_key_code);
+                (godot_key_to_bevy_key(msg.keycode), None)
             }
-        }
+        } else {
+            (godot_key_to_bevy_key(msg.keycode), None)
+        };
+
+        let state = if msg.pressed {
+            ButtonState::Pressed
+        } else {
+            ButtonState::Released
+        };
+
+        bevy_keyboard_events.write(BevyKeyboardInput {
+            key_code,
+            logical_key,
+            state,
+            text,
+            repeat: msg.echo,
+            window: Entity::PLACEHOLDER,
+        });
     }
 }
 
@@ -89,7 +105,6 @@ fn bridge_mouse_button_input(
             ButtonState::Released
         };
 
-        // Send MouseButtonInput event that Bevy's mouse_button_input_system will process
         bevy_mouse_button_messages.write(BevyMouseButtonInput {
             button: bevy_button,
             state,
@@ -102,7 +117,6 @@ fn bridge_mouse_motion(
     mut mouse_motion_messages: MessageReader<GodotMouseMotion>,
     mut bevy_mouse_motion_messages: MessageWriter<BevyMouseMotion>,
 ) {
-    // Send individual Bevy MouseMotion events - bevy input will handle the accumulation
     for event in mouse_motion_messages.read() {
         bevy_mouse_motion_messages.write(BevyMouseMotion { delta: event.delta });
     }
@@ -112,7 +126,6 @@ fn bridge_mouse_scroll(
     mut mouse_button_messages: MessageReader<GodotMouseButtonInput>,
     mut bevy_mouse_scroll_messages: MessageWriter<BevyMouseWheel>,
 ) {
-    // Send individual Bevy MouseWheel events - bevy input will handle the accumulation
     for message in mouse_button_messages.read() {
         match message.button {
             GodotMouseButton::WheelUp => {
@@ -155,7 +168,7 @@ fn bridge_mouse_scroll(
                     phase: TouchPhase::Moved,
                 });
             }
-            _ => {} // Ignore non-wheel buttons
+            _ => {}
         }
     }
 }
@@ -169,13 +182,50 @@ fn bridge_pan_gesture(
     }
 }
 
-fn clear_keyboard_input(mut keyboard_input: ResMut<ButtonInput<KeyCode>>) {
-    // Clear just_pressed/just_released states at the end of each frame
-    // This is what Bevy's InputPlugin normally does for gamepads, but we handle keyboard manually
-    keyboard_input.clear();
+// Conversion functions
+fn godot_key_to_bevy_key(godot_key: godot::global::Key) -> Key {
+    use godot::global::Key as GK;
+
+    match godot_key {
+        GK::SPACE => Key::Space,
+        GK::ENTER | GK::KP_ENTER => Key::Enter,
+        GK::ESCAPE => Key::Escape,
+        GK::BACKSPACE => Key::Backspace,
+        GK::TAB => Key::Tab,
+        GK::SHIFT => Key::Shift,
+        GK::CTRL => Key::Control,
+        GK::ALT => Key::Alt,
+        GK::LEFT => Key::ArrowLeft,
+        GK::RIGHT => Key::ArrowRight,
+        GK::UP => Key::ArrowUp,
+        GK::DOWN => Key::ArrowDown,
+        GK::F1 => Key::F1,
+        GK::F2 => Key::F2,
+        GK::F3 => Key::F3,
+        GK::F4 => Key::F4,
+        GK::F5 => Key::F5,
+        GK::F6 => Key::F6,
+        GK::F7 => Key::F7,
+        GK::F8 => Key::F8,
+        GK::F9 => Key::F9,
+        GK::F10 => Key::F10,
+        GK::F11 => Key::F11,
+        GK::F12 => Key::F12,
+        GK::DELETE => Key::Delete,
+        GK::INSERT => Key::Insert,
+        GK::HOME => Key::Home,
+        GK::END => Key::End,
+        GK::PAGEUP => Key::PageUp,
+        GK::PAGEDOWN => Key::PageDown,
+        GK::CAPSLOCK => Key::CapsLock,
+        GK::NUMLOCK => Key::NumLock,
+        GK::SCROLLLOCK => Key::ScrollLock,
+        GK::PAUSE => Key::Pause,
+        GK::PRINT => Key::PrintScreen,
+        _ => Key::Unidentified(NativeKey::Unidentified),
+    }
 }
 
-// Conversion functions
 fn godot_key_to_bevy_keycode(godot_key: godot::global::Key) -> Option<KeyCode> {
     use KeyCode as BK;
     use godot::global::Key as GK;
@@ -303,5 +353,153 @@ fn godot_mouse_to_bevy_mouse(godot_button: GodotMouseButton) -> BevyMouseButton 
         GodotMouseButton::Extra2 => BevyMouseButton::Forward,
         // Note: Bevy doesn't have wheel events as buttons
         _ => BevyMouseButton::Other(255),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::plugins::input::events::GodotKeyboardInput;
+    use bevy_app::{App, First, Update};
+    use bevy_ecs::{
+        message::{MessageReader, Messages},
+        resource::Resource,
+        system::ResMut,
+    };
+    use bevy_input::ButtonInput;
+
+    #[derive(Resource, Default)]
+    struct Collected(Vec<BevyKeyboardInput>);
+
+    fn collect(mut reader: MessageReader<BevyKeyboardInput>, mut out: ResMut<Collected>) {
+        for ev in reader.read() {
+            out.0.push(ev.clone());
+        }
+    }
+
+    fn make_app() -> App {
+        let mut app = App::new();
+        app.add_message::<GodotKeyboardInput>()
+            .add_message::<BevyKeyboardInput>()
+            .init_resource::<ButtonInput<KeyCode>>()
+            .init_resource::<Collected>()
+            .add_systems(First, bridge_keyboard_input)
+            .add_systems(Update, collect);
+        app
+    }
+
+    fn send(app: &mut App, msg: GodotKeyboardInput) {
+        app.world_mut()
+            .resource_mut::<Messages<GodotKeyboardInput>>()
+            .write(msg);
+    }
+
+    fn drain(app: &mut App) -> Vec<BevyKeyboardInput> {
+        core::mem::take(&mut app.world_mut().resource_mut::<Collected>().0)
+    }
+
+    fn godot_key_msg(
+        keycode: godot::global::Key,
+        unicode: u32,
+        pressed: bool,
+        echo: bool,
+    ) -> GodotKeyboardInput {
+        GodotKeyboardInput {
+            keycode,
+            physical_keycode: None,
+            pressed,
+            echo,
+            unicode,
+        }
+    }
+
+    // (a) printable: Key::A + unicode 'a' -> KeyCode::KeyA + Key::Character("a") + text Some("a") + Pressed
+    #[test]
+    fn printable_key_maps_to_character() {
+        let mut app = make_app();
+        send(
+            &mut app,
+            godot_key_msg(godot::global::Key::A, 'a' as u32, true, false),
+        );
+        app.update();
+        let events = drain(&mut app);
+        assert_eq!(events.len(), 1);
+        let ev = &events[0];
+        assert_eq!(ev.key_code, KeyCode::KeyA);
+        assert_eq!(ev.logical_key, Key::Character("a".to_string().into()));
+        assert_eq!(ev.text, Some("a".to_string().into()));
+        assert_eq!(ev.state, ButtonState::Pressed);
+        assert!(!ev.repeat);
+    }
+
+    // (b) named non-printable: Key::ESCAPE + unicode 0 -> KeyCode::Escape + Key::Escape + text None
+    #[test]
+    fn non_printable_key_maps_to_named_variant() {
+        let mut app = make_app();
+        send(
+            &mut app,
+            godot_key_msg(godot::global::Key::ESCAPE, 0, true, false),
+        );
+        app.update();
+        let events = drain(&mut app);
+        assert_eq!(events.len(), 1);
+        let ev = &events[0];
+        assert_eq!(ev.key_code, KeyCode::Escape);
+        assert_eq!(ev.logical_key, Key::Escape);
+        assert_eq!(ev.text, None);
+        assert_eq!(ev.state, ButtonState::Pressed);
+    }
+
+    // (c) unmapped key + unicode 0 -> both Unidentified, still emitted
+    #[test]
+    fn unmapped_key_emits_unidentified() {
+        let mut app = make_app();
+        // Key::NONE has no keycode mapping and no unicode
+        send(
+            &mut app,
+            godot_key_msg(godot::global::Key::NONE, 0, true, false),
+        );
+        app.update();
+        let events = drain(&mut app);
+        assert_eq!(events.len(), 1, "unmapped key must still emit an event");
+        let ev = &events[0];
+        assert!(
+            matches!(ev.key_code, KeyCode::Unidentified(_)),
+            "key_code should be Unidentified"
+        );
+        assert!(
+            matches!(ev.logical_key, Key::Unidentified(_)),
+            "logical_key should be Unidentified"
+        );
+    }
+
+    // (d) echo=true -> repeat true
+    #[test]
+    fn echo_maps_to_repeat() {
+        let mut app = make_app();
+        send(
+            &mut app,
+            godot_key_msg(godot::global::Key::A, 'a' as u32, true, true),
+        );
+        app.update();
+        let events = drain(&mut app);
+        assert_eq!(events.len(), 1);
+        assert!(events[0].repeat);
+    }
+
+    // (e) regression guard: bridge alone must not touch ButtonInput<KeyCode>
+    #[test]
+    fn bridge_does_not_press_button_input() {
+        let mut app = make_app();
+        send(
+            &mut app,
+            godot_key_msg(godot::global::Key::A, 'a' as u32, true, false),
+        );
+        app.update();
+        let input = app.world().resource::<ButtonInput<KeyCode>>();
+        assert!(
+            input.get_just_pressed().count() == 0 && input.get_pressed().count() == 0,
+            "bridge must only write events, never press ButtonInput<KeyCode> directly"
+        );
     }
 }

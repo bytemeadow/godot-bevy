@@ -21,8 +21,9 @@ pub use crate::plugins::{
     debugger::{DebuggerConfig, GodotDebuggerPlugin},
     // Collisions
     input::{
-        ActionInput, BevyInputBridgePlugin, GodotInputEventPlugin, KeyboardInput, MouseButtonInput,
-        MouseMotion,
+        Action, ActionInput, BevyInputBridgePlugin, GodotActions, GodotActionsPlugin,
+        GodotInputEventPlugin, GodotInputSet, GodotKeyboardInput, GodotMouseButtonInput,
+        GodotMouseMotion,
     },
     mailbox::{GodotMailboxMessage, GodotMailboxPlugin, GodotMailboxSet},
     // Core functionality
