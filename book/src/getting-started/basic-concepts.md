@@ -64,8 +64,7 @@ fn movement_system(
     mut query: Query<&mut Transform, With<Player>>,
 ) {
     for mut transform in query.iter_mut() {
-        transform.translation.x += 
-            100.0 * time.delta_seconds();
+        transform.translation.x += 100.0 * time.delta_secs();
     }
 }
 ```
@@ -105,7 +104,7 @@ disable that behavior with the `scene_tree_auto_despawn_children` attribute:
 #[bevy_app(scene_tree_auto_despawn_children = false)]
 fn build_app(app: &mut App) {
     // Children can outlive their parents (useful for pooling or custom lifetimes)
-    app.add_plugins(PhysicsPlugins::new(PhysicsUpdate));
+    app.add_plugins(PhysicsPlugins::new(FixedUpdate));
 }
 ```
 

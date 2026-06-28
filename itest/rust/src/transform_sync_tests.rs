@@ -49,8 +49,9 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         })
         .await;
 
-        // Wait for Bevy transform to sync to Godot node
-        app.update().await;
+        // Wait for Bevy transform to sync to Godot node.
+        // The write runs in FixedLast (physics rate), so we need a physics tick.
+        app.physics_update().await;
 
         let pos = node.get_position();
         let rot = node.get_rotation();
@@ -79,7 +80,7 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         );
 
         app.cleanup().await;
-        node.queue_free();
+        node.free();
     })
 }
 
@@ -121,7 +122,7 @@ fn test_godot_to_bevy_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         println!("✓ Godot→Bevy transform sync: {initial_x:.1} → {synced_x:.1}");
 
         app.cleanup().await;
-        node.queue_free();
+        node.free();
     })
 }
 
@@ -166,9 +167,12 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         // Move Godot node (tests Godot→Bevy sync)
         godot_node.set_position(Vector2::new(20.0, 0.0));
 
-        // Run several frames so the Bevy-controlled node accumulates
-        // enough movement for a meaningful assertion.
-        app.updates(4).await;
+        // Run several physics ticks so the Bevy-controlled node accumulates
+        // enough movement for a meaningful assertion. The write runs in
+        // FixedLast, so physics_update() is required to flush it.
+        for _ in 0..4 {
+            app.physics_update().await;
+        }
 
         let bevy_end = bevy_node.get_position().x;
 
@@ -199,8 +203,227 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         );
 
         app.cleanup().await;
-        bevy_node.queue_free();
-        godot_node.queue_free();
+        bevy_node.free();
+        godot_node.free();
+    })
+}
+
+/// Regression test for the TwoWay self-change guard across the `_process` /
+/// `_physics_process` boundary.
+///
+/// The Godot→Bevy read-back runs in `PreUpdate` (before the fixed steps), while
+/// the Bevy→Godot write runs in `FixedLast`. The guard is a value shadow
+/// (`TransformSyncMetadata.shadow`): the write pushes only when the Bevy value
+/// differs from the last-synced shadow, so a value that was read FROM Godot (and
+/// stored as the shadow) is recognised as not-Bevy-authored and the echo write is
+/// suppressed. Being value-based, the guard is order-independent -- no
+/// read-after-write requirement.
+///
+/// Without the guard the write would echo the Godot-origin position back,
+/// potentially resetting physics interpolation or overwriting a Godot-driven
+/// position with a stale Bevy value.
+///
+/// We set the node purely from Godot (no Bevy system touches this Transform), run
+/// physics ticks, and assert the Godot value is picked up by Bevy AND the node is
+/// not disturbed by an echo. A two-substep variant runs `physics_update()` twice to
+/// exercise multiple `FixedLast` passes against a single Godot move.
+#[itest(async)]
+fn test_twoway_no_echo_back_across_fixed_boundary(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        let mut node = godot::classes::Node2D::new_alloc();
+        node.set_name("TwoWayEchoNode");
+        node.set_position(Vector2::new(0.0, 0.0));
+        ctx_clone.scene_tree.clone().add_child(&node);
+
+        let node_id = node.instance_id();
+
+        let mut app = TestApp::new(&ctx_clone, move |app| {
+            app.add_plugins(GodotTransformSyncPlugin::default());
+            app.insert_resource(GodotTransformConfig::two_way());
+        })
+        .await;
+
+        // Move the node from Godot. No Bevy system touches this Transform, so the
+        // only path that could change it is the read-back (Godot->Bevy). The write
+        // (Bevy->Godot) must suppress the echo and leave the node where Godot put it.
+        node.set_position(Vector2::new(42.0, 17.0));
+
+        // One physics tick: read-back (PreUpdate) already recorded the Godot value,
+        // so the write (FixedLast) should suppress the echo.
+        app.physics_update().await;
+
+        let bevy_x = app.with_world_mut(|world| {
+            let mut q = world.query::<(&GodotNodeHandle, &Transform)>();
+            q.iter(world)
+                .find(|(h, _)| h.instance_id() == node_id)
+                .map(|(_, t)| t.translation.x)
+                .unwrap_or(f32::NAN)
+        });
+        assert!(
+            (bevy_x - 42.0).abs() < 0.1,
+            "Bevy should pick up the Godot value, expected ~42.0, got {bevy_x:.3}"
+        );
+
+        let pos_after_one = node.get_position();
+        assert!(
+            (pos_after_one.x - 42.0).abs() < 0.1 && (pos_after_one.y - 17.0).abs() < 0.1,
+            "Godot node must not be echoed/reset after 1 tick, expected (42, 17), got ({:.3}, {:.3})",
+            pos_after_one.x,
+            pos_after_one.y
+        );
+
+        // Second pass: another physics tick against the same (now settled) Godot
+        // value. The guard must still suppress -- no echo, no stale overwrite.
+        app.physics_update().await;
+
+        let pos_after_two = node.get_position();
+        assert!(
+            (pos_after_two.x - 42.0).abs() < 0.1 && (pos_after_two.y - 17.0).abs() < 0.1,
+            "Godot node must not be echoed/reset after 2 ticks, expected (42, 17), got ({:.3}, {:.3})",
+            pos_after_two.x,
+            pos_after_two.y
+        );
+
+        println!(
+            "✓ TwoWay no echo-back: Bevy x={bevy_x:.1}, Godot stable at ({:.1}, {:.1})",
+            pos_after_two.x, pos_after_two.y
+        );
+
+        app.cleanup().await;
+        node.free();
+    })
+}
+
+/// The canonical TwoWay coexistence pattern (see examples/two-way-sync-demo):
+/// Godot drives the node's x every frame, Bevy drives the node's y every frame.
+/// The self-change guard must let BOTH survive -- the read-back must not clobber
+/// the Bevy y-edit, and the write must not echo the Godot x back as a stale value.
+/// This is the case most sensitive to where the read-back runs relative to the
+/// FixedLast write across the process/physics boundary.
+#[itest(async)]
+fn test_twoway_godot_and_bevy_coexist(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        let mut node = godot::classes::Node2D::new_alloc();
+        node.set_name("CoexistNode");
+        node.set_position(Vector2::new(0.0, 0.0));
+        ctx_clone.scene_tree.clone().add_child(&node);
+
+        let node_id = node.instance_id();
+
+        // Bevy drives y each Update frame (like the example's update_quad_y_position).
+        let mut app = TestApp::new(&ctx_clone, move |app| {
+            app.add_plugins(GodotTransformSyncPlugin::default());
+            app.insert_resource(GodotTransformConfig::two_way());
+
+            app.add_systems(
+                Update,
+                move |mut q: Query<(&GodotNodeHandle, &mut Transform)>| {
+                    for (handle, mut transform) in q.iter_mut() {
+                        if handle.instance_id() == node_id {
+                            transform.translation.y += 1.0;
+                        }
+                    }
+                },
+            );
+        })
+        .await;
+
+        // Godot drives x each frame (stand-in for the GDScript-side x update).
+        let mut last_godot_x = 0.0_f32;
+        for i in 0..6 {
+            last_godot_x = (i as f32 + 1.0) * 5.0;
+            let y = node.get_position().y;
+            node.set_position(Vector2::new(last_godot_x, y));
+            app.physics_update().await;
+        }
+
+        let pos = node.get_position();
+        let bevy_y = app.with_world_mut(|world| {
+            let mut q = world.query::<(&GodotNodeHandle, &Transform)>();
+            q.iter(world)
+                .find(|(h, _)| h.instance_id() == node_id)
+                .map(|(_, t)| t.translation.y)
+                .unwrap_or(f32::NAN)
+        });
+
+        // Godot's x edits must survive (not echoed over by a stale Bevy x=0).
+        assert!(
+            (pos.x - last_godot_x).abs() < 1.0,
+            "Godot-driven x must survive the guard, expected ~{last_godot_x:.1}, got {:.1}",
+            pos.x
+        );
+        // Bevy's y edits must survive (not clobbered by the read-back reading y=... from Godot).
+        // The loop runs 6 physics_update() calls, each triggering at least one Update frame
+        // (+1.0 y), so y must be >= 5.0 -- well clear of a partial-clobber regression.
+        assert!(
+            pos.y >= 5.0,
+            "Bevy-driven y must accumulate and reach Godot, expected >=5, got {:.1}",
+            pos.y
+        );
+        // Bevy must track the Godot-driven x.
+        assert!(
+            bevy_y >= 5.0,
+            "Bevy entity y should reflect its own accumulating edits, expected >=5, got {bevy_y:.1}"
+        );
+
+        println!(
+            "✓ TwoWay coexist: Godot x={:.1}, y={:.1}; Bevy y={bevy_y:.1}",
+            pos.x, pos.y
+        );
+
+        app.cleanup().await;
+        node.free();
+    })
+}
+
+/// Test that spawning a synced node at a non-origin position does not produce
+/// a one-tick interpolation slide from the origin when physics interpolation is
+/// enabled. reset_physics_interpolation() must be called on the first Bevy→Godot
+/// write after the node is registered so the engine treats the set position as
+/// the canonical starting point.
+#[itest(async)]
+fn test_spawn_resets_physics_interpolation(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        // Physics interpolation is a global SceneTree flag -- the one cross-test
+        // state the harness's Drop-based isolation doesn't reset. Restore it via a
+        // guard so a failing assert below can't leak it into the next test.
+        struct FtiGuard(Gd<godot::classes::SceneTree>);
+        impl Drop for FtiGuard {
+            fn drop(&mut self) {
+                self.0.set_physics_interpolation_enabled(false);
+            }
+        }
+        let mut tree = ctx_clone.scene_tree.get_tree();
+        tree.set_physics_interpolation_enabled(true);
+        let _fti = FtiGuard(tree);
+
+        let mut app = TestApp::new(&ctx_clone, |app| {
+            app.add_plugins(GodotTransformSyncPlugin::default());
+        })
+        .await;
+
+        let (node, entity) = app.add_node::<godot::classes::Node2D>("Spawned").await;
+        app.with_world_mut(|w| {
+            w.get_mut::<Transform>(entity).unwrap().translation =
+                bevy::math::Vec3::new(500.0, 300.0, 0.0);
+        });
+        app.physics_update().await;
+
+        // With reset on the first post-spawn write, the rendered/global transform
+        // is the set value immediately -- no interpolation slide from origin.
+        let pos = node.get_position();
+        assert!(
+            (pos.x - 500.0).abs() < 0.5 && (pos.y - 300.0).abs() < 0.5,
+            "expected position ~(500, 300) after first write with FTI enabled, got {pos:?}"
+        );
+
+        app.cleanup().await;
+        node.free();
     })
 }
 
@@ -260,6 +483,59 @@ fn test_transform_sync_disabled(ctx: &TestContext) -> godot::task::TaskHandle {
         );
 
         app.cleanup().await;
-        node.queue_free();
+        node.free();
+    })
+}
+
+/// Brownfield guarantee: a Bevy system sees a Godot-authored transform in the SAME
+/// frame it runs. The TwoWay read lands in `PreUpdate` (before logic), so an `Update`
+/// system observes Godot's latest value this frame -- not next frame. If the read ran
+/// after the write, the system would observe the stale value and this would fail.
+#[itest(async)]
+fn test_twoway_read_before_logic(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        #[derive(Resource, Default)]
+        struct Observed(f32);
+
+        let mut node = godot::classes::Node2D::new_alloc();
+        node.set_name("ReadBeforeLogicNode");
+        node.set_position(Vector2::new(0.0, 0.0));
+        ctx_clone.scene_tree.clone().add_child(&node);
+        let node_id = node.instance_id();
+
+        let mut app = TestApp::new(&ctx_clone, move |app| {
+            app.add_plugins(GodotTransformSyncPlugin::default());
+            app.insert_resource(GodotTransformConfig::two_way());
+            app.init_resource::<Observed>();
+            // Record what the Bevy value is when Update logic runs.
+            app.add_systems(
+                Update,
+                move |q: Query<(&GodotNodeHandle, &Transform)>, mut obs: ResMut<Observed>| {
+                    for (h, t) in q.iter() {
+                        if h.instance_id() == node_id {
+                            obs.0 = t.translation.x;
+                        }
+                    }
+                },
+            );
+        })
+        .await;
+
+        // Author x purely from Godot, then advance one frame. The PreUpdate read must
+        // land it in Bevy before the Update system runs that same frame.
+        node.set_position(Vector2::new(99.0, 0.0));
+        app.update().await;
+
+        let observed = app.with_world(|w| w.resource::<Observed>().0);
+        assert!(
+            (observed - 99.0).abs() < 0.1,
+            "Update logic must see the Godot-authored x the same frame (read-before-logic); got {observed:.1}"
+        );
+
+        println!("✓ TwoWay read-before-logic: Update saw Godot x={observed:.1} same frame");
+
+        app.cleanup().await;
+        node.free();
     })
 }

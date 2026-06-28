@@ -14,14 +14,18 @@ members = [
   "godot-bevy-test",
   "godot-bevy-test-macros",
   "itest/rust",
-  "examples/avian-physics-demo/rust",
-  "examples/dodge-the-creeps-2d/rust",
   "examples/timing-test/rust",
-  "examples/input-event-demo/rust",
-  "examples/platformer-2d/rust",
   "examples/simple-node2d-movement/rust",
   "examples/perf-test/rust",
   "examples/two-way-sync-demo/rust",
+  "examples/dodge-the-creeps-2d/rust",
+  "examples/platformer-2d/rust",
+]
+# Temporarily excluded pending Bevy 0.19 support in third-party ecosystem crates.
+# Move each back into `members` once its deps ship a 0.19-compatible release:
+#   avian-physics-demo  -> avian3d (Mode B: Bevy/avian owns physics -- shelved)
+exclude = [
+  "examples/avian-physics-demo/rust",
 ]
 resolver = "2"
 

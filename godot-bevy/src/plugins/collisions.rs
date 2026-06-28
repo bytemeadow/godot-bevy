@@ -52,13 +52,12 @@
 //! ```
 
 use crate::interop::GodotNodeHandle;
-use crate::plugins::core::PrePhysicsUpdate;
 use crate::plugins::scene_tree::NodeEntityIndex;
-use bevy_app::{App, Plugin};
+use bevy_app::{App, FixedFirst, Plugin};
 use bevy_ecs::{
     entity::Entity,
     event::Event,
-    message::{Message, MessageReader, MessageWriter, message_update_system},
+    message::{Message, MessageReader, MessageWriter},
     prelude::Resource,
     schedule::IntoScheduleConfigs,
     system::{Commands, Res, ResMut, SystemParam},
@@ -450,9 +449,9 @@ impl Plugin for GodotCollisionsPlugin {
             .add_message::<CollisionStarted>()
             .add_message::<CollisionEnded>()
             .add_systems(
-                PrePhysicsUpdate,
+                FixedFirst,
                 (
-                    process_godot_collisions.before(message_update_system),
+                    process_godot_collisions,
                     trigger_collision_observers.after(process_godot_collisions),
                 ),
             );

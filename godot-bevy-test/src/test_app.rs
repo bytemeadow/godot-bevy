@@ -48,6 +48,22 @@ pub struct TestApp {
     bevy_app: Option<Gd<godot_bevy::BevyApp>>,
 }
 
+/// Wait for one frame boundary. With `test-frame-signal` this resolves on
+/// `bevy_frame_complete` (returning the frame's physics step count); without it,
+/// it falls back to a plain process-frame wait and reports 0 steps.
+async fn wait_frame_boundary(app: &Gd<godot_bevy::BevyApp>) -> i64 {
+    #[cfg(feature = "test-frame-signal")]
+    {
+        crate::await_bevy_frame(app).await
+    }
+    #[cfg(not(feature = "test-frame-signal"))]
+    {
+        let _ = app;
+        await_frame().await;
+        0
+    }
+}
+
 impl TestApp {
     /// Create a new test app by initializing the BevyAppSingleton autoload.
     ///
@@ -82,8 +98,16 @@ impl TestApp {
 
         bevy_app.bind_mut().initialize();
 
-        await_frame().await;
-        await_frame().await;
+        #[cfg(feature = "test-frame-signal")]
+        {
+            crate::await_bevy_frame(&bevy_app).await;
+            crate::await_bevy_frame(&bevy_app).await;
+        }
+        #[cfg(not(feature = "test-frame-signal"))]
+        {
+            await_frame().await;
+            await_frame().await;
+        }
 
         Self {
             ctx: ctx.clone(),
@@ -91,13 +115,11 @@ impl TestApp {
         }
     }
 
-    /// Advance one Godot frame.
-    ///
-    /// This waits for Godot to advance one frame, during which Godot will call
-    /// BevyApp::process(), which internally calls app.update().
-    /// This is the primary way to advance time in tests.
-    pub async fn update(&self) {
-        await_frame().await;
+    /// Advance one Godot frame. With the `test-frame-signal` feature, resolves on
+    /// `bevy_frame_complete` (after the suffix + clear_trackers), so any Update
+    /// system writes are visible when this returns. Returns the physics step count.
+    pub async fn update(&self) -> i64 {
+        wait_frame_boundary(self.bevy_app.as_ref().unwrap()).await
     }
 
     /// Advance multiple Godot frames.
@@ -109,17 +131,13 @@ impl TestApp {
         }
     }
 
-    /// Advance time until a physics tick and a render frame have both completed.
-    ///
-    /// Godot's main loop can run 0 physics ticks in a given render frame if
-    /// insufficient time has accumulated. This method waits for the
-    /// `physics_frame` signal (guaranteeing a physics tick is about to run),
-    /// then waits for `process_frame` (guaranteeing both `_physics_process()`
-    /// and `_process()` have completed). Use this when testing systems that
-    /// run in `PrePhysicsUpdate` or `PhysicsUpdate`, such as collisions.
+    /// Advance one full frame, guaranteeing a physics tick ran. Under `--fixed-fps`
+    /// this is equivalent to `update()`. Without the `test-frame-signal` feature it
+    /// falls back to waiting for a physics_frame signal before the frame boundary.
     pub async fn physics_update(&self) {
+        #[cfg(not(feature = "test-frame-signal"))]
         crate::await_physics_frame().await;
-        await_frame().await;
+        wait_frame_boundary(self.bevy_app.as_ref().unwrap()).await;
     }
 
     /// Get immutable access to the Bevy World
@@ -234,8 +252,13 @@ impl TestApp {
     pub async fn cleanup(&mut self) {
         if let Some(mut app) = self.bevy_app.take() {
             app.bind_mut().teardown();
+            // process() still runs and emits the signal even with app=None, so this
+            // settles the frame boundary regardless of feature path.
+            #[cfg(feature = "test-frame-signal")]
+            crate::await_bevy_frame(&app).await;
+            #[cfg(not(feature = "test-frame-signal"))]
+            await_frame().await;
         }
-        await_frame().await;
     }
 }
 
@@ -243,6 +266,15 @@ impl Drop for TestApp {
     fn drop(&mut self) {
         if let Some(mut app) = self.bevy_app.take() {
             app.bind_mut().teardown();
+        }
+        // Guarantee scene-tree isolation between tests. A test that panics before
+        // its own free (failed assert), or simply forgets one, would otherwise leak
+        // its nodes into the next test's scene scan and create spurious entities --
+        // coupling tests through the shared singleton. Drop runs even on panic, so
+        // free every leftover test node here. Explicitly-freed nodes are already out
+        // of the tree, so this is a no-op for them (no double-free).
+        for child in self.ctx.scene_tree.get_children().iter_shared() {
+            child.free();
         }
     }
 }

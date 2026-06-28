@@ -3,10 +3,9 @@ use crate::gameplay::audio::PlaySfxMessage;
 use bevy::app::{App, Plugin};
 use bevy::prelude::*;
 use godot::classes::CharacterBody2D;
-use godot::classes::{AnimatedSprite2D, Input, ProjectSettings};
+use godot::classes::{AnimatedSprite2D, ProjectSettings};
 use godot::global::move_toward;
 use godot::obj::Singleton;
-use godot_bevy::plugins::core::PhysicsDelta;
 use godot_bevy::prelude::*;
 
 /// System sets for player operations with better parallelization
@@ -61,7 +60,7 @@ impl Plugin for PlayerPlugin {
         app.add_message::<PlayerInputMessage>()
             .add_message::<PlayerMovementMessage>()
             .add_systems(
-                PhysicsUpdate,
+                FixedUpdate,
                 (
                     // Input detection runs first and can run in parallel with other input systems
                     detect_player_input.in_set(PlayerSystemSet::InputDetection),
@@ -82,6 +81,7 @@ impl Plugin for PlayerPlugin {
 fn detect_player_input(
     player: Query<&GodotNodeHandle, With<Player>>,
     mut input_events: MessageWriter<PlayerInputMessage>,
+    actions: Res<GodotActions>,
     mut godot: GodotAccess,
 ) {
     if let Ok(handle) = player.single() {
@@ -90,9 +90,8 @@ fn detect_player_input(
             return; // Node is invalid, skip this frame
         };
 
-        let input = godot.singleton::<Input>();
-        let movement_direction = input.get_axis("move_left", "move_right");
-        let jump_pressed = input.is_action_just_pressed("jump");
+        let movement_direction = actions.axis("move_left", "move_right");
+        let jump_pressed = actions.just_pressed("jump");
         let is_on_floor = character_body.is_on_floor();
 
         // Always send input events so movement system knows current input state,
@@ -112,7 +111,7 @@ fn detect_player_input(
 fn apply_player_movement(
     mut input_events: MessageReader<PlayerInputMessage>,
     player: Query<(&GodotNodeHandle, &Speed, &JumpVelocity, &Gravity), With<Player>>,
-    physics_delta: Res<PhysicsDelta>,
+    time: Res<Time>,
     mut commands: Commands,
     mut movement_events: MessageWriter<PlayerMovementMessage>,
     mut godot: GodotAccess,
@@ -128,7 +127,7 @@ fn apply_player_movement(
 
         // Always apply gravity if not on floor
         if !character_body.is_on_floor() {
-            velocity.y += gravity.0 * physics_delta.delta_seconds;
+            velocity.y += gravity.0 * time.delta_secs();
         }
 
         // Process input events (should always have at least one per frame now)

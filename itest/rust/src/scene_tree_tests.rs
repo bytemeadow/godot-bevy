@@ -22,7 +22,7 @@ fn test_node_added_creates_entity(ctx: &TestContext) -> godot::task::TaskHandle 
         let initial_count =
             app.with_world_mut(|world| world.query::<&GodotNodeHandle>().iter(world).count());
 
-        let (mut node, _entity) = app.add_node::<godot::classes::Node2D>("TestNode").await;
+        let (node, _entity) = app.add_node::<godot::classes::Node2D>("TestNode").await;
 
         let final_count =
             app.with_world_mut(|world| world.query::<&GodotNodeHandle>().iter(world).count());
@@ -38,7 +38,7 @@ fn test_node_added_creates_entity(ctx: &TestContext) -> godot::task::TaskHandle 
         );
 
         app.cleanup().await;
-        node.queue_free();
+        node.free();
     })
 }
 
@@ -90,7 +90,7 @@ fn test_node_renamed_event(ctx: &TestContext) -> godot::task::TaskHandle {
         );
 
         app.cleanup().await;
-        node.queue_free();
+        node.free();
     })
 }
 
@@ -164,7 +164,9 @@ fn test_node_handle_validity(ctx: &TestContext) -> godot::task::TaskHandle {
 
             let mut system_state: bevy::ecs::system::SystemState<GodotAccess> =
                 bevy::ecs::system::SystemState::new(world);
-            let mut godot = system_state.get_mut(world);
+            let mut godot = system_state
+                .get_mut(world)
+                .expect("system params should be valid in test");
 
             let matched = if let Some(gd_node) = godot.try_get::<godot::classes::Node2D>(handle) {
                 let pos = gd_node.get_position();
@@ -183,7 +185,7 @@ fn test_node_handle_validity(ctx: &TestContext) -> godot::task::TaskHandle {
         );
 
         app.cleanup().await;
-        node.queue_free();
+        node.free();
     })
 }
 
@@ -251,8 +253,8 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
         }
 
         app.cleanup().await;
-        parent1.queue_free();
-        parent2.queue_free();
+        parent1.free();
+        parent2.free();
     })
 }
 
@@ -291,7 +293,7 @@ fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHand
         );
 
         app.cleanup().await;
-        parent.queue_free();
+        parent.free();
     })
 }
 
@@ -303,7 +305,7 @@ fn test_node_entity_index_populated_on_add(ctx: &TestContext) -> godot::task::Ta
     godot::task::spawn(async move {
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
 
-        let (mut node, entity) = app
+        let (node, entity) = app
             .add_node::<godot::classes::Node2D>("IndexTestNode")
             .await;
 
@@ -323,7 +325,7 @@ fn test_node_entity_index_populated_on_add(ctx: &TestContext) -> godot::task::Ta
         );
 
         app.cleanup().await;
-        node.queue_free();
+        node.free();
     })
 }
 

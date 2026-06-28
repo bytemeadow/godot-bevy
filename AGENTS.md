@@ -5,7 +5,7 @@ This file provides guidance to AI coding agents (Claude Code, Cursor, etc.) when
 ## Working Principles
 
 - **Aim for simplicity.** Prefer the smallest change that solves the problem. Avoid speculative abstraction, extra layers, and configuration that isn't needed yet. Match the style, naming, and comment density of the surrounding code rather than introducing new patterns.
-- **Run a deslop pass after work.** Once a change is functionally complete, review the diff and strip the slop: redundant or obvious comments, dead code, unused imports, leftover scaffolding, over-engineered helpers, and verbose phrasing. The repo's `/simplify` command does exactly this — run it (or do the equivalent by hand) before considering work done.
+- **Run a deslop pass after work.** Once a change is functionally complete, review the diff and strip the slop: redundant or obvious comments (especially session-narrative like "now that…"/"previously…"), dead code, unused imports, leftover scaffolding, over-engineered helpers, and verbose phrasing. The repo's `deslop` skill (`.claude/skills/deslop`) does exactly this — run it (or do the equivalent by hand) before considering work done.
 
 ## Project Overview
 
@@ -42,9 +42,11 @@ cargo build --release --manifest-path examples/{example}/rust/Cargo.toml
 
 **BevyApp** (`godot-bevy/src/app.rs`): The central bridge between Godot and Bevy. This Godot node (`BevyApp`) hosts the entire Bevy App instance and coordinates between Godot's frame lifecycle and Bevy's ECS update cycles.
 
-**Dual Schedule System**: The library runs two separate Bevy schedules:
-- `Update` schedule runs during Godot's `_process()` at display framerate
-- `PhysicsUpdate` schedule runs during Godot's `_physics_process()` at fixed physics rate (60Hz)
+**Split-Main Schedule**: The library drives Bevy's standard `Main` schedule across Godot's two frame callbacks:
+- The prefix (`First`, `PreUpdate`, `StateTransition`) and `FixedMain` run during Godot's `_physics_process()` (its fixed physics clock, default 60Hz)
+- The suffix (`Update`, `PostUpdate`, `Last`) runs during Godot's `_process()` at display framerate
+
+There is no `PhysicsUpdate` schedule -- fixed-rate logic goes in `FixedUpdate`.
 
 **Bridge System** (`godot-bevy/src/bridge/`): Manages bidirectional communication between Godot nodes and Bevy entities:
 - `GodotNodeHandle` - Bevy component that provides access to Godot nodes from ECS

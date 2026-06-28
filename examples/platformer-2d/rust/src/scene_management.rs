@@ -50,7 +50,7 @@ fn process_scene_operations(
             }
 
             SceneOperationMessage::ChangeToPacked { scene } => {
-                if let Some(godot_resource) = assets.get_mut(scene) {
+                if let Some(mut godot_resource) = assets.get_mut(scene) {
                     if let Some(packed_scene) =
                         godot_resource.try_cast::<godot::classes::PackedScene>()
                     {

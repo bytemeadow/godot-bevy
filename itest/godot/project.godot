@@ -23,3 +23,11 @@ BevyAppSingleton="*res://addons/godot-bevy/bevy_app_singleton.tscn"
 
 gdscript/warnings/unused_parameter=0
 gdscript/warnings/shadowed_variable=0
+
+[physics]
+
+; Pin the physics rate so --fixed-fps 60 yields exactly one physics step per
+; render frame (deterministic itests). jitter_fix=0 keeps the accumulator from
+; perturbing that count.
+common/physics_ticks_per_second=60
+common/physics_jitter_fix=0.0

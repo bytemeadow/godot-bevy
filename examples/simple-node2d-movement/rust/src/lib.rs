@@ -41,8 +41,8 @@ fn build_app(app: &mut App) {
     // (https://bevy.org/learn/quick-start/getting-started/ecs/).
     //
     // Godot-Bevy synchronizes the Bevy 'Update' schedule parameter with the
-    // Godot `_process` update cycle. There is also a `PhysicsUpdate` schedule
-    // parameter that is synchronized with the Godot `_physics_process` update cycle.
+    // Godot `_process` update cycle. The `FixedUpdate` schedule is driven from
+    // Godot's `_physics_process` update cycle (its fixed physics clock).
     //
     // Read more about other schedules provided by Godot-Bevy here:
     // (https://bytemeadow.github.io/godot-bevy-book?page=scene-tree/timing.html).

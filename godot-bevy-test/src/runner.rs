@@ -495,10 +495,13 @@ const FMT_END: &str = "\x1b[0m";
 
 /// Helper function to wait for the next Godot process frame.
 ///
-/// The `process_frame` signal fires after all `_physics_process()` calls
-/// but before `_process()` calls for that frame. When this resolves,
-/// any PrePhysicsUpdate/PhysicsUpdate schedules have run, but the visual
-/// schedules (First, Update, Last, etc.) have not yet run for this frame.
+/// The `process_frame` signal fires after all `_physics_process()` calls but
+/// before `_process()` for that frame, so the suffix (Update/PostUpdate/Last)
+/// has not yet run when this resolves. The Main prefix
+/// (First/PreUpdate/StateTransition) + FixedMain have run too -- except on a
+/// 0-physics-step frame, where the prefix runs in the `_process` fallback after
+/// this fires. The itest harness pins `--fixed-fps 60` (one step per frame), so
+/// the prefix has always run there.
 pub async fn await_frame() {
     let tree = Engine::singleton()
         .get_main_loop()
@@ -529,4 +532,14 @@ pub async fn await_frames(count: u32) {
     for _ in 0..count {
         await_frame().await;
     }
+}
+
+/// Wait for the BevyApp to finish a full render frame (suffix + clear_trackers).
+/// Returns the number of physics steps that ran that frame. Requires the
+/// `test-frame-signal` feature.
+#[cfg(feature = "test-frame-signal")]
+pub async fn await_bevy_frame(app: &godot::obj::Gd<godot_bevy::BevyApp>) -> i64 {
+    let signal = godot::builtin::Signal::from_object_signal(app, "bevy_frame_complete");
+    let args = signal.to_future::<(i64,)>().await;
+    args.0
 }

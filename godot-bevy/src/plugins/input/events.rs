@@ -34,9 +34,9 @@ pub type GodotInputPlugin = GodotInputEventPlugin;
 impl Plugin for GodotInputEventPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(First, write_input_messages.before(message_update_system))
-            .add_message::<KeyboardInput>()
-            .add_message::<MouseButtonInput>()
-            .add_message::<MouseMotion>()
+            .add_message::<GodotKeyboardInput>()
+            .add_message::<GodotMouseButtonInput>()
+            .add_message::<GodotMouseMotion>()
             .add_message::<TouchInput>()
             .add_message::<ActionInput>()
             .add_message::<GamepadButtonInput>()
@@ -45,19 +45,20 @@ impl Plugin for GodotInputEventPlugin {
     }
 }
 
-/// Keyboard key press/release event
+/// Keyboard key press/release event.
 #[derive(Debug, Message, Clone)]
-pub struct KeyboardInput {
+pub struct GodotKeyboardInput {
     pub keycode: Key,
     pub physical_keycode: Option<Key>,
     pub pressed: bool,
     pub echo: bool,
+    pub unicode: u32,
 }
 
-/// Mouse button press/release event
+/// Mouse button press/release event.
 #[derive(Debug, Message, Clone)]
-pub struct MouseButtonInput {
-    pub button: MouseButton,
+pub struct GodotMouseButtonInput {
+    pub button: GodotMouseButton,
     pub pressed: bool,
     pub position: Vec2,
     pub factor: f32,
@@ -65,9 +66,9 @@ pub struct MouseButtonInput {
     pub is_double_click: bool,
 }
 
-/// Mouse motion event
+/// Mouse motion event.
 #[derive(Debug, Message, Clone)]
-pub struct MouseMotion {
+pub struct GodotMouseMotion {
     pub delta: Vec2,
     pub position: Vec2,
 }
@@ -111,9 +112,9 @@ pub struct PanGestureInput {
     pub delta: Vec2,
 }
 
-/// Mouse button types
+/// Mouse button types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
-pub enum MouseButton {
+pub enum GodotMouseButton {
     Left,
     Right,
     Middle,
@@ -125,19 +126,19 @@ pub enum MouseButton {
     Extra2,
 }
 
-impl From<godot::global::MouseButton> for MouseButton {
+impl From<godot::global::MouseButton> for GodotMouseButton {
     fn from(button: godot::global::MouseButton) -> Self {
         match button {
-            godot::global::MouseButton::LEFT => MouseButton::Left,
-            godot::global::MouseButton::RIGHT => MouseButton::Right,
-            godot::global::MouseButton::MIDDLE => MouseButton::Middle,
-            godot::global::MouseButton::WHEEL_UP => MouseButton::WheelUp,
-            godot::global::MouseButton::WHEEL_DOWN => MouseButton::WheelDown,
-            godot::global::MouseButton::WHEEL_LEFT => MouseButton::WheelLeft,
-            godot::global::MouseButton::WHEEL_RIGHT => MouseButton::WheelRight,
-            godot::global::MouseButton::XBUTTON1 => MouseButton::Extra1,
-            godot::global::MouseButton::XBUTTON2 => MouseButton::Extra2,
-            _ => MouseButton::Left, // fallback
+            godot::global::MouseButton::LEFT => GodotMouseButton::Left,
+            godot::global::MouseButton::RIGHT => GodotMouseButton::Right,
+            godot::global::MouseButton::MIDDLE => GodotMouseButton::Middle,
+            godot::global::MouseButton::WHEEL_UP => GodotMouseButton::WheelUp,
+            godot::global::MouseButton::WHEEL_DOWN => GodotMouseButton::WheelDown,
+            godot::global::MouseButton::WHEEL_LEFT => GodotMouseButton::WheelLeft,
+            godot::global::MouseButton::WHEEL_RIGHT => GodotMouseButton::WheelRight,
+            godot::global::MouseButton::XBUTTON1 => GodotMouseButton::Extra1,
+            godot::global::MouseButton::XBUTTON2 => GodotMouseButton::Extra2,
+            _ => GodotMouseButton::Left, // fallback
         }
     }
 }
@@ -145,9 +146,9 @@ impl From<godot::global::MouseButton> for MouseButton {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn write_input_messages(
     events: NonSendMut<InputEventReader>,
-    mut keyboard_events: MessageWriter<KeyboardInput>,
-    mut mouse_button_events: MessageWriter<MouseButtonInput>,
-    mut mouse_motion_events: MessageWriter<MouseMotion>,
+    mut keyboard_events: MessageWriter<GodotKeyboardInput>,
+    mut mouse_button_events: MessageWriter<GodotMouseButtonInput>,
+    mut mouse_motion_events: MessageWriter<GodotMouseMotion>,
     mut touch_events: MessageWriter<TouchInput>,
     mut action_events: MessageWriter<ActionInput>,
     mut gamepad_button_events: MessageWriter<GamepadButtonInput>,
@@ -183,12 +184,12 @@ pub(crate) fn write_input_messages(
 
 fn extract_mouse_motion_events(
     input_event: Gd<GodotInputEvent>,
-    mouse_motion_events: &mut MessageWriter<MouseMotion>,
+    mouse_motion_events: &mut MessageWriter<GodotMouseMotion>,
 ) {
     if let Ok(mouse_motion_event) = input_event.try_cast::<InputEventMouseMotion>() {
         let position = mouse_motion_event.get_position();
         let relative = mouse_motion_event.get_relative();
-        mouse_motion_events.write(MouseMotion {
+        mouse_motion_events.write(GodotMouseMotion {
             delta: Vec2::new(relative.x, relative.y),
             position: Vec2::new(position.x, position.y),
         });
@@ -198,8 +199,8 @@ fn extract_mouse_motion_events(
 #[allow(clippy::too_many_arguments)]
 fn extract_basic_input_events(
     input_event: Gd<GodotInputEvent>,
-    keyboard_events: &mut MessageWriter<KeyboardInput>,
-    mouse_button_events: &mut MessageWriter<MouseButtonInput>,
+    keyboard_events: &mut MessageWriter<GodotKeyboardInput>,
+    mouse_button_events: &mut MessageWriter<GodotMouseButtonInput>,
     touch_events: &mut MessageWriter<TouchInput>,
     gamepad_button_events: &mut MessageWriter<GamepadButtonInput>,
     gamepad_axis_events: &mut MessageWriter<GamepadAxisInput>,
@@ -208,11 +209,12 @@ fn extract_basic_input_events(
     // Keyboard input
     let input_event = match input_event.try_cast::<InputEventKey>() {
         Ok(key_event) => {
-            keyboard_events.write(KeyboardInput {
+            keyboard_events.write(GodotKeyboardInput {
                 keycode: key_event.get_keycode(),
                 physical_keycode: Some(key_event.get_physical_keycode()),
                 pressed: key_event.is_pressed(),
                 echo: key_event.is_echo(),
+                unicode: key_event.get_unicode(),
             });
             return;
         }
@@ -223,7 +225,7 @@ fn extract_basic_input_events(
     let input_event = match input_event.try_cast::<InputEventMouseButton>() {
         Ok(mouse_button_event) => {
             let position = mouse_button_event.get_position();
-            mouse_button_events.write(MouseButtonInput {
+            mouse_button_events.write(GodotMouseButtonInput {
                 button: mouse_button_event.get_button_index().into(),
                 pressed: mouse_button_event.is_pressed(),
                 position: Vec2::new(position.x, position.y),

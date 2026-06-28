@@ -11,22 +11,22 @@ version.workspace = true
 
 [dependencies]
 # Core Bevy sub-crates (required)
-bevy_app = {version = "0.18", default-features = false}
-bevy_asset = {version = "0.18", default-features = false}
-bevy_diagnostic = {version = "0.18", default-features = false}
-bevy_ecs = {version = "0.18", default-features = false, features = ["multi_threaded", "bevy_reflect"]}
-bevy_input = {version = "0.18", default-features = false, features = ["gestures", "keyboard", "mouse"]}
-bevy_math = {version = "0.18", default-features = false}
-bevy_platform = {version = "0.18", default-features = false, features = ["alloc"]}
-bevy_reflect = {version = "0.18", default-features = false}
-bevy_tasks = {version = "0.18", default-features = false, features = ["multi_threaded"]}
-bevy_time = {version = "0.18", default-features = false}
-bevy_transform = {version = "0.18", default-features = false, features = ["bevy-support"]}
-bevy_utils = {version = "0.18", default-features = false, features = ["debug"]}
+bevy_app = {version = "0.19", default-features = false}
+bevy_asset = {version = "0.19", default-features = false}
+bevy_diagnostic = {version = "0.19", default-features = false}
+bevy_ecs = {version = "0.19", default-features = false, features = ["multi_threaded", "bevy_reflect"]}
+bevy_input = {version = "0.19", default-features = false, features = ["gestures", "keyboard", "mouse"]}
+bevy_math = {version = "0.19", default-features = false}
+bevy_platform = {version = "0.19", default-features = false, features = ["alloc"]}
+bevy_reflect = {version = "0.19", default-features = false}
+bevy_tasks = {version = "0.19", default-features = false, features = ["multi_threaded"]}
+bevy_time = {version = "0.19", default-features = false}
+bevy_transform = {version = "0.19", default-features = false, features = ["bevy-support"]}
+bevy_utils = {version = "0.19", default-features = false, features = ["debug"]}
 
 # Optional Bevy sub-crates (feature-gated)
-bevy_gilrs = {version = "0.18", default-features = false, optional = true}
-bevy_log = {version = "0.18", default-features = false, optional = true}
+bevy_gilrs = {version = "0.19", default-features = false, optional = true}
+bevy_log = {version = "0.19", default-features = false, optional = true}
 
 chrono = {version = "0.4", optional = true}
 crossbeam-channel = "0.5"
@@ -68,6 +68,10 @@ experimental-godot-api = ["godot/experimental-godot-api"]
 # Uses api-custom-json to avoid cross-compilation issues with struct sizes.
 experimental-wasm = ["godot/experimental-wasm", "godot/lazy-function-tables", "godot/api-custom-json"]
 experimental-wasm-nothreads = ["experimental-wasm", "godot/experimental-wasm-nothreads"]
+# test-only: emits a per-frame bevy_frame_complete signal so the itest harness
+# can await a true end-of-frame boundary. never enable in production builds.
+test-frame-signal = []
 
 [dev-dependencies]
+bevy_state = {version = "0.19", default-features = false, features = ["bevy_app"]}
 criterion = {version = "0.5", features = ["html_reports"]}

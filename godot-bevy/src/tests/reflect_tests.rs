@@ -107,13 +107,12 @@ mod tests {
         let type_info = reflected.get_represented_type_info().unwrap();
         assert!(type_info.type_path().contains("TransformSyncMetadata"));
 
-        // Since last_sync_tick is marked with #[reflect(ignore)], it won't be accessible
-        // through reflection, but the struct itself is still reflectable
+        // shadow is #[reflect(ignore)] (Transform isn't Reflect here), so only
+        // written_once is reachable through reflection.
         if let ReflectRef::Struct(struct_ref) = reflected.reflect_ref() {
-            // The field is ignored, so field_len should be 0
-            assert_eq!(struct_ref.field_len(), 0);
-            // And the field should not be accessible
-            assert!(struct_ref.field("last_sync_tick").is_none());
+            assert_eq!(struct_ref.field_len(), 1);
+            assert!(struct_ref.field("written_once").is_some());
+            assert!(struct_ref.field("shadow").is_none());
         } else {
             panic!("Expected Struct reflection");
         }

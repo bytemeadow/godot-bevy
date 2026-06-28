@@ -1,10 +1,10 @@
 /*
  * Signal integration tests
  *
- * Tests typed signal connections and observer triggering:
- * - Signal connections made with connect are applied same-frame
- * - Signals fire and trigger observers on the next frame
- * - Multiple signal connections work correctly
+ * Tests typed signal connections and observer triggering.
+ *
+ * Deterministic signal flow (--fixed-fps 60 harness):
+ *   connect → update() [Last establishes connection] → emit → update() [First drains + fires observer] → assert
  */
 
 use bevy::prelude::*;
@@ -57,7 +57,9 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
 
             let mut system_state: bevy::ecs::system::SystemState<GodotSignals<TestSignalFired>> =
                 bevy::ecs::system::SystemState::new(world);
-            let signals = system_state.get(world);
+            let signals = system_state
+                .get(world)
+                .expect("system params should be valid in test");
 
             signals.connect(handle, "pressed", None, |_args, _handle, _entity| {
                 Some(TestSignalFired {
@@ -68,23 +70,22 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
             system_state.apply(world);
         });
 
-        // Wait for pending signal connections to be processed
+        // one update runs Last, which applies the pending connection
         app.update().await;
 
         button.emit_signal("pressed", &[]);
 
-        // Wait for signal to be processed and observer to fire
+        // one update runs First, which drains the channel and fires the observer
         app.update().await;
 
         let was_received = app.with_world(|world| world.resource::<SignalReceived>().0);
-
         assert!(
             was_received,
             "Signal should be received after connect (connection applied same-frame)"
         );
 
         app.cleanup().await;
-        button.queue_free();
+        button.free();
     })
 }
 
@@ -117,32 +118,33 @@ fn test_connect_object_signal(ctx: &TestContext) -> godot::task::TaskHandle {
         app.with_world_mut(|world| {
             let mut system_state: bevy::ecs::system::SystemState<GodotSignals<NodeAdded>> =
                 bevy::ecs::system::SystemState::new(world);
-            let signals = system_state.get(world);
+            let signals = system_state
+                .get(world)
+                .expect("system params should be valid in test");
 
             signals.connect_object(scene_tree, "node_added", |_args| Some(NodeAdded));
 
             system_state.apply(world);
         });
 
-        // One frame for pending connections to be processed
+        // one update runs Last, which applies the pending connection
         app.update().await;
 
         let mut trigger_node = godot::classes::Node::new_alloc();
         trigger_node.set_name("ConnectObjectTrigger");
         ctx_clone.scene_tree.clone().add_child(&trigger_node);
 
-        // One frame for signal to be drained and triggered
+        // one update runs First, which drains the channel and fires the observer
         app.update().await;
 
         let was_received = app.with_world(|world| world.resource::<SignalReceived>().0);
-
         assert!(
             was_received,
             "connect_object should receive signals from non-entity Godot objects"
         );
 
         app.cleanup().await;
-        trigger_node.queue_free();
+        trigger_node.free();
     })
 }
 
@@ -192,7 +194,9 @@ fn test_multiple_signal_connections(ctx: &TestContext) -> godot::task::TaskHandl
 
             let mut system_state: bevy::ecs::system::SystemState<GodotSignals<TestSignalFired>> =
                 bevy::ecs::system::SystemState::new(world);
-            let signals = system_state.get(world);
+            let signals = system_state
+                .get(world)
+                .expect("system params should be valid in test");
 
             if let Some(handle) = button1_handle {
                 signals.connect(handle, "pressed", None, |_args, _handle, _entity| {
@@ -213,27 +217,26 @@ fn test_multiple_signal_connections(ctx: &TestContext) -> godot::task::TaskHandl
             system_state.apply(world);
         });
 
-        // One frame for pending connections to be processed
+        // one update runs Last, which applies the pending connections
         app.update().await;
 
         button1.emit_signal("pressed", &[]);
         button2.emit_signal("pressed", &[]);
         button1.emit_signal("pressed", &[]);
 
-        // One frame for signals to be drained and triggered
+        // one update runs First, which drains the channel and fires observers for all three emits
         app.update().await;
 
         let counts = app.with_world(|world| {
             let c = world.resource::<SignalCounts>();
             (c.button1, c.button2)
         });
-
         assert_eq!(counts.0, 2, "Button1 should have received 2 signals");
         assert_eq!(counts.1, 1, "Button2 should have received 1 signal");
 
         app.cleanup().await;
-        button1.queue_free();
-        button2.queue_free();
+        button1.free();
+        button2.free();
     })
 }
 
@@ -286,25 +289,24 @@ fn test_signal_connection_via_system(ctx: &TestContext) -> godot::task::TaskHand
         })
         .await;
 
-        // Wait for signal connection to be established
-        app.updates(2).await;
+        // one update runs Update (system connects) then Last (connection established)
+        app.update().await;
 
         let connection_made = app.with_world(|world| world.resource::<ConnectionMade>().0);
         assert!(connection_made, "Signal connection should have been made");
 
         button.emit_signal("pressed", &[]);
 
-        // One frame for drain_and_trigger_signals
+        // one update runs First, which drains the channel and fires the observer
         app.update().await;
 
         let was_received = app.with_world(|world| world.resource::<SignalReceived>().0);
-
         assert!(
             was_received,
             "Signal should work when connection is made via system"
         );
 
         app.cleanup().await;
-        button.queue_free();
+        button.free();
     })
 }

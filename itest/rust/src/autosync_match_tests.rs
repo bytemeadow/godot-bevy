@@ -16,7 +16,7 @@ fn test_autosync_matches_registered_type(ctx: &TestContext) -> godot::task::Task
     godot::task::spawn(async move {
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
 
-        let (mut node, entity) = app.add_node::<BenchAutosyncNode0>("MatchNode").await;
+        let (node, entity) = app.add_node::<BenchAutosyncNode0>("MatchNode").await;
 
         app.with_world(|world| {
             assert!(
@@ -26,7 +26,7 @@ fn test_autosync_matches_registered_type(ctx: &TestContext) -> godot::task::Task
         });
 
         app.cleanup().await;
-        node.queue_free();
+        node.free();
     })
 }
 
@@ -38,7 +38,7 @@ fn test_autosync_skips_unregistered_type(ctx: &TestContext) -> godot::task::Task
     godot::task::spawn(async move {
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
 
-        let (mut node, entity) = app.add_node::<godot::classes::Node2D>("MissNode").await;
+        let (node, entity) = app.add_node::<godot::classes::Node2D>("MissNode").await;
 
         app.with_world(|world| {
             assert!(
@@ -48,6 +48,6 @@ fn test_autosync_skips_unregistered_type(ctx: &TestContext) -> godot::task::Task
         });
 
         app.cleanup().await;
-        node.queue_free();
+        node.free();
     })
 }

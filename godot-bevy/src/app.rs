@@ -1,9 +1,5 @@
-use crate::plugins::core::PrePhysicsUpdate;
 use crate::plugins::{
-    collisions::CollisionMessageReader,
-    core::{PhysicsDelta, PhysicsUpdate},
-    input::InputEventReader,
-    scene_tree::SceneTreeMessageReader,
+    collisions::CollisionMessageReader, input::InputEventReader, scene_tree::SceneTreeMessageReader,
 };
 use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
@@ -34,6 +30,14 @@ pub struct BevyApp {
     // If set, this takes precedence over the global BEVY_INIT_FUNC
     #[allow(clippy::type_complexity)]
     instance_init_func: Option<Box<dyn Fn(&mut App) + Send + Sync>>,
+    // True after the startup schedules have run (lifetime flag, set once).
+    started: bool,
+    // True from the first physics callback of a frame until the end of process().
+    // Guards the prefix from running twice in frames with >= 1 physics steps.
+    prefix_done_this_frame: bool,
+    // Physics steps run in the current render frame; reported via bevy_frame_complete.
+    #[cfg(feature = "test-frame-signal")]
+    physics_steps_this_frame: u32,
 }
 
 impl BevyApp {
@@ -41,6 +45,9 @@ impl BevyApp {
         self.app.as_ref()
     }
 
+    /// In production the split-Main driver owns the update loop; calling
+    /// `app.update()` directly is valid for testing but must not be mixed
+    /// with the production driver in the same frame.
     pub fn get_app_mut(&mut self) -> Option<&mut App> {
         self.app.as_mut()
     }
@@ -79,6 +86,11 @@ impl BevyApp {
     }
 
     fn do_initialize(&mut self) {
+        // Reset per-app state so that re-initialization (e.g. the itest harness
+        // calling teardown -> do_initialize) runs startup fresh.
+        self.started = false;
+        self.prefix_done_this_frame = false;
+
         let mut app = App::new();
 
         let config = BEVY_APP_CONFIG.get().copied().unwrap_or(BevyAppConfig {
@@ -113,8 +125,11 @@ impl BevyApp {
             self.register_collision_watcher(&mut app);
         }
 
-        use crate::plugins::input::KeyboardInput;
-        if app.world().contains_resource::<Messages<KeyboardInput>>() {
+        use crate::plugins::input::GodotKeyboardInput;
+        if app
+            .world()
+            .contains_resource::<Messages<GodotKeyboardInput>>()
+        {
             self.register_input_event_watcher(&mut app);
         }
 
@@ -131,7 +146,14 @@ impl BevyApp {
             app.cleanup();
         }
 
-        app.init_resource::<PhysicsDelta>();
+        // godot-bevy drives Main directly (prefix + N fixed steps + suffix); a
+        // secondary SubApp would never be extracted or updated. Fail loud at build
+        // time rather than silently skip.
+        assert!(
+            app.sub_apps().sub_apps.is_empty(),
+            "godot-bevy drives Main itself; a secondary SubApp would never be updated"
+        );
+
         self.app = Some(app);
     }
 
@@ -156,7 +178,7 @@ impl BevyApp {
         input_event_watcher.bind_mut().notification_channel = Some(sender);
         input_event_watcher.set_name("InputEventWatcher");
         self.base_mut().add_child(&input_event_watcher);
-        app.insert_non_send_resource(InputEventReader(receiver));
+        app.insert_non_send(InputEventReader(receiver));
     }
 
     fn register_collision_watcher(&mut self, app: &mut App) {
@@ -251,11 +273,11 @@ impl BevyApp {
             .get_node_or_null("OptimizedBulkOperations")
             .map(|n| n.upcast::<godot::classes::Object>())
         {
-            app.insert_non_send_resource(BulkOperationsCache::new(node));
+            app.insert_non_send(BulkOperationsCache::new(node));
             tracing::debug!("Cached OptimizedBulkOperations node reference");
         } else {
             // Initialize empty cache so systems don't need to check for resource existence
-            app.init_non_send_resource::<BulkOperationsCache>();
+            app.init_non_send::<BulkOperationsCache>();
         }
     }
 }
@@ -267,6 +289,10 @@ impl INode for BevyApp {
             base,
             app: Default::default(),
             instance_init_func: None,
+            started: false,
+            prefix_done_this_frame: false,
+            #[cfg(feature = "test-frame-signal")]
+            physics_steps_this_frame: 0,
         }
     }
 
@@ -290,52 +316,92 @@ impl INode for BevyApp {
     }
 
     fn process(&mut self, _delta: f64) {
-        use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
+        use crate::plugins::fixed_schedule::{run_main_suffix, run_preamble};
+        use std::panic::{AssertUnwindSafe, catch_unwind};
 
         if godot::classes::Engine::singleton().is_editor_hint() {
             return;
         }
 
-        if let Some(app) = self.app.as_mut()
-            && let Err(e) = catch_unwind(AssertUnwindSafe(|| {
-                // Run the full Bevy update cycle - much simpler!
-                app.update();
+        let need_startup = !self.started;
+        let need_prefix = !self.prefix_done_this_frame;
 
-                // Mark frame end for profiling
+        // Run the frame's suffix (and startup/prefix fallback). Capture any panic
+        // so the end-of-frame signal still fires before we propagate it.
+        let result = self.app.as_mut().map(|app| {
+            catch_unwind(AssertUnwindSafe(|| {
+                let world = app.world_mut();
+                run_preamble(world, need_startup, need_prefix);
+                run_main_suffix(world);
+                world.clear_trackers();
                 crate::profiling::frame_mark();
             }))
-        {
-            self.app = None;
+        });
 
+        self.started = true;
+        self.prefix_done_this_frame = false;
+
+        // Emit unconditionally: after suffix+clear, before resume_unwind, and even
+        // when app == None. A panicking/torn-down frame still resumes its awaiter,
+        // which fails cleanly rather than hanging the suite.
+        #[cfg(feature = "test-frame-signal")]
+        {
+            let steps = self.physics_steps_this_frame as i64;
+            self.physics_steps_this_frame = 0;
+            self.signals().bevy_frame_complete().emit(steps);
+        }
+
+        if let Some(Err(e)) = result {
+            self.app = None;
             eprintln!("bevy app update panicked");
-            resume_unwind(e);
+            std::panic::resume_unwind(e);
         }
     }
 
     fn physics_process(&mut self, delta: f32) {
+        use crate::plugins::fixed_schedule::run_physics_step;
         use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 
         if godot::classes::Engine::singleton().is_editor_hint() {
             return;
         }
 
+        #[cfg(feature = "test-frame-signal")]
+        {
+            self.physics_steps_this_frame += 1;
+        }
+
+        let need_startup = !self.started;
+        let need_prefix = !self.prefix_done_this_frame;
+
+        // Godot guarantees _process fires every render frame (main.cpp:4935), so the
+        // prefix set here will always be followed by _process running the suffix.
         if let Some(app) = self.app.as_mut()
             && let Err(e) = catch_unwind(AssertUnwindSafe(|| {
-                // Update physics delta resource with Godot's delta
-                app.world_mut().resource_mut::<PhysicsDelta>().delta_seconds = delta;
-
-                // Run only our physics-specific schedule
-                app.world_mut().run_schedule(PrePhysicsUpdate);
-                app.world_mut().run_schedule(PhysicsUpdate);
-
-                // Mark physics frame end for profiling
+                let world = app.world_mut();
+                run_physics_step(
+                    world,
+                    need_startup,
+                    need_prefix,
+                    std::time::Duration::from_secs_f64(delta as f64),
+                );
                 crate::profiling::secondary_frame_mark("physics");
             }))
         {
             self.app = None;
-
             eprintln!("bevy app physics update panicked");
             resume_unwind(e);
         }
+        self.started = true;
+        self.prefix_done_this_frame = true;
     }
+}
+
+#[cfg(feature = "test-frame-signal")]
+#[godot_api]
+impl BevyApp {
+    /// Emitted at the end of every render frame, after the Bevy suffix + clear_trackers.
+    /// Carries the number of physics steps that ran this frame. Test harness only.
+    #[signal]
+    fn bevy_frame_complete(physics_steps: i64);
 }

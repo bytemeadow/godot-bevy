@@ -169,6 +169,16 @@ impl IntoQuaternion for Quat {
     }
 }
 
+/// q and -q are the same rotation, so sign-normalize via the dot before
+/// the per-component compare.
+pub(crate) fn quats_differ(a: Quat, b: Quat, epsilon: f32) -> bool {
+    let b = if a.dot(b) < 0.0 { -b } else { b };
+    (a.x - b.x).abs() > epsilon
+        || (a.y - b.y).abs() > epsilon
+        || (a.z - b.z).abs() > epsilon
+        || (a.w - b.w).abs() > epsilon
+}
+
 #[cfg(test)]
 mod tests {
     use std::f32;
@@ -199,33 +209,9 @@ mod tests {
     }
 
     fn assert_quat_near(a: Quat, b: Quat, epsilon: f32) {
-        // Quaternions q and -q represent the same rotation
-        let dot = a.dot(b);
-        let b_adjusted = if dot < 0.0 { -b } else { b };
-
         assert!(
-            (a.x - b_adjusted.x).abs() < epsilon,
-            "x component mismatch: {} vs {}",
-            a.x,
-            b_adjusted.x
-        );
-        assert!(
-            (a.y - b_adjusted.y).abs() < epsilon,
-            "y component mismatch: {} vs {}",
-            a.y,
-            b_adjusted.y
-        );
-        assert!(
-            (a.z - b_adjusted.z).abs() < epsilon,
-            "z component mismatch: {} vs {}",
-            a.z,
-            b_adjusted.z
-        );
-        assert!(
-            (a.w - b_adjusted.w).abs() < epsilon,
-            "w component mismatch: {} vs {}",
-            a.w,
-            b_adjusted.w
+            !quats_differ(a, b, epsilon),
+            "quaternion mismatch: {a:?} vs {b:?}"
         );
     }
 

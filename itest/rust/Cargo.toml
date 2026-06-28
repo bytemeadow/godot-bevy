@@ -13,14 +13,21 @@ name = "godot_bevy_itest"
 
 [features]
 default = []
+test-frame-signal = ["godot-bevy/test-frame-signal", "godot-bevy-test/test-frame-signal"]
 
 [dependencies]
 godot = { workspace = true, features = ["__trace"] }
 godot-bevy = { path = "../../godot-bevy" }
 godot-bevy-test = { path = "../../godot-bevy-test" }
-bevy = { version = "0.18", default-features = false, features = [
+bevy = { version = "0.19", default-features = false, features = [
   "bevy_asset",
   "multi_threaded",
 ] }
 crossbeam-channel = "0.5"
 cargo-godot-lib.workspace = true
+
+# Ecosystem input crates exercised by input_ecosystem_tests.rs. These are real
+# dependencies (not dev-dependencies): itest is a cdylib whose tests compile into
+# the lib target.
+leafwing-input-manager = "0.21"
+bevy_enhanced_input = "0.26"

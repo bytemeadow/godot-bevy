@@ -26,7 +26,7 @@ pub struct ColliderFromGodotMesh;
 /// System that processes entities with ColliderFromGodotMesh marker and newly added GodotNodeHandles.
 /// Add this system to your app with:
 /// ```ignore
-/// app.add_systems(PhysicsUpdate, process_collider_from_godot_mesh);
+/// app.add_systems(FixedUpdate, process_collider_from_godot_mesh);
 /// ```
 pub fn process_collider_from_godot_mesh(
     mut commands: Commands,

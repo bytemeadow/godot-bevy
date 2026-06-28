@@ -3,12 +3,12 @@
  *
  * Tests the full collision pipeline through real Godot frames:
  * - CollisionWatcher receives collision events via channel
- * - Godot calls _physics_process() → PrePhysicsUpdate runs
+ * - Godot calls _physics_process() → FixedFirst runs
  * - process_godot_collisions drains channel → updates CollisionState
  * - trigger_collision_observers reads CollisionState → fires observers
  * - Collisions SystemParam provides query access
  *
- * Frame strategy: Collision processing runs in PrePhysicsUpdate, which only
+ * Frame strategy: Collision processing runs in FixedFirst, which only
  * executes during Godot's _physics_process(). Since a render frame can have
  * 0 physics ticks, we use app.physics_update() which waits for the
  * physics_frame signal (guaranteeing a tick will run) then process_frame
@@ -57,8 +57,8 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
         })
         .await;
 
-        let (mut area_a, entity_a) = app.add_node::<godot::classes::Area2D>("CollisionA").await;
-        let (mut area_b, entity_b) = app.add_node::<godot::classes::Area2D>("CollisionB").await;
+        let (area_a, entity_a) = app.add_node::<godot::classes::Area2D>("CollisionA").await;
+        let (area_b, entity_b) = app.add_node::<godot::classes::Area2D>("CollisionB").await;
 
         let mut watcher = find_collision_watcher(&ctx_clone.scene_tree)
             .expect("CollisionWatcher should exist when GodotCollisionsPlugin is added");
@@ -71,14 +71,16 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
             "Started",
         );
 
-        // Wait for a physics tick + render frame so PrePhysicsUpdate drains
+        // Wait for a physics tick + render frame so FixedFirst drains
         // the channel and updates CollisionState.
         app.physics_update().await;
 
         let (contains, colliding_with_a) = app.with_world_mut(|world| {
             let mut system_state: bevy::ecs::system::SystemState<Collisions> =
                 bevy::ecs::system::SystemState::new(world);
-            let collisions = system_state.get(world);
+            let collisions = system_state
+                .get(world)
+                .expect("system params should be valid in test");
             let contains = collisions.contains(entity_a, entity_b);
             let colliding: Vec<Entity> = collisions.colliding_with(entity_a).to_vec();
             (contains, colliding)
@@ -106,7 +108,9 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
         let still_contains = app.with_world_mut(|world| {
             let mut system_state: bevy::ecs::system::SystemState<Collisions> =
                 bevy::ecs::system::SystemState::new(world);
-            let collisions = system_state.get(world);
+            let collisions = system_state
+                .get(world)
+                .expect("system params should be valid in test");
             collisions.contains(entity_a, entity_b)
         });
 
@@ -116,8 +120,8 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
         );
 
         app.cleanup().await;
-        area_a.queue_free();
-        area_b.queue_free();
+        area_a.free();
+        area_b.free();
     })
 }
 
@@ -141,8 +145,8 @@ fn test_collision_started_observer_from_system(ctx: &TestContext) -> godot::task
         })
         .await;
 
-        let (mut area_a, _entity_a) = app.add_node::<godot::classes::Area2D>("ObsStartA").await;
-        let (mut area_b, _entity_b) = app.add_node::<godot::classes::Area2D>("ObsStartB").await;
+        let (area_a, _entity_a) = app.add_node::<godot::classes::Area2D>("ObsStartA").await;
+        let (area_b, _entity_b) = app.add_node::<godot::classes::Area2D>("ObsStartB").await;
 
         let mut watcher =
             find_collision_watcher(&ctx_clone.scene_tree).expect("CollisionWatcher should exist");
@@ -155,7 +159,7 @@ fn test_collision_started_observer_from_system(ctx: &TestContext) -> godot::task
         );
 
         // physics_update() guarantees a physics tick runs, which processes
-        // the collision and triggers the observer in the same PrePhysicsUpdate.
+        // the collision and triggers the observer in the same FixedFirst.
         app.physics_update().await;
 
         let count = app.with_world(|world| world.resource::<CollisionCount>().0);
@@ -166,8 +170,8 @@ fn test_collision_started_observer_from_system(ctx: &TestContext) -> godot::task
         );
 
         app.cleanup().await;
-        area_a.queue_free();
-        area_b.queue_free();
+        area_a.free();
+        area_b.free();
     })
 }
 
@@ -191,8 +195,8 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
         })
         .await;
 
-        let (mut area_a, _entity_a) = app.add_node::<godot::classes::Area2D>("ObsEndA").await;
-        let (mut area_b, _entity_b) = app.add_node::<godot::classes::Area2D>("ObsEndB").await;
+        let (area_a, _entity_a) = app.add_node::<godot::classes::Area2D>("ObsEndA").await;
+        let (area_b, _entity_b) = app.add_node::<godot::classes::Area2D>("ObsEndB").await;
 
         let mut watcher =
             find_collision_watcher(&ctx_clone.scene_tree).expect("CollisionWatcher should exist");
@@ -225,7 +229,7 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
         );
 
         app.cleanup().await;
-        area_a.queue_free();
-        area_b.queue_free();
+        area_a.free();
+        area_b.free();
     })
 }

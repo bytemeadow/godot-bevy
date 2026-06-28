@@ -69,6 +69,8 @@ pub use runner::__GODOT_BENCH;
 pub use runner::__GODOT_ITEST;
 
 // Re-export core types
+#[cfg(feature = "test-frame-signal")]
+pub use runner::await_bevy_frame;
 pub use runner::{AsyncRustTestCase, RustBenchmark, RustTestCase, TestRunnerImpl};
 pub use runner::{await_frame, await_frames, await_physics_frame};
 pub use test_app::TestApp;

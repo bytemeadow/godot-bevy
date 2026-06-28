@@ -1,44 +1,11 @@
-#![allow(deprecated)] // TODO: remove this once we've removed SystemDeltaTimer
-
 use bevy_app::{App, Plugin};
 use bevy_ecs::component::Component;
 use bevy_ecs::event::EntityEvent;
 use bevy_ecs::lifecycle::Remove;
 use bevy_ecs::observer::On;
 use bevy_ecs::prelude::{Name, Resource};
-use bevy_ecs::schedule::{Schedule, ScheduleLabel};
-use bevy_ecs::system::{Local, Query, SystemParam};
+use bevy_ecs::system::Query;
 use std::any::TypeId;
-use std::marker::PhantomData;
-use std::time::{Duration, Instant};
-
-/// Schedule that runs during Godot's physics_process at physics frame rate.
-/// This schedule runs just before the PhysicsUpdate schedule.
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PrePhysicsUpdate;
-
-/// Schedule that runs during Godot's physics_process at physics frame rate.
-/// Use this for movement, physics, and systems that need to sync with Godot's physics timing.
-#[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PhysicsUpdate;
-
-/// Resource containing Godot's physics delta time for the current frame
-#[derive(Resource, Default)]
-pub struct PhysicsDelta {
-    pub delta_seconds: f32,
-}
-
-impl PhysicsDelta {
-    pub fn new(delta: f64) -> Self {
-        Self {
-            delta_seconds: delta as f32,
-        }
-    }
-
-    pub fn delta(&self) -> Duration {
-        Duration::from_secs_f32(self.delta_seconds)
-    }
-}
 
 use crate::interop::{GodotAccess, GodotMainThread, GodotNode, GodotNodeHandle};
 use bevy_ecs::system::EntityCommands;
@@ -168,46 +135,13 @@ impl Plugin for GodotBaseCorePlugin {
             .add_plugins(bevy_app::TaskPoolPlugin::default())
             .add_plugins(bevy_diagnostic::FrameCountPlugin)
             .add_plugins(bevy_diagnostic::DiagnosticsPlugin)
-            .init_resource::<PhysicsDelta>()
-            .init_non_send_resource::<GodotMainThread>()
+            .init_non_send::<GodotMainThread>()
             .init_resource::<SceneTreeComponentRegistry>()
             .add_observer(on_godot_node_handle_removed);
 
-        // Add the PhysicsUpdate schedule
-        app.add_schedule(Schedule::new(PrePhysicsUpdate));
-        app.add_schedule(Schedule::new(PhysicsUpdate));
-    }
-}
-
-/// SystemParam to keep track of an independent delta time
-///
-/// Not every system runs on a Bevy update and Bevy can be updated multiple
-/// during a "frame".
-#[derive(SystemParam)]
-#[deprecated(note = "Use PhysicsDelta instead")]
-pub struct SystemDeltaTimer<'w, 's> {
-    last_time: Local<'s, Option<Instant>>,
-    marker: PhantomData<&'w ()>,
-}
-
-#[allow(deprecated)]
-impl<'w, 's> SystemDeltaTimer<'w, 's> {
-    /// Returns the time passed since the last invocation
-    pub fn delta(&mut self) -> Duration {
-        let now = Instant::now();
-        let last_time = self.last_time.unwrap_or(now);
-
-        *self.last_time = Some(now);
-
-        now - last_time
-    }
-
-    pub fn delta_seconds(&mut self) -> f32 {
-        self.delta().as_secs_f32()
-    }
-
-    pub fn delta_seconds_f64(&mut self) -> f64 {
-        self.delta().as_secs_f64()
+        // Keeps RunFixedMainLoop's Before/After anchor sets live for ecosystem plugins
+        // (e.g. leafwing). TimePlugin stays so Time<Real>/Virtual still advance in _process.
+        crate::plugins::fixed_schedule::host_fixed_main_loop(app);
     }
 }
 

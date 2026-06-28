@@ -1,10 +1,10 @@
 mod api;
 
 use api::{GodotPhysicsBox, GodotPhysicsStatic, process_collider_from_godot_mesh};
-use avian3d::prelude::PhysicsPlugins;
+use avian3d::prelude::{PhysicsInterpolationPlugin, PhysicsPlugins};
 use bevy::prelude::{
-    App, AppExtStates, AssetEvent, Assets, Commands, Handle, Mesh, OnExit, Plugin, Res, Resource,
-    States, Vec3,
+    App, AppExtStates, AssetEvent, Assets, Commands, FixedUpdate, Handle, Mesh, OnExit, Plugin,
+    PluginGroup, Res, Resource, States, Vec3,
 };
 use bevy::{scene::ScenePlugin, state::app::StatesPlugin};
 use bevy_asset_loader::{
@@ -13,7 +13,7 @@ use bevy_asset_loader::{
 };
 use godot_bevy::prelude::{
     GodotAssetsPlugin, GodotBevyLogPlugin, GodotPackedScenePlugin, GodotResource,
-    GodotTransformSyncPlugin, PhysicsUpdate, bevy_app,
+    GodotTransformSyncPlugin, bevy_app,
     godot_prelude::{ExtensionLibrary, gdextension},
 };
 use std::fmt::Debug;
@@ -42,8 +42,12 @@ impl Plugin for AvianPhysicsDemo {
             .add_plugins((
                 // Plugins required by Avian
                 ScenePlugin,
-                // Configure Avian to use godot-bevy's PhysicsUpdate schedule instead of FixedPostUpdate
-                PhysicsPlugins::new(PhysicsUpdate),
+                // Avian's default physics step runs in FixedPostUpdate, which godot-bevy
+                // ticks from Godot's _physics_process. Disable Avian's own transform
+                // interpolation since godot-bevy relies on Godot's physics interpolation.
+                PhysicsPlugins::default()
+                    .build()
+                    .disable::<PhysicsInterpolationPlugin>(),
             ))
             // Assets<Mesh> is required by Avian but normally comes from DefaultPlugins
             // We don't use DefaultPlugins in godot-bevy, so we initialize it manually
@@ -55,7 +59,7 @@ impl Plugin for AvianPhysicsDemo {
                     .continue_to_state(GameState::InGame),
             )
             .add_systems(OnExit(GameState::LoadAssets), spawn_entities)
-            .add_systems(PhysicsUpdate, process_collider_from_godot_mesh)
+            .add_systems(FixedUpdate, process_collider_from_godot_mesh)
             // Register AssetEvent<Mesh> since we're manually initializing Assets<Mesh> without the full asset plugin
             .add_message::<AssetEvent<Mesh>>();
     }
