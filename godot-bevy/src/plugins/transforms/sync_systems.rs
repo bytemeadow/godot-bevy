@@ -37,7 +37,7 @@ fn rotation_differs(a: Quat, b: Quat) -> bool {
 // may author some, bevy others), rotation whole. only axes godot actually moved
 // are pulled, with the shadow tracking what we've exchanged. returns whether
 // anything moved -- caller trips Changed (deref_mut) only then.
-fn merge_godot_into_bevy(
+pub(crate) fn merge_godot_into_bevy(
     bevy: &mut Mut<BevyTransform>,
     godot: &BevyTransform,
     shadow: &mut BevyTransform,
@@ -76,7 +76,7 @@ fn merge_godot_into_bevy(
 // value gate: did Bevy author anything the shadow hasn't seen? same epsilons as
 // the read so a value just pulled from Godot reads back clean -- no echo, no FTI
 // reset.
-fn write_needed(bevy: &BevyTransform, shadow: &BevyTransform) -> bool {
+pub(crate) fn write_needed(bevy: &BevyTransform, shadow: &BevyTransform) -> bool {
     bevy.translation != shadow.translation
         || (bevy.scale - shadow.scale).abs().max_element() > SCALE_EPSILON
         || rotation_differs(bevy.rotation, shadow.rotation)

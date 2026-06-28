@@ -222,6 +222,34 @@ fn transform_sync_godot_to_bevy_3d_sparse() -> i32 {
     result
 }
 
+/// Benchmark: per-physics-step Godot->Bevy read (3D) via the FixedFirst system.
+///
+/// Mirrors `transform_sync_godot_to_bevy_3d` but exercises the per-step read added
+/// for the TwoWay multi-step clobber fix, so the extra per-step FFI cost on
+/// multi-step frames stays visible in compare-benches.
+#[bench(repeat = 3)]
+fn transform_sync_godot_to_bevy_3d_per_step() -> i32 {
+    let (mut app, nodes) = setup_3d_benchmark_app(NODE_COUNT);
+    app.init_schedule(FixedFirst);
+
+    // Modify Godot transforms to simulate a physics-clock author moving nodes.
+    for (i, node) in nodes.iter().enumerate() {
+        let mut node = node.clone();
+        node.set_position(Vector3::new(i as f32 * 2.0, i as f32, 0.0));
+    }
+
+    // FixedStepFirstOfFrame absent -> not_first_fixed_step true -> FixedFirst read runs.
+    measured(|| app.world_mut().run_schedule(FixedFirst));
+
+    let result = nodes.len() as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
 // =============================================================================
 // 2D Transform Sync Benchmarks
 // =============================================================================
@@ -258,6 +286,29 @@ fn transform_sync_godot_to_bevy_2d() -> i32 {
     }
 
     measured(|| app.world_mut().run_schedule(PreUpdate));
+
+    let result = nodes.len() as i32;
+
+    for node in nodes {
+        node.free();
+    }
+
+    result
+}
+
+/// Benchmark: per-physics-step Godot->Bevy read (2D) via the FixedFirst system.
+#[bench(repeat = 3)]
+fn transform_sync_godot_to_bevy_2d_per_step() -> i32 {
+    let (mut app, nodes) = setup_2d_benchmark_app();
+    app.init_schedule(FixedFirst);
+
+    for (i, node) in nodes.iter().enumerate() {
+        let mut node = node.clone();
+        node.set_position(Vector2::new(i as f32 * 2.0, i as f32));
+    }
+
+    // FixedStepFirstOfFrame absent -> not_first_fixed_step true -> FixedFirst read runs.
+    measured(|| app.world_mut().run_schedule(FixedFirst));
 
     let result = nodes.len() as i32;
 

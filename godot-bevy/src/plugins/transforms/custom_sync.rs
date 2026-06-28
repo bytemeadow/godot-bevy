@@ -86,11 +86,19 @@ macro_rules! add_transform_sync_systems {
         );
     };
 
-    // Godot → Bevy read, restricted to the filter. Runs in `PreUpdate` to match auto sync.
+    // Godot → Bevy read, restricted to the filter. Runs in `PreUpdate` (step 1,
+    // suffix, idle frames) and once per physics step in `FixedFirst` for steps
+    // 2..N, matching auto sync's per-step cadence so a Godot author between steps
+    // isn't clobbered. No twoway gate here (direction is opt-in via the filter),
+    // but the `not_first_fixed_step` dedup keeps 1-step frames perf-neutral.
     (@generate_pre_system $app:expr, $godot_to_bevy_query:ty) => {
         $app.add_systems(
             $crate::bevy_app::PreUpdate,
             $crate::plugins::transforms::sync_systems::pre_update_godot_transforms::<$godot_to_bevy_query>,
+        );
+        $app.add_systems(
+            $crate::bevy_app::FixedFirst,
+            $crate::plugins::transforms::sync_systems::pre_update_godot_transforms::<$godot_to_bevy_query>.run_if($crate::plugins::fixed_schedule::not_first_fixed_step),
         );
     };
 }

@@ -44,7 +44,7 @@ Full bidirectional synchronization between ECS and Godot.
 - ✅ Works with Godot animations
 - ✅ Supports hybrid architectures
 - ✅ Per-axis co-authorship -- Godot and Bevy can drive different axes of the same node
-- ✅ Bevy reads the latest Godot value *before* your systems run (read in `PreUpdate`)
+- ✅ Bevy reads the latest Godot value *before* your systems run (read in `PreUpdate`, and again per physics step in `FixedFirst`)
 - ❌ Highest performance cost
 
 **Use when:**
@@ -56,8 +56,12 @@ Full bidirectional synchronization between ECS and Godot.
 
 The Godot→Bevy read runs in `PreUpdate` (before your systems), so a node moved from
 Godot -- by GDScript, an `AnimationPlayer`, or physics -- is visible to Bevy systems the
-same frame. The Bevy→Godot write runs in `FixedLast` and pushes only what Bevy changed,
-tracked against a per-entity value shadow. So a single node can be co-authored **per axis**:
+same frame. It also runs once per physics step in `FixedFirst`, so when a render frame
+spans several physics steps a node moved from Godot *between* steps stays visible every
+step (matching the `FixedLast` write cadence) rather than being clobbered by a stale
+whole-transform write. The Bevy→Godot write runs in `FixedLast` and pushes only what Bevy
+changed, tracked against a per-entity value shadow. So a single node can be co-authored
+**per axis**:
 
 ```gdscript
 # quad.gd -- Godot drives x
@@ -133,7 +137,7 @@ CPU Usage: None
 ### One-Way Mode Performance
 ```
 Transform Components: Created
-Write Systems: Running (Last schedule)
+Write Systems: Running (FixedLast schedule)
 Read Systems: Not running
 Memory Usage: ~48 bytes per entity
 CPU Usage: O(changed entities)
@@ -142,8 +146,8 @@ CPU Usage: O(changed entities)
 ### Two-Way Mode Performance
 ```
 Transform Components: Created
-Write Systems: Running (Last schedule)
-Read Systems: Running (PreUpdate schedule)
+Write Systems: Running (FixedLast schedule)
+Read Systems: Running (PreUpdate + FixedFirst schedules)
 Memory Usage: ~48 bytes per entity
 CPU Usage: O(all entities with transforms)
 ```
@@ -153,12 +157,12 @@ CPU Usage: O(all entities with transforms)
 ### System Execution Order
 
 **Write Systems (ECS → Godot)**
-- Schedule: `Last`
+- Schedule: `FixedLast` (physics rate, once per fixed step)
 - Only processes changed transforms
 - Runs for both OneWay and TwoWay modes
 
 **Read Systems (Godot → ECS)**
-- Schedule: `PreUpdate`
+- Schedule: `PreUpdate` (once per render frame) and `FixedFirst` (per physics step, steps 2..N)
 - Checks all transforms for external changes
 - Only runs in TwoWay mode
 

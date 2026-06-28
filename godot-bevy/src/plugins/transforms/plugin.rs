@@ -1,9 +1,10 @@
-use bevy_app::{App, FixedLast, Plugin, PreUpdate};
+use bevy_app::{App, FixedFirst, FixedLast, Plugin, PreUpdate};
 use bevy_ecs::{schedule::IntoScheduleConfigs, system::Res};
 use bevy_transform::components::Transform;
 use godot::classes::{Node2D, Node3D};
 
 use crate::plugins::core::AppSceneTreeExt;
+use crate::plugins::fixed_schedule::not_first_fixed_step;
 use crate::plugins::transforms::IntoBevyTransform;
 use crate::plugins::transforms::{GodotTransformConfig, TransformSyncMode};
 
@@ -65,13 +66,22 @@ impl Plugin for GodotTransformSyncPlugin {
 
         // Only add automatic sync systems if auto_sync is enabled
         if self.auto_sync {
-            // Godot→Bevy read runs in PreUpdate, before both the fixed phase
-            // (FixedUpdate logic + FixedLast write) and the Update suffix, so Bevy
-            // logic sees Godot's value the same frame -- the brownfield guarantee.
-            // The value shadow guard makes this safe read-before-write.
+            // Godot->Bevy read runs once per render frame in PreUpdate (covering
+            // step 1, the Update suffix, and idle 0-step frames) and once per
+            // physics step in FixedFirst for steps 2..N -- matching the FixedLast
+            // write cadence so a Godot physics-clock author moving an axis between
+            // steps isn't clobbered by a stale whole-transform write. The
+            // value-shadow guard makes the duplicate read idempotent; 1-step and
+            // idle frames still do exactly one read.
             app.add_systems(
                 PreUpdate,
                 pre_update_godot_transforms::<()>.run_if(transform_sync_twoway_enabled),
+            );
+            app.add_systems(
+                FixedFirst,
+                pre_update_godot_transforms::<()>
+                    .run_if(transform_sync_twoway_enabled)
+                    .run_if(not_first_fixed_step),
             );
 
             // Bevy -> Godot write at physics rate (once per fixed tick). This is

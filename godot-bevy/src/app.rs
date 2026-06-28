@@ -359,7 +359,7 @@ impl INode for BevyApp {
     }
 
     fn physics_process(&mut self, delta: f32) {
-        use crate::plugins::fixed_schedule::{run_godot_fixed_main, run_preamble};
+        use crate::plugins::fixed_schedule::run_physics_step;
         use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 
         if godot::classes::Engine::singleton().is_editor_hint() {
@@ -379,8 +379,12 @@ impl INode for BevyApp {
         if let Some(app) = self.app.as_mut()
             && let Err(e) = catch_unwind(AssertUnwindSafe(|| {
                 let world = app.world_mut();
-                run_preamble(world, need_startup, need_prefix);
-                run_godot_fixed_main(world, std::time::Duration::from_secs_f64(delta as f64));
+                run_physics_step(
+                    world,
+                    need_startup,
+                    need_prefix,
+                    std::time::Duration::from_secs_f64(delta as f64),
+                );
                 crate::profiling::secondary_frame_mark("physics");
             }))
         {
