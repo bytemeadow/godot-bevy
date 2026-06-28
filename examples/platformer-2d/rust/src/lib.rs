@@ -17,6 +17,7 @@ mod scene_management;
 fn build_app(app: &mut App) {
     // This example uses most godot-bevy features
     app.add_plugins(GodotDefaultPlugins)
+        .add_plugins(GodotActionsPlugin)
         .add_plugins(StatesPlugin)
         .init_state::<GameState>()
         .add_loading_state(

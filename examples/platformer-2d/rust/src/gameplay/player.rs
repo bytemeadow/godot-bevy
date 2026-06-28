@@ -3,7 +3,7 @@ use crate::gameplay::audio::PlaySfxMessage;
 use bevy::app::{App, Plugin};
 use bevy::prelude::*;
 use godot::classes::CharacterBody2D;
-use godot::classes::{AnimatedSprite2D, Input, ProjectSettings};
+use godot::classes::{AnimatedSprite2D, ProjectSettings};
 use godot::global::move_toward;
 use godot::obj::Singleton;
 use godot_bevy::prelude::*;
@@ -81,6 +81,7 @@ impl Plugin for PlayerPlugin {
 fn detect_player_input(
     player: Query<&GodotNodeHandle, With<Player>>,
     mut input_events: MessageWriter<PlayerInputMessage>,
+    actions: Res<GodotActions>,
     mut godot: GodotAccess,
 ) {
     if let Ok(handle) = player.single() {
@@ -89,9 +90,8 @@ fn detect_player_input(
             return; // Node is invalid, skip this frame
         };
 
-        let input = godot.singleton::<Input>();
-        let movement_direction = input.get_axis("move_left", "move_right");
-        let jump_pressed = input.is_action_just_pressed("jump");
+        let movement_direction = actions.axis("move_left", "move_right");
+        let jump_pressed = actions.just_pressed("jump");
         let is_on_floor = character_body.is_on_floor();
 
         // Always send input events so movement system knows current input state,

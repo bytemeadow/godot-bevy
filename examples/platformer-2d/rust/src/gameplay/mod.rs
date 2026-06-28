@@ -6,8 +6,7 @@ use bevy::prelude::*;
 use bevy::state::condition::in_state;
 use bevy::state::state::NextState;
 use gem::GemsCollected;
-use godot::classes::Input;
-use godot_bevy::prelude::GodotAccess;
+use godot_bevy::prelude::{GodotActions, GodotInputSet};
 use hud::{HudHandles, HudUpdateMessage};
 
 pub mod audio;
@@ -39,26 +38,23 @@ impl Plugin for GameplayPlugin {
         app.add_systems(
             Update,
             (detect_reset_level_input, detect_return_to_menu_input)
-                .run_if(in_state(GameState::InGame)),
+                .run_if(in_state(GameState::InGame))
+                .after(GodotInputSet),
         );
     }
 }
 
 /// System that detects reset level input and triggers observer
-fn detect_reset_level_input(mut commands: Commands, mut godot: GodotAccess) {
-    let input = godot.singleton::<Input>();
-
-    if input.is_action_just_pressed("reset_level") {
+fn detect_reset_level_input(mut commands: Commands, actions: Res<GodotActions>) {
+    if actions.just_pressed("reset_level") {
         info!("Reset level input detected");
         commands.trigger(ResetLevelMessage);
     }
 }
 
 /// System that detects return to menu input and triggers observer
-fn detect_return_to_menu_input(mut commands: Commands, mut godot: GodotAccess) {
-    let input = godot.singleton::<Input>();
-
-    if input.is_action_just_pressed("return_to_main_menu") {
+fn detect_return_to_menu_input(mut commands: Commands, actions: Res<GodotActions>) {
+    if actions.just_pressed("return_to_main_menu") {
         info!("Return to main menu input detected");
         commands.trigger(ReturnToMainMenuMessage);
     }
