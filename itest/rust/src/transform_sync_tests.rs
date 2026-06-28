@@ -389,10 +389,18 @@ fn test_twoway_godot_and_bevy_coexist(ctx: &TestContext) -> godot::task::TaskHan
 fn test_spawn_resets_physics_interpolation(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
     godot::task::spawn(async move {
-        ctx_clone
-            .scene_tree
-            .get_tree()
-            .set_physics_interpolation_enabled(true);
+        // Physics interpolation is a global SceneTree flag -- the one cross-test
+        // state the harness's Drop-based isolation doesn't reset. Restore it via a
+        // guard so a failing assert below can't leak it into the next test.
+        struct FtiGuard(Gd<godot::classes::SceneTree>);
+        impl Drop for FtiGuard {
+            fn drop(&mut self) {
+                self.0.set_physics_interpolation_enabled(false);
+            }
+        }
+        let mut tree = ctx_clone.scene_tree.get_tree();
+        tree.set_physics_interpolation_enabled(true);
+        let _fti = FtiGuard(tree);
 
         let mut app = TestApp::new(&ctx_clone, |app| {
             app.add_plugins(GodotTransformSyncPlugin::default());
@@ -416,10 +424,6 @@ fn test_spawn_resets_physics_interpolation(ctx: &TestContext) -> godot::task::Ta
 
         app.cleanup().await;
         node.free();
-        ctx_clone
-            .scene_tree
-            .get_tree()
-            .set_physics_interpolation_enabled(false);
     })
 }
 
