@@ -81,6 +81,12 @@ Visual Frame End
 
 Physics steps run on Godot's authoritative clock: each render frame drives the prefix and 0, 1, or N `FixedMain` steps in `_physics_process` before the suffix runs in `_process` — a deterministic order, not independent schedules.
 
+### `BeforeFixedMainLoop` / `AfterFixedMainLoop` anchors
+
+godot-bevy runs the whole `RunFixedMainLoop` schedule once per physics step, so the `BeforeFixedMainLoop` and `AfterFixedMainLoop` anchor sets fire **once per step** — 0, 1, or N times per render frame — not Bevy's stock once per frame. Order ecosystem systems (e.g. leafwing's input-buffer swap) against them with that cadence in mind.
+
+A `GodotActions` read inside either anchor sees the **process-clock** snapshot: the active clock is flipped to physics only around `FixedMain` itself. Read actions in `FixedUpdate` (physics snapshot) or `Update` (process snapshot), not in the anchors.
+
 ## Frame Rate Relationships
 
 | Schedule | Rate | Use case |

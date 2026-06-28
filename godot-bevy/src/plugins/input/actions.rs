@@ -180,8 +180,9 @@ impl GodotActions {
 
     /// Poll Godot's `Input` singleton and refresh the snapshot for `clock`.
     ///
-    /// Lazy-seeds the action list from `InputMap` on the first call (zero-alloc
-    /// on subsequent calls -- `action_keys` keeps pre-stringified keys).
+    /// Lazy-seeds the action list from `InputMap` on the first poll that returns
+    /// any actions; zero-alloc once seeded -- `action_keys` holds the
+    /// pre-stringified keys.
     pub(crate) fn poll(&mut self, clock: Clock) {
         if self.action_set.is_empty() {
             let acts: Vec<StringName> = InputMap::singleton().get_actions().iter_shared().collect();
