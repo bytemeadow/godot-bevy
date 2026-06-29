@@ -234,7 +234,7 @@ fn emit_required_registration(
 
 fn registration_warn(comp: &Path, trigger: &Path) -> TokenStream2 {
     quote! {
-        godot::global::godot_warn!(
+        godot_bevy::tracing::warn!(
             "godot-bevy: failed to register required component {} for {}: {}",
             stringify!(#comp), stringify!(#trigger), e
         );

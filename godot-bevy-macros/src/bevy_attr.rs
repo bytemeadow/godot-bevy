@@ -96,14 +96,23 @@ fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
                 }
                 "default" => {
                     input.parse::<Token![=]>()?;
+                    if d.default.is_some() {
+                        return Err(Error::new(key.span(), "duplicate `default`"));
+                    }
                     d.default = Some(input.parse()?);
                 }
                 "with" => {
                     input.parse::<Token![=]>()?;
+                    if d.with.is_some() {
+                        return Err(Error::new(key.span(), "duplicate `with`"));
+                    }
                     d.with = Some(input.parse()?);
                 }
                 "component" => {
                     input.parse::<Token![=]>()?;
+                    if d.component.is_some() {
+                        return Err(Error::new(key.span(), "duplicate `component`"));
+                    }
                     d.component = Some(input.parse()?);
                 }
                 _ => {
@@ -744,6 +753,21 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .contains("class_name")
+        );
+    }
+
+    #[test]
+    fn duplicate_directive_key_is_error() {
+        let di: syn::DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode)]
+            #[bevy(require(speed: Speed, as = f32, default = 1.0, default = 2.0))]
+            struct Player;
+        };
+        assert!(
+            parse_component_first(&di)
+                .unwrap_err()
+                .to_string()
+                .contains("duplicate `default`")
         );
     }
 

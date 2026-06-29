@@ -125,13 +125,8 @@ mod tests {
 
     #[derive(Component)]
     struct Primary;
-    #[derive(Component, PartialEq, Debug)]
+    #[derive(Component, PartialEq, Debug, Default)]
     struct Companion(u8);
-    impl Default for Companion {
-        fn default() -> Self {
-            Companion(0)
-        }
-    }
 
     fn register_primary(world: &mut World) {
         let _ = world.try_register_required_components_with::<Primary, Companion>(|| Companion(7));

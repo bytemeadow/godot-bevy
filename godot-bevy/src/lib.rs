@@ -34,6 +34,7 @@ pub use bevy_app;
 pub use bevy_ecs;
 pub use bevy_math;
 pub use bevy_transform;
+pub use tracing;
 
 pub struct GodotPlugin;
 
