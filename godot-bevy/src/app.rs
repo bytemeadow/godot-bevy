@@ -347,7 +347,10 @@ impl BevyApp {
         };
         let key = name.to_string();
         let Some(mapper) = registry.mappers.get(&key) else {
-            if registry.warner.lock().should_log(&key) {
+            // Gate all unknown names under one fixed key so untrusted GDScript
+            // can't grow the warner's map by spamming unique names. Registered
+            // names (a finite set) still gate per-name below.
+            if registry.warner.lock().should_log("<unknown event>") {
                 tracing::warn!(
                     "BevyApp::send_event: unknown event {key:?}; registered: {:?}",
                     registry.mappers.keys().collect::<Vec<_>>()

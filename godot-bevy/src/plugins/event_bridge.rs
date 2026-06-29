@@ -84,9 +84,14 @@ pub(crate) struct RateLimitedWarner {
 
 impl RateLimitedWarner {
     pub(crate) fn should_log(&mut self, name: &str) -> bool {
-        let count = self.seen.entry(name.to_string()).or_insert(0);
-        *count += 1;
-        count.is_power_of_two()
+        // Allocate the key only the first time a name is seen, not every call.
+        if let Some(count) = self.seen.get_mut(name) {
+            *count += 1;
+            count.is_power_of_two()
+        } else {
+            self.seen.insert(name.to_string(), 1);
+            true
+        }
     }
 }
 
