@@ -17,8 +17,28 @@ static TRACY_CLIENT: Lazy<tracing_tracy::client::Client> =
 pub fn init_profiler() {
     #[cfg(feature = "trace_tracy")]
     {
+        use godot::obj::Singleton;
+        let original_port = godot::classes::Os::singleton().get_environment("TRACY_PORT");
+        let editor_port =
+            godot::classes::Os::singleton().get_environment("GODOT_EDITOR_TRACY_PORT");
+        let editor_port = if editor_port.is_empty() {
+            godot::builtin::GString::from("7867")
+        } else {
+            editor_port
+        };
+
+        // Start Godot editor Tracy client on different port than game instances
+        // so the editor and game can be profiled separately
+        if godot::classes::Engine::singleton().is_editor_hint() {
+            // Set port before tracy client initialization
+            godot::classes::Os::singleton().set_environment("TRACY_PORT", &editor_port);
+        }
+
         // Force Tracy client initialization
         let _ = &*TRACY_CLIENT;
+
+        // Restore original port for game instances
+        godot::classes::Os::singleton().set_environment("TRACY_PORT", &original_port);
 
         // Optional: Set up tracing subscriber with Tracy layer
         // This could be done elsewhere if needed

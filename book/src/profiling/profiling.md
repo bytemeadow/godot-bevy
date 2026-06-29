@@ -46,3 +46,5 @@ trace_tracy = ["dep:tracing-tracy", "godot-bevy/trace_tracy"]
 ## Notes
 
 > **Note for version 0.9.3+**: The `check-cfg` workaround is no longer needed. Tracy integration has been refactored to prevent dependency leaks.
+
+> **Note for version 0.12.0+**: The Godot editor uses a different Tracy client port than game instances. The default editor port is `7867`. It can be overridden by setting the `GODOT_EDITOR_TRACY_PORT=7867` environment variable. You override the game instance Tracy port as usual with `TRACY_PORT=8086`.
