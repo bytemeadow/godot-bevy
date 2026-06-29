@@ -12,6 +12,7 @@ godot_bevy_test::declare_test_runner!();
 mod autosync_match_tests;
 mod benchmarks;
 mod collision_tests;
+mod event_bridge_tests;
 mod input_ecosystem_tests;
 mod input_tests;
 mod real_frame_tests;

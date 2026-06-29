@@ -23,9 +23,10 @@ pub(crate) trait SignalDispatch: Send {
     fn trigger_in_world(self: Box<Self>, world: &mut bevy_ecs::world::World);
 }
 
-/// Envelope that carries a signal event for observer triggering
-struct SignalEnvelope<T: Event + Clone + Send + 'static> {
-    event: T,
+/// Envelope that carries a signal event for observer triggering.
+/// `pub(crate)` so the event bridge can build envelopes for its own channel.
+pub(crate) struct SignalEnvelope<T: Event + Clone + Send + 'static> {
+    pub(crate) event: T,
 }
 
 impl<T: Event + Clone + Send + 'static> SignalDispatch for SignalEnvelope<T>

@@ -20,6 +20,7 @@ mod tests;
 
 // Re-export BevyApp for testing and advanced usage
 pub use app::{BEVY_INIT_FUNC, BevyApp};
+pub use plugins::event_bridge::send_event;
 
 // Re-export inventory to avoid requiring users to add it as a dependency
 pub use inventory;
