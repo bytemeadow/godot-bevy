@@ -31,7 +31,7 @@ use godot_bevy::plugins::signals::{GodotSignals, GodotSignalsPlugin};
 use godot_bevy::plugins::transforms::{
     GodotTransformSyncPlugin, GodotTransformSyncPluginExt, TransformSyncMetadata, TransformSyncMode,
 };
-use godot_bevy::prelude::BevyBundle;
+use godot_bevy::prelude::BevyComponents;
 use godot_bevy::watchers::collision_watcher::CollisionWatcher;
 use godot_bevy_test::{bench, measured};
 
@@ -680,9 +680,9 @@ macro_rules! bench_autosync_types {
             #[derive(bevy::prelude::Component, Default)]
             pub struct $marker;
 
-            #[derive(godot::prelude::GodotClass, BevyBundle)]
+            #[derive(godot::prelude::GodotClass, BevyComponents)]
             #[class(init, base=Node2D)]
-            #[bevy_bundle(($marker))]
+            #[bevy(require($marker))]
             pub struct $node {
                 base: godot::prelude::Base<godot::classes::Node2D>,
             }

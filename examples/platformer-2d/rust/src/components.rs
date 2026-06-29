@@ -41,20 +41,27 @@ impl Default for Gravity {
     }
 }
 
-/// Component marking an entity as the player
-#[derive(Component, Debug, Clone, Default, Reflect)]
+/// Player marker + the `Player2D` Godot node with exported speed/jump/gravity,
+/// each inserted as a companion when the node enters the tree.
+#[derive(Component, GodotNode, Default, Debug, Clone, Reflect)]
 #[reflect(Component)]
+#[bevy(base = CharacterBody2D, class_name = Player2D)]
+#[bevy(
+    require(speed: Speed, as = f32, default = 250.0),
+    require(jump_velocity: JumpVelocity, as = f32, default = -400.0),
+    require(gravity: Gravity, as = f32, default = 980.0),
+)]
 pub struct Player;
 
 /// Component marking an entity as a gem
 #[derive(Component, GodotNode, Default, Debug, Clone)]
-#[godot_node(base(Area2D), class_name(Gem2D))]
+#[bevy(base = Area2D, class_name = Gem2D)]
 pub struct Gem;
 
 /// Component marking an entity as a door
 #[derive(Component, GodotNode, Default, Debug, Clone)]
-#[godot_node(base(Area2D), class_name(Door2D))]
+#[bevy(base = Area2D, class_name = Door2D)]
 pub struct Door {
-    #[godot_export(default(LevelId::Level1))]
+    #[bevy(default = LevelId::Level1)]
     pub level_id: LevelId,
 }
