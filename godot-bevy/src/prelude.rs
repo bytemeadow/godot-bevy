@@ -19,13 +19,16 @@ pub use crate::plugins::{
     core::FindEntityByNameExt,
     // Debugger
     debugger::{DebuggerConfig, GodotDebuggerPlugin},
+    // Event bridge
+    event_bridge::{
+        AddGodotEventAppExt, EventBridgeSet, GodotEventBridgePlugin, GodotEventSender, send_event,
+    },
     // Collisions
     input::{
         Action, ActionInput, BevyInputBridgePlugin, GodotActions, GodotActionsPlugin,
         GodotInputEventPlugin, GodotInputSet, GodotKeyboardInput, GodotMouseButtonInput,
         GodotMouseMotion,
     },
-    mailbox::{GodotMailboxMessage, GodotMailboxPlugin, GodotMailboxSet},
     // Core functionality
     packed_scene::{GodotPackedScenePlugin, GodotScene},
     // Input
