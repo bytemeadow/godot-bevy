@@ -86,7 +86,7 @@ macro_rules! add_transform_sync_systems {
         );
     };
 
-    // Godot → Bevy read, restricted to the filter. Primary read runs every
+    // Godot → Bevy read, restricted to the filter. Runs every
     // physics step in `FixedFirst`, matching auto sync's per-step cadence so a
     // Godot author between steps isn't clobbered. `PreUpdate` is the 0-tick
     // fallback, firing only on render frames with zero physics steps. No twoway

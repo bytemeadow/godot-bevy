@@ -54,7 +54,7 @@ Full bidirectional synchronization between ECS and Godot.
 
 #### Co-authorship semantics
 
-The Godot→Bevy read is primary in `FixedFirst`, running once per physics step before your
+The Godot→Bevy read occurs in `FixedFirst`, running once per physics step before your
 `FixedUpdate` systems, so a node moved from Godot -- by GDScript, an `AnimationPlayer`, or
 physics -- *between* steps stays visible every step (matching the `FixedLast` write cadence)
 rather than being clobbered by a stale whole-transform write. On a render frame with no
@@ -82,11 +82,11 @@ What this guarantees and what it doesn't:
   is authored by one side at a time (2D rotation is a single angle anyway).
 - If **both sides change the same axis in the same frame**, Bevy wins.
 - A value authored in Godot's **idle phase** (`_process`, `AnimationPlayer` in idle) is seen
-  by Bevy the next frame, since Bevy's primary read runs in the physics phase, before Godot's
+  by Bevy the next frame, since Bevy's read runs in the physics phase, before Godot's
   idle phase within a frame -- the same one-frame relationship any Godot `_physics_process`
   reader has with an idle-phase writer.
 
-> **Freshness trade:** because the read is primary in `FixedFirst`, any *prefix* schedule
+> **Freshness trade:** because the read occurs in `FixedFirst`, any *prefix* schedule
 > (`First`, `PreUpdate`, `StateTransition`) on a frame with one or more physics steps sees
 > **last frame's** synced `Transform` -- the fresh Godot value isn't merged until
 > `FixedFirst` runs. Read this-frame's Godot value in `FixedUpdate` onward or in the
@@ -155,7 +155,7 @@ CPU Usage: O(changed entities)
 ```
 Transform Components: Created
 Write Systems: Running (FixedLast schedule)
-Read Systems: Running (FixedFirst primary, PreUpdate 0-step fallback)
+Read Systems: Running (FixedFirst every step, PreUpdate 0-step fallback)
 Memory Usage: ~48 bytes per entity
 CPU Usage: O(all entities with transforms)
 ```

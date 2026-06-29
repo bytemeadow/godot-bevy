@@ -66,7 +66,7 @@ impl Plugin for GodotTransformSyncPlugin {
 
         // Only add automatic sync systems if auto_sync is enabled
         if self.auto_sync {
-            // Godot->Bevy read is primary in FixedFirst -- it runs every physics
+            // Godot->Bevy read runs in FixedFirst every physics
             // step, matching the FixedLast write cadence so a Godot physics-clock
             // author moving an axis between steps isn't clobbered by a stale
             // whole-transform write, and so the Update suffix sees the last step's

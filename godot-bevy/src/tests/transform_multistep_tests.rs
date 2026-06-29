@@ -6,7 +6,7 @@
 //! step's whole-transform write dragged a stale Bevy value over any axis a Godot
 //! physics-clock author moved between steps -- silently clobbering it.
 //!
-//! The fix inverts the read cadence: FixedFirst is the primary read and runs every
+//! The fix inverts the read cadence: FixedFirst reads every
 //! physics step (matching the FixedLast write), so each step gets a fresh per-axis
 //! read before its write. PreUpdate becomes the 0-tick fallback -- it runs only on
 //! render frames with zero physics steps, where the Main prefix is the `_process`
@@ -46,7 +46,7 @@ const STEP_X: f32 = 1.0; // Bevy authors x by this much each physics step
 struct GodotNode(Transform);
 
 /// Counts read-system invocations per schedule, proving the cadence partition:
-/// FixedFirst reads every physics step (primary), PreUpdate reads only on a 0-tick
+/// FixedFirst reads every physics step, PreUpdate reads only on a 0-tick
 /// (process-fallback) frame.
 #[derive(Resource, Default)]
 struct ReadCount {
@@ -82,7 +82,7 @@ fn read_stub_preupdate(
     merge_reads(&mut q);
 }
 
-/// FixedFirst read stub: the primary per-step read. Bumps only `fixedfirst`.
+/// FixedFirst read stub: the per-step read. Bumps only `fixedfirst`.
 fn read_stub_fixedfirst(
     mut q: Query<(&mut Transform, &GodotNode, &mut TransformSyncMetadata)>,
     mut count: ResMut<ReadCount>,
@@ -114,7 +114,7 @@ fn author_stub(mut q: Query<&mut Transform, With<GodotNode>>) {
 
 /// Build an app wired like the production TwoWay path: PreUpdate read gated by
 /// `prefix_ran_in_process_fallback` (the 0-tick fallback), FixedFirst read every
-/// physics step (primary), FixedLast write, FixedUpdate author. `with_fixed_first`
+/// physics step, FixedLast write, FixedUpdate author. `with_fixed_first`
 /// lets the control test omit the per-step read to prove the bug. Returns the app
 /// and the single synced entity.
 fn wired_app(mode: TransformSyncMode, with_fixed_first: bool) -> (App, Entity) {
@@ -206,7 +206,7 @@ fn close(a: f32, b: f32) -> bool {
 }
 
 /// Core regression: a 2-step frame where a Godot physics-clock author moves the
-/// node's y between steps. The primary FixedFirst read runs every step, so step 2
+/// node's y between steps. The FixedFirst read runs every step, so step 2
 /// pulls the fresh y before its whole-transform write -- the Godot y survives and
 /// the Bevy x advances both steps. Fails on pre-fix code (no FixedFirst read),
 /// where step 2's write drags a stale y=0 over the Godot move.
@@ -316,7 +316,7 @@ fn idle_frame_reads_via_preupdate_fallback() {
     );
 }
 
-/// Per-schedule read partition: FixedFirst reads once per physics step (primary);
+/// Per-schedule read partition: FixedFirst reads once per physics step;
 /// PreUpdate reads only on a 0-tick (process-fallback) frame. The `preupdate == 0`
 /// on tick frames is the explicit "PreUpdate does not fire on a tick frame" check.
 #[test]

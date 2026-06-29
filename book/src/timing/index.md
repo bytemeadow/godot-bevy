@@ -10,6 +10,8 @@ godot-bevy splits Bevy's standard `Main` schedule across Godot's two frame callb
 
 The **prefix** of the main schedule plus the fixed loop run here, on Godot's physics clock.
 
+The `TwoWay` notes below refer to [`TransformSyncMode::TwoWay`](../transforms/sync-modes.md) (bidirectional Godot↔ECS transform sync); they only affect *where* the Godot→ECS read runs.
+
 **What runs:**
 - `First`
 - `PreUpdate` (TwoWay: reads Godot → ECS transforms only on 0-physics-step frames)
@@ -191,7 +193,7 @@ fn physics_system(time: Res<Time>) {
 
 Godot transforms written in `FixedLast` aren't read back into ECS until the next physics step's `FixedFirst` (TwoWay), or — on a render frame with no physics step — that frame's `PreUpdate` fallback.
 
-Because the TwoWay read is primary in `FixedFirst`, any *prefix* schedule (`First`, `PreUpdate`, `StateTransition`) on a frame with one or more physics steps sees **last frame's** synced `Transform` — the fresh Godot value isn't merged until `FixedFirst` runs. Read this frame's Godot value in `FixedUpdate` onward (after `FixedFirst`) or in the `Update` suffix (after the last step's read), not in a prefix schedule.
+Because the TwoWay read occurs in `FixedFirst`, any *prefix* schedule (`First`, `PreUpdate`, `StateTransition`) on a frame with one or more physics steps sees **last frame's** synced `Transform` — the fresh Godot value isn't merged until `FixedFirst` runs. Read this frame's Godot value in `FixedUpdate` onward (after `FixedFirst`) or in the `Update` suffix (after the last step's read), not in a prefix schedule.
 
 ## Performance Considerations
 
