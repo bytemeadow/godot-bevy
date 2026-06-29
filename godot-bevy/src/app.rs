@@ -38,6 +38,8 @@ pub struct BevyApp {
     // Physics steps run in the current render frame; reported via bevy_frame_complete.
     #[cfg(feature = "test-frame-signal")]
     physics_steps_this_frame: u32,
+    /// Tracks the Godot RenderingServer draw time.
+    render_server_span: Option<tracing::span::EnteredSpan>,
 }
 
 impl BevyApp {
@@ -293,9 +295,11 @@ impl INode for BevyApp {
             prefix_done_this_frame: false,
             #[cfg(feature = "test-frame-signal")]
             physics_steps_this_frame: 0,
+            render_server_span: None,
         }
     }
 
+    #[tracing::instrument(skip_all)]
     fn ready(&mut self) {
         if godot::classes::Engine::singleton().is_editor_hint() {
             return;
@@ -312,9 +316,19 @@ impl INode for BevyApp {
             return;
         }
 
+        godot::classes::RenderingServer::singleton()
+            .signals()
+            .frame_pre_draw()
+            .connect_other(self, Self::on_frame_pre_draw);
+        godot::classes::RenderingServer::singleton()
+            .signals()
+            .frame_post_draw()
+            .connect_other(self, Self::on_frame_post_draw);
+
         self.do_initialize();
     }
 
+    #[tracing::instrument(skip_all)]
     fn process(&mut self, _delta: f64) {
         use crate::plugins::fixed_schedule::{run_main_suffix, run_preamble};
         use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -358,6 +372,7 @@ impl INode for BevyApp {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     fn physics_process(&mut self, delta: f32) {
         use crate::plugins::fixed_schedule::run_physics_step;
         use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
@@ -404,4 +419,15 @@ impl BevyApp {
     /// Carries the number of physics steps that ran this frame. Test harness only.
     #[signal]
     fn bevy_frame_complete(physics_steps: i64);
+}
+
+impl BevyApp {
+    fn on_frame_pre_draw(&mut self) {
+        self.render_server_span = Some(tracing::info_span!("RenderingServer draw").entered());
+    }
+    fn on_frame_post_draw(&mut self) {
+        if let Some(span) = self.render_server_span.take() {
+            span.exit();
+        }
+    }
 }
