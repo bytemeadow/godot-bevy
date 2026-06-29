@@ -31,7 +31,7 @@ echo -e "${CYAN}Building godot-bevy-itest ($BUILD_TYPE)...${NC}"
 
 # Build the Rust library
 cd "$(dirname "$0")/rust"
-cargo build $CARGO_BUILD_FLAGS --features test-frame-signal
+cargo build $CARGO_BUILD_FLAGS --features test-frame-signal,autosync-tests
 
 cd ..
 
