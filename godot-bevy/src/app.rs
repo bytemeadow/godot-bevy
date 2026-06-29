@@ -316,14 +316,21 @@ impl INode for BevyApp {
             return;
         }
 
-        godot::classes::RenderingServer::singleton()
-            .signals()
-            .frame_pre_draw()
-            .connect_other(self, Self::on_frame_pre_draw);
-        godot::classes::RenderingServer::singleton()
-            .signals()
-            .frame_post_draw()
-            .connect_other(self, Self::on_frame_post_draw);
+        #[cfg(feature = "trace_tracy")]
+        {
+            godot::classes::RenderingServer::singleton()
+                .signals()
+                .frame_pre_draw()
+                .connect_other(self, Self::on_frame_pre_draw);
+            godot::classes::RenderingServer::singleton()
+                .signals()
+                .frame_post_draw()
+                .connect_other(self, Self::on_frame_post_draw);
+        }
+        #[cfg(not(feature = "trace_tracy"))]
+        {
+            let _ = self.render_server_span; // Avoid unused variable warning
+        }
 
         self.do_initialize();
     }
@@ -421,6 +428,7 @@ impl BevyApp {
     fn bevy_frame_complete(physics_steps: i64);
 }
 
+#[cfg(feature = "trace_tracy")]
 impl BevyApp {
     fn on_frame_pre_draw(&mut self) {
         self.render_server_span = Some(tracing::info_span!("RenderingServer draw").entered());
