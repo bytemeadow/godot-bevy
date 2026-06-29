@@ -7,7 +7,8 @@ the important distinction between automatic markers for built-in Godot types ver
 
 - Built-in Godot types get automatic markers (e.g., `Sprite2DMarker`)
 - Custom nodes do NOT get automatic markers for their type, but DO inherit base class markers
-- Use `BevyBundle` to define components for custom nodes
+- Use `GodotNode` (component-first) to define a Bevy component that generates the Godot class
+- Use `BevyComponents` (Godot-first) to attach Bevy components to a class you write yourself
 - Prefer semantic components over generic markers
 - Combine base class markers with custom components for powerful queries
 
