@@ -1,23 +1,25 @@
 //! Deterministic, FFI-free validation of the TwoWay multi-step clobber fix.
 //!
-//! The bug: the Godot->Bevy read runs once per render frame (PreUpdate), but the
-//! whole-transform write runs once per physics step (FixedLast). On a frame with
-//! 2+ physics steps, steps 2..N write without a fresh read, so the step's
-//! whole-transform write drags a stale Bevy value over any axis a Godot
+//! The bug: the Godot->Bevy read used to run once per render frame (PreUpdate),
+//! but the whole-transform write runs once per physics step (FixedLast). On a
+//! frame with 2+ physics steps, steps 2..N wrote without a fresh read, so the
+//! step's whole-transform write dragged a stale Bevy value over any axis a Godot
 //! physics-clock author moved between steps -- silently clobbering it.
 //!
-//! The fix keeps the PreUpdate read (step 1,
-//! the Update suffix, idle 0-step frames) and adds the same read to FixedFirst,
-//! gated by `not_first_fixed_step` so steps 2..N each get a fresh per-axis read
-//! before their FixedLast write. Step 1 and idle frames still do exactly one read.
+//! The fix inverts the read cadence: FixedFirst is the primary read and runs every
+//! physics step (matching the FixedLast write), so each step gets a fresh per-axis
+//! read before its write. PreUpdate becomes the 0-tick fallback -- it runs only on
+//! render frames with zero physics steps, where the Main prefix is the `_process`
+//! fallback (gated by `prefix_ran_in_process_fallback`).
 //!
 //! These tests model the Godot node as a `GodotNode(Transform)` component (no FFI)
 //! and wire stub systems that call the real merge/value-gate math
 //! (`merge_godot_into_bevy`, `write_needed`) and the real run condition
-//! (`not_first_fixed_step`), driven per step through the real production path
-//! (`run_physics_step`, which publishes `FixedStepFirstOfFrame`), reproducing the
-//! production schedule wiring without Godot. The structural test at the bottom
-//! asserts the real plugin registers the read in both PreUpdate and FixedFirst.
+//! (`prefix_ran_in_process_fallback`), driven per step through the real production
+//! path (`run_physics_step`, which clears `ProcessFallbackPrefix`) plus a `frame()`
+//! driver that publishes the flag for the `_process` fallback exactly like
+//! `app.rs`. The structural test at the bottom asserts the real plugin registers
+//! the read in both PreUpdate and FixedFirst.
 
 use bevy_app::{App, FixedFirst, FixedLast, FixedUpdate, PreUpdate};
 use bevy_ecs::prelude::*;
@@ -27,7 +29,8 @@ use bevy_transform::components::Transform;
 use std::time::Duration;
 
 use crate::plugins::fixed_schedule::{
-    host_fixed_main_loop, not_first_fixed_step, run_main_suffix, run_physics_step, run_preamble,
+    ProcessFallbackPrefix, host_fixed_main_loop, prefix_ran_in_process_fallback, run_main_suffix,
+    run_physics_step, run_preamble,
 };
 use crate::plugins::transforms::sync_systems::{merge_godot_into_bevy, write_needed};
 use crate::plugins::transforms::{
@@ -42,10 +45,14 @@ const STEP_X: f32 = 1.0; // Bevy authors x by this much each physics step
 #[derive(Component)]
 struct GodotNode(Transform);
 
-/// Counts read-system invocations (PreUpdate + FixedFirst), to prove the dedup
-/// partition: 1-step and idle frames read once, multi-step frames read per step.
+/// Counts read-system invocations per schedule, proving the cadence partition:
+/// FixedFirst reads every physics step (primary), PreUpdate reads only on a 0-tick
+/// (process-fallback) frame.
 #[derive(Resource, Default)]
-struct ReadCount(u32);
+struct ReadCount {
+    preupdate: u32,
+    fixedfirst: u32,
+}
 
 // Run conditions mirror plugin.rs's private `transform_sync_twoway_enabled` /
 // `transform_sync_enabled` so the stub wiring matches production gating exactly.
@@ -57,16 +64,31 @@ fn sync_write_enabled(config: Res<GodotTransformConfig>) -> bool {
     config.sync_mode != TransformSyncMode::Disabled
 }
 
-/// Godot->Bevy read stub: calls the real per-axis merge. Idempotent via the
-/// value-shadow guard, so duplicate reads on 1-step frames don't trip Changed.
-fn read_stub(
-    mut q: Query<(&mut Transform, &GodotNode, &mut TransformSyncMetadata)>,
-    mut count: ResMut<ReadCount>,
-) {
-    count.0 += 1;
+/// Shared Godot->Bevy merge body for both read stubs: calls the real per-axis
+/// merge. Idempotent via the value-shadow guard, so a duplicate read doesn't trip
+/// Changed.
+fn merge_reads(q: &mut Query<(&mut Transform, &GodotNode, &mut TransformSyncMetadata)>) {
     for (mut transform, node, mut meta) in q.iter_mut() {
         merge_godot_into_bevy(&mut transform, &node.0, &mut meta.shadow);
     }
+}
+
+/// PreUpdate read stub: the 0-tick fallback read. Bumps only `preupdate`.
+fn read_stub_preupdate(
+    mut q: Query<(&mut Transform, &GodotNode, &mut TransformSyncMetadata)>,
+    mut count: ResMut<ReadCount>,
+) {
+    count.preupdate += 1;
+    merge_reads(&mut q);
+}
+
+/// FixedFirst read stub: the primary per-step read. Bumps only `fixedfirst`.
+fn read_stub_fixedfirst(
+    mut q: Query<(&mut Transform, &GodotNode, &mut TransformSyncMetadata)>,
+    mut count: ResMut<ReadCount>,
+) {
+    count.fixedfirst += 1;
+    merge_reads(&mut q);
 }
 
 /// Bevy->Godot write stub: the real value gate, then a whole-transform push --
@@ -90,10 +112,11 @@ fn author_stub(mut q: Query<&mut Transform, With<GodotNode>>) {
     }
 }
 
-/// Build an app wired like the production TwoWay path: PreUpdate read, FixedFirst
-/// read gated by `not_first_fixed_step`, FixedLast write, FixedUpdate author.
-/// `with_fixed_first` lets the control test omit the per-step read to prove the
-/// bug. Returns the app and the single synced entity.
+/// Build an app wired like the production TwoWay path: PreUpdate read gated by
+/// `prefix_ran_in_process_fallback` (the 0-tick fallback), FixedFirst read every
+/// physics step (primary), FixedLast write, FixedUpdate author. `with_fixed_first`
+/// lets the control test omit the per-step read to prove the bug. Returns the app
+/// and the single synced entity.
 fn wired_app(mode: TransformSyncMode, with_fixed_first: bool) -> (App, Entity) {
     let mut app = App::new();
     app.add_plugins(TimePlugin);
@@ -101,14 +124,14 @@ fn wired_app(mode: TransformSyncMode, with_fixed_first: bool) -> (App, Entity) {
     app.insert_resource(GodotTransformConfig { sync_mode: mode });
     app.init_resource::<ReadCount>();
 
-    app.add_systems(PreUpdate, read_stub.run_if(twoway_read_enabled));
+    app.add_systems(
+        PreUpdate,
+        read_stub_preupdate
+            .run_if(twoway_read_enabled)
+            .run_if(prefix_ran_in_process_fallback),
+    );
     if with_fixed_first {
-        app.add_systems(
-            FixedFirst,
-            read_stub
-                .run_if(twoway_read_enabled)
-                .run_if(not_first_fixed_step),
-        );
+        app.add_systems(FixedFirst, read_stub_fixedfirst.run_if(twoway_read_enabled));
     }
     app.add_systems(FixedLast, write_stub.run_if(sync_write_enabled));
     app.add_systems(FixedUpdate, author_stub);
@@ -126,14 +149,16 @@ fn wired_app(mode: TransformSyncMode, with_fixed_first: bool) -> (App, Entity) {
 
 /// Drive one render frame with `n_steps` physics steps through the real production
 /// per-step path (`run_physics_step`), mirroring `app.rs`:
-/// - each physics step runs `run_physics_step`, which does the preamble (startup
-///   once ever, prefix once per frame), publishes `FixedStepFirstOfFrame` via the
-///   production code, then runs the fixed main
-/// - the end-of-frame `_process` runs the prefix on idle 0-step frames, then the
-///   suffix and `clear_trackers`
+/// - each physics step runs `run_physics_step`, which clears `ProcessFallbackPrefix`
+///   (a step's prefix is never the process fallback) and runs the preamble + fixed
+///   main
+/// - the end-of-frame `_process` publishes `ProcessFallbackPrefix = !prefix_done`
+///   (true only on an idle 0-step frame), runs the prefix fallback, then the suffix
+///   and `clear_trackers`
 ///
-/// Driving the real publish (not a hand-copied `step == 0`) means a regression in
-/// `run_physics_step`'s `f.0 = need_prefix` breaks these tests, not just the itest.
+/// Publishing the flag in the driver -- exactly as `app.rs::process()` does -- is
+/// what lets the PreUpdate read fire on a 0-tick frame and stay suppressed on tick
+/// frames; a regression in that publish breaks these tests, not just the itest.
 ///
 /// `godot_author(world, step)` runs before each step's fixed main, letting a test
 /// move the Godot-side node between steps like a GDScript `_physics_process`.
@@ -144,8 +169,8 @@ fn frame(app: &mut App, n_steps: u32, mut godot_author: impl FnMut(&mut World, u
     let world = app.world_mut();
     let need_startup = !world.contains_resource::<StartupRan>();
 
-    // prefix_done mirrors app.rs's prefix_done_this_frame: true only the first
-    // physics step runs the prefix and publishes need_prefix == true.
+    // prefix_done mirrors app.rs's prefix_done_this_frame: true once the first
+    // physics step runs the prefix.
     let mut prefix_done = false;
     for step in 0..n_steps {
         godot_author(world, step);
@@ -153,8 +178,12 @@ fn frame(app: &mut App, n_steps: u32, mut godot_author: impl FnMut(&mut World, u
         prefix_done = true;
     }
 
-    // End-of-frame _process(): run the prefix if no physics step did (idle frame),
-    // then the suffix and clear_trackers.
+    // End-of-frame _process(): publish the process-fallback flag (true only on an
+    // idle 0-step frame), run the prefix if no physics step did, then the suffix
+    // and clear_trackers.
+    if let Some(mut f) = world.get_resource_mut::<ProcessFallbackPrefix>() {
+        f.0 = !prefix_done;
+    }
     run_preamble(world, need_startup && n_steps == 0, !prefix_done);
     run_main_suffix(world);
     world.clear_trackers();
@@ -177,10 +206,10 @@ fn close(a: f32, b: f32) -> bool {
 }
 
 /// Core regression: a 2-step frame where a Godot physics-clock author moves the
-/// node's y between steps. With the FixedFirst read, step 2 pulls the fresh y
-/// before its whole-transform write, so the Godot y survives and the Bevy x
-/// advances both steps. Fails on pre-fix code (no FixedFirst read), where step 2's
-/// write drags a stale y=0 over the Godot move.
+/// node's y between steps. The primary FixedFirst read runs every step, so step 2
+/// pulls the fresh y before its whole-transform write -- the Godot y survives and
+/// the Bevy x advances both steps. Fails on pre-fix code (no FixedFirst read),
+/// where step 2's write drags a stale y=0 over the Godot move.
 #[test]
 fn twoway_multistep_does_not_clobber_godot_axis() {
     let (mut app, entity) = wired_app(TransformSyncMode::TwoWay, true);
@@ -205,9 +234,9 @@ fn twoway_multistep_does_not_clobber_godot_axis() {
 }
 
 /// Control that proves the scenario genuinely triggers the bug: the same 2-step
-/// frame, but the per-step FixedFirst read is omitted (PreUpdate-only, i.e. the
-/// pre-fix wiring). The Godot y is clobbered back to the step-1 value, confirming
-/// the regression test above is not vacuous.
+/// frame, but the FixedFirst read is omitted. With PreUpdate now gated to 0-tick
+/// frames, a 2-step frame reads nothing, so the step-2 write clobbers the Godot y
+/// back to 0 -- confirming the regression test above is not vacuous.
 #[test]
 fn twoway_multistep_clobbers_without_fixed_first_read() {
     let (mut app, entity) = wired_app(TransformSyncMode::TwoWay, false);
@@ -264,8 +293,9 @@ fn twoway_nstep_accumulates_every_godot_move() {
 }
 
 /// Brownfield idle path: after a Godot move, a 0-step render frame must still pull
-/// the value via the PreUpdate fallback read (the FixedFirst read never runs with
-/// 0 steps). Guards that adding the per-step read didn't break the idle cadence.
+/// the value via the PreUpdate fallback read (FixedFirst never runs with 0 steps).
+/// This is the test that proves the new `prefix_ran_in_process_fallback` gate fires
+/// on a 0-tick frame -- it depends on `frame()` publishing the flag.
 #[test]
 fn idle_frame_reads_via_preupdate_fallback() {
     let (mut app, entity) = wired_app(TransformSyncMode::TwoWay, true);
@@ -286,37 +316,51 @@ fn idle_frame_reads_via_preupdate_fallback() {
     );
 }
 
-/// Dedup read-count partition: the reads partition the physics steps gap-free and
-/// overlap-free. A 1-step frame and an idle frame each read exactly once
-/// (PreUpdate only, byte-for-byte today's cost); a 2-step frame reads twice
-/// (PreUpdate + one FixedFirst). Locks perf-neutrality on the common cadence.
+/// Per-schedule read partition: FixedFirst reads once per physics step (primary);
+/// PreUpdate reads only on a 0-tick (process-fallback) frame. The `preupdate == 0`
+/// on tick frames is the explicit "PreUpdate does not fire on a tick frame" check.
 #[test]
 fn read_count_partitions_steps() {
     let (mut app, _entity) = wired_app(TransformSyncMode::TwoWay, true);
 
-    app.world_mut().resource_mut::<ReadCount>().0 = 0;
+    *app.world_mut().resource_mut::<ReadCount>() = ReadCount::default();
     frame(&mut app, 1, |_, _| {});
-    assert_eq!(
-        app.world().resource::<ReadCount>().0,
-        1,
-        "1-step frame: PreUpdate read only (FixedFirst skipped on step 1)"
-    );
+    {
+        let rc = app.world().resource::<ReadCount>();
+        assert_eq!(
+            rc.preupdate, 0,
+            "tick frame: PreUpdate read suppressed (gated to 0-tick frames)"
+        );
+        assert_eq!(
+            rc.fixedfirst, 1,
+            "tick frame: FixedFirst reads once for the single step"
+        );
+    }
 
-    app.world_mut().resource_mut::<ReadCount>().0 = 0;
+    *app.world_mut().resource_mut::<ReadCount>() = ReadCount::default();
     frame(&mut app, 0, |_, _| {});
-    assert_eq!(
-        app.world().resource::<ReadCount>().0,
-        1,
-        "idle frame: PreUpdate read only"
-    );
+    {
+        let rc = app.world().resource::<ReadCount>();
+        assert_eq!(
+            rc.preupdate, 1,
+            "idle frame: PreUpdate 0-tick fallback reads once"
+        );
+        assert_eq!(rc.fixedfirst, 0, "idle frame: FixedFirst never runs");
+    }
 
-    app.world_mut().resource_mut::<ReadCount>().0 = 0;
+    *app.world_mut().resource_mut::<ReadCount>() = ReadCount::default();
     frame(&mut app, 2, |_, _| {});
-    assert_eq!(
-        app.world().resource::<ReadCount>().0,
-        2,
-        "2-step frame: PreUpdate + one FixedFirst read (step 2)"
-    );
+    {
+        let rc = app.world().resource::<ReadCount>();
+        assert_eq!(
+            rc.preupdate, 0,
+            "two-step frame: PreUpdate suppressed on a tick frame"
+        );
+        assert_eq!(
+            rc.fixedfirst, 2,
+            "two-step frame: one FixedFirst read per step"
+        );
+    }
 }
 
 /// OneWay regression: with sync disabled in the Godot->Bevy direction, neither
@@ -325,16 +369,20 @@ fn read_count_partitions_steps() {
 fn oneway_never_reads_but_still_writes_per_step() {
     let (mut app, entity) = wired_app(TransformSyncMode::OneWay, true);
 
-    app.world_mut().resource_mut::<ReadCount>().0 = 0;
+    *app.world_mut().resource_mut::<ReadCount>() = ReadCount::default();
     frame(&mut app, 3, |world, _step| {
         // A Godot move that OneWay deliberately ignores.
         world.get_mut::<GodotNode>(entity).unwrap().0.translation.y += 1.0;
     });
 
+    let rc = app.world().resource::<ReadCount>();
     assert_eq!(
-        app.world().resource::<ReadCount>().0,
-        0,
-        "OneWay must never run the Godot->Bevy read"
+        rc.preupdate, 0,
+        "OneWay must never run the PreUpdate Godot->Bevy read"
+    );
+    assert_eq!(
+        rc.fixedfirst, 0,
+        "OneWay must never run the FixedFirst Godot->Bevy read"
     );
     let node = node_translation(&app, entity);
     assert!(
@@ -366,9 +414,10 @@ fn schedule_has_system(app: &mut App, label: impl ScheduleLabel, needle: &str) -
 }
 
 /// The real plugin must register the Godot->Bevy read in both PreUpdate and
-/// FixedFirst, and the Bevy->Godot write in FixedLast. Fails on pre-fix code,
-/// which lacks the FixedFirst read -- guarding the per-step registration itself
-/// (the deterministic tests above use stub wiring, so this is the production check).
+/// FixedFirst, and the Bevy->Godot write in FixedLast. Guards that the production
+/// registration exists in all three schedules (the deterministic tests above use
+/// stub wiring); it checks the read is registered, not which run-condition gates
+/// which schedule.
 #[test]
 fn read_registered_in_preupdate_and_fixedfirst_write_in_fixedlast() {
     let mut app = App::new();
@@ -390,7 +439,7 @@ fn read_registered_in_preupdate_and_fixedfirst_write_in_fixedlast() {
     );
     assert!(
         schedule_has_system(&mut app, FixedFirst, "pre_update_godot_transforms"),
-        "Godot->Bevy read must be registered in FixedFirst (per-step, steps 2..N)"
+        "Godot->Bevy read must be registered in FixedFirst (per-step, every step)"
     );
     assert!(
         schedule_has_system(&mut app, FixedLast, "post_update_godot_transforms"),

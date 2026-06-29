@@ -24,20 +24,22 @@ struct GodotFixedMainLoopSplit;
 #[derive(Resource, Default)]
 pub(crate) struct GodotFixedDelta(pub Duration);
 
-/// Published once per physics step by `BevyApp::physics_process`: true on the
-/// first step of a render frame (whose Godot->Bevy read the PreUpdate prefix
-/// already did), false on steps 2..N. Gates the per-step FixedFirst read so the
-/// reads partition the steps gap-free and overlap-free.
+/// Set true only when the Main prefix is the `_process` fallback run on a
+/// 0-physics-step render frame. Gates the PreUpdate Godot->Bevy read so it
+/// fires only when no FixedFirst read ran this frame.
 #[doc(hidden)]
 #[derive(Resource, Default)]
-pub struct FixedStepFirstOfFrame(pub bool);
+pub struct ProcessFallbackPrefix(pub bool);
 
-/// Run-condition: skip the first physics step of a frame (PreUpdate read it),
-/// run on steps 2..N. Absent resource -> run, the safe default for standalone /
-/// benchmark apps that never publish it.
+/// Run-condition for the PreUpdate read: true only on a 0-tick frame's
+/// process-fallback prefix. Absent resource -> true, the safe default for
+/// standalone / benchmark apps that bypass `host_fixed_main_loop` and call
+/// `run_schedule(PreUpdate)` directly (so those apps still exercise the read).
 #[doc(hidden)]
-pub fn not_first_fixed_step(step: Option<bevy_ecs::system::Res<FixedStepFirstOfFrame>>) -> bool {
-    step.is_none_or(|s| !s.0)
+pub fn prefix_ran_in_process_fallback(
+    flag: Option<bevy_ecs::system::Res<ProcessFallbackPrefix>>,
+) -> bool {
+    flag.is_none_or(|f| f.0)
 }
 
 /// Take over Bevy's fixed-timestep loop: drive `RunFixedMainLoop` from Godot's
@@ -73,7 +75,7 @@ pub(crate) fn host_fixed_main_loop(app: &mut App) {
     );
 
     app.init_resource::<GodotFixedDelta>();
-    app.init_resource::<FixedStepFirstOfFrame>();
+    app.init_resource::<ProcessFallbackPrefix>();
     app.add_systems(
         RunFixedMainLoop,
         godot_fixed_driver.in_set(RunFixedMainLoopSystems::FixedMainLoop),
@@ -180,7 +182,7 @@ pub(crate) fn run_preamble(world: &mut World, need_startup: bool, need_prefix: b
 }
 
 /// One physics step of the hosted fixed loop, shared by `BevyApp::physics_process`
-/// and the deterministic multi-step tests so the `FixedStepFirstOfFrame` publish
+/// and the deterministic multi-step tests so the `ProcessFallbackPrefix` publish
 /// can't drift between production and the test driver.
 pub(crate) fn run_physics_step(
     world: &mut World,
@@ -188,13 +190,14 @@ pub(crate) fn run_physics_step(
     need_prefix: bool,
     delta: Duration,
 ) {
-    run_preamble(world, need_startup, need_prefix);
-    // need_prefix (== !prefix_done_this_frame) is true only on the first physics
-    // step of a render frame; steps 2..N publish false. get_resource_mut so a
-    // torn-down/partial world never panics.
-    if let Some(mut f) = world.get_resource_mut::<FixedStepFirstOfFrame>() {
-        f.0 = need_prefix;
+    // A physics step's prefix is never the process fallback, so the PreUpdate
+    // read stays gated off this step (the FixedFirst read covers it). Published
+    // before run_preamble because the flag gates the read inside the prefix.
+    // get_resource_mut so a torn-down/partial world never panics.
+    if let Some(mut f) = world.get_resource_mut::<ProcessFallbackPrefix>() {
+        f.0 = false;
     }
+    run_preamble(world, need_startup, need_prefix);
     run_godot_fixed_main(world, delta);
 }
 

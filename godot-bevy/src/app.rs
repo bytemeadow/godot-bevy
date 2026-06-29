@@ -316,7 +316,9 @@ impl INode for BevyApp {
     }
 
     fn process(&mut self, _delta: f64) {
-        use crate::plugins::fixed_schedule::{run_main_suffix, run_preamble};
+        use crate::plugins::fixed_schedule::{
+            ProcessFallbackPrefix, run_main_suffix, run_preamble,
+        };
         use std::panic::{AssertUnwindSafe, catch_unwind};
 
         if godot::classes::Engine::singleton().is_editor_hint() {
@@ -331,6 +333,12 @@ impl INode for BevyApp {
         let result = self.app.as_mut().map(|app| {
             catch_unwind(AssertUnwindSafe(|| {
                 let world = app.world_mut();
+                // need_prefix is true only on a 0-tick frame (physics already ran
+                // the prefix otherwise), so this marks the prefix-about-to-run as
+                // the process fallback and gates the PreUpdate read accordingly.
+                if let Some(mut f) = world.get_resource_mut::<ProcessFallbackPrefix>() {
+                    f.0 = need_prefix;
+                }
                 run_preamble(world, need_startup, need_prefix);
                 run_main_suffix(world);
                 world.clear_trackers();

@@ -211,8 +211,9 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
 /// Regression test for the TwoWay self-change guard across the `_process` /
 /// `_physics_process` boundary.
 ///
-/// The Godot→Bevy read-back runs in `PreUpdate` (before the fixed steps), while
-/// the Bevy→Godot write runs in `FixedLast`. The guard is a value shadow
+/// The Godot→Bevy read-back runs every physics step in `FixedFirst` (before that
+/// step's write; on a 0-step frame, in `PreUpdate`), while the Bevy→Godot write
+/// runs in `FixedLast`. The guard is a value shadow
 /// (`TransformSyncMetadata.shadow`): the write pushes only when the Bevy value
 /// differs from the last-synced shadow, so a value that was read FROM Godot (and
 /// stored as the shadow) is recognised as not-Bevy-authored and the echo write is
@@ -250,7 +251,7 @@ fn test_twoway_no_echo_back_across_fixed_boundary(ctx: &TestContext) -> godot::t
         // (Bevy->Godot) must suppress the echo and leave the node where Godot put it.
         node.set_position(Vector2::new(42.0, 17.0));
 
-        // One physics tick: read-back (PreUpdate) already recorded the Godot value,
+        // One physics tick: read-back (FixedFirst) already recorded the Godot value,
         // so the write (FixedLast) should suppress the echo.
         app.physics_update().await;
 
@@ -488,9 +489,10 @@ fn test_transform_sync_disabled(ctx: &TestContext) -> godot::task::TaskHandle {
 }
 
 /// Brownfield guarantee: a Bevy system sees a Godot-authored transform in the SAME
-/// frame it runs. The TwoWay read lands in `PreUpdate` (before logic), so an `Update`
-/// system observes Godot's latest value this frame -- not next frame. If the read ran
-/// after the write, the system would observe the stale value and this would fail.
+/// frame it runs. The TwoWay read lands before the `Update` suffix -- the last
+/// `FixedFirst` read on a tick frame, or the `PreUpdate` fallback on a 0-step frame --
+/// so an `Update` system observes Godot's latest value this frame, not next frame. If
+/// the read ran after the write, the system would observe the stale value and fail.
 #[itest(async)]
 fn test_twoway_read_before_logic(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -522,8 +524,9 @@ fn test_twoway_read_before_logic(ctx: &TestContext) -> godot::task::TaskHandle {
         })
         .await;
 
-        // Author x purely from Godot, then advance one frame. The PreUpdate read must
-        // land it in Bevy before the Update system runs that same frame.
+        // Author x purely from Godot, then advance one frame. The read (FixedFirst on
+        // a tick frame, PreUpdate on a 0-step frame) must land it in Bevy before the
+        // Update system runs that same frame.
         node.set_position(Vector2::new(99.0, 0.0));
         app.update().await;
 

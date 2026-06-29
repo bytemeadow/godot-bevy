@@ -12,10 +12,10 @@ The **prefix** of the main schedule plus the fixed loop run here, on Godot's phy
 
 **What runs:**
 - `First`
-- `PreUpdate` (reads Godot → ECS transforms, once per render frame)
+- `PreUpdate` (TwoWay: reads Godot → ECS transforms only on 0-physics-step frames)
 - `StateTransition`
 - `FixedMain` (zero or more times per render frame)
-  - `FixedFirst` (TwoWay: re-reads Godot → ECS per physics step, steps 2..N)
+  - `FixedFirst` (TwoWay: reads Godot → ECS every physics step)
   - `FixedPreUpdate`
   - `FixedUpdate` (your physics logic)
   - `FixedPostUpdate`
@@ -57,10 +57,10 @@ On a render frame with no physics step, the prefix runs in `_process` before the
 ```
 Physics Frame Start
     ├── First           ┐
-    ├── PreUpdate       │ prefix: once per render frame (reads Godot → ECS)
+    ├── PreUpdate       │ prefix: once per render frame (TwoWay read only on 0-step frames)
     ├── StateTransition ┘
     └── FixedMain       (once per physics step)
-        ├── FixedFirst      (TwoWay: re-reads Godot → ECS, steps 2..N)
+        ├── FixedFirst      (TwoWay: reads Godot → ECS every physics step)
         ├── FixedPreUpdate
         ├── FixedUpdate     (your physics/fixed logic)
         ├── FixedPostUpdate
@@ -189,12 +189,14 @@ fn physics_system(time: Res<Time>) {
 
 ### Don't expect immediate cross-schedule visibility
 
-Godot transforms written in `FixedLast` aren't read back into ECS until the next render frame's `PreUpdate` (which runs in the physics prefix).
+Godot transforms written in `FixedLast` aren't read back into ECS until the next physics step's `FixedFirst` (TwoWay), or — on a render frame with no physics step — that frame's `PreUpdate` fallback.
+
+Because the TwoWay read is primary in `FixedFirst`, any *prefix* schedule (`First`, `PreUpdate`, `StateTransition`) on a frame with one or more physics steps sees **last frame's** synced `Transform` — the fresh Godot value isn't merged until `FixedFirst` runs. Read this frame's Godot value in `FixedUpdate` onward (after `FixedFirst`) or in the `Update` suffix (after the last step's read), not in a prefix schedule.
 
 ## Performance Considerations
 
 1. **Visual frames** vary widely (30–144+ FPS)
 2. **FixedUpdate** runs at a constant rate driven by Godot's physics clock
-3. Transform syncing from ECS → Godot happens in `FixedLast`; Godot → ECS happens in `PreUpdate` (and per physics step in `FixedFirst` under TwoWay)
+3. Transform syncing from ECS → Godot happens in `FixedLast`; Godot → ECS happens every physics step in `FixedFirst` (TwoWay), and in `PreUpdate` on 0-step frames
 
 > **Note:** Scene tree entities are initialized during `PreStartup`, before any `Startup` systems run. You can safely query Godot scene entities in `Startup` systems. See [Scene Tree Initialization and Timing](../scene-tree/timing.md) for details.
