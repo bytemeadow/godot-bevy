@@ -2,10 +2,9 @@ use crate::components::{Gravity, JumpVelocity, Player, Speed};
 use crate::gameplay::audio::PlaySfxMessage;
 use bevy::app::{App, Plugin};
 use bevy::prelude::*;
+use godot::classes::AnimatedSprite2D;
 use godot::classes::CharacterBody2D;
-use godot::classes::{AnimatedSprite2D, ProjectSettings};
 use godot::global::move_toward;
-use godot::obj::Singleton;
 use godot_bevy::prelude::*;
 
 /// System sets for player operations with better parallelization
@@ -33,24 +32,6 @@ pub struct PlayerMovementMessage {
     pub is_moving: bool,
     pub is_on_floor: bool,
     pub facing_left: bool,
-}
-
-#[derive(Bundle, GodotNode)]
-#[godot_node(base(CharacterBody2D), class_name(Player2D))]
-pub struct PlayerBundle {
-    pub player: Player,
-
-    #[export_fields(value(export_type(f32), default(250.0)))]
-    pub speed: Speed,
-
-    #[export_fields(value(export_type(f32), default(-400.0)))]
-    pub jump_velocity: JumpVelocity,
-
-    #[export_fields(value(export_type(f32), default(ProjectSettings::singleton()
-        .get_setting("physics/2d/default_gravity")
-        .try_to::<f32>()
-        .unwrap_or(980.0))))]
-    pub gravity: Gravity,
 }
 
 pub struct PlayerPlugin;

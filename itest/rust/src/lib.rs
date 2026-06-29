@@ -14,6 +14,8 @@ mod benchmarks;
 mod collision_tests;
 mod input_ecosystem_tests;
 mod input_tests;
+#[cfg(feature = "autosync-tests")]
+mod macro_redesign_tests;
 mod real_frame_tests;
 mod scene_tree_tests;
 mod scene_tree_watcher_init_tests;

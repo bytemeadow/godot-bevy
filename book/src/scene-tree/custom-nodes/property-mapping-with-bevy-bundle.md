@@ -1,185 +1,143 @@
-# Property Mapping from Godot to Bevy
+# Property Mapping — `#[bevy(...)]` Grammar
 
-The `BevyBundle` macro allows you to attach Bevy Components to Custom Godot nodes.
-It supports several ways to map Godot node properties to Bevy components:
+> This page was previously "Property Mapping with BevyBundle". The `BevyBundle` macro is gone; the unified `#[bevy(...)]` attribute replaces it on both bridging derives.
 
-#### Default Component Creation
+Both `GodotNode` (component-first) and `BevyComponents` (Godot-first) accept `#[bevy(...)]` annotations. The keys available depend on which derive you are using.
 
-The simplest form creates a component with its default value:
+## Component-first (`GodotNode`)
+
+### Companion component — newtype
+
+Generate one exported property and wrap its value in a newtype component:
 
 ```rust
-#[derive(GodotClass, BevyBundle)]
-#[class(base=Node2D)]
-#[bevy_bundle((Player))]
+#[derive(Component, GodotNode, Default)]
+#[bevy(base = CharacterBody2D, class_name = Player2D)]
+#[bevy(require(speed: Speed, as = f32, default = 250.0))]
+pub struct Player;
+```
+
+- `speed` becomes a `#[export] speed: f32` on the generated `Player2D` class (default 250.0).
+- When the node enters the tree, `Speed(speed_value)` is inserted.
+- `as = f32` is required here — the macro cannot see `Speed`'s inner type.
+
+### Companion component — struct
+
+Generate multiple exported properties for a multi-field component:
+
+```rust
+#[derive(Component, GodotNode, Default)]
+#[bevy(base = CharacterBody2D, class_name = Enemy2D)]
+#[bevy(require(stats: Stats {
+    health(as = f32, default = 100.0),
+    mana(as = f32, default = 50.0),
+}))]
+pub struct Enemy;
+```
+
+Each inner `field(as = T, …)` follows the same `as`/`default`/`with` grammar as the newtype form. The name before `:` (e.g. `stats`) is required by the grammar but ignored — the generated export properties use the inner field names (`health`, `mana`).
+
+### Marker companion
+
+Insert a component via `Default` with no exported property:
+
+```rust
+#[bevy(require(Stunned))]
+```
+
+### Primary field with conversion
+
+Fields on the component struct itself can declare a type conversion:
+
+```rust
+#[derive(Component, GodotNode, Default)]
+#[bevy(base = Node2D, class_name = Slider2D)]
+pub struct Slider {
+    /// Editor shows 0–100; component gets 0.0–1.0
+    #[bevy(as = f32, with = percentage_to_fraction)]
+    pub value: f32,
+}
+
+fn percentage_to_fraction(v: f32) -> f32 { v / 100.0 }
+```
+
+`as = T` is optional when the field type is already Godot-compatible; add it only when the export type differs from the Rust field type.
+
+### All component-first keys
+
+| Placement | Key | Required? | Meaning |
+|-----------|-----|-----------|---------|
+| struct | `base = GodotBase` | no (default: `Node`) | Godot class to extend |
+| struct | `class_name = Name` | no (default: `<Struct>BevyComponent`) | Generated class name |
+| struct | `require(…)` | no | Companion component (see forms above) |
+| field | `as = T` | no | Godot export type |
+| field | `default = expr` | no | Editor default (via `#[init(val = …)]`); a pure-Bevy `spawn(T)` uses the struct's own `Default` — make them agree if you rely on `spawn(T)`. |
+| field | `with = fn` | no | Godot-value → field-value conversion |
+| `require(prop: Comp, …)` | `as = T` | **yes** | Export type for the generated property |
+| `require(prop: Comp, …)` | `default = expr` | no | Export default |
+| `require(prop: Comp, …)` | `with = fn` | no | Conversion before constructing the component |
+
+## Godot-first (`BevyComponents`)
+
+### Field binding
+
+Map a single `#[export]` property to a newtype component:
+
+```rust
+#[derive(GodotClass, BevyComponents)]
+#[class(base = Node2D, init)]
+pub struct EnemyNode {
+    base: Base<Node2D>,
+
+    #[bevy(component = Health)]
+    #[export]
+    max_health: f32,
+
+    #[bevy(component = Speed, with = to_speed)]
+    #[export]
+    #[init(val = 100.0)]
+    speed: f32,
+}
+```
+
+`component = Comp` is required. `with = fn` is optional. `as` and `default` are **not** allowed — gdext's `#[init(val = …)]` owns defaults on this path.
+
+### Marker at the struct level
+
+```rust
+#[derive(GodotClass, BevyComponents)]
+#[class(base = CharacterBody2D, init)]
+#[bevy(require(Player))]
 pub struct PlayerNode {
-    base: Base<Node2D>,
+    base: Base<CharacterBody2D>,
+    // ...
 }
 ```
 
-#### Single Field Mapping
+### N→1 binding
 
-Map a single Godot property to initialize a component:
-
-```rust
-#[derive(Component)]
-struct Health(f32);
-
-#[derive(GodotClass, BevyBundle)]
-#[class(base=Node2D)]
-#[bevy_bundle((Enemy), (Health: max_health), (AttackDamage: damage))]
-pub struct Goblin {
-    base: Base<Node2D>,
-    #[export] max_health: f32,  // This value initializes Health component
-    #[export] damage: f32,       // This value initializes AttackDamage component
-}
-```
-
-#### Struct Component Mapping
-
-Map multiple Godot properties to fields in a struct component:
+Build a multi-field component from several existing `#[export]` properties:
 
 ```rust
-#[derive(Component)]
-struct Stats {
-    health: f32,
-    mana: f32,
-    stamina: f32,
-}
-
-#[derive(GodotClass, BevyBundle)]
-#[class(base=CharacterBody2D)]
-#[bevy_bundle((Player), (Stats { health: max_health, mana: max_mana, stamina: max_stamina }))]
-pub struct PlayerCharacter {
+#[derive(GodotClass, BevyComponents)]
+#[class(base = CharacterBody2D, init)]
+#[bevy(require(Stats { health: max_health, mana: max_mana }))]
+pub struct PlayerNode {
     base: Base<CharacterBody2D>,
     #[export] max_health: f32,
     #[export] max_mana: f32,
-    #[export] max_stamina: f32,
 }
 ```
 
+### All Godot-first keys
 
+| Placement | Key | Required? | Meaning |
+|-----------|-----|-----------|---------|
+| struct | `require(Marker)` | no | Insert `Marker::default()` |
+| struct | `require(Comp { bevy_field: godot_field, … })` | no | Build struct component from existing exports |
+| field | `component = Comp` | **yes** | Bevy component type (`Comp(value)`) |
+| field | `with = fn` | no | Godot-value → component-value conversion |
 
-## Transform Function
+## Reserved keys
 
-Sometimes a Godot property's type isn't convertable to a Bevy/Rust compatible type,
-or maybe you want to process the value from Godot before it's assigned to a component.
-To solve this, you can use `transform_with` to apply a transformation function to
-convert Godot values before they're assigned to components:
-
-```rust
-fn percentage_to_fraction(value: f32) -> f32 {
-    value / 100.0
-}
-
-#[derive(GodotClass, BevyBundle)]
-#[class(base=Node2D)]
-#[bevy_bundle((Enemy), (Health: health_percentage))]
-pub struct Enemy {
-    base: Base<Node2D>,
-    #[export]
-    #[bevy_bundle(transform_with = "percentage_to_fraction")]
-    health_percentage: f32,  // Editor shows 0-100, component gets 0.0-1.0
-}
-```
-
-
-
-## Recommended approach
-
-The recommended approach is to use meaningful components instead of generic markers:
-
-```rust
-#[derive(Component)]
-struct Player;
-
-#[derive(Component)]
-struct Health(f32);
-
-#[derive(Component)]
-struct Speed(f32);
-
-#[derive(GodotClass, BevyBundle)]
-#[class(base=CharacterBody2D)]
-#[bevy_bundle((Player), (Health: max_health), (Speed: speed))]
-pub struct PlayerNode {
-    base: Base<CharacterBody2D>,
-    #[export] max_health: f32,
-    #[export] speed: f32,
-}
-
-// Now query using your custom components
-fn update_players(
-    players: Query<(&Health, &Speed), With<Player>>
-) {
-    for (health, speed) in players.iter() {
-        // Process player entities
-    }
-}
-```
-
-You can also leverage the automatic markers from the base class:
-
-```rust
-#[derive(Component)]
-struct Player;
-
-#[derive(GodotClass, BevyBundle)]
-#[class(base=CharacterBody2D)]
-#[bevy_bundle((Player))]
-pub struct PlayerNode {
-    base: Base<CharacterBody2D>,
-}
-
-// Query using both the base class marker and your component
-fn update_player_bodies(
-    players: Query<&GodotNodeHandle, (With<CharacterBody2DMarker>, With<Player>)>,
-    mut godot: GodotAccess,
-) {
-    for handle in players.iter() {
-        let mut body = godot.get::<CharacterBody2D>(*handle);
-        body.move_and_slide();
-    }
-}
-```
-
-
-
-# Complete Example
-
-```rust
-#[derive(Component)]
-struct Velocity(Vec2);
-
-#[derive(Component)]
-struct Combat {
-    damage: f32,
-    attack_speed: f32,
-    range: f32,
-}
-
-fn degrees_to_radians(degrees: f32) -> f32 {
-    degrees.to_radians()
-}
-
-#[derive(GodotClass, BevyBundle)]
-#[class(base=CharacterBody2D)]
-#[bevy_bundle(
-    (Player),
-    (Health: max_health),
-    (Velocity: movement_speed),
-    (Combat { damage: attack_damage, attack_speed: attack_rate, range: attack_range })
-)]
-pub struct PlayerNode {
-    base: Base<CharacterBody2D>,
-
-    #[export] max_health: f32,
-    #[export] movement_speed: Vec2,
-    #[export] attack_damage: f32,
-    #[export] attack_rate: f32,
-    #[export] attack_range: f32,
-
-    #[export]
-    #[bevy_bundle(transform_with = "degrees_to_radians")]
-    rotation_degrees: f32,  // Can be transformed even if not used in components
-}
-```
+`into` and `sync` are reserved for the upcoming component-sync feature and will produce a compile error if used. Use only the keys documented above.
