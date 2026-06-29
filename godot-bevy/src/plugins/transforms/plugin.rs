@@ -4,7 +4,7 @@ use bevy_transform::components::Transform;
 use godot::classes::{Node2D, Node3D};
 
 use crate::plugins::core::AppSceneTreeExt;
-use crate::plugins::fixed_schedule::not_first_fixed_step;
+use crate::plugins::fixed_schedule::prefix_ran_in_process_fallback;
 use crate::plugins::transforms::IntoBevyTransform;
 use crate::plugins::transforms::{GodotTransformConfig, TransformSyncMode};
 
@@ -66,22 +66,23 @@ impl Plugin for GodotTransformSyncPlugin {
 
         // Only add automatic sync systems if auto_sync is enabled
         if self.auto_sync {
-            // Godot->Bevy read runs once per render frame in PreUpdate (covering
-            // step 1, the Update suffix, and idle 0-step frames) and once per
-            // physics step in FixedFirst for steps 2..N -- matching the FixedLast
-            // write cadence so a Godot physics-clock author moving an axis between
-            // steps isn't clobbered by a stale whole-transform write. The
-            // value-shadow guard makes the duplicate read idempotent; 1-step and
-            // idle frames still do exactly one read.
+            // Godot->Bevy read runs in FixedFirst every physics
+            // step, matching the FixedLast write cadence so a Godot physics-clock
+            // author moving an axis between steps isn't clobbered by a stale
+            // whole-transform write, and so the Update suffix sees the last step's
+            // read. PreUpdate is the 0-tick fallback: it runs only on render frames
+            // with zero physics steps (where the prefix is the `_process`
+            // fallback), keeping idle frames covered. The value-shadow guard makes
+            // any duplicate read idempotent.
             app.add_systems(
                 PreUpdate,
-                pre_update_godot_transforms::<()>.run_if(transform_sync_twoway_enabled),
+                pre_update_godot_transforms::<()>
+                    .run_if(transform_sync_twoway_enabled)
+                    .run_if(prefix_ran_in_process_fallback),
             );
             app.add_systems(
                 FixedFirst,
-                pre_update_godot_transforms::<()>
-                    .run_if(transform_sync_twoway_enabled)
-                    .run_if(not_first_fixed_step),
+                pre_update_godot_transforms::<()>.run_if(transform_sync_twoway_enabled),
             );
 
             // Bevy -> Godot write at physics rate (once per fixed tick). This is

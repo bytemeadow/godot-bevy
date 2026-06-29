@@ -108,22 +108,22 @@ cost roughly 5x the time — a much larger ratio means super-linear (e.g. O(n²)
 growth, and an optimization that only helps at one size shows up as a skewed
 ratio.
 
-### Transform Synchronization (9 benchmarks, 1000 entities unless suffixed)
+### Transform Synchronization (10 benchmarks, 1000 entities unless suffixed)
 
 These benchmarks measure the real `GodotTransformSyncPlugin` systems that sync transforms between Bevy ECS and Godot nodes.
 
 | Benchmark | What It Tests |
 |-----------|---------------|
-| `transform_sync_bevy_to_godot_3d` | Bevy->Godot 3D sync (Last schedule) |
+| `transform_sync_bevy_to_godot_3d` | Bevy->Godot 3D sync (FixedLast schedule) |
 | `transform_sync_bevy_to_godot_3d_100` | Scaling variant (100 nodes) |
 | `transform_sync_bevy_to_godot_3d_5000` | Scaling variant (5000 nodes) |
-| `transform_sync_godot_to_bevy_3d` | Godot->Bevy 3D sync (PreUpdate schedule) |
+| `transform_sync_godot_to_bevy_3d` | Godot->Bevy 3D sync (FixedFirst schedule, per-step read) |
 | `transform_sync_godot_to_bevy_3d_5000` | Scaling variant (5000 nodes) |
 | `transform_sync_godot_to_bevy_3d_sparse` | 1000 nodes, only 10 moved (quantifies polling unchanged transforms) |
-| `transform_sync_bevy_to_godot_2d` | Bevy->Godot 2D sync (Last schedule) |
-| `transform_sync_godot_to_bevy_2d` | Godot->Bevy 2D sync (PreUpdate schedule) |
-| `transform_sync_roundtrip_3d` | Full frame: PreUpdate -> game logic -> Last (3D) |
-| `transform_sync_roundtrip_2d` | Full frame: PreUpdate -> game logic -> Last (2D) |
+| `transform_sync_bevy_to_godot_2d` | Bevy->Godot 2D sync (FixedLast schedule) |
+| `transform_sync_godot_to_bevy_2d` | Godot->Bevy 2D sync (FixedFirst schedule, per-step read) |
+| `transform_sync_roundtrip_3d` | Full frame: FixedFirst -> game logic -> FixedLast (3D) |
+| `transform_sync_roundtrip_2d` | Full frame: FixedFirst -> game logic -> FixedLast (2D) |
 
 ### Scene Tree Processing (7 benchmarks, 500 nodes unless suffixed)
 

@@ -50,6 +50,7 @@ fn setup_3d_benchmark_app(node_count: usize) -> (App, Vec<Gd<Node3D>>) {
 
     // Initialize schedules manually (avoid plugin duplication issues)
     app.init_schedule(PreUpdate);
+    app.init_schedule(FixedFirst);
     app.init_schedule(FixedLast);
 
     // Add transform sync plugin
@@ -87,6 +88,7 @@ fn setup_2d_benchmark_app() -> (App, Vec<Gd<Node2D>>) {
 
     // Initialize schedules manually (avoid plugin duplication issues)
     app.init_schedule(PreUpdate);
+    app.init_schedule(FixedFirst);
     app.init_schedule(FixedLast);
 
     // Add transform sync plugin
@@ -172,8 +174,10 @@ fn run_transform_sync_godot_to_bevy_3d(node_count: usize) -> i32 {
         node.set_position(Vector3::new(i as f32 * 2.0, i as f32, 0.0));
     }
 
-    // Run the PreUpdate schedule which contains the sync system
-    measured(|| app.world_mut().run_schedule(PreUpdate));
+    // FixedFirst is the per-step Godot->Bevy read path
+    // (PreUpdate is only the rare 0-tick fallback). Measuring it here also guards
+    // the FixedFirst registration: drop it and this benchmark measures ~0.
+    measured(|| app.world_mut().run_schedule(FixedFirst));
 
     let result = nodes.len() as i32;
 
@@ -186,8 +190,9 @@ fn run_transform_sync_godot_to_bevy_3d(node_count: usize) -> i32 {
 
 /// Benchmark: Read transforms from Godot into Bevy (3D) using actual systems
 ///
-/// This runs the real pre_update_godot_transforms system that syncs
-/// Godot node transforms into Bevy.
+/// Runs the real pre_update_godot_transforms read via FixedFirst -- the
+/// per-step Godot->Bevy path. (The same system is also registered in PreUpdate as
+/// the 0-tick fallback; both run identical bodies.)
 #[bench(repeat = 3)]
 fn transform_sync_godot_to_bevy_3d() -> i32 {
     run_transform_sync_godot_to_bevy_3d(NODE_COUNT)
@@ -211,34 +216,7 @@ fn transform_sync_godot_to_bevy_3d_sparse() -> i32 {
         node.set_position(Vector3::new(i as f32 * 3.0, 1.0, 0.0));
     }
 
-    measured(|| app.world_mut().run_schedule(PreUpdate));
-
-    let result = nodes.len() as i32;
-
-    for node in nodes {
-        node.free();
-    }
-
-    result
-}
-
-/// Benchmark: per-physics-step Godot->Bevy read (3D) via the FixedFirst system.
-///
-/// Mirrors `transform_sync_godot_to_bevy_3d` but exercises the per-step read added
-/// for the TwoWay multi-step clobber fix, so the extra per-step FFI cost on
-/// multi-step frames stays visible in compare-benches.
-#[bench(repeat = 3)]
-fn transform_sync_godot_to_bevy_3d_per_step() -> i32 {
-    let (mut app, nodes) = setup_3d_benchmark_app(NODE_COUNT);
-    app.init_schedule(FixedFirst);
-
-    // Modify Godot transforms to simulate a physics-clock author moving nodes.
-    for (i, node) in nodes.iter().enumerate() {
-        let mut node = node.clone();
-        node.set_position(Vector3::new(i as f32 * 2.0, i as f32, 0.0));
-    }
-
-    // FixedStepFirstOfFrame absent -> not_first_fixed_step true -> FixedFirst read runs.
+    // FixedFirst is the per-step read path (see transform_sync_godot_to_bevy_3d).
     measured(|| app.world_mut().run_schedule(FixedFirst));
 
     let result = nodes.len() as i32;
@@ -276,6 +254,9 @@ fn transform_sync_bevy_to_godot_2d() -> i32 {
 }
 
 /// Benchmark: Read transforms from Godot into Bevy (2D) using actual systems
+///
+/// Runs via FixedFirst -- the per-step Godot->Bevy read path (PreUpdate is
+/// the 0-tick fallback). See `transform_sync_godot_to_bevy_3d`.
 #[bench(repeat = 3)]
 fn transform_sync_godot_to_bevy_2d() -> i32 {
     let (mut app, nodes) = setup_2d_benchmark_app();
@@ -285,29 +266,6 @@ fn transform_sync_godot_to_bevy_2d() -> i32 {
         node.set_position(Vector2::new(i as f32 * 2.0, i as f32));
     }
 
-    measured(|| app.world_mut().run_schedule(PreUpdate));
-
-    let result = nodes.len() as i32;
-
-    for node in nodes {
-        node.free();
-    }
-
-    result
-}
-
-/// Benchmark: per-physics-step Godot->Bevy read (2D) via the FixedFirst system.
-#[bench(repeat = 3)]
-fn transform_sync_godot_to_bevy_2d_per_step() -> i32 {
-    let (mut app, nodes) = setup_2d_benchmark_app();
-    app.init_schedule(FixedFirst);
-
-    for (i, node) in nodes.iter().enumerate() {
-        let mut node = node.clone();
-        node.set_position(Vector2::new(i as f32 * 2.0, i as f32));
-    }
-
-    // FixedStepFirstOfFrame absent -> not_first_fixed_step true -> FixedFirst read runs.
     measured(|| app.world_mut().run_schedule(FixedFirst));
 
     let result = nodes.len() as i32;
@@ -326,9 +284,9 @@ fn transform_sync_godot_to_bevy_2d_per_step() -> i32 {
 /// Benchmark: Complete transform sync cycle (both directions) for 3D
 ///
 /// This represents a complete frame's worth of transform synchronization:
-/// 1. PreUpdate: Read Godot transforms into Bevy
+/// 1. FixedFirst: Read Godot transforms into Bevy (per-step read)
 /// 2. Game logic modifies some transforms
-/// 3. PostUpdate: Write Bevy transforms back to Godot
+/// 3. FixedLast: Write Bevy transforms back to Godot
 #[bench(repeat = 3)]
 fn transform_sync_roundtrip_3d() -> i32 {
     let (mut app, nodes) = setup_3d_benchmark_app(NODE_COUNT);
@@ -340,8 +298,8 @@ fn transform_sync_roundtrip_3d() -> i32 {
     }
 
     measured(|| {
-        // Phase 1: Sync Godot -> Bevy (PreUpdate)
-        app.world_mut().run_schedule(PreUpdate);
+        // Phase 1: Sync Godot -> Bevy (FixedFirst — per-step read)
+        app.world_mut().run_schedule(FixedFirst);
 
         // Phase 2: Simulate game logic modifying transforms
         let mut query = app.world_mut().query::<&mut BevyTransform>();
@@ -376,8 +334,8 @@ fn transform_sync_roundtrip_2d() -> i32 {
     }
 
     measured(|| {
-        // Phase 1: Sync Godot -> Bevy (PreUpdate)
-        app.world_mut().run_schedule(PreUpdate);
+        // Phase 1: Sync Godot -> Bevy (FixedFirst — per-step read)
+        app.world_mut().run_schedule(FixedFirst);
 
         // Phase 2: Simulate game logic modifying transforms
         let mut query = app.world_mut().query::<&mut BevyTransform>();

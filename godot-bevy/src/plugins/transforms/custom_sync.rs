@@ -86,27 +86,27 @@ macro_rules! add_transform_sync_systems {
         );
     };
 
-    // Godot → Bevy read, restricted to the filter. Runs in `PreUpdate` (step 1,
-    // suffix, idle frames) and once per physics step in `FixedFirst` for steps
-    // 2..N, matching auto sync's per-step cadence so a Godot author between steps
-    // isn't clobbered. No twoway gate here (direction is opt-in via the filter),
-    // but the `not_first_fixed_step` dedup keeps 1-step frames perf-neutral.
+    // Godot → Bevy read, restricted to the filter. Runs every
+    // physics step in `FixedFirst`, matching auto sync's per-step cadence so a
+    // Godot author between steps isn't clobbered. `PreUpdate` is the 0-tick
+    // fallback, firing only on render frames with zero physics steps. No twoway
+    // gate here (direction is opt-in via the filter).
     (@generate_pre_system $app:expr, $godot_to_bevy_query:ty) => {
-        $app.add_systems(
-            $crate::bevy_app::PreUpdate,
-            $crate::plugins::transforms::sync_systems::pre_update_godot_transforms::<$godot_to_bevy_query>,
-        );
         {
             // `.run_if` resolves via `IntoScheduleConfigs`; bring it into scope so the
             // macro compiles for callers who only `use godot_bevy::prelude::*` (the
             // prelude namespaces bevy_ecs's prelude rather than globbing it).
             use $crate::prelude::bevy_ecs_prelude::IntoScheduleConfigs as _;
             $app.add_systems(
-                $crate::bevy_app::FixedFirst,
+                $crate::bevy_app::PreUpdate,
                 $crate::plugins::transforms::sync_systems::pre_update_godot_transforms::<$godot_to_bevy_query>
-                    .run_if($crate::plugins::fixed_schedule::not_first_fixed_step),
+                    .run_if($crate::plugins::fixed_schedule::prefix_ran_in_process_fallback),
             );
         }
+        $app.add_systems(
+            $crate::bevy_app::FixedFirst,
+            $crate::plugins::transforms::sync_systems::pre_update_godot_transforms::<$godot_to_bevy_query>,
+        );
     };
 }
 
