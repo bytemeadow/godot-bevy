@@ -57,8 +57,8 @@ This means custom components are available in `Startup` systems for initial scen
 
 ```rust
 #[derive(Component, GodotNode, Default)]
-#[bevy(base = Node2D, class_name = Player2D)]
-#[bevy(require(Health), require(Velocity))]
+#[gdbevy(base = Node2D, class_name = Player2D)]
+#[gdbevy(require(Health), require(Velocity))]
 pub struct Player;
 
 // This will work in Startup - the Health and Velocity components

@@ -335,8 +335,8 @@ mod tests {
     fn cf_generates_class_companions_and_required_registration() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(Component, GodotNode, Default)]
-            #[bevy(base = CharacterBody2D, class_name = Player2D)]
-            #[bevy(require(speed: Speed, as = f32, default = 250.0), require(Stunned))]
+            #[gdbevy(base = CharacterBody2D, class_name = Player2D)]
+            #[gdbevy(require(speed: Speed, as = f32, default = 250.0), require(Stunned))]
             struct Player;
         };
         let out = crate::godot_node::derive_godot_node_component(di)
@@ -361,10 +361,10 @@ mod tests {
     fn gf_emits_insert_and_no_class() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(GodotClass, BevyComponents)]
-            #[bevy(require(Player))]
+            #[gdbevy(require(Player))]
             struct PlayerNode {
                 base: Base<Node2D>,
-                #[bevy(component = Speed, with = to_speed)]
+                #[gdbevy(component = Speed, with = to_speed)]
                 #[export] speed: f32,
             }
         };
@@ -384,7 +384,7 @@ mod tests {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(Component, GodotNode, Default)]
             #[require(Stunned)]
-            #[bevy(require(Stunned), require(speed: Speed, as = f32))]
+            #[gdbevy(require(Stunned), require(speed: Speed, as = f32))]
             struct Player;
         };
         let out = crate::godot_node::derive_godot_node_component(di)

@@ -15,8 +15,8 @@ impl Default for TestSpeed {
 struct TestGrounded;
 
 #[derive(Component, GodotNode, Default)]
-#[bevy(base = Node2D, class_name = AutoSyncPlayerNode)]
-#[bevy(require(TestGrounded), require(speed: TestSpeed, as = f32, default = 250.0))]
+#[gdbevy(base = Node2D, class_name = AutoSyncPlayerNode)]
+#[gdbevy(require(TestGrounded), require(speed: TestSpeed, as = f32, default = 250.0))]
 struct AutoSyncPlayer;
 
 #[itest(async)]

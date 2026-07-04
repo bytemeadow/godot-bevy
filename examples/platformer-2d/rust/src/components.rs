@@ -45,8 +45,8 @@ impl Default for Gravity {
 /// each inserted as a companion when the node enters the tree.
 #[derive(Component, GodotNode, Default, Debug, Clone, Reflect)]
 #[reflect(Component)]
-#[bevy(base = CharacterBody2D, class_name = Player2D)]
-#[bevy(
+#[gdbevy(base = CharacterBody2D, class_name = Player2D)]
+#[gdbevy(
     require(speed: Speed, as = f32, default = 250.0),
     require(jump_velocity: JumpVelocity, as = f32, default = -400.0),
     require(gravity: Gravity, as = f32, default = 980.0),
@@ -55,13 +55,13 @@ pub struct Player;
 
 /// Component marking an entity as a gem
 #[derive(Component, GodotNode, Default, Debug, Clone)]
-#[bevy(base = Area2D, class_name = Gem2D)]
+#[gdbevy(base = Area2D, class_name = Gem2D)]
 pub struct Gem;
 
 /// Component marking an entity as a door
 #[derive(Component, GodotNode, Default, Debug, Clone)]
-#[bevy(base = Area2D, class_name = Door2D)]
+#[gdbevy(base = Area2D, class_name = Door2D)]
 pub struct Door {
-    #[bevy(default = LevelId::Level1)]
+    #[gdbevy(default = LevelId::Level1)]
     pub level_id: LevelId,
 }

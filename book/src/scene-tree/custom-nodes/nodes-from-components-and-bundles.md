@@ -1,6 +1,6 @@
 # Nodes from Components
 
-godot-bevy bridges Godot nodes and Bevy entities through two derive macros that share one `#[bevy(...)]` attribute grammar:
+godot-bevy bridges Godot nodes and Bevy entities through two derive macros that share one `#[gdbevy(...)]` attribute grammar:
 
 - **`GodotNode`** (component-first) — you write a Bevy `Component`; the macro generates the Godot class.
 - **`BevyComponents`** (Godot-first) — you write the `GodotClass` yourself; the macro wires its `#[export]` fields into Bevy components.
@@ -15,7 +15,7 @@ Derive `Component` and `GodotNode` on a plain Rust struct. The macro generates a
 
 ```rust
 #[derive(Component, GodotNode, Default, Debug, Clone)]
-#[bevy(base = Area2D, class_name = Gem2D)]
+#[gdbevy(base = Area2D, class_name = Gem2D)]
 pub struct Gem;
 ```
 
@@ -27,16 +27,16 @@ Fields on the component struct can be exported to the editor:
 
 ```rust
 #[derive(Component, GodotNode, Default, Debug, Clone)]
-#[bevy(base = Area2D, class_name = Door2D)]
+#[gdbevy(base = Area2D, class_name = Door2D)]
 pub struct Door {
-    #[bevy(default = LevelId::Level1)]
+    #[gdbevy(default = LevelId::Level1)]
     pub level_id: LevelId,
 }
 ```
 
-`#[bevy(default = expr)]` sets the editor default (via `#[init(val = …)]`). The field's Rust type is used as the Godot export type unless you add `as = T`.
+`#[gdbevy(default = expr)]` sets the editor default (via `#[init(val = …)]`). The field's Rust type is used as the Godot export type unless you add `as = T`.
 
-Available keys on a field-level `#[bevy(...)]`:
+Available keys on a field-level `#[gdbevy(...)]`:
 
 | Key | Meaning |
 |-----|---------|
@@ -51,8 +51,8 @@ Use `require(...)` at the struct level to generate exported properties that feed
 ```rust
 #[derive(Component, GodotNode, Default, Debug, Clone, Reflect)]
 #[reflect(Component)]
-#[bevy(base = CharacterBody2D, class_name = Player2D)]
-#[bevy(
+#[gdbevy(base = CharacterBody2D, class_name = Player2D)]
+#[gdbevy(
     require(speed: Speed, as = f32, default = 250.0),
     require(jump_velocity: JumpVelocity, as = f32, default = -400.0),
     require(gravity: Gravity, as = f32, default = 980.0),
@@ -81,19 +81,19 @@ When you already own the `GodotClass` struct — or prefer writing gdext code yo
 ```rust
 #[derive(GodotClass, BevyComponents)]
 #[class(base = Node2D, init)]
-#[bevy(require(Player))]
+#[gdbevy(require(Player))]
 struct PlayerNode {
     base: Base<Node2D>,
 
     /// Maps the `speed` export to `Speed(to_speed(speed))`.
-    #[bevy(component = Speed, with = to_speed)]
+    #[gdbevy(component = Speed, with = to_speed)]
     #[export]
     #[init(val = 250.0)]
     speed: f32,
 }
 ```
 
-Field-level `#[bevy(...)]` keys on a Godot-first binding:
+Field-level `#[gdbevy(...)]` keys on a Godot-first binding:
 
 | Key | Meaning |
 |-----|---------|
@@ -114,7 +114,7 @@ Struct-level `require(...)` on the Godot-first path supports markers and N→1 b
 | | `GodotNode` | `BevyComponents` |
 |---|---|---|
 | Who writes the Godot class | Macro | You |
-| `base` / `class_name` | `#[bevy(base = …, class_name = …)]` | `#[class(base = …)]` in gdext |
+| `base` / `class_name` | `#[gdbevy(base = …, class_name = …)]` | `#[class(base = …)]` in gdext |
 | Required-components (pure Bevy spawn) | Yes | No |
 | Custom `init` / `#[godot_api]` | No | Yes — full gdext control |
 

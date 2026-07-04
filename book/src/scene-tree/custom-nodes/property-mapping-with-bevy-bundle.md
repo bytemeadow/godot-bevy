@@ -1,8 +1,8 @@
-# Property Mapping — `#[bevy(...)]` Grammar
+# Property Mapping — `#[gdbevy(...)]` Grammar
 
-> This page was previously "Property Mapping with BevyBundle". The `BevyBundle` macro is gone; the unified `#[bevy(...)]` attribute replaces it on both bridging derives.
+> This page was previously "Property Mapping with BevyBundle". The `BevyBundle` macro is gone; the unified `#[gdbevy(...)]` attribute replaces it on both bridging derives.
 
-Both `GodotNode` (component-first) and `BevyComponents` (Godot-first) accept `#[bevy(...)]` annotations. The keys available depend on which derive you are using.
+Both `GodotNode` (component-first) and `BevyComponents` (Godot-first) accept `#[gdbevy(...)]` annotations. The keys available depend on which derive you are using.
 
 ## Component-first (`GodotNode`)
 
@@ -12,8 +12,8 @@ Generate one exported property and wrap its value in a newtype component:
 
 ```rust
 #[derive(Component, GodotNode, Default)]
-#[bevy(base = CharacterBody2D, class_name = Player2D)]
-#[bevy(require(speed: Speed, as = f32, default = 250.0))]
+#[gdbevy(base = CharacterBody2D, class_name = Player2D)]
+#[gdbevy(require(speed: Speed, as = f32, default = 250.0))]
 pub struct Player;
 ```
 
@@ -27,8 +27,8 @@ Generate multiple exported properties for a multi-field component:
 
 ```rust
 #[derive(Component, GodotNode, Default)]
-#[bevy(base = CharacterBody2D, class_name = Enemy2D)]
-#[bevy(require(stats: Stats {
+#[gdbevy(base = CharacterBody2D, class_name = Enemy2D)]
+#[gdbevy(require(stats: Stats {
     health(as = f32, default = 100.0),
     mana(as = f32, default = 50.0),
 }))]
@@ -42,7 +42,7 @@ Each inner `field(as = T, …)` follows the same `as`/`default`/`with` grammar a
 Insert a component via `Default` with no exported property:
 
 ```rust
-#[bevy(require(Stunned))]
+#[gdbevy(require(Stunned))]
 ```
 
 ### Primary field with conversion
@@ -51,10 +51,10 @@ Fields on the component struct itself can declare a type conversion:
 
 ```rust
 #[derive(Component, GodotNode, Default)]
-#[bevy(base = Node2D, class_name = Slider2D)]
+#[gdbevy(base = Node2D, class_name = Slider2D)]
 pub struct Slider {
     /// Editor shows 0–100; component gets 0.0–1.0
-    #[bevy(as = f32, with = percentage_to_fraction)]
+    #[gdbevy(as = f32, with = percentage_to_fraction)]
     pub value: f32,
 }
 
@@ -89,11 +89,11 @@ Map a single `#[export]` property to a newtype component:
 pub struct EnemyNode {
     base: Base<Node2D>,
 
-    #[bevy(component = Health)]
+    #[gdbevy(component = Health)]
     #[export]
     max_health: f32,
 
-    #[bevy(component = Speed, with = to_speed)]
+    #[gdbevy(component = Speed, with = to_speed)]
     #[export]
     #[init(val = 100.0)]
     speed: f32,
@@ -107,7 +107,7 @@ pub struct EnemyNode {
 ```rust
 #[derive(GodotClass, BevyComponents)]
 #[class(base = CharacterBody2D, init)]
-#[bevy(require(Player))]
+#[gdbevy(require(Player))]
 pub struct PlayerNode {
     base: Base<CharacterBody2D>,
     // ...
@@ -121,7 +121,7 @@ Build a multi-field component from several existing `#[export]` properties:
 ```rust
 #[derive(GodotClass, BevyComponents)]
 #[class(base = CharacterBody2D, init)]
-#[bevy(require(Stats { health: max_health, mana: max_mana }))]
+#[gdbevy(require(Stats { health: max_health, mana: max_mana }))]
 pub struct PlayerNode {
     base: Base<CharacterBody2D>,
     #[export] max_health: f32,

@@ -155,7 +155,7 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
 ///
 /// ## Field bindings
 ///
-/// Annotate each `#[export]` field with `#[bevy(component = Comp)]` to map it onto a
+/// Annotate each `#[export]` field with `#[gdbevy(component = Comp)]` to map it onto a
 /// newtype component:
 ///
 /// ```rust,ignore
@@ -165,17 +165,17 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
 ///
 ///     /// Maps `speed` → `Speed(speed_value)`.  `with` converts the Godot value first.
 ///     #[export]
-///     #[bevy(component = Speed, with = to_speed)]
+///     #[gdbevy(component = Speed, with = to_speed)]
 ///     speed: f32,
 ///
 ///     /// Maps `health` → `Health(health)` directly (no `with`).
 ///     #[export]
-///     #[bevy(component = Health)]
+///     #[gdbevy(component = Health)]
 ///     health: f32,
 /// }
 /// ```
 ///
-/// Valid keys on a field-level `#[bevy(...)]`:
+/// Valid keys on a field-level `#[gdbevy(...)]`:
 /// - `component = Comp` (**required**) — the Bevy component type to insert.
 /// - `with = fn` — a function `fn(T) -> T` (or any `Into` adapter) applied to the Godot
 ///   value before it is passed to the component constructor.
@@ -183,13 +183,13 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
 ///
 /// ## Struct-level companions
 ///
-/// Use `#[bevy(require(...))]` at the struct level to add components that are not tied to
+/// Use `#[gdbevy(require(...))]` at the struct level to add components that are not tied to
 /// a specific exported property:
 ///
 /// ```rust,ignore
 /// #[derive(GodotClass, BevyComponents)]
-/// #[bevy(require(Player))]          // marker — inserted via `Player::default()`
-/// #[bevy(require(Stats { current: max_health, max: max_health }))]  // N→1 binding
+/// #[gdbevy(require(Player))]          // marker — inserted via `Player::default()`
+/// #[gdbevy(require(Stats { current: max_health, max: max_health }))]  // N→1 binding
 /// struct PlayerNode {
 ///     base: Base<Node2D>,
 ///     #[export] max_health: f32,
@@ -205,7 +205,7 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
 ///
 /// `base`, `class_name`, and generated-export forms (`require(prop: Comp, …)`) are
 /// **not** valid here — those are component-first (`GodotNode`) only.
-#[proc_macro_derive(BevyComponents, attributes(bevy))]
+#[proc_macro_derive(BevyComponents, attributes(gdbevy))]
 pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
     derive_bevy_components(input)
@@ -221,14 +221,14 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 ///
 /// ## Struct-level attributes
 ///
-/// Place `#[bevy(...)]` directly on the struct to set class metadata and declare companion
+/// Place `#[gdbevy(...)]` directly on the struct to set class metadata and declare companion
 /// components:
 ///
 /// ```rust,ignore
 /// #[derive(Component, GodotNode, Default)]
-/// #[bevy(base = CharacterBody2D, class_name = Player2D)]
-/// #[bevy(require(speed: Speed, as = f32, default = 250.0))]
-/// #[bevy(require(Stunned))]
+/// #[gdbevy(base = CharacterBody2D, class_name = Player2D)]
+/// #[gdbevy(require(speed: Speed, as = f32, default = 250.0))]
+/// #[gdbevy(require(Stunned))]
 /// struct Player;
 /// ```
 ///
@@ -245,12 +245,12 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 ///
 /// **Marker** — inserts the component via `Default`:
 /// ```rust,ignore
-/// #[bevy(require(Stunned))]
+/// #[gdbevy(require(Stunned))]
 /// ```
 ///
 /// **Newtype** — generates one `#[export]` property and creates the component from it:
 /// ```rust,ignore
-/// #[bevy(require(speed: Speed, as = f32, default = 250.0, with = to_speed))]
+/// #[gdbevy(require(speed: Speed, as = f32, default = 250.0, with = to_speed))]
 /// //               ^^^^^ prop name  ^^^^ Godot export type
 /// ```
 /// `as = T` is **required**. `default = expr` sets the editor default and the Bevy
@@ -259,28 +259,28 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 ///
 /// **Struct** — generates multiple `#[export]` properties for a multi-field component:
 /// ```rust,ignore
-/// #[bevy(require(stats: Stats { current(as = i32, default = 100), max(as = i32, default = 100) }))]
+/// #[gdbevy(require(stats: Stats { current(as = i32, default = 100), max(as = i32, default = 100) }))]
 /// ```
 /// Each inner `field(as = T, …)` follows the same `as`/`default`/`with` grammar. The name
 /// before `:` (e.g. `stats`) is required by the grammar but ignored — the generated export
 /// properties use the inner field names (`current`, `max`).
 ///
-/// Multiple `require(...)` entries may appear in one `#[bevy(...)]` or in separate
-/// `#[bevy(...)]` attributes — both are equivalent.
+/// Multiple `require(...)` entries may appear in one `#[gdbevy(...)]` or in separate
+/// `#[gdbevy(...)]` attributes — both are equivalent.
 ///
 /// ## Field-level attributes
 ///
-/// Annotate primary struct fields with `#[bevy(...)]` to expose them as `#[export]`
+/// Annotate primary struct fields with `#[gdbevy(...)]` to expose them as `#[export]`
 /// properties on the generated Godot class:
 ///
 /// ```rust,ignore
 /// #[derive(Component, GodotNode, Default)]
-/// #[bevy(base = Area2D, class_name = Door2D)]
+/// #[gdbevy(base = Area2D, class_name = Door2D)]
 /// struct Door {
-///     #[bevy(default = LevelId::Level1)]
+///     #[gdbevy(default = LevelId::Level1)]
 ///     level_id: LevelId,
 ///
-///     #[bevy(as = f32, with = meters_to_units)]
+///     #[gdbevy(as = f32, with = meters_to_units)]
 ///     range: f32,
 /// }
 /// ```
@@ -295,7 +295,7 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 ///
 /// `into` and `sync` are reserved for the deferred component-sync feature and will produce
 /// a compile error if used.
-#[proc_macro_derive(GodotNode, attributes(bevy))]
+#[proc_macro_derive(GodotNode, attributes(gdbevy))]
 pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
     let parsed: DeriveInput = parse_macro_input!(input as DeriveInput);
     derive_godot_node_component(parsed)

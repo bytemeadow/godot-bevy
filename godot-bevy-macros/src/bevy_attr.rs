@@ -231,7 +231,7 @@ fn parse_one_require(input: ParseStream) -> syn::Result<RawRequire> {
     }
 }
 
-/// Struct-level `#[bevy(...)]` directives: `base`, `class_name`, and `require(...)`.
+/// Struct-level `#[gdbevy(...)]` directives: `base`, `class_name`, and `require(...)`.
 #[derive(Default)]
 struct StructLevel {
     base: Option<Ident>,
@@ -279,7 +279,7 @@ impl Parse for StructLevel {
 fn collect_struct_level(input: &DeriveInput) -> syn::Result<StructLevel> {
     let mut acc = StructLevel::default();
     for attr in &input.attrs {
-        if !attr.path().is_ident("bevy") {
+        if !attr.path().is_ident("gdbevy") {
             continue;
         }
         let sl: StructLevel = attr.parse_args()?;
@@ -309,14 +309,14 @@ fn struct_fields(input: &DeriveInput) -> syn::Result<Vec<&Field>> {
 }
 
 fn find_bevy_attr(field: &Field) -> Option<&Attribute> {
-    field.attrs.iter().find(|a| a.path().is_ident("bevy"))
+    field.attrs.iter().find(|a| a.path().is_ident("gdbevy"))
 }
 
 fn parse_field_directives(attr: &Attribute) -> syn::Result<Directives> {
     match &attr.meta {
         Meta::Path(_) => Ok(Directives::default()),
         Meta::List(_) => attr.parse_args_with(parse_directives),
-        Meta::NameValue(nv) => Err(Error::new_spanned(nv, "expected `#[bevy(...)]`")),
+        Meta::NameValue(nv) => Err(Error::new_spanned(nv, "expected `#[gdbevy(...)]`")),
     }
 }
 
@@ -605,8 +605,8 @@ mod tests {
     fn cf_marker_and_newtype_companions() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(Component, GodotNode, Default)]
-            #[bevy(base = CharacterBody2D, class_name = Player2D)]
-            #[bevy(require(speed: Speed, as = f32, default = 250.0), require(Stunned))]
+            #[gdbevy(base = CharacterBody2D, class_name = Player2D)]
+            #[gdbevy(require(speed: Speed, as = f32, default = 250.0), require(Stunned))]
             struct Player;
         };
         let plan = parse_component_first(&di).unwrap();
@@ -639,8 +639,8 @@ mod tests {
     fn cf_primary_field_default() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(Component, GodotNode, Default)]
-            #[bevy(base = Area2D, class_name = Door2D)]
-            struct Door { #[bevy(default = LevelId::Level1)] level_id: LevelId }
+            #[gdbevy(base = Area2D, class_name = Door2D)]
+            struct Door { #[gdbevy(default = LevelId::Level1)] level_id: LevelId }
         };
         let plan = parse_component_first(&di).unwrap();
         assert_eq!(plan.primary.fields.len(), 1);
@@ -662,10 +662,10 @@ mod tests {
     fn gf_field_binding() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(GodotClass, BevyComponents)]
-            #[bevy(require(Player))]
+            #[gdbevy(require(Player))]
             struct PlayerNode {
                 base: Base<Node2D>,
-                #[bevy(component = Speed, with = to_speed)]
+                #[gdbevy(component = Speed, with = to_speed)]
                 #[export] speed: f32,
             }
         };
@@ -700,7 +700,7 @@ mod tests {
     fn cf_as_missing_on_companion() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(Component, GodotNode)]
-            #[bevy(require(speed: Speed, default = 250.0))]
+            #[gdbevy(require(speed: Speed, default = 250.0))]
             struct Player;
         };
         assert!(
@@ -715,7 +715,7 @@ mod tests {
     fn cf_duplicate_export_prop() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(Component, GodotNode)]
-            #[bevy(require(speed: Speed, as = f32), require(speed: Boost, as = f32))]
+            #[gdbevy(require(speed: Speed, as = f32), require(speed: Boost, as = f32))]
             struct Player;
         };
         assert!(
@@ -730,7 +730,7 @@ mod tests {
     fn cf_newtype_struct_mix_in_one_require() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(Component, GodotNode)]
-            #[bevy(require(stats: Stats { current(as = i32) }, default = 5))]
+            #[gdbevy(require(stats: Stats { current(as = i32) }, default = 5))]
             struct Player;
         };
         assert!(
@@ -745,7 +745,7 @@ mod tests {
     fn class_name_equals_component() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(Component, GodotNode)]
-            #[bevy(class_name = Player)]
+            #[gdbevy(class_name = Player)]
             struct Player;
         };
         assert!(
@@ -760,7 +760,7 @@ mod tests {
     fn duplicate_directive_key_is_error() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(Component, GodotNode)]
-            #[bevy(require(speed: Speed, as = f32, default = 1.0, default = 2.0))]
+            #[gdbevy(require(speed: Speed, as = f32, default = 1.0, default = 2.0))]
             struct Player;
         };
         assert!(
@@ -777,7 +777,7 @@ mod tests {
             #[derive(GodotClass, BevyComponents)]
             struct PlayerNode {
                 base: Base<Node2D>,
-                #[bevy(component = Speed, as = f32)]
+                #[gdbevy(component = Speed, as = f32)]
                 #[export] speed: f32,
             }
         };
@@ -795,7 +795,7 @@ mod tests {
             #[derive(GodotClass, BevyComponents)]
             struct PlayerNode {
                 base: Base<Node2D>,
-                #[bevy(component = Speed, default = 5.0)]
+                #[gdbevy(component = Speed, default = 5.0)]
                 #[export] speed: f32,
             }
         };
@@ -813,7 +813,7 @@ mod tests {
             #[derive(GodotClass, BevyComponents)]
             struct PlayerNode {
                 base: Base<Node2D>,
-                #[bevy(with = to_speed)]
+                #[gdbevy(with = to_speed)]
                 #[export] speed: f32,
             }
         };
@@ -829,7 +829,7 @@ mod tests {
     fn gf_struct_level_generated_export() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(GodotClass, BevyComponents)]
-            #[bevy(require(speed: Speed, as = f32))]
+            #[gdbevy(require(speed: Speed, as = f32))]
             struct PlayerNode { base: Base<Node2D> }
         };
         assert!(
@@ -844,7 +844,7 @@ mod tests {
     fn base_or_class_name_on_gf() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(GodotClass, BevyComponents)]
-            #[bevy(base = Node2D)]
+            #[gdbevy(base = Node2D)]
             struct PlayerNode { base: Base<Node2D> }
         };
         assert!(
@@ -859,7 +859,7 @@ mod tests {
     fn sync_key_is_reserved() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(Component, GodotNode)]
-            #[bevy(require(speed: Speed, as = f32, sync = two_way))]
+            #[gdbevy(require(speed: Speed, as = f32, sync = two_way))]
             struct Player;
         };
         assert!(
@@ -874,7 +874,7 @@ mod tests {
     fn into_key_is_reserved() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(Component, GodotNode)]
-            #[bevy(require(speed: Speed, as = f32, into = Foo))]
+            #[gdbevy(require(speed: Speed, as = f32, into = Foo))]
             struct Player;
         };
         assert!(

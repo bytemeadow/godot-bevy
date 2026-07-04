@@ -30,8 +30,8 @@ fn update_player_base(players: Query<&GodotNodeHandle, With<CharacterBody2DMarke
 
 // ✅ Use GodotNode to define explicit components (component-first)
 #[derive(Component, GodotNode, Default)]
-#[bevy(base = CharacterBody2D, class_name = Player2D)]
-#[bevy(require(Health), require(Speed))]
+#[gdbevy(base = CharacterBody2D, class_name = Player2D)]
+#[gdbevy(require(Health), require(Speed))]
 pub struct Player;
 
 // Now query with your semantic component

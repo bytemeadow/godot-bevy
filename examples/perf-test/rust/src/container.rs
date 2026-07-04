@@ -7,7 +7,7 @@ pub struct ParticleContainer;
 
 #[derive(GodotClass, BevyComponents)]
 #[class(base=Node2D)]
-#[bevy(require(ParticleContainer))]
+#[gdbevy(require(ParticleContainer))]
 pub struct ParticleRain {
     base: Base<Node2D>,
     pub is_running: bool,

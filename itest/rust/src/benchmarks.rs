@@ -682,7 +682,7 @@ macro_rules! bench_autosync_types {
 
             #[derive(godot::prelude::GodotClass, BevyComponents)]
             #[class(init, base=Node2D)]
-            #[bevy(require($marker))]
+            #[gdbevy(require($marker))]
             pub struct $node {
                 base: godot::prelude::Base<godot::classes::Node2D>,
             }
