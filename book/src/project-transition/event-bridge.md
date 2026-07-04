@@ -30,10 +30,9 @@ impl Enemy {
 Handle it like any observer:
 
 ```rust,ignore
-app.add_plugins(GodotEventBridgePlugin)
-   .add_observer(|trigger: On<Damage>, mut hp: ResMut<Health>| {
-       hp.0 -= trigger.event().amount;
-   });
+app.add_observer(|trigger: On<Damage>, mut hp: ResMut<Health>| {
+    hp.0 -= trigger.event().amount;
+});
 ```
 
 Fire these from the main thread, from a node callback *between* frames — they bind the app to reach its world, so don't fire from inside a running Bevy frame (a signal a system emitted synchronously). Off the main thread, hold a cloned `GodotEventSender` (a `Res<GodotEventSender>` you cloned on the main thread) and `.send()` through that — it's a plain channel send, safe from anywhere.
@@ -46,11 +45,10 @@ GDScript can't name a Rust type, so you register the name once on the Rust side 
 #[derive(Event, Clone)]
 struct Damage { amount: i64 }   // GDScript ints arrive as i64
 
-app.add_plugins(GodotEventBridgePlugin)
-   .add_godot_event::<Damage>("damage", |payload| {
-       let dict = payload.try_to::<VarDictionary>().ok()?;
-       Some(Damage { amount: dict.get("amount")?.try_to::<i64>().ok()? })
-   });
+app.add_godot_event::<Damage>("damage", |payload| {
+    let dict = payload.try_to::<VarDictionary>().ok()?;
+    Some(Damage { amount: dict.get("amount")?.try_to::<i64>().ok()? })
+});
 ```
 
 Then any script fires it through the autoload:
@@ -100,7 +98,7 @@ Earlier versions shipped a poll-based `GodotMailboxPlugin`: a `FixedFirst` syste
 |---|---|
 | `impl GodotMailboxMessage` + `drain_from_node` reads node fields | `add_godot_event::<T>("name", \|v\| ...)` decoder; GDScript fires `send_event("name", payload)` |
 | `drain_from_node`'s `source: GodotNodeHandle` | pass `{"source": self}` in the payload; the mapper extracts it, the observer resolves node → `Entity` via `NodeEntityIndex` |
-| `GodotMailboxPlugin<T, Marker>` per message type | `GodotEventBridgePlugin` once |
+| `GodotMailboxPlugin<T, Marker>` per message type | no plugin; `add_godot_event` per GDScript name |
 | `MessageReader<T>` batch loop | an observer accumulates into a `Resource`, an ordered system drains it (below) |
 | O(entities) FFI scan every fixed step | one decode per fire, deferred to the next `First` |
 

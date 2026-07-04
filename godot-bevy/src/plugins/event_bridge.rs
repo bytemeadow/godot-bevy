@@ -1,6 +1,6 @@
 use crate::app::BevyApp;
 use crate::plugins::signals::{SignalDispatch, SignalEnvelope};
-use bevy_app::{App, First, Plugin};
+use bevy_app::{App, First};
 use bevy_ecs::event::Event;
 use bevy_ecs::prelude::Resource;
 use bevy_ecs::schedule::{IntoScheduleConfigs, SystemSet};
@@ -47,7 +47,7 @@ impl GodotEventSender {
 struct GodotEventReceiver(Mutex<Receiver<Box<dyn SignalDispatch>>>);
 
 /// Installs the event channel + its drain, once per App (idempotent — guarded on
-/// `GodotEventSender`, so the plugin and `add_godot_event` can both call it). A
+/// `GodotEventSender`, so core and `add_godot_event` can both call it). A
 /// separate channel from `signals.rs`'s: events and signals don't share a queue.
 pub(crate) fn ensure_event_channel(app: &mut App) {
     if app.world().contains_resource::<GodotEventSender>() {
@@ -106,8 +106,8 @@ pub(crate) struct GodotEventRegistry {
 
 /// Registers `name -> event` decoders for the GDScript `send_event`.
 pub trait AddGodotEventAppExt {
-    /// Registers a decoder for `send_event("name", payload)` and installs the
-    /// channel + drain. Re-registering a `name` replaces it (last-wins).
+    /// Registers a decoder for `send_event("name", payload)`. Re-registering a
+    /// `name` replaces it (last-wins).
     fn add_godot_event<T>(
         &mut self,
         name: &str,
@@ -158,26 +158,12 @@ impl AddGodotEventAppExt for App {
     }
 }
 
-/// Installs the event channel + drain and the GDScript registry. The Rust
-/// surfaces (`Res<GodotEventSender>`, `send_event(&app, ..)`) only need the
-/// channel; the GDScript `send_event(name, payload)` also needs this plugin's
-/// registry, which you fill with `add_godot_event`.
-#[derive(Default)]
-pub struct GodotEventBridgePlugin;
-
-impl Plugin for GodotEventBridgePlugin {
-    fn build(&self, app: &mut App) {
-        ensure_event_channel(app);
-        app.init_resource::<GodotEventRegistry>();
-    }
-}
-
 /// Send a typed event into a specific `BevyApp`'s ECS from Godot Rust code that
 /// holds a `Gd<BevyApp>`. It reaches `On<T>` observers on the next `First` drain
 /// — it enqueues, it doesn't `trigger` synchronously, so code already inside a
 /// system wants `Commands::trigger` instead. No-op (with a `warn!`) if the app
-/// isn't live or has no channel. Resolve `app` with `BevyApp::try_singleton()`,
-/// or pass a specific instance.
+/// isn't live. Resolve `app` with `BevyApp::try_singleton()`, or pass a specific
+/// instance.
 ///
 /// Call this from the main thread, from a node callback between frames — it
 /// binds the app to reach its world. Do NOT fire it while that app's own frame
@@ -240,9 +226,9 @@ mod tests {
     }
 
     #[test]
-    fn plugin_installs_channel_and_registry() {
+    fn add_godot_event_installs_channel_and_registry() {
         let mut app = App::new();
-        app.add_plugins(GodotEventBridgePlugin);
+        app.add_godot_event::<Damage>("damage", |_p| Some(Damage { amount: 0 }));
         assert!(app.world().contains_resource::<GodotEventSender>());
         assert!(app.world().contains_resource::<GodotEventRegistry>());
     }

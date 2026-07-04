@@ -142,6 +142,11 @@ impl Plugin for GodotBaseCorePlugin {
         // Keeps RunFixedMainLoop's Before/After anchor sets live for ecosystem plugins
         // (e.g. leafwing). TimePlugin stays so Time<Real>/Virtual still advance in _process.
         crate::plugins::fixed_schedule::host_fixed_main_loop(app);
+
+        // The event bridge's channel + First drain live in core so any app can
+        // receive events; `add_godot_event` installs the GDScript decoder
+        // registry on demand.
+        crate::plugins::event_bridge::ensure_event_channel(app);
     }
 }
 

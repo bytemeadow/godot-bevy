@@ -23,9 +23,7 @@ pub use audio::GodotAudioPlugin;
 pub use collisions::GodotCollisionsPlugin;
 pub use core::GodotBaseCorePlugin;
 pub use debugger::{DebuggerConfig, GodotDebuggerPlugin};
-pub use event_bridge::{
-    AddGodotEventAppExt, EventBridgeSet, GodotEventBridgePlugin, GodotEventSender, send_event,
-};
+pub use event_bridge::{AddGodotEventAppExt, EventBridgeSet, GodotEventSender, send_event};
 #[cfg(feature = "godot_bevy_log")]
 pub use godot_bevy_logger::GodotBevyLogPlugin;
 pub use input::{BevyInputBridgePlugin, GodotInputEventPlugin};
@@ -56,7 +54,6 @@ plugin_group! {
         :GodotPackedScenePlugin,
         :GodotTransformSyncPlugin,
         :GodotDebuggerPlugin,
-        :GodotEventBridgePlugin,
         #[cfg(feature = "godot_bevy_log")]
         :GodotBevyLogPlugin,
         #[cfg(feature = "bevy_gamepad")]

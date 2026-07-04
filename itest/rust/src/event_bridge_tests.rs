@@ -47,7 +47,6 @@ fn test_send_event_rust_node_scoped(ctx: &TestContext) -> godot::task::TaskHandl
         struct Received(i32);
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<Received>();
             app.add_observer(|t: On<Damage>, mut r: ResMut<Received>| {
                 r.0 = t.event().amount;
@@ -77,7 +76,6 @@ fn test_send_event_via_try_singleton(ctx: &TestContext) -> godot::task::TaskHand
         struct Received(i32);
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<Received>();
             app.add_observer(|t: On<Damage>, mut r: ResMut<Received>| {
                 r.0 = t.event().amount;
@@ -106,7 +104,6 @@ fn test_send_event_after_teardown_noop(ctx: &TestContext) -> godot::task::TaskHa
         let witness_clone = Arc::clone(&witness);
 
         let mut app = TestApp::new(&ctx_clone, move |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.add_observer(move |t: On<Damage>| {
                 witness_clone.store(t.event().amount, SeqCst);
             });
@@ -132,36 +129,6 @@ fn test_send_event_after_teardown_noop(ctx: &TestContext) -> godot::task::TaskHa
         );
 
         // cleanup() takes the harness's handle, already torn down — safe.
-        app.cleanup().await;
-    })
-}
-
-/// A BevyApp with no event channel (GodotCorePlugins only) no-ops.
-#[itest(async)]
-fn test_send_event_no_channel_noop(ctx: &TestContext) -> godot::task::TaskHandle {
-    let ctx_clone = ctx.clone();
-    godot::task::spawn(async move {
-        #[derive(Resource, Default)]
-        struct Received(i32);
-
-        // GodotCorePlugins is added automatically by TestApp; add nothing that
-        // installs the event channel -> no GodotEventSender resource.
-        let mut app = TestApp::new(&ctx_clone, |app| {
-            app.init_resource::<Received>();
-            app.add_observer(|t: On<Damage>, mut r: ResMut<Received>| {
-                r.0 = t.event().amount;
-            });
-        })
-        .await;
-
-        let node = singleton_node(&ctx_clone);
-        godot_bevy::send_event(&node, Damage { amount: 5 });
-
-        app.update().await;
-
-        let got = app.with_world(|w| w.resource::<Received>().0);
-        assert_eq!(got, 0, "no delivery when there is no event channel");
-
         app.cleanup().await;
     })
 }
@@ -199,7 +166,6 @@ fn test_send_event_multi_live_app(ctx: &TestContext) -> godot::task::TaskHandle 
 
         // App A: the autoload, via the harness.
         let mut app_a = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<Received>();
             app.add_observer(|t: On<Damage>, mut r: ResMut<Received>| {
                 r.0 = t.event().amount;
@@ -214,7 +180,6 @@ fn test_send_event_multi_live_app(ctx: &TestContext) -> godot::task::TaskHandle 
         node_b
             .bind_mut()
             .set_instance_init_func(Box::new(|app: &mut App| {
-                app.add_plugins(GodotEventBridgePlugin);
                 app.init_resource::<Received>();
                 app.add_observer(|t: On<Damage>, mut r: ResMut<Received>| {
                     r.0 = t.event().amount;
@@ -267,7 +232,6 @@ fn test_send_event_dict_payload(ctx: &TestContext) -> godot::task::TaskHandle {
         struct Received(i64);
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<Received>();
             app.add_godot_event::<DamageI64>("damage", |payload| {
                 let dict = payload.try_to::<godot::builtin::VarDictionary>().ok()?;
@@ -312,7 +276,6 @@ fn test_send_event_from_newtype(ctx: &TestContext) -> godot::task::TaskHandle {
         struct GotVolume(f64);
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<GotVolume>();
             app.add_godot_event_from::<Volume>("volume");
             app.add_observer(|t: On<Volume>, mut r: ResMut<GotVolume>| {
@@ -345,7 +308,6 @@ fn test_send_event_unit_via_null(ctx: &TestContext) -> godot::task::TaskHandle {
         struct GameOverSeen(bool);
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<GameOverSeen>();
             app.add_godot_event::<GameOver>("game_over", |_payload| Some(GameOver));
             app.add_observer(|_t: On<GameOver>, mut r: ResMut<GameOverSeen>| {
@@ -375,7 +337,6 @@ fn test_send_event_unknown_and_bad_payload_drop(ctx: &TestContext) -> godot::tas
         struct Received(i64);
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<Received>();
             app.add_godot_event::<DamageI64>("damage", |payload| {
                 let dict = payload.try_to::<godot::builtin::VarDictionary>().ok()?;
@@ -416,7 +377,6 @@ fn test_send_event_strict_int_drop_then_success(ctx: &TestContext) -> godot::tas
         struct Received(i64);
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<Received>();
             app.add_godot_event::<DamageI64>("damage", |payload| {
                 let dict = payload.try_to::<godot::builtin::VarDictionary>().ok()?;
@@ -476,7 +436,6 @@ fn test_send_event_unknown_name_spam_is_rate_limited(ctx: &TestContext) -> godot
         struct Received(i64);
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<Received>();
             app.add_godot_event::<DamageI64>("damage", |payload| {
                 let dict = payload.try_to::<godot::builtin::VarDictionary>().ok()?;
@@ -524,7 +483,6 @@ fn test_send_event_multiple_names(ctx: &TestContext) -> godot::task::TaskHandle 
         }
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<Tally>();
             app.add_godot_event::<DamageI64>("damage", |p| {
                 let d = p.try_to::<godot::builtin::VarDictionary>().ok()?;
@@ -589,7 +547,6 @@ fn test_send_event_same_name_last_wins(ctx: &TestContext) -> godot::task::TaskHa
         }
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<Seen>();
             app.add_godot_event::<EvA>("x", |_p| Some(EvA));
             app.add_godot_event::<EvB>("x", |_p| Some(EvB));
@@ -626,7 +583,6 @@ fn test_send_event_method_form_delivers(ctx: &TestContext) -> godot::task::TaskH
         struct Received(i32);
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<Received>();
             app.add_observer(|t: On<Damage>, mut r: ResMut<Received>| {
                 r.0 = t.event().amount;
@@ -678,7 +634,6 @@ fn test_send_event_reentrant_mapper(ctx: &TestContext) -> godot::task::TaskHandl
             .instance_id();
 
         let mut app = TestApp::new(&ctx_clone, move |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<Seen>();
             app.add_godot_event::<EvB>("inner", |_p| Some(EvB));
             // The "outer" mapper calls send_event on the same BevyApp node via its
@@ -731,7 +686,6 @@ fn test_send_event_mid_frame_defers_to_next_frame(ctx: &TestContext) -> godot::t
         struct FireNow(bool);
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<Received>();
             app.init_resource::<FireNow>();
             app.add_observer(|t: On<Damage>, mut r: ResMut<Received>| {
@@ -783,7 +737,6 @@ fn test_send_event_off_thread_clone(ctx: &TestContext) -> godot::task::TaskHandl
         struct Received(i32);
 
         let mut app = TestApp::new(&ctx_clone, |app| {
-            app.add_plugins(GodotEventBridgePlugin);
             app.init_resource::<Received>();
             app.add_observer(|t: On<Damage>, mut r: ResMut<Received>| {
                 r.0 = t.event().amount;

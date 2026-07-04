@@ -67,8 +67,7 @@ impl BevyApp {
 
     /// Enqueue a typed event into this app's ECS, delivered to `On<T>` observers
     /// on the next `First` drain — the method form of `godot_bevy::send_event`.
-    /// No-op (warn) if this app has no live world or no event channel
-    /// (`GodotEventBridgePlugin` not added).
+    /// No-op (warn) if this app has no live world.
     ///
     /// Callers reach this through `app.bind()`, which panics — and the frame's
     /// `catch_unwind` then tears the app down — if done while this app's own
@@ -86,9 +85,7 @@ impl BevyApp {
             return;
         };
         let Some(sender) = bevy_app.world().get_resource::<GodotEventSender>() else {
-            tracing::warn!(
-                "BevyApp::send_event: no event channel (add GodotEventBridgePlugin); event dropped"
-            );
+            tracing::warn!("BevyApp::send_event: no event channel; event dropped");
             return;
         };
         sender.send(event);
@@ -342,14 +339,14 @@ impl BevyApp {
         };
         let world = app.world();
         let Some(registry) = world.get_resource::<GodotEventRegistry>() else {
-            tracing::warn!("BevyApp::send_event: GodotEventBridgePlugin not added; ignored");
+            tracing::warn!("BevyApp::send_event: no events registered (call add_godot_event)");
             return;
         };
         let key = name.to_string();
         let Some(mapper) = registry.mappers.get(&key) else {
             // Gate all unknown names under one fixed key so untrusted GDScript
             // can't grow the warner's map by spamming unique names. Registered
-            // names (a finite set) still gate per-name below.
+            // names (a finite set) gate per-name below.
             if registry.warner.lock().should_log("<unknown event>") {
                 tracing::warn!(
                     "BevyApp::send_event: unknown event {key:?}; registered: {:?}",

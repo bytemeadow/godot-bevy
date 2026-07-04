@@ -20,9 +20,7 @@ pub use crate::plugins::{
     // Debugger
     debugger::{DebuggerConfig, GodotDebuggerPlugin},
     // Event bridge
-    event_bridge::{
-        AddGodotEventAppExt, EventBridgeSet, GodotEventBridgePlugin, GodotEventSender, send_event,
-    },
+    event_bridge::{AddGodotEventAppExt, EventBridgeSet, GodotEventSender, send_event},
     // Collisions
     input::{
         Action, ActionInput, BevyInputBridgePlugin, GodotActions, GodotActionsPlugin,
