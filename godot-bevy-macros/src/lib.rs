@@ -270,23 +270,25 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 ///
 /// ## Field-level attributes
 ///
-/// Annotate primary struct fields with `#[gdbevy(...)]` to expose them as `#[export]`
-/// properties on the generated Godot class:
+/// Annotate primary struct fields with `#[gdbevy(export, ...)]` to expose them as `#[export]`
+/// properties on the generated Godot class. `export` is required — it marks the field as a
+/// generated Godot export:
 ///
 /// ```rust,ignore
 /// #[derive(Component, GodotNode, Default)]
 /// #[gdbevy(base = Area2D, class_name = Door2D)]
 /// struct Door {
-///     #[gdbevy(default = LevelId::Level1)]
+///     #[gdbevy(export, default = LevelId::Level1)]
 ///     level_id: LevelId,
 ///
-///     #[gdbevy(as = f32, with = meters_to_units)]
+///     #[gdbevy(export, as = f32, with = meters_to_units)]
 ///     range: f32,
 /// }
 /// ```
 ///
 /// | Key | Meaning |
 /// |-----|---------|
+/// | `export` (**required**) | Marks the field as a generated Godot export. |
 /// | `as = T` | Godot export type (defaults to the field's Rust type when omitted). |
 /// | `default = expr` | Editor default value passed to `#[init(val = …)]`. A pure-Bevy `spawn(T)` uses the struct's own `Default` — make them agree if you rely on `spawn(T)`. |
 /// | `with = fn` | Converts the Godot export value before assigning to the field. |

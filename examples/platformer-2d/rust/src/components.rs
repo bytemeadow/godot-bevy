@@ -62,6 +62,6 @@ pub struct Gem;
 #[derive(Component, GodotNode, Default, Debug, Clone)]
 #[gdbevy(base = Area2D, class_name = Door2D)]
 pub struct Door {
-    #[gdbevy(default = LevelId::Level1)]
+    #[gdbevy(export, default = LevelId::Level1)]
     pub level_id: LevelId,
 }

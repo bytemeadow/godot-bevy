@@ -71,6 +71,7 @@ struct Directives {
     default: Option<Expr>,
     with: Option<Path>,
     component: Option<Path>,
+    export: bool,
 }
 
 fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
@@ -115,11 +116,17 @@ fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
                     }
                     d.component = Some(input.parse()?);
                 }
+                "export" => {
+                    if d.export {
+                        return Err(Error::new(key.span(), "duplicate `export`"));
+                    }
+                    d.export = true;
+                }
                 _ => {
                     return Err(Error::new(
                         key.span(),
                         format!(
-                            "unknown key `{name}`; expected `as`, `default`, `with`, or `component`"
+                            "unknown key `{name}`; expected `as`, `default`, `with`, `component`, or `export`"
                         ),
                     ));
                 }
@@ -449,6 +456,12 @@ fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
                 "`component` is not valid on a component-first field; it is for Godot-first field bindings",
             ));
         }
+        if !d.export {
+            return Err(Error::new_spanned(
+                attr,
+                "component-first field attributes require `export`, e.g. `#[gdbevy(export)]`",
+            ));
+        }
         out.push(Mapping {
             godot_prop: name.clone(),
             bevy_field: Some(name),
@@ -478,6 +491,12 @@ fn collect_field_bindings(input: &DeriveInput) -> syn::Result<Vec<ComponentPlan>
             return Err(Error::new_spanned(
                 attr,
                 "`default` is not allowed on a Godot-first field binding",
+            ));
+        }
+        if d.export {
+            return Err(Error::new_spanned(
+                attr,
+                "`export` is not valid on a Godot-first field binding",
             ));
         }
         let Some(component) = d.component else {
@@ -640,7 +659,7 @@ mod tests {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(Component, GodotNode, Default)]
             #[gdbevy(base = Area2D, class_name = Door2D)]
-            struct Door { #[gdbevy(default = LevelId::Level1)] level_id: LevelId }
+            struct Door { #[gdbevy(export, default = LevelId::Level1)] level_id: LevelId }
         };
         let plan = parse_component_first(&di).unwrap();
         assert_eq!(plan.primary.fields.len(), 1);
@@ -656,6 +675,35 @@ mod tests {
                 .to_string(),
             "level_id"
         );
+    }
+
+    #[test]
+    fn cf_primary_field_missing_export() {
+        let di: syn::DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode, Default)]
+            #[gdbevy(base = Area2D, class_name = Door2D)]
+            struct Door { #[gdbevy(default = 1.0)] level_id: f32 }
+        };
+        assert!(
+            parse_component_first(&di)
+                .unwrap_err()
+                .to_string()
+                .contains("export")
+        );
+    }
+
+    #[test]
+    fn cf_primary_field_bare_export() {
+        let di: syn::DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode, Default)]
+            #[gdbevy(base = Area2D, class_name = Door2D)]
+            struct Door { #[gdbevy(export)] level_id: LevelId }
+        };
+        let plan = parse_component_first(&di).unwrap();
+        assert_eq!(plan.primary.fields.len(), 1);
+        assert_eq!(plan.primary.fields[0].godot_prop.to_string(), "level_id");
+        assert!(plan.primary.fields[0].default.is_none());
+        assert!(plan.primary.fields[0].as_type.is_none());
     }
 
     #[test]

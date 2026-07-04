@@ -54,7 +54,7 @@ Fields on the component struct itself can declare a type conversion:
 #[gdbevy(base = Node2D, class_name = Slider2D)]
 pub struct Slider {
     /// Editor shows 0–100; component gets 0.0–1.0
-    #[gdbevy(as = f32, with = percentage_to_fraction)]
+    #[gdbevy(export, as = f32, with = percentage_to_fraction)]
     pub value: f32,
 }
 
@@ -70,6 +70,7 @@ fn percentage_to_fraction(v: f32) -> f32 { v / 100.0 }
 | struct | `base = GodotBase` | no (default: `Node`) | Godot class to extend |
 | struct | `class_name = Name` | no (default: `<Struct>BevyComponent`) | Generated class name |
 | struct | `require(…)` | no | Companion component (see forms above) |
+| field | `export` | **yes** | Marks the field as a generated Godot export |
 | field | `as = T` | no | Godot export type |
 | field | `default = expr` | no | Editor default (via `#[init(val = …)]`); a pure-Bevy `spawn(T)` uses the struct's own `Default` — make them agree if you rely on `spawn(T)`. |
 | field | `with = fn` | no | Godot-value → field-value conversion |

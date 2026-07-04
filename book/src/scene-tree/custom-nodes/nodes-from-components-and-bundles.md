@@ -29,17 +29,18 @@ Fields on the component struct can be exported to the editor:
 #[derive(Component, GodotNode, Default, Debug, Clone)]
 #[gdbevy(base = Area2D, class_name = Door2D)]
 pub struct Door {
-    #[gdbevy(default = LevelId::Level1)]
+    #[gdbevy(export, default = LevelId::Level1)]
     pub level_id: LevelId,
 }
 ```
 
-`#[gdbevy(default = expr)]` sets the editor default (via `#[init(val = …)]`). The field's Rust type is used as the Godot export type unless you add `as = T`.
+`export` is required and marks the field as a generated Godot export. `default = expr` sets the editor default (via `#[init(val = …)]`). The field's Rust type is used as the Godot export type unless you add `as = T`.
 
 Available keys on a field-level `#[gdbevy(...)]`:
 
 | Key | Meaning |
 |-----|---------|
+| `export` | **(required)** Marks the field as a generated Godot export. |
 | `as = T` | Godot export type (defaults to the field's Rust type). |
 | `default = expr` | Editor default value (via `#[init(val = …)]`). A pure-Bevy `spawn(T)` uses the struct's own `Default` — make them agree if you rely on `spawn(T)`. |
 | `with = fn` | Converts the Godot value before assigning to the field. |

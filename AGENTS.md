@@ -105,7 +105,7 @@ fn build_app(app: &mut App) {
 
 ### AutoSync System
 
-The `autosync` system (`godot-bevy/src/autosync.rs`) automatically registers custom Godot node types and inserts their Bevy components when a matching node enters the scene tree. Register via `#[derive(GodotNode)]` (component-first, generates the Godot class) or `#[derive(BevyComponents)]` (Godot-first, annotates a user-written `GodotClass`). Both use the `#[gdbevy(...)]` attribute grammar.
+The `autosync` system (`godot-bevy/src/autosync.rs`) automatically registers custom Godot node types and inserts their Bevy components when a matching node enters the scene tree. Register via `#[derive(GodotNode)]` (component-first, generates the Godot class) or `#[derive(BevyComponents)]` (Godot-first, annotates a user-written `GodotClass`). Both use one `#[gdbevy(...)]` attribute grammar for struct config, companions, and field bindings; component-first field exports require the explicit `export` directive, e.g. `#[gdbevy(export, default = …)]`.
 
 ## Development Workflow
 
