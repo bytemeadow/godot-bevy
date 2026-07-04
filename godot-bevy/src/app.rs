@@ -54,6 +54,43 @@ impl BevyApp {
         self.app.as_mut()
     }
 
+    /// Resolves the `/root/BevyAppSingleton` autoload — `None` in the editor or
+    /// before the autoload exists.
+    pub fn try_singleton() -> Option<Gd<BevyApp>> {
+        godot::classes::Engine::singleton()
+            .get_main_loop()?
+            .try_cast::<godot::classes::SceneTree>()
+            .ok()?
+            .get_root()?
+            .try_get_node_as::<BevyApp>("BevyAppSingleton")
+    }
+
+    /// Enqueue a typed event into this app's ECS, delivered to `On<T>` observers
+    /// on the next `First` drain — the method form of `godot_bevy::send_event`.
+    /// No-op (warn) if this app has no live world.
+    ///
+    /// Callers reach this through `app.bind()`, which panics — and the frame's
+    /// `catch_unwind` then tears the app down — if done while this app's own
+    /// frame is running. Fire from a between-frames node callback; off-thread,
+    /// clone a `GodotEventSender` and send through that.
+    pub fn send_event<T>(&self, event: T)
+    where
+        T: bevy_ecs::event::Event + Clone + Send + 'static,
+        for<'a> T::Trigger<'a>: Default,
+    {
+        use crate::plugins::event_bridge::GodotEventSender;
+
+        let Some(bevy_app) = self.get_app() else {
+            tracing::warn!("BevyApp::send_event called with no live App; event dropped");
+            return;
+        };
+        let Some(sender) = bevy_app.world().get_resource::<GodotEventSender>() else {
+            tracing::warn!("BevyApp::send_event: no event channel; event dropped");
+            return;
+        };
+        sender.send(event);
+    }
+
     /// Set a per-instance init function (for tests)
     /// This allows each BevyApp instance to have its own configuration
     pub fn set_instance_init_func(&mut self, func: Box<dyn Fn(&mut App) + Send + Sync>) {
@@ -285,6 +322,62 @@ impl BevyApp {
 }
 
 #[godot_api]
+impl BevyApp {
+    /// GDScript entry point: fires a registered event by name, `payload` as its
+    /// arg (`null` for unit events). No-op + warn on an unknown name or rejected
+    /// payload; never panics across FFI. `&self`, not `&mut self`, so a re-entrant
+    /// mapper takes a second shared borrow instead of a conflicting mut borrow.
+    /// Firing from GDScript while this app's frame runs is the one case gdext
+    /// can't make safe (it panics on entry) — see the book.
+    #[func(rename = send_event)]
+    fn gd_send_event(&self, name: GString, payload: Variant) {
+        use crate::plugins::event_bridge::{GodotEventRegistry, GodotEventSender};
+
+        let Some(app) = self.app.as_ref() else {
+            tracing::warn!("BevyApp::send_event({name}) called with no live App; ignored");
+            return;
+        };
+        let world = app.world();
+        let Some(registry) = world.get_resource::<GodotEventRegistry>() else {
+            tracing::warn!("BevyApp::send_event: no events registered (call add_godot_event)");
+            return;
+        };
+        let key = name.to_string();
+        let Some(mapper) = registry.mappers.get(&key) else {
+            // Gate all unknown names under one fixed key so untrusted GDScript
+            // can't grow the warner's map by spamming unique names. Registered
+            // names (a finite set) gate per-name below.
+            if registry.warner.lock().should_log("<unknown event>") {
+                tracing::warn!(
+                    "BevyApp::send_event: unknown event {key:?}; registered: {:?}",
+                    registry.mappers.keys().collect::<Vec<_>>()
+                );
+            }
+            return;
+        };
+        let Some(boxed) = mapper(payload) else {
+            if registry.warner.lock().should_log(&key) {
+                tracing::warn!("BevyApp::send_event: mapper rejected payload for {key:?}");
+            }
+            return;
+        };
+        let Some(sender) = world.get_resource::<GodotEventSender>() else {
+            tracing::warn!("BevyApp::send_event: no event channel; ignored");
+            return;
+        };
+        if sender.0.send(boxed).is_err() {
+            tracing::warn!("BevyApp::send_event: channel receiver gone; ignored");
+        }
+    }
+
+    /// Emitted at the end of every render frame, after the Bevy suffix + clear_trackers.
+    /// Carries the number of physics steps that ran this frame. Test harness only.
+    #[cfg(feature = "test-frame-signal")]
+    #[signal]
+    fn bevy_frame_complete(physics_steps: i64);
+}
+
+#[godot_api]
 impl INode for BevyApp {
     fn init(base: Base<Node>) -> Self {
         Self {
@@ -425,15 +518,6 @@ impl INode for BevyApp {
         self.started = true;
         self.prefix_done_this_frame = true;
     }
-}
-
-#[cfg(feature = "test-frame-signal")]
-#[godot_api]
-impl BevyApp {
-    /// Emitted at the end of every render frame, after the Bevy suffix + clear_trackers.
-    /// Carries the number of physics steps that ran this frame. Test harness only.
-    #[signal]
-    fn bevy_frame_complete(physics_steps: i64);
 }
 
 #[cfg(feature = "trace_tracy")]
