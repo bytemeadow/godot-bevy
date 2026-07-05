@@ -9,6 +9,7 @@ use godot::init::{ExtensionLibrary, gdextension};
 godot_bevy_test::declare_test_runner!();
 
 // Test modules
+mod asset_reader_tests;
 mod autosync_match_tests;
 mod benchmarks;
 mod collision_tests;
