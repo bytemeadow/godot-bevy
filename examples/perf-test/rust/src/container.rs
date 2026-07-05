@@ -5,9 +5,9 @@ use godot_bevy::prelude::*;
 #[derive(Component, Default)]
 pub struct ParticleContainer;
 
-#[derive(GodotClass, BevyBundle)]
+#[derive(GodotClass, BevyComponents)]
 #[class(base=Node2D)]
-#[bevy_bundle((ParticleContainer))]
+#[gdbevy(require(ParticleContainer))]
 pub struct ParticleRain {
     base: Base<Node2D>,
     pub is_running: bool,

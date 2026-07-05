@@ -8,9 +8,9 @@ fn build_app(app: &mut App) {
     app.add_systems(Startup, find_player);
 }
 
-fn find_player(query: Query<&PlayerBundle>) {
+fn find_player(query: Query<&Player>) {
     // Your player entity will be here! ✨
-    for player in &query {
+    for _player in &query {
         println!("Found the player!");
     }
 }
@@ -42,26 +42,24 @@ When the scene tree is parsed, each Godot node becomes a Bevy entity with these 
 - **`Name`** - The node's name from Godot
 - **`Groups`** - The node's group memberships
 - **Node type markers** - Components like `ButtonMarker`, `Sprite2DMarker`, etc.
-- **Custom bundles** - Components from `#[derive(BevyBundle)]` are automatically added
+- **Custom components** - Components from `#[derive(GodotNode)]` or `#[derive(BevyComponents)]` are automatically added
 
 For collision detection, use the `Collisions` system param and `CollisionStarted`/`CollisionEnded` events (requires `GodotCollisionsPlugin`).
 
-## BevyBundle Component Timing
+## Custom Node Component Timing
 
-If you've defined custom Godot node types with `#[derive(BevyBundle)]`, their components are added **immediately** during scene tree processing. This happens:
+If you've defined custom Godot node types with `GodotNode` or `BevyComponents`, their components are added **immediately** during scene tree processing. This happens:
 
 - **During `PreStartup`** for nodes that exist when the scene is first loaded
 - **During `First`** for nodes added dynamically at runtime
 
-This means BevyBundle components are available in `Startup` systems for initial scene nodes, and immediately available for dynamically added nodes.
+This means custom components are available in `Startup` systems for initial scene nodes, and immediately available for dynamically added nodes.
 
 ```rust
-#[derive(GodotClass, BevyBundle)]
-#[class(base=Node2D)]
-#[bevy_bundle((Health), (Velocity))]
-pub struct Player {
-    base: Base<Node2D>,
-}
+#[derive(Component, GodotNode, Default)]
+#[gdbevy(base = Node2D, class_name = Player2D)]
+#[gdbevy(require(Health), require(Velocity))]
+pub struct Player;
 
 // This will work in Startup - the Health and Velocity components
 // are automatically added during PreStartup for existing nodes

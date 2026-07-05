@@ -1,8 +1,9 @@
-mod bevy_bundle;
+mod bevy_attr;
+mod emit;
 mod godot_node;
 mod node_tree_view;
 
-use crate::godot_node::derive_godot_node;
+use crate::godot_node::{derive_bevy_components, derive_godot_node_component};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::Parser;
@@ -145,72 +146,161 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-#[proc_macro_derive(BevyBundle, attributes(bevy_bundle))]
-pub fn derive_bevy_bundle(item: TokenStream) -> TokenStream {
+/// # Attaches Bevy components to a user-owned Godot class (Godot-first)
+///
+/// Derive `BevyComponents` alongside `GodotClass` when you write the Godot class yourself.
+/// The derive generates the autosync glue that reads `#[export]` property values off the
+/// Godot node and inserts the mapped Bevy components onto the entity — without generating
+/// a new `GodotClass` struct.
+///
+/// ## Field bindings
+///
+/// Annotate each `#[export]` field with `#[gdbevy(component = Comp)]` to map it onto a
+/// newtype component:
+///
+/// ```rust,ignore
+/// #[derive(GodotClass, BevyComponents)]
+/// struct PlayerNode {
+///     base: Base<Node2D>,
+///
+///     /// Maps `speed` → `Speed(speed_value)`.  `with` converts the Godot value first.
+///     #[export]
+///     #[gdbevy(component = Speed, with = to_speed)]
+///     speed: f32,
+///
+///     /// Maps `health` → `Health(health)` directly (no `with`).
+///     #[export]
+///     #[gdbevy(component = Health)]
+///     health: f32,
+/// }
+/// ```
+///
+/// Valid keys on a field-level `#[gdbevy(...)]`:
+/// - `component = Comp` (**required**) — the Bevy component type to insert.
+/// - `with = fn` — a function `fn(T) -> T` (or any `Into` adapter) applied to the Godot
+///   value before it is passed to the component constructor.
+/// - `as` and `default` are **not** allowed on Godot-first field bindings.
+///
+/// ## Struct-level companions
+///
+/// Use `#[gdbevy(require(...))]` at the struct level to add components that are not tied to
+/// a specific exported property:
+///
+/// ```rust,ignore
+/// #[derive(GodotClass, BevyComponents)]
+/// #[gdbevy(require(Player))]          // marker — inserted via `Player::default()`
+/// #[gdbevy(require(Stats { current: max_health, max: max_health }))]  // N→1 binding
+/// struct PlayerNode {
+///     base: Base<Node2D>,
+///     #[export] max_health: f32,
+/// }
+/// ```
+///
+/// Two forms of struct-level `require(...)`:
+///
+/// | Form | Meaning |
+/// |------|---------|
+/// | `require(Marker)` | Insert `Marker::default()` — a pure marker component. |
+/// | `require(Comp { bevy_field: godot_field, … })` | Build `Comp` from existing Godot exports, mapping each Bevy field name to a Godot property name. |
+///
+/// `base`, `class_name`, and generated-export forms (`require(prop: Comp, …)`) are
+/// **not** valid here — those are component-first (`GodotNode`) only.
+#[proc_macro_derive(BevyComponents, attributes(gdbevy))]
+pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
-
-    let expanded = bevy_bundle::bevy_bundle(input).unwrap_or_else(Error::into_compile_error);
-
-    TokenStream::from(expanded)
+    derive_bevy_components(input)
+        .unwrap_or_else(Error::into_compile_error)
+        .into()
 }
 
-/// # Generates a Godot Node from a Bevy Component or Bevy Bundle
+/// # Generates a Godot class from a Bevy `Component` (component-first)
 ///
-/// A struct level attribute can be used to specify the Godot class to extend, and the class name:
+/// Derive `GodotNode` alongside `Component` to generate a Godot class whose `#[export]`
+/// properties are authored in the Godot editor and mirrored onto the entity's components
+/// when the node enters the scene tree.
 ///
-/// ```ignore
-/// #[godot_node(base(<godot_node_type>), class_name(<custom_class_name>))]
+/// ## Struct-level attributes
+///
+/// Place `#[gdbevy(...)]` directly on the struct to set class metadata and declare companion
+/// components:
+///
+/// ```rust,ignore
+/// #[derive(Component, GodotNode, Default)]
+/// #[gdbevy(base = CharacterBody2D, class_name = Player2D)]
+/// #[gdbevy(require(speed: Speed, as = f32, default = 250.0))]
+/// #[gdbevy(require(Stunned))]
+/// struct Player;
 /// ```
 ///
-/// - `base` (Default: `Node`) Godot node to extend.
-/// - `class_name` (Default: `<struct_name>BevyComponent`) Name of generated Godot class.
+/// ### `base` and `class_name`
 ///
-/// ## Annotating structs that derive `Bundle`
+/// | Key | Default | Meaning |
+/// |-----|---------|---------|
+/// | `base = GodotBase` | `Node` | Godot class to extend (`CharacterBody2D`, `Area2D`, …). |
+/// | `class_name = Name` | `<Struct>BevyComponent` | Name of the generated `GodotClass` struct. Must differ from the component name. |
 ///
-/// Bundle component fields can be annotated with `#[export_fields(...)]` to expose them to Godot.
-/// The `export_fields` attribute takes a list of component field entries:
-/// - Struct component fields: `field_name(export_type(Type), transform_with(path::to::fn), default(expr))`
-/// - Tuple/newtype components: `value(export_type(Type), transform_with(path::to::fn), default(expr))`
+/// ### `require(...)`
 ///
-/// Each entry can take optional parameters to configure how it will be exported. See
-/// the [export configuration attributes](#export-configuration-attributes) for details.
+/// Declares a companion Bevy component. Three forms:
 ///
-/// Example syntax:
-///
-/// ```ignore
-/// #[export_fields(
-///     <field1_name>(
-///         export_type(<godot_type>),
-///         transform_with(<conversion_function>),
-///         default(<value>)
-///     ),
-///     <field2_name>(...),
-///     ...
-/// )]
+/// **Marker** — inserts the component via `Default`:
+/// ```rust,ignore
+/// #[gdbevy(require(Stunned))]
 /// ```
 ///
-/// ## Annotating structs that derive `Component`
+/// **Newtype** — generates one `#[export]` property and creates the component from it:
+/// ```rust,ignore
+/// #[gdbevy(require(speed: Speed, as = f32, default = 250.0, with = to_speed))]
+/// //               ^^^^^ prop name  ^^^^ Godot export type
+/// ```
+/// `as = T` is **required**. `default = expr` sets the editor default and the Bevy
+/// required-component default. `with = fn` converts the Godot value before constructing
+/// the component.
 ///
-/// Component fields can be exposed to Godot as node properties using the `#[godot_export]` attribute.
-/// The attribute syntax is:
+/// **Struct** — generates multiple `#[export]` properties for a multi-field component:
+/// ```rust,ignore
+/// #[gdbevy(require(stats: Stats { current(as = i32, default = 100), max(as = i32, default = 100) }))]
+/// ```
+/// Each inner `field(as = T, …)` follows the same `as`/`default`/`with` grammar. The name
+/// before `:` (e.g. `stats`) is required by the grammar but ignored — the generated export
+/// properties use the inner field names (`current`, `max`).
 ///
-/// ```ignore
-/// #[godot_export(export_type(<godot_type>), transform_with(<conversion_function>), default(<value>))]
+/// Multiple `require(...)` entries may appear in one `#[gdbevy(...)]` or in separate
+/// `#[gdbevy(...)]` attributes — both are equivalent.
+///
+/// ## Field-level attributes
+///
+/// Annotate primary struct fields with `#[gdbevy(export, ...)]` to expose them as `#[export]`
+/// properties on the generated Godot class. `export` is required — it marks the field as a
+/// generated Godot export:
+///
+/// ```rust,ignore
+/// #[derive(Component, GodotNode, Default)]
+/// #[gdbevy(base = Area2D, class_name = Door2D)]
+/// struct Door {
+///     #[gdbevy(export, default = LevelId::Level1)]
+///     level_id: LevelId,
+///
+///     #[gdbevy(export, as = f32, with = meters_to_units)]
+///     range: f32,
+/// }
 /// ```
 ///
-/// See the [export configuration attributes for](#export-configuration-attributes)
-/// for export parameter details.
+/// | Key | Meaning |
+/// |-----|---------|
+/// | `export` (**required**) | Marks the field as a generated Godot export. |
+/// | `as = T` | Godot export type (defaults to the field's Rust type when omitted). |
+/// | `default = expr` | Editor default value passed to `#[init(val = …)]`. A pure-Bevy `spawn(T)` uses the struct's own `Default` — make them agree if you rely on `spawn(T)`. |
+/// | `with = fn` | Converts the Godot export value before assigning to the field. |
 ///
-/// ## Export configuration attributes
+/// ## Reserved keys
 ///
-/// For fields with types incompatible with Godot-Rust's `#[export]` macro:
-/// - Use `export_type` to specify an alternate Godot-compatible type
-/// - Use `transform_with` to provide a conversion function from the Godot type to the field type
-/// - Use `default` to provide an initial value to the exported Godot field.
-#[proc_macro_derive(GodotNode, attributes(godot_export, godot_node, export_fields))]
+/// `into` and `sync` are reserved for the deferred component-sync feature and will produce
+/// a compile error if used.
+#[proc_macro_derive(GodotNode, attributes(gdbevy))]
 pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
     let parsed: DeriveInput = parse_macro_input!(input as DeriveInput);
-    derive_godot_node(parsed)
+    derive_godot_node_component(parsed)
         .unwrap_or_else(Error::into_compile_error)
         .into()
 }

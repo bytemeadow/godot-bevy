@@ -105,14 +105,14 @@ fn build_app(app: &mut App) {
 
 ### AutoSync System
 
-The `autosync` system (`godot-bevy/src/autosync.rs`) automatically registers custom Godot node types with their corresponding Bevy bundles using the `#[derive(BevyBundle)]` macro, enabling seamless integration between Godot editor-placed nodes and ECS components.
+The `autosync` system (`godot-bevy/src/autosync.rs`) automatically registers custom Godot node types and inserts their Bevy components when a matching node enters the scene tree. Register via `#[derive(GodotNode)]` (component-first, generates the Godot class) or `#[derive(BevyComponents)]` (Godot-first, annotates a user-written `GodotClass`). Both use one `#[gdbevy(...)]` attribute grammar for struct config, companions, and field bindings; component-first field exports require the explicit `export` directive, e.g. `#[gdbevy(export, default = …)]`.
 
 ## Development Workflow
 
 ### Godot-First Approach
 The library is designed for a Godot-first workflow:
 1. Design scenes and place nodes in Godot editor
-2. Define custom Godot node classes with `#[derive(BevyBundle)]` 
+2. Define custom Godot node classes with `#[derive(GodotNode)]` (or `#[derive(BevyComponents)]` for user-owned classes)
 3. Write game logic as Bevy systems that operate on these entities
 4. Use Godot for asset management, import settings, and visual authoring
 
