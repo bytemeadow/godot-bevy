@@ -16,9 +16,34 @@
  */
 
 use bevy::prelude::*;
+use godot::classes::{Area2D, CircleShape2D, CollisionShape2D};
 use godot::prelude::*;
 use godot_bevy::prelude::*;
 use godot_bevy_test::prelude::*;
+
+/// Read `Collisions::contains` through a `SystemState`, like the pure-state tests.
+fn collisions_contains(app: &mut TestApp, a: Entity, b: Entity) -> bool {
+    app.with_world_mut(|world| {
+        let mut system_state: bevy::ecs::system::SystemState<Collisions> =
+            bevy::ecs::system::SystemState::new(world);
+        let collisions = system_state
+            .get(world)
+            .expect("system params should be valid in test");
+        collisions.contains(a, b)
+    })
+}
+
+/// Attach a `CollisionShape2D` with a `CircleShape2D` child to a physics node.
+fn add_circle_collision<T>(parent: &Gd<T>, radius: f32)
+where
+    T: godot::obj::Inherits<Node>,
+{
+    let mut circle = CircleShape2D::new_gd();
+    circle.set_radius(radius);
+    let mut shape = CollisionShape2D::new_alloc();
+    shape.set_shape(&circle);
+    parent.clone().upcast::<Node>().add_child(&shape);
+}
 
 /// Find the CollisionWatcher node in the scene tree.
 fn find_collision_watcher(
@@ -273,5 +298,62 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
         app.cleanup().await;
         area_a.free();
         area_b.free();
+    })
+}
+
+/// Freeing a node while it overlaps another must purge the pair and fire
+/// `CollisionEnded` -- the "bullet dies on hit" idiom, which the channel path drops
+/// because the freed node's index entry is gone before the exit resolves. Real Area2D
+/// physics, so the overlap and the purge are polled as eventual transitions.
+#[itest(async)]
+fn test_free_while_overlapping(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        #[derive(Resource, Default)]
+        struct EndedCount(u32);
+
+        let mut app = TestApp::new(&ctx_clone, |app| {
+            app.add_plugins(GodotCollisionsPlugin);
+            app.init_resource::<EndedCount>();
+            app.add_observer(|_: On<CollisionEnded>, mut c: ResMut<EndedCount>| c.0 += 1);
+        })
+        .await;
+
+        let (area_a, entity_a) = app.add_node::<Area2D>("OverlapA").await;
+        add_circle_collision(&area_a, 32.0);
+        let (area_b, entity_b) = app.add_node::<Area2D>("OverlapB").await;
+        add_circle_collision(&area_b, 32.0);
+
+        // Wait for the real overlap to form (polled, not assumed on a fixed frame).
+        let mut overlapping = false;
+        for _ in 0..30 {
+            app.physics_update().await;
+            if collisions_contains(&mut app, entity_a, entity_b) {
+                overlapping = true;
+                break;
+            }
+        }
+        assert!(overlapping, "areas at the same position should overlap");
+
+        // Free one while overlapping -- deferred, real frames run it.
+        area_b.clone().upcast::<Node>().queue_free();
+
+        // The purge must clear the pair (polled for the eventual transition).
+        let mut purged = false;
+        for _ in 0..30 {
+            app.physics_update().await;
+            if !collisions_contains(&mut app, entity_a, entity_b) {
+                purged = true;
+                break;
+            }
+        }
+        assert!(purged, "freeing an overlapping node must purge its pair");
+
+        let ended = app.with_world(|w| w.resource::<EndedCount>().0);
+        assert!(ended >= 1, "CollisionEnded should fire for the freed pair");
+
+        app.cleanup().await;
+        area_a.free();
     })
 }
