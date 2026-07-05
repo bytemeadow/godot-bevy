@@ -60,7 +60,7 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
                 #body
             }
 
-            ::godot::sys::plugin_add!(
+            ::godot::sys::shard_add!(
                 ::godot_bevy_test::__GODOT_ASYNC_ITEST;
                 ::godot_bevy_test::AsyncRustTestCase {
                     name: #test_name_str,
@@ -79,7 +79,7 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
                 #body
             }
 
-            ::godot::sys::plugin_add!(
+            ::godot::sys::shard_add!(
                 ::godot_bevy_test::__GODOT_ITEST;
                 ::godot_bevy_test::RustTestCase {
                     name: #test_name_str,
@@ -149,7 +149,7 @@ pub fn bench(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
-        ::godot::sys::plugin_add!(
+        ::godot::sys::shard_add!(
             ::godot_bevy_test::__GODOT_BENCH;
             ::godot_bevy_test::RustBenchmark {
                 name: #bench_name_str,
