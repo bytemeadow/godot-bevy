@@ -258,6 +258,73 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
     })
 }
 
+/// Test that a reparent does not re-seed the registry-initialized Transform from the node,
+/// clobbering a value a system authored. Uses `auto_sync: false` so the ECS value never
+/// propagates to the node and stays observably distinct.
+#[itest(async)]
+fn test_reparent_preserves_registry_transform(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        use godot_bevy::bevy_math::Vec3;
+        use godot_bevy::bevy_transform::components::Transform;
+
+        let mut app = TestApp::new(&ctx_clone, |app| {
+            app.add_plugins(GodotTransformSyncPlugin {
+                auto_sync: false,
+                ..Default::default()
+            });
+        })
+        .await;
+
+        let mut parent1 = Node::new_alloc();
+        parent1.set_name("TransformParent1");
+        let mut parent2 = Node::new_alloc();
+        parent2.set_name("TransformParent2");
+        ctx_clone.scene_tree.clone().add_child(&parent1);
+        ctx_clone.scene_tree.clone().add_child(&parent2);
+
+        let mut child = godot::classes::Node2D::new_alloc();
+        child.set_name("TransformChild");
+        parent1
+            .clone()
+            .add_child(&child.clone().upcast::<godot::classes::Node>());
+
+        // Wait for the entity to be created and its Transform seeded from the node.
+        app.updates(2).await;
+
+        let entity = app
+            .entity_for_node(child.instance_id())
+            .expect("Child entity should exist");
+
+        // A system authors a sentinel translation the node does not carry.
+        app.with_world_mut(|world| {
+            let mut transform = world
+                .get_mut::<Transform>(entity)
+                .expect("registry should seed a Transform for the Node2D");
+            transform.translation = Vec3::new(999.0, 999.0, 0.0);
+        });
+
+        child
+            .clone()
+            .upcast::<godot::classes::Node>()
+            .reparent(&parent2);
+        app.updates(2).await;
+
+        let translation =
+            app.with_world(|world| world.get::<Transform>(entity).map(|t| t.translation));
+        assert_eq!(
+            translation,
+            Some(Vec3::new(999.0, 999.0, 0.0)),
+            "reparent must not re-seed Transform from the node (would reset to origin)"
+        );
+
+        app.cleanup().await;
+        parent1.free();
+        parent2.free();
+    })
+}
+
 /// Test that remove_child() despawns the entity (unlike reparent which preserves it)
 #[itest(async)]
 fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHandle {

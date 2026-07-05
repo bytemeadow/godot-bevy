@@ -175,6 +175,48 @@ fn test_collision_started_observer_from_system(ctx: &TestContext) -> godot::task
     })
 }
 
+/// Reparenting a collision body must not drop its signal connection. The skip branch
+/// leaves the existing connect intact (Godot preserves connections across a reparent),
+/// so the `area_entered` connection count stays exactly one. Reads the connection state
+/// directly rather than injecting synthetic events, which bypass the connection.
+#[itest(async)]
+fn test_reparent_keeps_collision_connection(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx_clone, |app| {
+            app.add_plugins(GodotCollisionsPlugin);
+        })
+        .await;
+
+        let mut parent2 = Node::new_alloc();
+        parent2.set_name("CollisionReparentParent");
+        ctx_clone.scene_tree.clone().add_child(&parent2);
+
+        let (area, _entity) = app.add_node::<godot::classes::Area2D>("ReparentArea").await;
+
+        let baseline = area.get_signal_connection_list("area_entered").len();
+        assert_eq!(
+            baseline, 1,
+            "decoration should connect area_entered exactly once"
+        );
+
+        area.clone()
+            .upcast::<godot::classes::Node>()
+            .reparent(&parent2);
+        app.updates(2).await;
+
+        let after = area.get_signal_connection_list("area_entered").len();
+        assert_eq!(
+            after, 1,
+            "reparent must preserve the single area_entered connection"
+        );
+
+        app.cleanup().await;
+        parent2.free();
+    })
+}
+
 /// Test that CollisionEnded observers fire from the real system pipeline.
 #[itest(async)]
 fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::TaskHandle {
