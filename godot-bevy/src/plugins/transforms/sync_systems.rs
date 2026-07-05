@@ -162,9 +162,12 @@ fn pre_update_godot_transforms_bulk<F: QueryFilter>(
         let instance_ids: Vec<i64> = entities_3d.iter().map(|(_, id)| *id).collect();
         let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
 
-        let result = batch_singleton
+        let Ok(result) = batch_singleton
             .call("bulk_get_transforms_3d", &[ids_packed.to_variant()])
-            .to::<VarDictionary>();
+            .try_to::<VarDictionary>()
+        else {
+            return; // a dead id aborted the GDScript read -> NIL; skip this step's bulk read
+        };
 
         if let (Some(positions), Some(rotations), Some(scales)) = (
             result
@@ -205,9 +208,12 @@ fn pre_update_godot_transforms_bulk<F: QueryFilter>(
         let instance_ids: Vec<i64> = entities_2d.iter().map(|(_, id)| *id).collect();
         let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
 
-        let result = batch_singleton
+        let Ok(result) = batch_singleton
             .call("bulk_get_transforms_2d", &[ids_packed.to_variant()])
-            .to::<VarDictionary>();
+            .try_to::<VarDictionary>()
+        else {
+            return; // a dead id aborted the GDScript read -> NIL; skip this step's bulk read
+        };
 
         if let (Some(positions), Some(rotations), Some(scales)) = (
             result
@@ -257,15 +263,19 @@ fn pre_update_godot_transforms_individual<F: QueryFilter>(
 ) {
     for (_, mut bevy_transform, reference, mut metadata, (node2d, node3d)) in entities.iter_mut() {
         let godot_transform = if node2d.is_some() {
-            godot
-                .get::<Node2D>(*reference)
-                .get_transform()
-                .to_bevy_transform()
+            let Some(node) = godot.try_get::<Node2D>(*reference) else {
+                tracing::trace!(target: "godot_transforms",
+                    "skipped transform read for freed node {:?}", reference.instance_id());
+                continue;
+            };
+            node.get_transform().to_bevy_transform()
         } else if node3d.is_some() {
-            godot
-                .get::<Node3D>(*reference)
-                .get_transform()
-                .to_bevy_transform()
+            let Some(node) = godot.try_get::<Node3D>(*reference) else {
+                tracing::trace!(target: "godot_transforms",
+                    "skipped transform read for freed node {:?}", reference.instance_id());
+                continue;
+            };
+            node.get_transform().to_bevy_transform()
         } else {
             panic!("Expected AnyOf to match either a Node2D or a Node3D, is there a bug in bevy?");
         };
@@ -467,7 +477,9 @@ fn post_update_godot_transforms_bulk<F: QueryFilter>(
 
     // Reset physics interpolation after the bulk write, so it applies to the just-set transform.
     for handle in first_write_handles {
-        godot.get::<Node>(handle).reset_physics_interpolation();
+        if let Some(mut node) = godot.try_get::<Node>(handle) {
+            node.reset_physics_interpolation();
+        }
     }
 }
 
@@ -496,19 +508,27 @@ fn post_update_godot_transforms_individual<F: QueryFilter>(
 
         if node2d.is_some() {
             let _span = tracing::info_span!("individual_ffi_call_2d").entered();
-            let mut obj = godot.get::<Node2D>(*reference);
+            let Some(mut obj) = godot.try_get::<Node2D>(*reference) else {
+                tracing::trace!(target: "godot_transforms",
+                    "skipped transform write for freed node {:?}", reference.instance_id());
+                continue;
+            };
             obj.set_transform(transform_ref.to_godot_transform_2d());
         } else if node3d.is_some() {
             let _span = tracing::info_span!("individual_ffi_call_3d").entered();
-            let mut obj = godot.get::<Node3D>(*reference);
+            let Some(mut obj) = godot.try_get::<Node3D>(*reference) else {
+                tracing::trace!(target: "godot_transforms",
+                    "skipped transform write for freed node {:?}", reference.instance_id());
+                continue;
+            };
             obj.set_transform(transform_ref.to_godot_transform());
         }
 
         metadata.shadow = *transform_ref;
         if is_first_write {
             metadata.written_once = true;
-            if fti_enabled {
-                godot.get::<Node>(*reference).reset_physics_interpolation();
+            if fti_enabled && let Some(mut n) = godot.try_get::<Node>(*reference) {
+                n.reset_physics_interpolation();
             }
         }
     }

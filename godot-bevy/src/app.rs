@@ -475,7 +475,10 @@ impl INode for BevyApp {
 
         if let Some(Err(e)) = result {
             self.app = None;
-            eprintln!("bevy app update panicked");
+            godot::global::godot_error!(
+                "godot-bevy: Bevy app panicked during _process and was permanently torn down; \
+                 it will not recover this session. See the panic above."
+            );
             std::panic::resume_unwind(e);
         }
     }
@@ -512,7 +515,10 @@ impl INode for BevyApp {
             }))
         {
             self.app = None;
-            eprintln!("bevy app physics update panicked");
+            godot::global::godot_error!(
+                "godot-bevy: Bevy app panicked during _physics_process and was permanently torn down; \
+                 it will not recover this session. See the panic above."
+            );
             resume_unwind(e);
         }
         self.started = true;
