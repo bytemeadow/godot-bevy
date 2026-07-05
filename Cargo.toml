@@ -13,6 +13,7 @@ members = [
   "godot-bevy-macros",
   "godot-bevy-test",
   "godot-bevy-test-macros",
+  "book-tests",
   "itest/rust",
   "examples/timing-test/rust",
   "examples/simple-node2d-movement/rust",

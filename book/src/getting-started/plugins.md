@@ -135,9 +135,7 @@ Add only the plugins you need:
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotTransformSyncPlugin::default())  // Move nodes
-        .add_plugins(GodotAudioPlugin)                    // Play sounds
-        .add_plugins(BevyInputBridgePlugin);              // Handle input
+{{#include ../../../book-tests/src/plugins.rs:adding_features}}
 
     app.add_systems(Update, my_game_systems);
 }
@@ -150,7 +148,7 @@ For all features or easy migration from older versions:
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotDefaultPlugins);  // All optional features
+{{#include ../../../book-tests/src/plugins.rs:everything}}
     app.add_systems(Update, my_game_systems);
 }
 ```
@@ -162,10 +160,7 @@ fn build_app(app: &mut App) {
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotTransformSyncPlugin::default())  // Move entities
-        .add_plugins(GodotAudioPlugin)                    // Play sounds
-        .add_plugins(BevyInputBridgePlugin);              // Input handling
-    // Core plugins handle entity creation
+{{#include ../../../book-tests/src/plugins.rs:pure_ecs}}
 }
 ```
 
@@ -174,13 +169,7 @@ fn build_app(app: &mut App) {
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotTransformSyncPlugin {
-            sync_mode: TransformSyncMode::Disabled,  // Use Godot physics
-            ..Default::default()
-        })
-        .add_plugins(GodotCollisionsPlugin)         // Detect collisions
-        .add_plugins(GodotSignalsPlugin::<UiSignal>::default()) // Handle signals
-        .add_plugins(GodotAudioPlugin);             // Play sounds
+{{#include ../../../book-tests/src/plugins.rs:physics_platformer}}
 }
 ```
 
@@ -189,10 +178,7 @@ fn build_app(app: &mut App) {
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotSignalsPlugin::<UiSignal>::default()) // Button clicks, etc.
-        .add_plugins(BevyInputBridgePlugin)        // Keyboard shortcuts
-        .add_plugins(GodotAudioPlugin);            // UI sounds
-    // Don't need transform sync for UI
+{{#include ../../../book-tests/src/plugins.rs:ui_heavy}}
 }
 ```
 
@@ -201,20 +187,7 @@ fn build_app(app: &mut App) {
 ### Transform Sync Modes
 
 ```rust
-// Default: One-way sync (Bevy → Godot)
-app.add_plugins(GodotTransformSyncPlugin::default());
-
-// Two-way sync (Bevy ↔ Godot)
-app.add_plugins(GodotTransformSyncPlugin {
-    sync_mode: TransformSyncMode::TwoWay,
-    ..Default::default()
-});
-
-// Disabled (use Godot physics directly)
-app.add_plugins(GodotTransformSyncPlugin {
-    sync_mode: TransformSyncMode::Disabled,
-    ..Default::default()
-});
+{{#include ../../../book-tests/src/plugins.rs:transform_sync_modes}}
 ```
 
 ### Scene Tree Configuration
