@@ -239,6 +239,39 @@ impl TestApp {
         panic!("Entity should exist for node '{name}' after 3 frames");
     }
 
+    /// Add an already-built Godot node (with its children set up) to the scene tree
+    /// and return it with its entity.
+    ///
+    /// Like [`add_node`](Self::add_node) but takes a node the caller constructed, so
+    /// shapes/children are present before the scene-tree connect runs -- needed to test
+    /// spawn-into-overlap, where the overlap must exist at the first flush.
+    pub async fn add_prebuilt_node<T>(&mut self, node: Gd<T>, name: &str) -> (Gd<T>, Entity)
+    where
+        T: godot::obj::Inherits<godot::classes::Node> + godot::obj::GodotClass,
+    {
+        node.clone().upcast::<godot::classes::Node>().set_name(name);
+        self.ctx
+            .scene_tree
+            .clone()
+            .add_child(&node.clone().upcast::<godot::classes::Node>());
+
+        for i in 0..3 {
+            self.update().await;
+            if let Some(entity) = self.entity_for_node(node.instance_id()) {
+                return (node, entity);
+            }
+            if i < 2 {
+                godot::global::godot_print!(
+                    "Entity not yet created for prebuilt node '{}' after {} frame(s), waiting another frame",
+                    name,
+                    i + 1,
+                );
+            }
+        }
+
+        panic!("Entity should exist for prebuilt node '{name}' after 3 frames");
+    }
+
     /// Get the test context
     pub fn ctx(&self) -> &TestContext {
         &self.ctx

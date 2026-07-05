@@ -16,7 +16,9 @@
  */
 
 use bevy::prelude::*;
-use godot::classes::{Area2D, CircleShape2D, CollisionShape2D};
+use godot::classes::{
+    Area2D, CircleShape2D, CollisionShape2D, RectangleShape2D, RigidBody2D, StaticBody2D,
+};
 use godot::prelude::*;
 use godot_bevy::prelude::*;
 use godot_bevy_test::prelude::*;
@@ -42,6 +44,18 @@ where
     circle.set_radius(radius);
     let mut shape = CollisionShape2D::new_alloc();
     shape.set_shape(&circle);
+    parent.clone().upcast::<Node>().add_child(&shape);
+}
+
+/// Attach a `CollisionShape2D` with a `RectangleShape2D` child to a physics node.
+fn add_rect_collision<T>(parent: &Gd<T>, size: Vector2)
+where
+    T: godot::obj::Inherits<Node>,
+{
+    let mut rect = RectangleShape2D::new_gd();
+    rect.set_size(size);
+    let mut shape = CollisionShape2D::new_alloc();
+    shape.set_shape(&rect);
     parent.clone().upcast::<Node>().add_child(&shape);
 }
 
@@ -355,5 +369,101 @@ fn test_free_while_overlapping(ctx: &TestContext) -> godot::task::TaskHandle {
 
         app.cleanup().await;
         area_a.free();
+    })
+}
+
+/// Spawning a monitoring Area directly into an existing overlap. The peer is a
+/// StaticBody2D, which emits no enter signal for the Area, so the seed at connect
+/// (`get_overlapping_bodies`) is the ONLY path that can capture the pair -- the test
+/// genuinely fails if the seed is a no-op. (A monitoring-Area peer would capture the
+/// pair via its own live `area_entered`, hiding a broken seed.)
+#[itest(async)]
+fn test_spawn_into_overlap(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        #[derive(Resource, Default)]
+        struct StartedCount(u32);
+
+        let mut app = TestApp::new(&ctx_clone, |app| {
+            app.add_plugins(GodotCollisionsPlugin);
+            app.init_resource::<StartedCount>();
+            app.add_observer(|_: On<CollisionStarted>, mut c: ResMut<StartedCount>| c.0 += 1);
+        })
+        .await;
+
+        // A passive peer: a StaticBody2D never emits area/body enter signals, so it
+        // cannot capture the overlap on the Area's behalf.
+        let (wall, wall_entity) = app.add_node::<StaticBody2D>("Wall").await;
+        add_rect_collision(&wall, Vector2::new(64.0, 64.0));
+        // Let physics register the static body's shape before the Area spawns.
+        app.physics_update().await;
+        app.physics_update().await;
+
+        // Build the Area fully -- shape child attached -- BEFORE it enters the tree, so
+        // the overlap exists at the first flush and the seed reads a populated body_map.
+        let seed = Area2D::new_alloc();
+        add_circle_collision(&seed, 16.0);
+        let (seed, seed_entity) = app.add_prebuilt_node(seed, "SeedArea").await;
+
+        // The seed's own body_entered(Wall) fired to zero connections before connect and
+        // Wall emits nothing, so only seed_overlaps_2d can capture this pair.
+        let mut captured = false;
+        for _ in 0..30 {
+            app.physics_update().await;
+            if collisions_contains(&mut app, seed_entity, wall_entity) {
+                captured = true;
+                break;
+            }
+        }
+        assert!(
+            captured,
+            "the seed must capture the spawn-into-overlap pair"
+        );
+
+        let started = app.with_world(|w| w.resource::<StartedCount>().0);
+        assert!(
+            started >= 1,
+            "CollisionStarted should fire for the seeded overlap"
+        );
+
+        app.cleanup().await;
+        seed.free();
+        wall.free();
+    })
+}
+
+/// The contact-monitor warn predicate. A default RigidBody2D has `contact_monitor` disabled, so its
+/// `body_entered/exited` never fire and godot-bevy warns at connect. This mirrors the
+/// private `is_rigid_body_without_contact_monitor` condition on a real node and drives
+/// the connect+warn path (must not panic). The warn line itself is a manual check (log
+/// capture); this asserts the boolean condition it keys on.
+#[itest(async)]
+fn test_rigid_body_without_contact_monitor(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx_clone, |app| {
+            app.add_plugins(GodotCollisionsPlugin);
+        })
+        .await;
+
+        let (rigid, _entity) = app.add_node::<RigidBody2D>("NoContactMonitor").await;
+        assert!(
+            !rigid.is_contact_monitor_enabled(),
+            "a default RigidBody2D has contact_monitor disabled -- the warn condition"
+        );
+
+        // Enabling it flips the predicate false (no warn).
+        let mut enabled = RigidBody2D::new_alloc();
+        enabled.set_contact_monitor(true);
+        assert!(enabled.is_contact_monitor_enabled());
+        enabled.free();
+
+        // The connect+warn path ran for `rigid` without panicking.
+        app.physics_update().await;
+
+        app.cleanup().await;
+        rigid.free();
     })
 }

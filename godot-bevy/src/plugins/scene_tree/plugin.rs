@@ -26,7 +26,7 @@ use godot::classes::ClassDb;
 use godot::tools::try_get_autoload_by_name;
 use godot::{
     builtin::{GString, StringName},
-    classes::{Engine, Node, SceneTree},
+    classes::{Area2D, Area3D, Engine, Node, RigidBody2D, RigidBody3D, SceneTree},
     meta::ToGodot,
     obj::{Gd, Inherits, InstanceId, Singleton},
     prelude::GodotConvert,
@@ -869,44 +869,47 @@ fn batch_connect_collision_signals(collision_watcher: &Gd<Node>, pending_bodies:
 
             let node_clone = node.clone();
 
+            // Guard each connect: a reparent re-processes the node, and Godot rejects a
+            // duplicate connection with an error print (it dedups on the base callable,
+            // binds ignored). The guard skips the re-connect instead of eating the print.
             if collision_mask_has(*mask, COLLISION_MASK_BODY_ENTERED) {
-                node.connect(
-                    BODY_ENTERED,
-                    &collision_watcher.callable("collision_event").bind(&[
-                        node_clone.to_variant(),
-                        CollisionMessageType::Started.to_variant(),
-                    ]),
-                );
+                let callable = collision_watcher.callable("collision_event").bind(&[
+                    node_clone.to_variant(),
+                    CollisionMessageType::Started.to_variant(),
+                ]);
+                if !node.is_connected(BODY_ENTERED, &callable) {
+                    node.connect(BODY_ENTERED, &callable);
+                }
             }
 
             if collision_mask_has(*mask, COLLISION_MASK_BODY_EXITED) {
-                node.connect(
-                    BODY_EXITED,
-                    &collision_watcher.callable("collision_event").bind(&[
-                        node_clone.to_variant(),
-                        CollisionMessageType::Ended.to_variant(),
-                    ]),
-                );
+                let callable = collision_watcher.callable("collision_event").bind(&[
+                    node_clone.to_variant(),
+                    CollisionMessageType::Ended.to_variant(),
+                ]);
+                if !node.is_connected(BODY_EXITED, &callable) {
+                    node.connect(BODY_EXITED, &callable);
+                }
             }
 
             if collision_mask_has(*mask, COLLISION_MASK_AREA_ENTERED) {
-                node.connect(
-                    AREA_ENTERED,
-                    &collision_watcher.callable("collision_event").bind(&[
-                        node_clone.to_variant(),
-                        CollisionMessageType::Started.to_variant(),
-                    ]),
-                );
+                let callable = collision_watcher.callable("collision_event").bind(&[
+                    node_clone.to_variant(),
+                    CollisionMessageType::Started.to_variant(),
+                ]);
+                if !node.is_connected(AREA_ENTERED, &callable) {
+                    node.connect(AREA_ENTERED, &callable);
+                }
             }
 
             if collision_mask_has(*mask, COLLISION_MASK_AREA_EXITED) {
-                node.connect(
-                    AREA_EXITED,
-                    &collision_watcher.callable("collision_event").bind(&[
-                        node_clone.to_variant(),
-                        CollisionMessageType::Ended.to_variant(),
-                    ]),
-                );
+                let callable = collision_watcher.callable("collision_event").bind(&[
+                    node_clone.to_variant(),
+                    CollisionMessageType::Ended.to_variant(),
+                ]);
+                if !node.is_connected(AREA_EXITED, &callable) {
+                    node.connect(AREA_EXITED, &callable);
+                }
             }
         }
 
@@ -914,6 +917,97 @@ fn batch_connect_collision_signals(collision_watcher: &Gd<Node>, pending_bodies:
                count = pending_bodies.len(),
                "Individually connected collision signals (bulk ops not available)");
     }
+
+    // Seed pre-existing overlaps (Area only) and warn on contact-monitor-less
+    // RigidBodies. Runs after connect for both the bulk and fallback paths; per new
+    // collider (one-time at scene-tree add), so the re-fetch + cast FFI is fine.
+    for (instance_id, _mask) in pending_bodies {
+        let instance_id = InstanceId::from_i64(*instance_id);
+        let Some(node) = Gd::<Node>::try_from_instance_id(instance_id).ok() else {
+            continue;
+        };
+
+        if let Ok(area) = node.clone().try_cast::<Area2D>() {
+            seed_overlaps_2d(&area, collision_watcher);
+        } else if let Ok(area) = node.clone().try_cast::<Area3D>() {
+            seed_overlaps_3d(&area, collision_watcher);
+        } else if is_rigid_body_without_contact_monitor(&node) {
+            warn_dead_contact_monitor(&node);
+        }
+    }
+}
+
+/// Route each of an Area2D's current overlaps through the collision watcher as a
+/// synthetic `Started`, recovering a spawn-into-overlap whose real enter signal fired
+/// (to zero connections) before this connect. `get_overlapping_*` reads the area's
+/// `body_map`, populated at `flush_queries` regardless of signal connection.
+/// `add_collision` dedups, so a real enter that also fired produces no duplicate.
+fn seed_overlaps_2d(area: &Gd<Area2D>, watcher: &Gd<Node>) {
+    let mut watcher = watcher.clone();
+    for body in area.get_overlapping_bodies().iter_shared() {
+        watcher.call(
+            "collision_event",
+            &[
+                body.to_variant(),
+                area.to_variant(),
+                CollisionMessageType::Started.to_variant(),
+            ],
+        );
+    }
+    for other in area.get_overlapping_areas().iter_shared() {
+        watcher.call(
+            "collision_event",
+            &[
+                other.to_variant(),
+                area.to_variant(),
+                CollisionMessageType::Started.to_variant(),
+            ],
+        );
+    }
+}
+
+fn seed_overlaps_3d(area: &Gd<Area3D>, watcher: &Gd<Node>) {
+    let mut watcher = watcher.clone();
+    for body in area.get_overlapping_bodies().iter_shared() {
+        watcher.call(
+            "collision_event",
+            &[
+                body.to_variant(),
+                area.to_variant(),
+                CollisionMessageType::Started.to_variant(),
+            ],
+        );
+    }
+    for other in area.get_overlapping_areas().iter_shared() {
+        watcher.call(
+            "collision_event",
+            &[
+                other.to_variant(),
+                area.to_variant(),
+                CollisionMessageType::Started.to_variant(),
+            ],
+        );
+    }
+}
+
+/// A RigidBody with `contact_monitor` disabled never fires the `body_entered/exited`
+/// signals we connect (Godot's `_body_inout` returns early on a null contact monitor).
+fn is_rigid_body_without_contact_monitor(node: &Gd<Node>) -> bool {
+    if let Ok(body) = node.clone().try_cast::<RigidBody2D>() {
+        !body.is_contact_monitor_enabled()
+    } else if let Ok(body) = node.clone().try_cast::<RigidBody3D>() {
+        !body.is_contact_monitor_enabled()
+    } else {
+        false
+    }
+}
+
+fn warn_dead_contact_monitor(node: &Gd<Node>) {
+    warn!(target: "godot_scene_tree_collisions",
+        node = %node.get_path(),
+        "connected RigidBody collision signals but contact_monitor is disabled; \
+         Godot will never fire them. Set contact_monitor = true and \
+         max_contacts_reported > 0 on this node to receive collision events.");
 }
 
 fn _strip_godot_components(commands: &mut Commands, ent: Entity) {
