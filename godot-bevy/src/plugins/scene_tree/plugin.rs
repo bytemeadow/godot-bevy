@@ -16,6 +16,7 @@ use bevy_ecs::{
     lifecycle::HookContext,
     message::{Message, MessageReader, MessageWriter, message_update_system},
     prelude::{Name, ReflectComponent, ReflectResource, Resource},
+    query::Has,
     schedule::IntoScheduleConfigs,
     system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam},
     world::DeferredWorld,
@@ -229,9 +230,15 @@ impl Default for SceneTreeRefImpl {
 fn initialize_scene_tree(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
-    mut entities: Query<(&GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
+    mut entities: Query<(
+        &GodotNodeHandle,
+        Entity,
+        Option<&ProtectedNodeEntity>,
+        Has<SceneTreeDecorated>,
+    )>,
     component_registry: Res<SceneTreeComponentRegistry>,
     mut node_index: ResMut<NodeEntityIndex>,
+    message_reader: Res<SceneTreeMessageReader>,
     mut godot: GodotAccess,
 ) {
     let root = scene_tree.get().get_root().unwrap();
@@ -331,6 +338,13 @@ fn initialize_scene_tree(
         &mut node_index,
         &mut godot,
     );
+
+    // The snapshot above created and decorated an entity for every node currently in the
+    // tree. Anything the watcher queued between connecting (the addon's _ready, during
+    // do_initialize) and now is either a node the snapshot also captured or one no longer
+    // present, so it carries nothing new. Discard the backlog so First doesn't re-walk it;
+    // events that arrive after this drain land in the channel normally.
+    let _ = message_reader.0.lock().try_iter().count();
 }
 
 fn traverse_fallback(node: Gd<Node>) -> Vec<SceneTreeMessage> {
@@ -562,11 +576,23 @@ fn write_scene_tree_messages(
 #[derive(Component)]
 pub struct ProtectedNodeEntity;
 
+/// Inserted once when the scene-tree plugin fully decorates an entity. A later
+/// `NodeAdded` for the same node (a reparent, or a startup-backlog duplicate) refreshes
+/// Name/GodotChildOf but must not re-run the registry, autosync, markers, Groups, or
+/// collision connects -- that would reset authored ECS state.
+#[derive(Component)]
+struct SceneTreeDecorated;
+
 fn create_scene_tree_entity(
     commands: &mut Commands,
     messages: impl IntoIterator<Item = SceneTreeMessage>,
     scene_tree: &mut SceneTreeRef,
-    entities: &mut Query<(&GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
+    entities: &mut Query<(
+        &GodotNodeHandle,
+        Entity,
+        Option<&ProtectedNodeEntity>,
+        Has<SceneTreeDecorated>,
+    )>,
     component_registry: &SceneTreeComponentRegistry,
     node_index: &mut NodeEntityIndex,
     godot: &mut GodotAccess,
@@ -605,6 +631,15 @@ fn create_scene_tree_entity(
                     continue;
                 }
 
+                // A NodeAdded for an entity we already fully decorated (a reparent, or a
+                // startup-backlog duplicate) must not re-run the registry/autosync/markers/
+                // Groups/collision connects -- that would reset ECS state a system authored.
+                // Such an entity comes from a prior batch, so it is queryable now.
+                let already_decorated = existing_entity
+                    .and_then(|ent| entities.get(ent).ok())
+                    .map(|(_, _, _, decorated)| decorated)
+                    .unwrap_or(false);
+
                 let mut new_entity_commands = if let Some(ent) = existing_entity {
                     commands.entity(ent)
                 } else {
@@ -619,68 +654,78 @@ fn create_scene_tree_entity(
                     .insert(node_id)
                     .insert(Name::from(node_name));
 
-                // Compute the class hierarchy once; reused for markers and autosync.
-                let class_hierarchy = get_inheritance_hierarchy(
-                    node_type
-                        // Fall back to getting node-type from node if not provided by message
-                        .unwrap_or_else(|| node.get_class().to_string())
-                        .as_str(),
-                );
-                for class_name in class_hierarchy.iter() {
-                    add_node_type_markers_from_string(
-                        &mut new_entity_commands,
-                        class_name.as_str(),
-                    );
-                }
-
-                // Check if the node is a collision body (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.)
-                // These nodes typically have collision detection capabilities
-                // Only connect if CollisionWatcher exists (i.e., GodotCollisionsPlugin was added)
-                let collision_mask = collision_mask.or_else(|| {
-                    collision_watcher
-                        .as_ref()
-                        .map(|_| collision_mask_from_node(&mut node))
-                });
-
-                // Check if the node is a collision body and collect for batched signal connection
-                if collision_watcher.is_some()
-                    && let Some(mask) = collision_mask
-                {
-                    let is_collision_body = collision_mask_has(mask, COLLISION_MASK_BODY_ENTERED)
-                        || collision_mask_has(mask, COLLISION_MASK_AREA_ENTERED);
-
-                    if is_collision_body {
-                        debug!(target: "godot_scene_tree_collisions",
-                               node_id = instance_id.to_string(),
-                               "is collision body");
-
-                        // Collect for batched connection
-                        pending_collision_bodies.push((instance_id.to_i64(), mask));
-                    }
-                }
-                // Use pre-analyzed groups from GDScript watcher if available, otherwise fallback to FFI
-                if let Some(groups_vec) = groups {
-                    new_entity_commands.insert(Groups::from(groups_vec));
+                let new_entity = if already_decorated {
+                    new_entity_commands.id()
                 } else {
-                    new_entity_commands.insert(Groups::from(&node));
-                }
+                    // Compute the class hierarchy once; reused for markers and autosync.
+                    let class_hierarchy = get_inheritance_hierarchy(
+                        node_type
+                            // Fall back to getting node-type from node if not provided by message
+                            .unwrap_or_else(|| node.get_class().to_string())
+                            .as_str(),
+                    );
+                    for class_name in class_hierarchy.iter() {
+                        add_node_type_markers_from_string(
+                            &mut new_entity_commands,
+                            class_name.as_str(),
+                        );
+                    }
 
-                // Add all components registered by plugins
-                component_registry.add_to_entity(&mut new_entity_commands, &mut node_accessor);
+                    // Check if the node is a collision body (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.)
+                    // These nodes typically have collision detection capabilities
+                    // Only connect if CollisionWatcher exists (i.e., GodotCollisionsPlugin was added)
+                    let collision_mask = collision_mask.or_else(|| {
+                        collision_watcher
+                            .as_ref()
+                            .map(|_| collision_mask_from_node(&mut node))
+                    });
 
-                let new_entity = new_entity_commands.id();
-                node_index.insert(instance_id, new_entity);
+                    // Check if the node is a collision body and collect for batched signal connection
+                    if collision_watcher.is_some()
+                        && let Some(mask) = collision_mask
+                    {
+                        let is_collision_body =
+                            collision_mask_has(mask, COLLISION_MASK_BODY_ENTERED)
+                                || collision_mask_has(mask, COLLISION_MASK_AREA_ENTERED);
 
-                // Try to add any registered bundles for this node type
-                super::autosync::try_add_bundles_for_node(
-                    commands,
-                    new_entity,
-                    godot,
-                    node_handle,
-                    class_hierarchy.as_slice(),
-                );
+                        if is_collision_body {
+                            debug!(target: "godot_scene_tree_collisions",
+                                   node_id = instance_id.to_string(),
+                                   "is collision body");
 
-                // Add GodotChildOf relationship to mirror Godot's scene tree hierarchy
+                            // Collect for batched connection
+                            pending_collision_bodies.push((instance_id.to_i64(), mask));
+                        }
+                    }
+                    // Use pre-analyzed groups from GDScript watcher if available, otherwise fallback to FFI
+                    if let Some(groups_vec) = groups {
+                        new_entity_commands.insert(Groups::from(groups_vec));
+                    } else {
+                        new_entity_commands.insert(Groups::from(&node));
+                    }
+
+                    // Add all components registered by plugins
+                    component_registry.add_to_entity(&mut new_entity_commands, &mut node_accessor);
+
+                    new_entity_commands.insert(SceneTreeDecorated);
+                    let new_entity = new_entity_commands.id();
+                    node_index.insert(instance_id, new_entity);
+
+                    // Try to add any registered bundles for this node type
+                    super::autosync::try_add_bundles_for_node(
+                        commands,
+                        new_entity,
+                        godot,
+                        node_handle,
+                        class_hierarchy.as_slice(),
+                    );
+
+                    new_entity
+                };
+
+                // (Re)insert the GodotChildOf relationship to mirror Godot's scene tree
+                // hierarchy. Runs in both branches: updating the parent is the whole point
+                // of processing a reparent NodeAdded.
                 let parent_id = parent_id_from_gdscript
                     .or_else(|| node.get_parent().map(|parent| parent.instance_id()));
                 if let Some(parent_id) = parent_id
@@ -718,7 +763,7 @@ fn create_scene_tree_entity(
                         // spawns aren't queryable yet but are never protected.
                         let protected = entities
                             .get(ent)
-                            .map(|(_, _, prot)| prot.is_some())
+                            .map(|(_, _, prot, _)| prot.is_some())
                             .unwrap_or(false);
                         if !protected {
                             commands.entity(ent).despawn();
@@ -878,6 +923,7 @@ fn _strip_godot_components(commands: &mut Commands, ent: Entity) {
     entity_commands.remove::<GodotScene>();
     entity_commands.remove::<Name>();
     entity_commands.remove::<Groups>();
+    entity_commands.remove::<SceneTreeDecorated>();
 
     remove_comprehensive_node_type_markers(&mut entity_commands);
 }
@@ -917,7 +963,12 @@ fn read_scene_tree_messages(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
     mut message_reader: MessageReader<SceneTreeMessage>,
-    mut entities: Query<(&GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
+    mut entities: Query<(
+        &GodotNodeHandle,
+        Entity,
+        Option<&ProtectedNodeEntity>,
+        Has<SceneTreeDecorated>,
+    )>,
     component_registry: Res<SceneTreeComponentRegistry>,
     mut node_index: ResMut<NodeEntityIndex>,
     mut godot: GodotAccess,
