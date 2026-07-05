@@ -18,19 +18,19 @@ fn find_player(query: Query<&Player>) {
 
 ## How It Works
 
-The scene tree initialization happens in the `PreStartup` schedule, ensuring entities are ready before any `Startup` systems run. This process has two parallel systems:
+The scene tree initialization happens in the `PreStartup` schedule, ensuring entities are ready before any `Startup` systems run. This process runs two chained systems:
 
-1. **`initialize_scene_tree`** - Traverses the entire Godot scene tree and creates Bevy entities with components like `GodotNodeHandle`, `Name`, transforms, and more
-2. **`connect_scene_tree`** - Sets up event listeners for runtime scene changes (nodes being added, removed, or renamed)
+1. **`connect_scene_tree`** - Sets up event listeners for runtime scene changes (nodes being added, removed, or renamed)
+2. **`initialize_scene_tree`** - Traverses the entire Godot scene tree and creates Bevy entities with components like `GodotNodeHandle`, `Name`, transforms, and more
 
-Both systems run in parallel during `PreStartup`, and both complete before your `Startup` systems run. This means you can safely query for Godot scene entities in `Startup`!
+Both systems run in sequence during `PreStartup`, and both complete before your `Startup` systems run. This means you can safely query for Godot scene entities in `Startup`!
 
 ## Runtime Scene Updates
 
 After the initial parse, the library continues to listen for scene tree changes during runtime. This is handled by two systems that run in the `First` schedule:
 
-- **`write_scene_tree_events`** - Receives events from Godot (via an mpsc channel) and writes them to Bevy's event system
-- **`read_scene_tree_events`** - Processes those events to create/update/remove entities
+- **`write_scene_tree_messages`** - Receives events from Godot (via an mpsc channel) and writes them to Bevy's event system
+- **`read_scene_tree_messages`** - Processes those events to create/update/remove entities
 
 This separation allows other systems to also react to `SceneTreeEvent`s if needed.
 
@@ -83,7 +83,7 @@ Here's what happens when a node is added to the scene tree during runtime:
 1. Godot emits a `node_added` signal
 2. The `SceneTreeWatcher` (on the Godot side) receives the signal
 3. It sends a `SceneTreeEvent` through an mpsc channel
-4. `write_scene_tree_events` (in `First` schedule) reads from the channel and writes to Bevy's event system
-5. `read_scene_tree_events` (also in `First` schedule) processes the event and creates/updates entities
+4. `write_scene_tree_messages` (in `First` schedule) reads from the channel and writes to Bevy's event system
+5. `read_scene_tree_messages` (also in `First` schedule) processes the event and creates/updates entities
 
 This architecture allows for flexible event handling while maintaining a clean separation between Godot and Bevy.

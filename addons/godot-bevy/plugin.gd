@@ -151,7 +151,7 @@ use godot_bevy::prelude::*;
 fn build_app(app: &mut App) {
 	// GodotDefaultPlugins provides all standard godot-bevy functionality
 	// For minimal setup, use individual plugins instead:
-	// app.add_plugins(GodotTransformSyncPlugin)
+	// app.add_plugins(GodotTransformSyncPlugin::default())
 	//     .add_plugins(GodotAudioPlugin)
 	//     .add_plugins(BevyInputBridgePlugin);
 	%s

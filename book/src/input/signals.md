@@ -205,7 +205,7 @@ The mapper closure for `connect_object` is simpler than `connect` since there's 
 
 ## Deferred Connections
 
-When spawning entities before their `GodotNodeHandle` is ready, you can defer connections. Add `DeferredSignalConnections<T>` with a signal-to-event mapper; the `GodotTypedSignalsPlugin<T>` wires it once the handle appears.
+When spawning entities before their `GodotNodeHandle` is ready, you can defer connections. Add `DeferredSignalConnections<T>` with a signal-to-event mapper; the `GodotSignalsPlugin<T>` wires it once the handle appears.
 
 ```rust
 #[derive(Component)] struct MyArea;

@@ -6,9 +6,6 @@ on:
       - main
     tags: # Trigger on version tags
       - 'v*'
-    paths:
-      - 'book/**'
-      - '.github/workflows/book.yml'
   pull_request:
     paths:
       - 'book/**'
