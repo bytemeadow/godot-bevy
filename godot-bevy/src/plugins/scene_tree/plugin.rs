@@ -606,7 +606,7 @@ fn create_scene_tree_entity(
 
     // Collect collision bodies for batched signal connection
     // Tuple: (instance_id as i64, collision_mask as u8)
-    let mut pending_collision_bodies: Vec<(i64, u8)> = Vec::new();
+    let mut pending_collision_bodies: Vec<(i64, u8, ColliderKind)> = Vec::new();
 
     for message in messages.into_iter() {
         trace!(target: "godot_scene_tree_messages", message = ?message);
@@ -691,8 +691,14 @@ fn create_scene_tree_entity(
                                    node_id = instance_id.to_string(),
                                    "is collision body");
 
-                            // Collect for batched connection
-                            pending_collision_bodies.push((instance_id.to_i64(), mask));
+                            let kind = if class_hierarchy.iter().any(|c| c.as_str() == "Area2D") {
+                                ColliderKind::Area2D
+                            } else if class_hierarchy.iter().any(|c| c.as_str() == "Area3D") {
+                                ColliderKind::Area3D
+                            } else {
+                                ColliderKind::Other
+                            };
+                            pending_collision_bodies.push((instance_id.to_i64(), mask, kind));
                         }
                     }
                     // Use pre-analyzed groups from GDScript watcher if available, otherwise fallback to FFI
@@ -827,7 +833,19 @@ fn get_inheritance_hierarchy(class_name: &str) -> Rc<Vec<String>> {
 
 /// Batch connect collision signals using GDScript bulk operations.
 /// Falls back to individual connections if bulk operations node is not available.
-fn batch_connect_collision_signals(collision_watcher: &Gd<Node>, pending_bodies: &[(i64, u8)]) {
+/// Which collider a pending body is, derived once from the class hierarchy at decoration
+/// so the seed dispatches without re-probing the type via casts. Only Areas are seeded.
+#[derive(Clone, Copy)]
+enum ColliderKind {
+    Area2D,
+    Area3D,
+    Other,
+}
+
+fn batch_connect_collision_signals(
+    collision_watcher: &Gd<Node>,
+    pending_bodies: &[(i64, u8, ColliderKind)],
+) {
     use godot::builtin::PackedInt64Array;
 
     let bulk_ops = get_bevy_app_child("OptimizedBulkOperations")
@@ -835,10 +853,10 @@ fn batch_connect_collision_signals(collision_watcher: &Gd<Node>, pending_bodies:
 
     if let Some(mut bulk_ops) = bulk_ops {
         // Use batched GDScript call
-        let instance_ids: Vec<i64> = pending_bodies.iter().map(|(id, _)| *id).collect();
+        let instance_ids: Vec<i64> = pending_bodies.iter().map(|(id, _, _)| *id).collect();
         let collision_masks: Vec<i64> = pending_bodies
             .iter()
-            .map(|(_, mask)| i64::from(*mask))
+            .map(|(_, mask, _)| i64::from(*mask))
             .collect();
 
         let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
@@ -854,7 +872,7 @@ fn batch_connect_collision_signals(collision_watcher: &Gd<Node>, pending_bodies:
         );
     } else {
         // Fallback: connect signals individually
-        for (instance_id, mask) in pending_bodies {
+        for (instance_id, mask, _) in pending_bodies {
             let instance_id = InstanceId::from_i64(*instance_id);
             if !instance_id.lookup_validity() {
                 continue;
@@ -917,20 +935,31 @@ fn batch_connect_collision_signals(collision_watcher: &Gd<Node>, pending_bodies:
     }
 
     // Seed pre-existing overlaps (Area only) and warn on contact-monitor-less
-    // RigidBodies. Runs after connect for both the bulk and fallback paths; per new
-    // collider (one-time at scene-tree add), so the re-fetch + cast FFI is fine.
-    for (instance_id, _mask) in pending_bodies {
+    // RigidBodies. Runs after connect for both the bulk and fallback paths, one-time
+    // per new collider at scene-tree add.
+    for (instance_id, _mask, kind) in pending_bodies {
         let instance_id = InstanceId::from_i64(*instance_id);
         let Some(node) = Gd::<Node>::try_from_instance_id(instance_id).ok() else {
             continue;
         };
 
-        if let Ok(area) = node.clone().try_cast::<Area2D>() {
-            seed_overlaps_2d(&area, collision_watcher);
-        } else if let Ok(area) = node.clone().try_cast::<Area3D>() {
-            seed_overlaps_3d(&area, collision_watcher);
-        } else if is_rigid_body_without_contact_monitor(&node) {
-            warn_dead_contact_monitor(&node);
+        // try_cast still gates, so a stale kind fails safe to "no seed".
+        match kind {
+            ColliderKind::Area2D => {
+                if let Ok(area) = node.try_cast::<Area2D>() {
+                    seed_overlaps_2d(&area, collision_watcher);
+                }
+            }
+            ColliderKind::Area3D => {
+                if let Ok(area) = node.try_cast::<Area3D>() {
+                    seed_overlaps_3d(&area, collision_watcher);
+                }
+            }
+            ColliderKind::Other => {
+                if is_rigid_body_without_contact_monitor(&node) {
+                    warn_dead_contact_monitor(&node);
+                }
+            }
         }
     }
 }
