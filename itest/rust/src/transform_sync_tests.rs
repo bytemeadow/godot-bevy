@@ -617,12 +617,9 @@ fn test_freeing_synced_node_is_non_fatal(ctx: &TestContext) -> godot::task::Task
         app.with_world_mut(|w| w.resource_mut::<FreeVictim>().0 = true);
         app.physics_update().await;
 
-        // Regression guard (release only): has_entity_for_node -> with_world ->
-        // get_app().expect(...). In release the freed-node panic sets app = None and
-        // this call panics, failing the test. In debug the app never tears down (see
-        // the header comment), so this call always returns -- the debug run is a
-        // liveness smoke test, not a fixed-vs-unfixed guard. Poll for the eventual
-        // despawn (never assert an exact frame -- respect the process/BevyApp slop).
+        // Release-only tripwire (see header): has_entity_for_node -> with_world ->
+        // get_app().expect(...) panics on a torn-down app. Poll for the eventual despawn
+        // -- never assert an exact frame (process/BevyApp slop).
         let mut despawned = false;
         for _ in 0..30 {
             if !app.has_entity_for_node(victim_id) {

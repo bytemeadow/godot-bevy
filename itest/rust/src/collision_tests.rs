@@ -353,7 +353,6 @@ fn test_free_while_overlapping(ctx: &TestContext) -> godot::task::TaskHandle {
         // Free one while overlapping -- deferred, real frames run it.
         area_b.clone().upcast::<Node>().queue_free();
 
-        // The purge must clear the pair (polled for the eventual transition).
         let mut purged = false;
         for _ in 0..30 {
             app.physics_update().await;
@@ -392,8 +391,6 @@ fn test_spawn_into_overlap(ctx: &TestContext) -> godot::task::TaskHandle {
         })
         .await;
 
-        // A passive peer: a StaticBody2D never emits area/body enter signals, so it
-        // cannot capture the overlap on the Area's behalf.
         let (wall, wall_entity) = app.add_node::<StaticBody2D>("Wall").await;
         add_rect_collision(&wall, Vector2::new(64.0, 64.0));
         // Let physics register the static body's shape before the Area spawns.
@@ -406,8 +403,7 @@ fn test_spawn_into_overlap(ctx: &TestContext) -> godot::task::TaskHandle {
         add_circle_collision(&seed, 16.0);
         let (seed, seed_entity) = app.add_prebuilt_node(seed, "SeedArea").await;
 
-        // The seed's own body_entered(Wall) fired to zero connections before connect and
-        // Wall emits nothing, so only seed_overlaps_2d can capture this pair.
+        // body_entered(Wall) fired to zero connections before connect.
         let mut captured = false;
         for _ in 0..30 {
             app.physics_update().await;

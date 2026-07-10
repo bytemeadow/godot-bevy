@@ -176,7 +176,6 @@ fn test_missing_data_file_fails_cleanly(ctx: &TestContext) -> godot::task::TaskH
             "a missing data file should reach Failed within budget"
         );
 
-        // The world is still live: a good load after the failure still succeeds.
         let good: Handle<Greeting> = app.with_world(|w| {
             w.resource::<AssetServer>()
                 .load("res://itest_assets/hello.greeting")

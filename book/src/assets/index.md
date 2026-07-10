@@ -4,7 +4,7 @@ godot-bevy loads assets through Bevy's `AssetServer`, but Godot owns the filesys
 
 ## Two lanes
 
-**Godot-imported resources** — anything Godot imports and manages: `.png`, `.ogg`, `.glb`, `.tscn`, `.tres`, `.res`, `.wav`. Load these as `GodotResource` and cast:
+**Godot-imported resources** -- anything Godot imports and manages: `.png`, `.ogg`, `.glb`, `.tscn`, `.tres`, `.res`, `.wav`. Load these as `GodotResource` and cast:
 
 ```rust,ignore
 let scene: Handle<GodotResource> = asset_server.load("res://player.tscn");
@@ -17,9 +17,9 @@ if let Some(res) = assets.get_mut(&scene) {
 }
 ```
 
-This lane goes through Godot's `ResourceLoader`, which resolves imports, `.remap`s, and `uid://` references — the things a raw file read can't.
+This lane goes through Godot's `ResourceLoader`, which resolves imports, `.remap`s, and `uid://` references -- the things a raw file read can't.
 
-**Raw data files** — your own formats: `.ron`, `.toml`, `.json`, a custom binary. Write a normal Bevy `AssetLoader` for the type and load it directly. The reader hands your loader the real file bytes:
+**Raw data files** -- your own formats: `.ron`, `.toml`, `.json`, a custom binary. Write a normal Bevy `AssetLoader` for the type and load it directly. The reader hands your loader the real file bytes:
 
 ```rust,ignore
 #[derive(Asset, TypePath)]
@@ -51,13 +51,13 @@ let level: Handle<Level> = asset_server.load("res://levels/one.level");
 
 The lanes are not interchangeable, and the reason only shows up in an **exported** build.
 
-When Godot imports `player.png`, the export `.pck` contains the *imported* form (a `.ctex`) plus a remap entry — **not** the original `player.png`. `ResourceLoader` follows the remap; a raw file read cannot. So a byte loader pointed at `res://player.png` works in the editor (the original file is right there on disk) and fails in an export (the original isn't in the `.pck`).
+When Godot imports `player.png`, the export `.pck` contains the *imported* form (a `.ctex`) plus a remap entry, **not** the original `player.png`. `ResourceLoader` follows the remap; a raw file read cannot. So a byte loader pointed at `res://player.png` works in the editor (the original file is right there on disk) and fails in an export (the original isn't in the `.pck`).
 
 Rule of thumb: **load imported types as `GodotResource`; use byte loaders only for genuine data files** that Godot doesn't import.
 
 ## Export include filter
 
-Godot only packs *resources* into an export by default. Your `.ron`/`.toml`/`.json`/custom-extension files are not resources, so they're excluded — and dev works while the export 404s.
+Godot only packs *resources* into an export by default. Your `.ron`/`.toml`/`.json`/custom-extension files are not resources, so they're excluded, and dev works while the export 404s.
 
 Add them under the export preset's **Resources → "Filters to export non-resource files"**, e.g.:
 
@@ -65,7 +65,7 @@ Add them under the export preset's **Resources → "Filters to export non-resour
 *.ron, *.level
 ```
 
-Without the filter the file simply isn't in the `.pck`.
+Without the filter the file isn't in the `.pck`.
 
 ## `uid://` is resource-only
 

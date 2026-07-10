@@ -260,15 +260,11 @@ fn pre_update_godot_transforms_individual<F: QueryFilter>(
     for (_, mut bevy_transform, reference, mut metadata, (node2d, node3d)) in entities.iter_mut() {
         let godot_transform = if node2d.is_some() {
             let Some(node) = godot.try_get::<Node2D>(*reference) else {
-                tracing::trace!(target: "godot_transforms",
-                    "skipped transform read for freed node {:?}", reference.instance_id());
                 continue;
             };
             node.get_transform().to_bevy_transform()
         } else if node3d.is_some() {
             let Some(node) = godot.try_get::<Node3D>(*reference) else {
-                tracing::trace!(target: "godot_transforms",
-                    "skipped transform read for freed node {:?}", reference.instance_id());
                 continue;
             };
             node.get_transform().to_bevy_transform()
@@ -505,16 +501,12 @@ fn post_update_godot_transforms_individual<F: QueryFilter>(
         if node2d.is_some() {
             let _span = tracing::info_span!("individual_ffi_call_2d").entered();
             let Some(mut obj) = godot.try_get::<Node2D>(*reference) else {
-                tracing::trace!(target: "godot_transforms",
-                    "skipped transform write for freed node {:?}", reference.instance_id());
                 continue;
             };
             obj.set_transform(transform_ref.to_godot_transform_2d());
         } else if node3d.is_some() {
             let _span = tracing::info_span!("individual_ffi_call_3d").entered();
             let Some(mut obj) = godot.try_get::<Node3D>(*reference) else {
-                tracing::trace!(target: "godot_transforms",
-                    "skipped transform write for freed node {:?}", reference.instance_id());
                 continue;
             };
             obj.set_transform(transform_ref.to_godot_transform());
@@ -523,8 +515,8 @@ fn post_update_godot_transforms_individual<F: QueryFilter>(
         metadata.shadow = *transform_ref;
         if is_first_write {
             metadata.written_once = true;
-            if fti_enabled && let Some(mut n) = godot.try_get::<Node>(*reference) {
-                n.reset_physics_interpolation();
+            if fti_enabled && let Some(mut node) = godot.try_get::<Node>(*reference) {
+                node.reset_physics_interpolation();
             }
         }
     }

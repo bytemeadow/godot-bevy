@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use godot_bevy::prelude::*;
 
 #[derive(Event, Clone)]
-struct UiSignal; // satisfies the GodotSignalsPlugin<T> bound (signals.rs:158-162)
+struct UiSignal; // satisfies the GodotSignalsPlugin<T> Event bound
 
 // Each fn below mirrors one plugins.md funnel block. The `#[bevy_app] fn build_app`
 // header stays literal in the .md; only the anchored body is `{{#include}}`d.

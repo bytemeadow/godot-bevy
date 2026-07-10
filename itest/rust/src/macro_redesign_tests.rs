@@ -83,7 +83,6 @@ fn reparent_preserves_autosync_component(ctx: &TestContext) -> godot::task::Task
             "spawn should seed TestSpeed from the exported value"
         );
 
-        // A system authors a runtime-distinct value after spawn.
         app.with_world_mut(|w| {
             w.entity_mut(entity).insert(TestSpeed(7.0));
         });

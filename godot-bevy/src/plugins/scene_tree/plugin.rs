@@ -631,10 +631,8 @@ fn create_scene_tree_entity(
                     continue;
                 }
 
-                // A NodeAdded for an entity we already fully decorated (a reparent, or a
-                // startup-backlog duplicate) must not re-run the registry/autosync/markers/
-                // Groups/collision connects -- that would reset ECS state a system authored.
-                // Such an entity comes from a prior batch, so it is queryable now.
+                // A prior batch already decorated this entity, so it is queryable now;
+                // skip re-decorating (see SceneTreeDecorated).
                 let already_decorated = existing_entity
                     .and_then(|ent| entities.get(ent).ok())
                     .map(|(_, _, _, decorated)| decorated)
