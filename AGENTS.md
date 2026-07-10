@@ -13,6 +13,24 @@ This is `godot-bevy`, a Rust library that bridges Bevy's Entity Component System
 
 ## Development Commands
 
+### Environment (devenv)
+
+This repo's toolchain (rust, godot, python, mdbook, etc.) lives in `devenv.nix`. Run commands inside it with `devenv shell -- <cmd>`, or let direnv activate it automatically.
+
+When a command or tool is missing and there's no `devenv.nix`, spin up an ad-hoc environment instead of installing globally:
+
+```bash
+devenv -O languages.rust.enable:bool true -O packages:pkgs "mypackage mypackage2" shell -- cli args
+```
+
+Once the setup gets complex, commit it to a `devenv.nix` and run within it:
+
+```bash
+devenv shell -- cli args
+```
+
+See https://devenv.sh/ad-hoc-developer-environments/
+
 ### Build and Test
 ```bash
 # Format code (run before commits)
