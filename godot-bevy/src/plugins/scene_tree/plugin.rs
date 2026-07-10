@@ -604,8 +604,7 @@ fn create_scene_tree_entity(
     // CollisionWatcher is optional - only required if GodotCollisionsPlugin is added
     let collision_watcher = get_bevy_app_child("CollisionWatcher");
 
-    // Collect collision bodies for batched signal connection
-    // Tuple: (instance_id as i64, collision_mask as u8)
+    // Collect collision bodies for batched signal connection.
     let mut pending_collision_bodies: Vec<(Gd<Node>, u8, ColliderKind)> = Vec::new();
 
     for message in messages.into_iter() {
@@ -832,8 +831,6 @@ fn get_inheritance_hierarchy(class_name: &str) -> Rc<Vec<String>> {
     })
 }
 
-/// Batch connect collision signals using GDScript bulk operations.
-/// Falls back to individual connections if bulk operations node is not available.
 /// Which collider a pending body is, derived once from the class hierarchy at decoration
 /// so the seed dispatches without re-probing the type via casts. Only Areas are seeded.
 #[derive(Clone, Copy)]
@@ -843,6 +840,8 @@ enum ColliderKind {
     Other,
 }
 
+/// Batch connect collision signals using GDScript bulk operations.
+/// Falls back to individual connections if bulk operations node is not available.
 fn batch_connect_collision_signals(
     collision_watcher: &Gd<Node>,
     pending_bodies: &[(Gd<Node>, u8, ColliderKind)],
@@ -881,49 +880,41 @@ fn batch_connect_collision_signals(
                 continue;
             }
             let mut node = node.clone();
-            let node_clone = node.clone();
+            let node_variant = node.to_variant();
 
-            // Guard each connect: a reparent re-processes the node, and Godot rejects a
-            // duplicate connection with an error print (it dedups on the base callable,
-            // binds ignored). The guard skips the re-connect instead of eating the print.
+            // Only two distinct bound callables -- Started (enter) and Ended (exit) --
+            // reused across the body/area signal pair.
+            let started = collision_watcher.callable("collision_event").bind(&[
+                node_variant.clone(),
+                CollisionMessageType::Started.to_variant(),
+            ]);
+            let ended = collision_watcher
+                .callable("collision_event")
+                .bind(&[node_variant, CollisionMessageType::Ended.to_variant()]);
+
+            // A duplicate connect (the same node pushed twice in one batch) makes Godot
+            // print an error. One is_connected on the first enter signal proves the node
+            // is already wired -- skip all four rather than eat four error prints.
+            let enter_sig = if collision_mask_has(*mask, COLLISION_MASK_BODY_ENTERED) {
+                BODY_ENTERED
+            } else {
+                AREA_ENTERED
+            };
+            if node.is_connected(enter_sig, &started) {
+                continue;
+            }
+
             if collision_mask_has(*mask, COLLISION_MASK_BODY_ENTERED) {
-                let callable = collision_watcher.callable("collision_event").bind(&[
-                    node_clone.to_variant(),
-                    CollisionMessageType::Started.to_variant(),
-                ]);
-                if !node.is_connected(BODY_ENTERED, &callable) {
-                    node.connect(BODY_ENTERED, &callable);
-                }
+                node.connect(BODY_ENTERED, &started);
             }
-
             if collision_mask_has(*mask, COLLISION_MASK_BODY_EXITED) {
-                let callable = collision_watcher.callable("collision_event").bind(&[
-                    node_clone.to_variant(),
-                    CollisionMessageType::Ended.to_variant(),
-                ]);
-                if !node.is_connected(BODY_EXITED, &callable) {
-                    node.connect(BODY_EXITED, &callable);
-                }
+                node.connect(BODY_EXITED, &ended);
             }
-
             if collision_mask_has(*mask, COLLISION_MASK_AREA_ENTERED) {
-                let callable = collision_watcher.callable("collision_event").bind(&[
-                    node_clone.to_variant(),
-                    CollisionMessageType::Started.to_variant(),
-                ]);
-                if !node.is_connected(AREA_ENTERED, &callable) {
-                    node.connect(AREA_ENTERED, &callable);
-                }
+                node.connect(AREA_ENTERED, &started);
             }
-
             if collision_mask_has(*mask, COLLISION_MASK_AREA_EXITED) {
-                let callable = collision_watcher.callable("collision_event").bind(&[
-                    node_clone.to_variant(),
-                    CollisionMessageType::Ended.to_variant(),
-                ]);
-                if !node.is_connected(AREA_EXITED, &callable) {
-                    node.connect(AREA_EXITED, &callable);
-                }
+                node.connect(AREA_EXITED, &ended);
             }
         }
 
