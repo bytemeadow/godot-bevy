@@ -942,49 +942,58 @@ fn batch_connect_collision_signals(collision_watcher: &Gd<Node>, pending_bodies:
 /// `add_collision` dedups, so a real enter that also fired produces no duplicate.
 fn seed_overlaps_2d(area: &Gd<Area2D>, watcher: &Gd<Node>) {
     let mut watcher = watcher.clone();
-    for body in area.get_overlapping_bodies().iter_shared() {
-        watcher.call(
-            "collision_event",
-            &[
-                body.to_variant(),
-                area.to_variant(),
-                CollisionMessageType::Started.to_variant(),
-            ],
-        );
+    // has_* is a cheap bool; skip the Array-marshalling get_* when there's nothing to seed.
+    if area.has_overlapping_bodies() {
+        for body in area.get_overlapping_bodies().iter_shared() {
+            watcher.call(
+                "collision_event",
+                &[
+                    body.to_variant(),
+                    area.to_variant(),
+                    CollisionMessageType::Started.to_variant(),
+                ],
+            );
+        }
     }
-    for other in area.get_overlapping_areas().iter_shared() {
-        watcher.call(
-            "collision_event",
-            &[
-                other.to_variant(),
-                area.to_variant(),
-                CollisionMessageType::Started.to_variant(),
-            ],
-        );
+    if area.has_overlapping_areas() {
+        for other in area.get_overlapping_areas().iter_shared() {
+            watcher.call(
+                "collision_event",
+                &[
+                    other.to_variant(),
+                    area.to_variant(),
+                    CollisionMessageType::Started.to_variant(),
+                ],
+            );
+        }
     }
 }
 
 fn seed_overlaps_3d(area: &Gd<Area3D>, watcher: &Gd<Node>) {
     let mut watcher = watcher.clone();
-    for body in area.get_overlapping_bodies().iter_shared() {
-        watcher.call(
-            "collision_event",
-            &[
-                body.to_variant(),
-                area.to_variant(),
-                CollisionMessageType::Started.to_variant(),
-            ],
-        );
+    if area.has_overlapping_bodies() {
+        for body in area.get_overlapping_bodies().iter_shared() {
+            watcher.call(
+                "collision_event",
+                &[
+                    body.to_variant(),
+                    area.to_variant(),
+                    CollisionMessageType::Started.to_variant(),
+                ],
+            );
+        }
     }
-    for other in area.get_overlapping_areas().iter_shared() {
-        watcher.call(
-            "collision_event",
-            &[
-                other.to_variant(),
-                area.to_variant(),
-                CollisionMessageType::Started.to_variant(),
-            ],
-        );
+    if area.has_overlapping_areas() {
+        for other in area.get_overlapping_areas().iter_shared() {
+            watcher.call(
+                "collision_event",
+                &[
+                    other.to_variant(),
+                    area.to_variant(),
+                    CollisionMessageType::Started.to_variant(),
+                ],
+            );
+        }
     }
 }
 
