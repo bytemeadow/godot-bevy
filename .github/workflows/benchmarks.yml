@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   benchmarks:
-    runs-on: ${{ github.event_name == 'workflow_dispatch' && 'ubuntu-latest' || 'blaze/compute/ubuntu-latest-amd64' }}
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout PR branch

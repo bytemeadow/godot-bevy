@@ -74,14 +74,12 @@ jobs:
     strategy:
       matrix:
         # For workflow_dispatch, use only ubuntu-latest (for act compatibility)
-        # For push/PR, use full matrix with custom runners
-        os: ${{ github.event_name == 'workflow_dispatch' && fromJson('["ubuntu-latest"]') || fromJson('["blaze/compute/ubuntu-latest-amd64", "blaze/macos-latest", "windows-latest"]') }}
+        # For push/PR, use the full cross-platform matrix
+        os: ${{ github.event_name == 'workflow_dispatch' && fromJson('["ubuntu-latest"]') || fromJson('["ubuntu-latest", "macos-latest", "windows-latest"]') }}
         include:
           - os: ubuntu-latest
             platform: linux
-          - os: blaze/compute/ubuntu-latest-amd64
-            platform: linux
-          - os: blaze/macos-latest
+          - os: macos-latest
             platform: macos
           - os: windows-latest
             platform: windows
@@ -147,7 +145,7 @@ jobs:
   # For local testing with act: act workflow_dispatch -j integration-tests --container-architecture linux/amd64
   integration-tests:
     name: integration tests (${{ matrix.profile }})
-    runs-on: ${{ github.event_name == 'workflow_dispatch' && 'ubuntu-latest' || 'blaze/macos-latest' }}
+    runs-on: ubuntu-latest
     needs: [lint, changes]
     if: |
       always() &&
