@@ -146,7 +146,7 @@ jobs:
   # Integration tests with Godot runtime
   # For local testing with act: act workflow_dispatch -j integration-tests --container-architecture linux/amd64
   integration-tests:
-    name: integration tests
+    name: integration tests (${{ matrix.profile }})
     runs-on: ${{ github.event_name == 'workflow_dispatch' && 'ubuntu-latest' || 'blaze/macos-latest' }}
     needs: [lint, changes]
     if: |
@@ -154,6 +154,12 @@ jobs:
       (github.event_name == 'workflow_dispatch' ||
        needs.changes.outputs.library == 'true' ||
        needs.changes.outputs.itest == 'true')
+    strategy:
+      # Run both profiles even if one fails -- debug and release exercise different
+      # code paths (release-only panics vs debug bulk GDScript), so both signals matter.
+      fail-fast: false
+      matrix:
+        profile: [debug, release]
 
     steps:
       - name: Checkout code
@@ -165,6 +171,7 @@ jobs:
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
+          key: ${{ matrix.profile }}
           workspaces: |
             . -> target
             itest/rust -> target
@@ -196,4 +203,4 @@ jobs:
         working-directory: itest
         env:
           GODOT4_BIN: godot
-        run: ./run-tests.sh
+        run: ./run-tests.sh ${{ matrix.profile == 'release' && '--release' || '' }}
