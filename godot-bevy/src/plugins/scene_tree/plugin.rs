@@ -701,17 +701,18 @@ fn create_scene_tree_entity(
                             pending_collision_bodies.push((instance_id.to_i64(), mask, kind));
                         }
                     }
-                    // Use pre-analyzed groups from GDScript watcher if available, otherwise fallback to FFI
+                    // Use pre-analyzed groups from GDScript watcher if available, otherwise
+                    // fallback to FFI. SceneTreeDecorated rides this insert to avoid a
+                    // separate archetype transition.
                     if let Some(groups_vec) = groups {
-                        new_entity_commands.insert(Groups::from(groups_vec));
+                        new_entity_commands.insert((Groups::from(groups_vec), SceneTreeDecorated));
                     } else {
-                        new_entity_commands.insert(Groups::from(&node));
+                        new_entity_commands.insert((Groups::from(&node), SceneTreeDecorated));
                     }
 
                     // Add all components registered by plugins
                     component_registry.add_to_entity(&mut new_entity_commands, &mut node_accessor);
 
-                    new_entity_commands.insert(SceneTreeDecorated);
                     let new_entity = new_entity_commands.id();
                     node_index.insert(instance_id, new_entity);
 
