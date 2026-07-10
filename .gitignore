@@ -29,6 +29,8 @@ devenv.local.nix
 # devenv Nix store. It is not necessary to commit this file to your repository
 # and it can safely be ignored.
 .pre-commit-config.yaml
+# .mcp.json is a symlink devenv generates (claude.code.enable) into the Nix store
+.mcp.json
 
 # https://direnv.net/
 .direnv
