@@ -74,14 +74,12 @@ jobs:
     strategy:
       matrix:
         # For workflow_dispatch, use only ubuntu-latest (for act compatibility)
-        # For push/PR, use full matrix with custom runners
-        os: ${{ github.event_name == 'workflow_dispatch' && fromJson('["ubuntu-latest"]') || fromJson('["blaze/compute/ubuntu-latest-amd64", "blaze/macos-latest", "windows-latest"]') }}
+        # For push/PR, use the full cross-platform matrix
+        os: ${{ github.event_name == 'workflow_dispatch' && fromJson('["ubuntu-latest"]') || fromJson('["ubuntu-latest", "macos-latest", "windows-latest"]') }}
         include:
           - os: ubuntu-latest
             platform: linux
-          - os: blaze/compute/ubuntu-latest-amd64
-            platform: linux
-          - os: blaze/macos-latest
+          - os: macos-latest
             platform: macos
           - os: windows-latest
             platform: windows
@@ -146,14 +144,20 @@ jobs:
   # Integration tests with Godot runtime
   # For local testing with act: act workflow_dispatch -j integration-tests --container-architecture linux/amd64
   integration-tests:
-    name: integration tests
-    runs-on: ${{ github.event_name == 'workflow_dispatch' && 'ubuntu-latest' || 'blaze/macos-latest' }}
+    name: integration tests (${{ matrix.profile }})
+    runs-on: ubuntu-latest
     needs: [lint, changes]
     if: |
       always() &&
       (github.event_name == 'workflow_dispatch' ||
        needs.changes.outputs.library == 'true' ||
        needs.changes.outputs.itest == 'true')
+    strategy:
+      # Run both profiles even if one fails -- debug and release exercise different
+      # code paths (release-only panics vs debug bulk GDScript), so both signals matter.
+      fail-fast: false
+      matrix:
+        profile: [debug, release]
 
     steps:
       - name: Checkout code
@@ -165,6 +169,7 @@ jobs:
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
+          key: ${{ matrix.profile }}
           workspaces: |
             . -> target
             itest/rust -> target
@@ -196,4 +201,4 @@ jobs:
         working-directory: itest
         env:
           GODOT4_BIN: godot
-        run: ./run-tests.sh
+        run: ./run-tests.sh ${{ matrix.profile == 'release' && '--release' || '' }}

@@ -542,3 +542,113 @@ fn test_twoway_read_before_logic(ctx: &TestContext) -> godot::task::TaskHandle {
         node.free();
     })
 }
+
+/// Freeing a synced node from inside a Bevy system must not tear down the app. On
+/// the free step the `FixedLast` write selects the just-mutated victim (`Changed`)
+/// and hits its now-dead handle -- that must skip, not panic. Stays TwoWay and frees
+/// from inside a system so the free lands after that step's `First` drain, reproducing
+/// the dead-handle window; a second untouched node proves one dead node doesn't wedge
+/// the write batch.
+///
+/// This only discriminates fixed-vs-unfixed in *release*, where the individual write's
+/// `godot.get` on the dead handle panics pre-fix and tears the app down (the
+/// `has_entity_for_node` call below then fails). Debug -- what CI runs -- never tears
+/// down here (the bulk path's dead-id deref is a non-fatal GDScript error), so in
+/// debug this is a liveness smoke test, not a regression guard. Run in release to
+/// exercise the fix.
+#[itest(async)]
+fn test_freeing_synced_node_is_non_fatal(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        #[derive(Resource, Default)]
+        struct FreeVictim(bool);
+
+        let mut victim = godot::classes::Node2D::new_alloc();
+        victim.set_name("FreedVictim");
+        victim.set_position(Vector2::new(0.0, 0.0));
+        ctx_clone.scene_tree.clone().add_child(&victim);
+        let victim_id = victim.instance_id();
+
+        let mut survivor = godot::classes::Node2D::new_alloc();
+        survivor.set_name("Survivor");
+        survivor.set_position(Vector2::new(0.0, 0.0));
+        ctx_clone.scene_tree.clone().add_child(&survivor);
+        let survivor_id = survivor.instance_id();
+
+        let mut app = TestApp::new(&ctx_clone, move |app| {
+            app.add_plugins(GodotTransformSyncPlugin::default());
+            app.insert_resource(GodotTransformConfig::two_way());
+            app.init_resource::<FreeVictim>();
+
+            app.add_systems(
+                FixedUpdate,
+                move |mut flag: ResMut<FreeVictim>,
+                      mut q: Query<(&GodotNodeHandle, &mut Transform)>,
+                      mut godot: GodotAccess| {
+                    let free_now = flag.0;
+                    for (handle, mut transform) in q.iter_mut() {
+                        let id = handle.instance_id();
+                        if id == survivor_id {
+                            // keep the survivor writing every step
+                            transform.translation.x += 1.0;
+                        } else if id == victim_id && free_now {
+                            // trip Changed so this step's FixedLast write selects the
+                            // victim, then free the node so that write hits a dead handle
+                            transform.translation.x += 1.0;
+                            if let Some(node) = godot.try_get::<godot::classes::Node2D>(*handle) {
+                                node.free();
+                            }
+                        }
+                    }
+                    if free_now {
+                        flag.0 = false;
+                    }
+                },
+            );
+        })
+        .await;
+
+        // Settle both nodes into steady sync, then record the survivor's baseline.
+        app.physics_update().await;
+        app.physics_update().await;
+        let survivor_x_before = survivor.get_position().x;
+
+        // Free the victim on the next physics step (in-system, mid-FixedMain).
+        app.with_world_mut(|w| w.resource_mut::<FreeVictim>().0 = true);
+        app.physics_update().await;
+
+        // Release-only tripwire (see header): has_entity_for_node -> with_world ->
+        // get_app().expect(...) panics on a torn-down app. Poll for the eventual despawn
+        // -- never assert an exact frame (process/BevyApp slop).
+        let mut despawned = false;
+        for _ in 0..30 {
+            if !app.has_entity_for_node(victim_id) {
+                despawned = true;
+                break;
+            }
+            app.physics_update().await;
+        }
+        assert!(
+            despawned,
+            "victim entity should eventually despawn after its node was freed"
+        );
+
+        // The survivor's Bevy->Godot writes must still land -- proves one freed node
+        // doesn't abort the write batch. Assert on the write direction (Godot node
+        // position), which stays granular even in debug's bulk path; the Godot->Bevy
+        // read can stall one step in debug and is deliberately not asserted here.
+        let survivor_x_after = survivor.get_position().x;
+        assert!(
+            survivor_x_after > survivor_x_before + 0.5,
+            "survivor should keep syncing after the victim was freed, before={survivor_x_before:.1}, after={survivor_x_after:.1}"
+        );
+
+        println!(
+            "✓ Freed synced node non-fatal: app survived, victim despawned, survivor {survivor_x_before:.1}->{survivor_x_after:.1}"
+        );
+
+        app.cleanup().await;
+        // victim was already freed inside the system; only free the survivor.
+        survivor.free();
+    })
+}

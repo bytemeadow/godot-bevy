@@ -3,20 +3,23 @@ use bevy_asset::{
     Asset, AssetApp, AssetLoader, AssetMetaCheck, AssetPlugin, LoadContext,
     io::{
         AssetReader, AssetReaderError, AssetSourceBuilder, AssetSourceId, PathStream, Reader,
-        VecReader,
+        ReaderNotSeekableError, SeekableReader, VecReader,
     },
 };
 use bevy_reflect::TypePath;
+use futures_lite::io::AsyncRead;
 use futures_lite::stream;
+use godot::classes::FileAccess;
 use godot::classes::ResourceLoader;
+use godot::classes::file_access::ModeFlags;
 #[cfg(feature = "experimental-threads")]
 use godot::classes::resource_loader::ThreadLoadStatus;
 use godot::obj::{Gd, Singleton};
 use godot::prelude::Resource as GodotBaseResource;
-use parking_lot::Mutex;
-use std::collections::HashMap;
+use std::io;
 use std::path::Path;
-use std::sync::Arc;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use thiserror::Error;
 
 use crate::interop::GodotResourceHandle;
@@ -74,22 +77,23 @@ pub struct GodotAssetsPlugin;
 
 impl Plugin for GodotAssetsPlugin {
     fn build(&self, app: &mut App) {
-        // IMPORTANT: Register custom AssetReader BEFORE setting up AssetPlugin
+        // IMPORTANT: Register custom AssetReader BEFORE setting up AssetPlugin.
+        // Each source reconstructs the Godot VFS path with its own scheme.
         app.register_asset_source(
             AssetSourceId::Default,
-            AssetSourceBuilder::new(|| Box::new(GodotAssetReader::new())),
+            AssetSourceBuilder::new(|| Box::new(GodotAssetReader::new("res://"))),
         );
         app.register_asset_source(
             AssetSourceId::from("res"),
-            AssetSourceBuilder::new(|| Box::new(GodotAssetReader::new())),
+            AssetSourceBuilder::new(|| Box::new(GodotAssetReader::new("res://"))),
         );
         app.register_asset_source(
             AssetSourceId::from("user"),
-            AssetSourceBuilder::new(|| Box::new(GodotAssetReader::new())),
+            AssetSourceBuilder::new(|| Box::new(GodotAssetReader::new("user://"))),
         );
         app.register_asset_source(
             AssetSourceId::from("uid"),
-            AssetSourceBuilder::new(|| Box::new(GodotAssetReader::new())),
+            AssetSourceBuilder::new(|| Box::new(GodotAssetReader::new("uid://"))),
         );
 
         // Configure AssetPlugin to bypass path verification for Godot resources
@@ -103,50 +107,119 @@ impl Plugin for GodotAssetsPlugin {
     }
 }
 
-/// Custom AssetReader that bypasses all filesystem verification.
-/// This allows Godot's ResourceLoader to handle virtual paths from .pck files
-/// without Bevy's asset system rejecting them for not existing on disk.
-pub struct GodotAssetReader;
-
-impl Default for GodotAssetReader {
-    fn default() -> Self {
-        Self::new()
-    }
+/// Reconstructs the Godot VFS path for its source and hands back a lazy,
+/// `FileAccess`-backed reader. Private: only `GodotAssetsPlugin` constructs it.
+struct GodotAssetReader {
+    scheme: &'static str, // "res://" | "user://" | "uid://"
 }
 
 impl GodotAssetReader {
-    pub fn new() -> Self {
-        Self
+    fn new(scheme: &'static str) -> Self {
+        Self { scheme }
+    }
+
+    fn godot_path(&self, path: &Path) -> String {
+        format!("{}{}", self.scheme, path.to_string_lossy())
     }
 }
 
 impl AssetReader for GodotAssetReader {
-    async fn read<'a>(&'a self, _path: &'a Path) -> Result<impl Reader + 'a, AssetReaderError> {
-        // Return a dummy reader - our GodotResourceAssetLoader ignores this anyway
-        Ok(VecReader::new(Vec::<u8>::new()))
+    async fn read<'a>(&'a self, path: &'a Path) -> Result<impl Reader + 'a, AssetReaderError> {
+        // Never do IO here and never return NotFound on file existence: returning Ok
+        // keeps the already-selected loader running (GodotResourceAssetLoader ignores
+        // the reader and resolves imported/remap/uid assets via ResourceLoader, which
+        // FileAccess can't see in exports). Byte loaders that actually read get real
+        // bytes on first access, or a clean io::Error if the file is missing.
+        Ok(GodotFileReader::pending(self.godot_path(path)))
     }
 
-    async fn read_meta<'a>(
-        &'a self,
-        _path: &'a Path,
-    ) -> Result<impl Reader + 'a, AssetReaderError> {
-        // Return empty metadata
-        Ok(VecReader::new(Vec::<u8>::new()))
+    async fn read_meta<'a>(&'a self, path: &'a Path) -> Result<impl Reader + 'a, AssetReaderError> {
+        // Godot has no bevy `.meta` sidecar; NotFound is the signal bevy handles
+        // gracefully (falls back to loader-by-extension with default meta).
+        Err::<VecReader, _>(AssetReaderError::NotFound(path.to_path_buf()))
     }
 
     async fn read_directory<'a>(
         &'a self,
         _path: &'a Path,
     ) -> Result<Box<PathStream>, AssetReaderError> {
-        // Return empty directory listing
+        // Directory support is descoped: a real listing of a Godot dir yields
+        // `.import`/`.uid`/`.gd` sidecars with no bevy loader, which hard-fails
+        // load_folder. Keep the empty stream so load_folder is a no-op, not a failure.
         let empty_iter = std::iter::empty::<std::path::PathBuf>();
         let stream = stream::iter(empty_iter);
         Ok(Box::new(stream) as Box<PathStream>)
     }
 
     async fn is_directory<'a>(&'a self, _path: &'a Path) -> Result<bool, AssetReaderError> {
-        // Always report as not a directory
         Ok(false)
+    }
+}
+
+/// Lazy, `FileAccess`-backed [`Reader`]. Holds a Godot VFS path until first access,
+/// then materializes the whole file into a `VecReader`. Never stores a `Gd` across a
+/// call, so it stays `Send + Sync + Unpin`.
+enum GodotFileReader {
+    Pending(String),  // godot VFS path; no Gd stored
+    Ready(VecReader), // materialized bytes
+}
+
+impl GodotFileReader {
+    fn pending(godot_path: String) -> Self {
+        GodotFileReader::Pending(godot_path)
+    }
+
+    /// Read the file on first access; idempotent once `Ready`.
+    fn ensure_ready(&mut self) -> io::Result<&mut VecReader> {
+        if let GodotFileReader::Pending(path) = self {
+            let bytes = read_godot_file(path)?;
+            *self = GodotFileReader::Ready(VecReader::new(bytes));
+        }
+        match self {
+            GodotFileReader::Ready(reader) => Ok(reader),
+            GodotFileReader::Pending(_) => unreachable!(),
+        }
+    }
+}
+
+impl AsyncRead for GodotFileReader {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        let this = self.get_mut(); // GodotFileReader: Unpin (String / VecReader are Unpin)
+        match this.ensure_ready() {
+            Ok(reader) => Pin::new(reader).poll_read(cx, buf),
+            Err(e) => Poll::Ready(Err(e)),
+        }
+    }
+}
+
+impl Reader for GodotFileReader {
+    fn seekable(&mut self) -> Result<&mut dyn SeekableReader, ReaderNotSeekableError> {
+        // Materialize so seeking loaders get a real seekable VecReader. On open
+        // failure report not-seekable; the loader's fallback reads via read_to_end,
+        // which surfaces the same open error.
+        match self.ensure_ready() {
+            Ok(reader) => reader.seekable(),
+            Err(_) => Err(ReaderNotSeekableError),
+        }
+    }
+}
+
+/// Read a whole Godot file into a byte vec via `FileAccess`. Open failure is the
+/// `None` branch (mapped to `NotFound`), distinct from an empty file (`Some`, length 0).
+fn read_godot_file(godot_path: &str) -> io::Result<Vec<u8>> {
+    match FileAccess::open(godot_path, ModeFlags::READ) {
+        Some(mut fa) => {
+            let len = fa.get_length() as i64;
+            Ok(fa.get_buffer(len).to_vec())
+        }
+        None => Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("Godot FileAccess could not open '{godot_path}'"),
+        )),
     }
 }
 
@@ -185,19 +258,6 @@ impl GodotResource {
     }
 }
 
-/// Tracks loading state for async Godot resource loading
-#[derive(Debug)]
-enum LoadingState {
-    Requested,
-    Loading,
-    Ready,
-    Failed,
-}
-
-/// Global state for tracking async loads
-static LOADING_TRACKER: once_cell::sync::Lazy<Arc<Mutex<HashMap<String, LoadingState>>>> =
-    once_cell::sync::Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
-
 /// Universal AssetLoader for all Godot resources using async loading
 #[derive(Default, TypePath)]
 pub struct GodotResourceAssetLoader;
@@ -222,11 +282,6 @@ impl AssetLoader for GodotResourceAssetLoader {
             resource_loader.load_threaded_request(&path_gstring);
         }
 
-        {
-            let mut tracker = LOADING_TRACKER.lock();
-            tracker.insert(godot_path.clone(), LoadingState::Requested);
-        }
-
         loop {
             let status = {
                 let mut resource_loader = ResourceLoader::singleton();
@@ -244,21 +299,10 @@ impl AssetLoader for GodotResourceAssetLoader {
 
                     match resource {
                         Some(resource) => {
-                            {
-                                let mut tracker = LOADING_TRACKER.lock();
-                                tracker.insert(godot_path.clone(), LoadingState::Ready);
-                            }
-
                             let handle = GodotResourceHandle::new(resource);
                             return Ok(GodotResource { handle });
                         }
                         None => {
-                            // Update tracker
-                            {
-                                let mut tracker = LOADING_TRACKER.lock();
-                                tracker.insert(godot_path.clone(), LoadingState::Failed);
-                            }
-
                             return Err(GodotAssetLoaderError::ResourceLoadFailed(format!(
                                 "Failed to get loaded Godot resource: {godot_path}"
                             )));
@@ -266,31 +310,16 @@ impl AssetLoader for GodotResourceAssetLoader {
                     }
                 }
                 ThreadLoadStatus::FAILED => {
-                    {
-                        let mut tracker = LOADING_TRACKER.lock();
-                        tracker.insert(godot_path.clone(), LoadingState::Failed);
-                    }
-
                     return Err(GodotAssetLoaderError::ResourceLoadFailed(format!(
                         "Godot ResourceLoader failed to load: {godot_path}"
                     )));
                 }
                 ThreadLoadStatus::INVALID_RESOURCE => {
-                    {
-                        let mut tracker = LOADING_TRACKER.lock();
-                        tracker.insert(godot_path.clone(), LoadingState::Failed);
-                    }
-
                     return Err(GodotAssetLoaderError::ResourceLoadFailed(format!(
                         "Invalid resource path or corrupted resource: {godot_path}"
                     )));
                 }
                 _ => {
-                    {
-                        let mut tracker = LOADING_TRACKER.lock();
-                        tracker.insert(godot_path.clone(), LoadingState::Loading);
-                    }
-
                     futures_lite::future::yield_now().await;
                 }
             }
@@ -309,35 +338,17 @@ impl AssetLoader for GodotResourceAssetLoader {
         let godot_path = load_context.path().to_string();
         let path_gstring = godot::builtin::GString::from(&godot_path);
 
-        {
-            let mut tracker = LOADING_TRACKER.lock();
-            tracker.insert(godot_path.clone(), LoadingState::Requested);
-        }
-
-        // Use synchronous load for web builds
         let mut resource_loader = ResourceLoader::singleton();
         let resource = resource_loader.load(&path_gstring);
 
         match resource {
             Some(resource) => {
-                {
-                    let mut tracker = LOADING_TRACKER.lock();
-                    tracker.insert(godot_path.clone(), LoadingState::Ready);
-                }
-
                 let handle = GodotResourceHandle::new(resource);
                 Ok(GodotResource { handle })
             }
-            None => {
-                {
-                    let mut tracker = LOADING_TRACKER.lock();
-                    tracker.insert(godot_path.clone(), LoadingState::Failed);
-                }
-
-                Err(GodotAssetLoaderError::ResourceLoadFailed(format!(
-                    "Failed to load Godot resource: {godot_path}"
-                )))
-            }
+            None => Err(GodotAssetLoaderError::ResourceLoadFailed(format!(
+                "Failed to load Godot resource: {godot_path}"
+            ))),
         }
     }
 

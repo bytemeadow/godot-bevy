@@ -13,6 +13,7 @@ members = [
   "godot-bevy-macros",
   "godot-bevy-test",
   "godot-bevy-test-macros",
+  "book-tests",
   "itest/rust",
   "examples/timing-test/rust",
   "examples/simple-node2d-movement/rust",
@@ -30,7 +31,7 @@ exclude = [
 resolver = "2"
 
 [workspace.dependencies]
-godot = { version = "0.5" }
+godot = { version = "0.5.4" }
 godot-bevy = { version = "0.11.0", path = "godot-bevy" }
 godot-bevy-macros = { version = "0.11.0", path = "godot-bevy-macros" }
 godot-bevy-test = { version = "0.11.0", path = "godot-bevy-test" }

@@ -28,6 +28,8 @@ func bulk_update_transforms_3d(
 	var rotation: Quaternion = Quaternion()
 	for i: int in range(instance_ids.size()):
 		var node: Node3D = instance_from_id(instance_ids[i]) as Node3D
+		if not node:
+			continue
 		node.position = positions[i]
 		rotation.x = rotations[i].x
 		rotation.y = rotations[i].y
@@ -45,6 +47,8 @@ func bulk_update_transforms_2d(
 ) -> void:
 	for i: int in range(instance_ids.size()):
 		var node: Node2D = instance_from_id(instance_ids[i]) as Node2D
+		if not node:
+			continue
 		node.position = positions[i]
 		node.rotation = rotations[i]
 		node.scale = scales[i]

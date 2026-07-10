@@ -56,8 +56,10 @@ use crate::plugins::scene_tree::NodeEntityIndex;
 use bevy_app::{App, FixedFirst, Plugin};
 use bevy_ecs::{
     entity::Entity,
-    event::Event,
+    event::{EntityEvent, Event},
+    lifecycle::Remove,
     message::{Message, MessageReader, MessageWriter},
+    observer::On,
     prelude::Resource,
     schedule::IntoScheduleConfigs,
     system::{Commands, Res, ResMut, SystemParam},
@@ -245,6 +247,20 @@ impl CollisionState {
         } else {
             false
         }
+    }
+
+    /// Remove every pair involving `entity`, returning the entities it was
+    /// colliding with (for `CollisionEnded` emission). Symmetric: also drops
+    /// `entity` from each neighbor's adjacency list.
+    fn purge_entity(&mut self, entity: Entity) -> Vec<Entity> {
+        let neighbors = self.entity_collisions.remove(&entity).unwrap_or_default();
+        for &other in &neighbors {
+            self.active_pairs.remove(&normalize_pair(entity, other));
+            if let Some(list) = self.entity_collisions.get_mut(&other) {
+                list.retain(|&e| e != entity);
+            }
+        }
+        neighbors
     }
 
     fn rebuild_entity_collisions(&mut self) {
@@ -448,6 +464,7 @@ impl Plugin for GodotCollisionsPlugin {
         app.init_resource::<CollisionState>()
             .add_message::<CollisionStarted>()
             .add_message::<CollisionEnded>()
+            .add_observer(purge_collisions_on_node_removed)
             .add_systems(
                 FixedFirst,
                 (
@@ -537,6 +554,25 @@ fn trigger_collision_observers(
     }
 }
 
+/// Purge collision pairs when a node's `GodotNodeHandle` is removed. `Remove` fires
+/// on despawn and on the protected-node strip path but not on re-association (that is
+/// a `Discard`), so a freed collider's pairs are cleared without a spurious end for a
+/// reparent. Emitted through the message tier so `trigger_collision_observers` re-pumps
+/// it to observers, matching `process_godot_collisions`.
+fn purge_collisions_on_node_removed(
+    trigger: On<Remove, GodotNodeHandle>,
+    mut state: ResMut<CollisionState>,
+    mut ended: MessageWriter<CollisionEnded>,
+) {
+    let entity = trigger.event_target();
+    for other in state.purge_entity(entity) {
+        ended.write(CollisionEnded {
+            entity1: entity,
+            entity2: other,
+        });
+    }
+}
+
 // ============================================================================
 // TESTS
 // ============================================================================
@@ -623,6 +659,39 @@ mod tests {
 
         // e3 only collides with e1
         assert_eq!(state.colliding_with(e3), &[e1]);
+    }
+
+    #[test]
+    fn test_purge_entity_removes_all_pairs() {
+        let mut state = CollisionState::default();
+        let e1 = Entity::from_bits(1);
+        let e2 = Entity::from_bits(2);
+        let e3 = Entity::from_bits(3);
+
+        state.add_collision(e1, e2);
+        state.add_collision(e1, e3);
+        state.add_collision(e2, e3);
+
+        let mut purged = state.purge_entity(e1);
+        purged.sort();
+        assert_eq!(purged, vec![e2, e3]);
+
+        // e1's pairs are gone; the e2-e3 pair survives.
+        assert!(!state.contains(e1, e2));
+        assert!(!state.contains(e1, e3));
+        assert!(state.contains(e2, e3));
+
+        // e1 is dropped from every neighbor's adjacency list.
+        assert_eq!(state.colliding_with(e2), &[e3]);
+        assert_eq!(state.colliding_with(e3), &[e2]);
+        assert!(state.colliding_with(e1).is_empty());
+    }
+
+    #[test]
+    fn test_purge_entity_with_no_pairs() {
+        let mut state = CollisionState::default();
+        let e1 = Entity::from_bits(1);
+        assert!(state.purge_entity(e1).is_empty());
     }
 
     #[test]

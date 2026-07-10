@@ -16,6 +16,7 @@ use bevy_ecs::{
     lifecycle::HookContext,
     message::{Message, MessageReader, MessageWriter, message_update_system},
     prelude::{Name, ReflectComponent, ReflectResource, Resource},
+    query::Has,
     schedule::IntoScheduleConfigs,
     system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam},
     world::DeferredWorld,
@@ -25,7 +26,7 @@ use godot::classes::ClassDb;
 use godot::tools::try_get_autoload_by_name;
 use godot::{
     builtin::{GString, StringName},
-    classes::{Engine, Node, SceneTree},
+    classes::{Area2D, Area3D, Engine, Node, RigidBody2D, RigidBody3D, SceneTree},
     meta::ToGodot,
     obj::{Gd, Inherits, InstanceId, Singleton},
     prelude::GodotConvert,
@@ -229,9 +230,15 @@ impl Default for SceneTreeRefImpl {
 fn initialize_scene_tree(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
-    mut entities: Query<(&GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
+    mut entities: Query<(
+        &GodotNodeHandle,
+        Entity,
+        Option<&ProtectedNodeEntity>,
+        Has<SceneTreeDecorated>,
+    )>,
     component_registry: Res<SceneTreeComponentRegistry>,
     mut node_index: ResMut<NodeEntityIndex>,
+    message_reader: Res<SceneTreeMessageReader>,
     mut godot: GodotAccess,
 ) {
     let root = scene_tree.get().get_root().unwrap();
@@ -331,6 +338,13 @@ fn initialize_scene_tree(
         &mut node_index,
         &mut godot,
     );
+
+    // The snapshot above created and decorated an entity for every node currently in the
+    // tree. Anything the watcher queued between connecting (the addon's _ready, during
+    // do_initialize) and now is either a node the snapshot also captured or one no longer
+    // present, so it carries nothing new. Discard the backlog so First doesn't re-walk it;
+    // events that arrive after this drain land in the channel normally.
+    let _ = message_reader.0.lock().try_iter().count();
 }
 
 fn traverse_fallback(node: Gd<Node>) -> Vec<SceneTreeMessage> {
@@ -562,11 +576,23 @@ fn write_scene_tree_messages(
 #[derive(Component)]
 pub struct ProtectedNodeEntity;
 
+/// Inserted once when the scene-tree plugin fully decorates an entity. A later
+/// `NodeAdded` for the same node (a reparent, or a startup-backlog duplicate) refreshes
+/// Name/GodotChildOf but must not re-run the registry, autosync, markers, Groups, or
+/// collision connects -- that would reset authored ECS state.
+#[derive(Component)]
+struct SceneTreeDecorated;
+
 fn create_scene_tree_entity(
     commands: &mut Commands,
     messages: impl IntoIterator<Item = SceneTreeMessage>,
     scene_tree: &mut SceneTreeRef,
-    entities: &mut Query<(&GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
+    entities: &mut Query<(
+        &GodotNodeHandle,
+        Entity,
+        Option<&ProtectedNodeEntity>,
+        Has<SceneTreeDecorated>,
+    )>,
     component_registry: &SceneTreeComponentRegistry,
     node_index: &mut NodeEntityIndex,
     godot: &mut GodotAccess,
@@ -578,9 +604,8 @@ fn create_scene_tree_entity(
     // CollisionWatcher is optional - only required if GodotCollisionsPlugin is added
     let collision_watcher = get_bevy_app_child("CollisionWatcher");
 
-    // Collect collision bodies for batched signal connection
-    // Tuple: (instance_id as i64, collision_mask as u8)
-    let mut pending_collision_bodies: Vec<(i64, u8)> = Vec::new();
+    // Collect collision bodies for batched signal connection.
+    let mut pending_collision_bodies: Vec<(Gd<Node>, u8, ColliderKind)> = Vec::new();
 
     for message in messages.into_iter() {
         trace!(target: "godot_scene_tree_messages", message = ?message);
@@ -605,6 +630,13 @@ fn create_scene_tree_entity(
                     continue;
                 }
 
+                // A prior batch already decorated this entity, so it is queryable now;
+                // skip re-decorating (see SceneTreeDecorated).
+                let already_decorated = existing_entity
+                    .and_then(|ent| entities.get(ent).ok())
+                    .map(|(_, _, _, decorated)| decorated)
+                    .unwrap_or(false);
+
                 let mut new_entity_commands = if let Some(ent) = existing_entity {
                     commands.entity(ent)
                 } else {
@@ -619,68 +651,85 @@ fn create_scene_tree_entity(
                     .insert(node_id)
                     .insert(Name::from(node_name));
 
-                // Compute the class hierarchy once; reused for markers and autosync.
-                let class_hierarchy = get_inheritance_hierarchy(
-                    node_type
-                        // Fall back to getting node-type from node if not provided by message
-                        .unwrap_or_else(|| node.get_class().to_string())
-                        .as_str(),
-                );
-                for class_name in class_hierarchy.iter() {
-                    add_node_type_markers_from_string(
-                        &mut new_entity_commands,
-                        class_name.as_str(),
-                    );
-                }
-
-                // Check if the node is a collision body (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.)
-                // These nodes typically have collision detection capabilities
-                // Only connect if CollisionWatcher exists (i.e., GodotCollisionsPlugin was added)
-                let collision_mask = collision_mask.or_else(|| {
-                    collision_watcher
-                        .as_ref()
-                        .map(|_| collision_mask_from_node(&mut node))
-                });
-
-                // Check if the node is a collision body and collect for batched signal connection
-                if collision_watcher.is_some()
-                    && let Some(mask) = collision_mask
-                {
-                    let is_collision_body = collision_mask_has(mask, COLLISION_MASK_BODY_ENTERED)
-                        || collision_mask_has(mask, COLLISION_MASK_AREA_ENTERED);
-
-                    if is_collision_body {
-                        debug!(target: "godot_scene_tree_collisions",
-                               node_id = instance_id.to_string(),
-                               "is collision body");
-
-                        // Collect for batched connection
-                        pending_collision_bodies.push((instance_id.to_i64(), mask));
-                    }
-                }
-                // Use pre-analyzed groups from GDScript watcher if available, otherwise fallback to FFI
-                if let Some(groups_vec) = groups {
-                    new_entity_commands.insert(Groups::from(groups_vec));
+                let new_entity = if already_decorated {
+                    new_entity_commands.id()
                 } else {
-                    new_entity_commands.insert(Groups::from(&node));
-                }
+                    // Compute the class hierarchy once; reused for markers and autosync.
+                    let class_hierarchy = get_inheritance_hierarchy(
+                        node_type
+                            // Fall back to getting node-type from node if not provided by message
+                            .unwrap_or_else(|| node.get_class().to_string())
+                            .as_str(),
+                    );
+                    for class_name in class_hierarchy.iter() {
+                        add_node_type_markers_from_string(
+                            &mut new_entity_commands,
+                            class_name.as_str(),
+                        );
+                    }
 
-                // Add all components registered by plugins
-                component_registry.add_to_entity(&mut new_entity_commands, &mut node_accessor);
+                    // Check if the node is a collision body (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.)
+                    // These nodes typically have collision detection capabilities
+                    // Only connect if CollisionWatcher exists (i.e., GodotCollisionsPlugin was added)
+                    let collision_mask = collision_mask.or_else(|| {
+                        collision_watcher
+                            .as_ref()
+                            .map(|_| collision_mask_from_node(&mut node))
+                    });
 
-                let new_entity = new_entity_commands.id();
-                node_index.insert(instance_id, new_entity);
+                    // Check if the node is a collision body and collect for batched signal connection
+                    if collision_watcher.is_some()
+                        && let Some(mask) = collision_mask
+                    {
+                        let is_collision_body =
+                            collision_mask_has(mask, COLLISION_MASK_BODY_ENTERED)
+                                || collision_mask_has(mask, COLLISION_MASK_AREA_ENTERED);
 
-                // Try to add any registered bundles for this node type
-                super::autosync::try_add_bundles_for_node(
-                    commands,
-                    new_entity,
-                    godot,
-                    node_handle,
-                    class_hierarchy.as_slice(),
-                );
+                        if is_collision_body {
+                            debug!(target: "godot_scene_tree_collisions",
+                                   node_id = instance_id.to_string(),
+                                   "is collision body");
 
-                // Add GodotChildOf relationship to mirror Godot's scene tree hierarchy
+                            let kind = if class_hierarchy.iter().any(|c| c.as_str() == "Area2D") {
+                                ColliderKind::Area2D
+                            } else if class_hierarchy.iter().any(|c| c.as_str() == "Area3D") {
+                                ColliderKind::Area3D
+                            } else {
+                                ColliderKind::Other
+                            };
+                            pending_collision_bodies.push((node.clone(), mask, kind));
+                        }
+                    }
+                    // Use pre-analyzed groups from GDScript watcher if available, otherwise
+                    // fallback to FFI. SceneTreeDecorated rides this insert to avoid a
+                    // separate archetype transition.
+                    if let Some(groups_vec) = groups {
+                        new_entity_commands.insert((Groups::from(groups_vec), SceneTreeDecorated));
+                    } else {
+                        new_entity_commands.insert((Groups::from(&node), SceneTreeDecorated));
+                    }
+
+                    // Add all components registered by plugins
+                    component_registry.add_to_entity(&mut new_entity_commands, &mut node_accessor);
+
+                    let new_entity = new_entity_commands.id();
+                    node_index.insert(instance_id, new_entity);
+
+                    // Try to add any registered bundles for this node type
+                    super::autosync::try_add_bundles_for_node(
+                        commands,
+                        new_entity,
+                        godot,
+                        node_handle,
+                        class_hierarchy.as_slice(),
+                    );
+
+                    new_entity
+                };
+
+                // (Re)insert the GodotChildOf relationship to mirror Godot's scene tree
+                // hierarchy. Runs in both branches: updating the parent is the whole point
+                // of processing a reparent NodeAdded.
                 let parent_id = parent_id_from_gdscript
                     .or_else(|| node.get_parent().map(|parent| parent.instance_id()));
                 if let Some(parent_id) = parent_id
@@ -718,7 +767,7 @@ fn create_scene_tree_entity(
                         // spawns aren't queryable yet but are never protected.
                         let protected = entities
                             .get(ent)
-                            .map(|(_, _, prot)| prot.is_some())
+                            .map(|(_, _, prot, _)| prot.is_some())
                             .unwrap_or(false);
                         if !protected {
                             commands.entity(ent).despawn();
@@ -782,9 +831,21 @@ fn get_inheritance_hierarchy(class_name: &str) -> Rc<Vec<String>> {
     })
 }
 
+/// Which collider a pending body is, derived once from the class hierarchy at decoration
+/// so the seed dispatches without re-probing the type via casts. Only Areas are seeded.
+#[derive(Clone, Copy)]
+enum ColliderKind {
+    Area2D,
+    Area3D,
+    Other,
+}
+
 /// Batch connect collision signals using GDScript bulk operations.
 /// Falls back to individual connections if bulk operations node is not available.
-fn batch_connect_collision_signals(collision_watcher: &Gd<Node>, pending_bodies: &[(i64, u8)]) {
+fn batch_connect_collision_signals(
+    collision_watcher: &Gd<Node>,
+    pending_bodies: &[(Gd<Node>, u8, ColliderKind)],
+) {
     use godot::builtin::PackedInt64Array;
 
     let bulk_ops = get_bevy_app_child("OptimizedBulkOperations")
@@ -792,10 +853,13 @@ fn batch_connect_collision_signals(collision_watcher: &Gd<Node>, pending_bodies:
 
     if let Some(mut bulk_ops) = bulk_ops {
         // Use batched GDScript call
-        let instance_ids: Vec<i64> = pending_bodies.iter().map(|(id, _)| *id).collect();
+        let instance_ids: Vec<i64> = pending_bodies
+            .iter()
+            .map(|(node, _, _)| node.instance_id().to_i64())
+            .collect();
         let collision_masks: Vec<i64> = pending_bodies
             .iter()
-            .map(|(_, mask)| i64::from(*mask))
+            .map(|(_, mask, _)| i64::from(*mask))
             .collect();
 
         let ids_packed = PackedInt64Array::from(instance_ids.as_slice());
@@ -811,57 +875,46 @@ fn batch_connect_collision_signals(collision_watcher: &Gd<Node>, pending_bodies:
         );
     } else {
         // Fallback: connect signals individually
-        for (instance_id, mask) in pending_bodies {
-            let instance_id = InstanceId::from_i64(*instance_id);
-            if !instance_id.lookup_validity() {
+        for (node, mask, _) in pending_bodies {
+            if !node.is_instance_valid() {
                 continue;
             }
+            let mut node = node.clone();
+            let node_variant = node.to_variant();
 
-            // Get the node from instance ID
-            let Some(mut node) = Gd::<Node>::try_from_instance_id(instance_id).ok() else {
-                continue;
+            // Only two distinct bound callables -- Started (enter) and Ended (exit) --
+            // reused across the body/area signal pair.
+            let started = collision_watcher.callable("collision_event").bind(&[
+                node_variant.clone(),
+                CollisionMessageType::Started.to_variant(),
+            ]);
+            let ended = collision_watcher
+                .callable("collision_event")
+                .bind(&[node_variant, CollisionMessageType::Ended.to_variant()]);
+
+            // A duplicate connect (the same node pushed twice in one batch) makes Godot
+            // print an error. One is_connected on the first enter signal proves the node
+            // is already wired -- skip all four rather than eat four error prints.
+            let enter_sig = if collision_mask_has(*mask, COLLISION_MASK_BODY_ENTERED) {
+                BODY_ENTERED
+            } else {
+                AREA_ENTERED
             };
-
-            let node_clone = node.clone();
+            if node.is_connected(enter_sig, &started) {
+                continue;
+            }
 
             if collision_mask_has(*mask, COLLISION_MASK_BODY_ENTERED) {
-                node.connect(
-                    BODY_ENTERED,
-                    &collision_watcher.callable("collision_event").bind(&[
-                        node_clone.to_variant(),
-                        CollisionMessageType::Started.to_variant(),
-                    ]),
-                );
+                node.connect(BODY_ENTERED, &started);
             }
-
             if collision_mask_has(*mask, COLLISION_MASK_BODY_EXITED) {
-                node.connect(
-                    BODY_EXITED,
-                    &collision_watcher.callable("collision_event").bind(&[
-                        node_clone.to_variant(),
-                        CollisionMessageType::Ended.to_variant(),
-                    ]),
-                );
+                node.connect(BODY_EXITED, &ended);
             }
-
             if collision_mask_has(*mask, COLLISION_MASK_AREA_ENTERED) {
-                node.connect(
-                    AREA_ENTERED,
-                    &collision_watcher.callable("collision_event").bind(&[
-                        node_clone.to_variant(),
-                        CollisionMessageType::Started.to_variant(),
-                    ]),
-                );
+                node.connect(AREA_ENTERED, &started);
             }
-
             if collision_mask_has(*mask, COLLISION_MASK_AREA_EXITED) {
-                node.connect(
-                    AREA_EXITED,
-                    &collision_watcher.callable("collision_event").bind(&[
-                        node_clone.to_variant(),
-                        CollisionMessageType::Ended.to_variant(),
-                    ]),
-                );
+                node.connect(AREA_EXITED, &ended);
             }
         }
 
@@ -869,6 +922,116 @@ fn batch_connect_collision_signals(collision_watcher: &Gd<Node>, pending_bodies:
                count = pending_bodies.len(),
                "Individually connected collision signals (bulk ops not available)");
     }
+
+    // Seed pre-existing overlaps (Area only) and warn on contact-monitor-less
+    // RigidBodies. Runs after connect for both the bulk and fallback paths, one-time
+    // per new collider at scene-tree add.
+    for (node, _mask, kind) in pending_bodies {
+        if !node.is_instance_valid() {
+            continue;
+        }
+
+        // try_cast still gates, so a stale kind fails safe to "no seed".
+        match kind {
+            ColliderKind::Area2D => {
+                if let Ok(area) = node.clone().try_cast::<Area2D>() {
+                    seed_overlaps_2d(&area, collision_watcher);
+                }
+            }
+            ColliderKind::Area3D => {
+                if let Ok(area) = node.clone().try_cast::<Area3D>() {
+                    seed_overlaps_3d(&area, collision_watcher);
+                }
+            }
+            ColliderKind::Other => {
+                if is_rigid_body_without_contact_monitor(node) {
+                    warn_dead_contact_monitor(node);
+                }
+            }
+        }
+    }
+}
+
+/// Route each of an Area2D's current overlaps through the collision watcher as a
+/// synthetic `Started`, recovering a spawn-into-overlap whose real enter signal fired
+/// (to zero connections) before this connect. `get_overlapping_*` reads the area's
+/// `body_map`, populated at `flush_queries` regardless of signal connection.
+/// `add_collision` dedups, so a real enter that also fired produces no duplicate.
+fn seed_overlaps_2d(area: &Gd<Area2D>, watcher: &Gd<Node>) {
+    let mut watcher = watcher.clone();
+    // has_* is a cheap bool; skip the Array-marshalling get_* when there's nothing to seed.
+    if area.has_overlapping_bodies() {
+        for body in area.get_overlapping_bodies().iter_shared() {
+            watcher.call(
+                "collision_event",
+                &[
+                    body.to_variant(),
+                    area.to_variant(),
+                    CollisionMessageType::Started.to_variant(),
+                ],
+            );
+        }
+    }
+    if area.has_overlapping_areas() {
+        for other in area.get_overlapping_areas().iter_shared() {
+            watcher.call(
+                "collision_event",
+                &[
+                    other.to_variant(),
+                    area.to_variant(),
+                    CollisionMessageType::Started.to_variant(),
+                ],
+            );
+        }
+    }
+}
+
+fn seed_overlaps_3d(area: &Gd<Area3D>, watcher: &Gd<Node>) {
+    let mut watcher = watcher.clone();
+    if area.has_overlapping_bodies() {
+        for body in area.get_overlapping_bodies().iter_shared() {
+            watcher.call(
+                "collision_event",
+                &[
+                    body.to_variant(),
+                    area.to_variant(),
+                    CollisionMessageType::Started.to_variant(),
+                ],
+            );
+        }
+    }
+    if area.has_overlapping_areas() {
+        for other in area.get_overlapping_areas().iter_shared() {
+            watcher.call(
+                "collision_event",
+                &[
+                    other.to_variant(),
+                    area.to_variant(),
+                    CollisionMessageType::Started.to_variant(),
+                ],
+            );
+        }
+    }
+}
+
+/// A RigidBody with `contact_monitor` disabled never fires the `body_entered/exited`
+/// signals we connect (Godot's `_body_inout` returns early on a null contact monitor).
+fn is_rigid_body_without_contact_monitor(node: &Gd<Node>) -> bool {
+    if let Ok(body) = node.clone().try_cast::<RigidBody2D>() {
+        !body.is_contact_monitor_enabled()
+    } else if let Ok(body) = node.clone().try_cast::<RigidBody3D>() {
+        !body.is_contact_monitor_enabled()
+    } else {
+        false
+    }
+}
+
+fn warn_dead_contact_monitor(node: &Gd<Node>) {
+    warn!(target: "godot_scene_tree_collisions",
+        node = %node.get_path(),
+        "connected RigidBody collision signals but contact_monitor is disabled; \
+         Godot will never fire them. Set contact_monitor = true and \
+         max_contacts_reported > 0 on this node to receive collision events.");
 }
 
 fn _strip_godot_components(commands: &mut Commands, ent: Entity) {
@@ -878,6 +1041,7 @@ fn _strip_godot_components(commands: &mut Commands, ent: Entity) {
     entity_commands.remove::<GodotScene>();
     entity_commands.remove::<Name>();
     entity_commands.remove::<Groups>();
+    entity_commands.remove::<SceneTreeDecorated>();
 
     remove_comprehensive_node_type_markers(&mut entity_commands);
 }
@@ -917,7 +1081,12 @@ fn read_scene_tree_messages(
     mut commands: Commands,
     mut scene_tree: SceneTreeRef,
     mut message_reader: MessageReader<SceneTreeMessage>,
-    mut entities: Query<(&GodotNodeHandle, Entity, Option<&ProtectedNodeEntity>)>,
+    mut entities: Query<(
+        &GodotNodeHandle,
+        Entity,
+        Option<&ProtectedNodeEntity>,
+        Has<SceneTreeDecorated>,
+    )>,
     component_registry: Res<SceneTreeComponentRegistry>,
     mut node_index: ResMut<NodeEntityIndex>,
     mut godot: GodotAccess,

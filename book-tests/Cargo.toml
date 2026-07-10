@@ -1,0 +1,11 @@
+[package]
+name = "book-tests"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Compiles the drift-prone snippets included into the book via `{{#include}}`
+# anchors. Never loaded by Godot -- a plain rlib, guarded by `clippy --all-targets`.
+[dependencies]
+godot-bevy = { path = "../godot-bevy" }
+bevy = { version = "0.19", default-features = false }

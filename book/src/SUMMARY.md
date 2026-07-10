@@ -28,6 +28,10 @@
 
 ---
 
+- [Asset Loading](./assets/index.md)
+
+---
+
 - [Input Handling](./input/index.md)
   - [Bevy vs Godot Input](./input/bevy-vs-godot.md)
   - [Signal Handling](./input/signals.md)

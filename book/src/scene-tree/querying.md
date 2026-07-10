@@ -12,7 +12,8 @@ use godot_bevy::prelude::*;
 // Query all Sprite2D entities - no runtime type checking needed!
 fn update_sprites(sprites: Query<&GodotNodeHandle, With<Sprite2DMarker>>, mut godot: GodotAccess) {
     for handle in sprites.iter() {
-        // We know this is a Sprite2D, so .get() is safe
+        // The marker guarantees the type; in a per-frame system prefer `.try_get()`
+        // and skip on `None` -- the node may have been freed this frame.
         let sprite = godot.get::<Sprite2D>(*handle);
         // Work with the sprite...
     }
@@ -157,7 +158,7 @@ fn update_audio_system(
 Node type markers provide significant performance improvements:
 
 1. **Reduced Iteration**: Only process entities you care about
-2. **No Runtime Type Checking**: Skip `try_get()` calls
+2. **No Runtime Type Checking**: The marker guarantees the node *type*, so you can skip type-mismatch branches -- but it does not guarantee the node is still alive, so still `try_get()` and skip on `None`
 3. **Better ECS Optimization**: Bevy can optimize queries with markers
 4. **Cache Efficiency**: Process similar entities together
 
@@ -177,6 +178,6 @@ This happens transparently when nodes are discovered in your scene tree, making 
 - Use specific markers when you know the exact node type: `With<Sprite2DMarker>`
 - Use hierarchy markers for broader categories: `With<Node2DMarker>` for all 2D nodes
 - Combine markers to find entities with multiple components
-- Prefer `.get()` over `.try_get()` when using markers - it's both faster and safer
+- **Prefer `.try_get()` and skip on `None`** in systems that run every frame: a node handle can outlive its Godot node by up to a frame -- GDScript (or Bevy) can `free()` a node while its entity still exists, until the scene-tree removal drain despawns it. `None` means "freed, the drain will catch up," not an error. Reserve `.get()` for one-shot code where you just created or resolved the node and a missing node is a genuine bug. godot-bevy's own transform sync uses `try_get` + skip for exactly this reason.
 
 For migration information from pre-0.7.0 versions, see the [Migration Guide](../migration/v0.6-to-v0.7.md).

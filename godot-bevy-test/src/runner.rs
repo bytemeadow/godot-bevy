@@ -14,10 +14,10 @@ use crate::TestContext;
 use crate::bencher;
 use crate::exit_code::write_exit_code;
 
-// Plugin registries - defined here so plugin_foreach! can access them as simple identifiers
-godot::sys::plugin_registry!(pub __GODOT_ITEST: RustTestCase);
-godot::sys::plugin_registry!(pub __GODOT_ASYNC_ITEST: AsyncRustTestCase);
-godot::sys::plugin_registry!(pub __GODOT_BENCH: RustBenchmark);
+// Shard registries - defined here so shard_foreach! can access them as simple identifiers
+godot::sys::shard_registry!(pub __GODOT_ITEST: RustTestCase);
+godot::sys::shard_registry!(pub __GODOT_ASYNC_ITEST: AsyncRustTestCase);
+godot::sys::shard_registry!(pub __GODOT_BENCH: RustBenchmark);
 
 /// Represents a single sync test case
 #[derive(Copy, Clone)]
@@ -153,7 +153,7 @@ impl TestRunnerImpl {
         let mut tests = Vec::new();
         let mut is_focus_run = false;
 
-        godot::sys::plugin_foreach!(__GODOT_ASYNC_ITEST; |test: &AsyncRustTestCase| {
+        godot::sys::shard_foreach!(__GODOT_ASYNC_ITEST; |test: &AsyncRustTestCase| {
             // Switch to focused mode if we encounter a focused test
             if !is_focus_run && test.focused {
                 tests.clear();
@@ -189,7 +189,7 @@ impl TestRunnerImpl {
         let mut all_files = HashSet::new();
         let mut benchmarks = Vec::new();
 
-        godot::sys::plugin_foreach!(__GODOT_BENCH; |bench: &RustBenchmark| {
+        godot::sys::shard_foreach!(__GODOT_BENCH; |bench: &RustBenchmark| {
             let matches = filter
                 .as_deref()
                 .is_none_or(|f| f.split(',').any(|pat| bench.name.contains(pat.trim())));

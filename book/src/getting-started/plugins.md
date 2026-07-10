@@ -31,7 +31,7 @@ All other features must be explicitly added as plugins.
     - `GodotPackedScenePlugin`: Runtime scene spawning
     - `GodotBevyLogPlugin`: Unify/improve bevy and godot logging such that `info!`, `debug!`, etc log messages are visible in the Godot Editor
 
-Typed signals are opt-in per message type using `GodotTypedSignalsPlugin::<T>`.
+Typed signals are opt-in per message type using `GodotSignalsPlugin::<T>`.
 
 ## Available Plugins
 
@@ -74,10 +74,10 @@ Typed signals are opt-in per message type using `GodotTypedSignalsPlugin::<T>`.
   - Provides `Collisions` system param for querying collision state
   - Provides `CollisionStarted` / `CollisionEnded` events (messages + observers)
 
-- **`GodotTypedSignalsPlugin<T>`**: Typed signal bridge
+- **`GodotSignalsPlugin<T>`**: Typed signal bridge
 
   - Add one plugin per message type you want to emit
-  - Use `TypedGodotSignals<T>` to connect signals
+  - Use `GodotSignals<T>` to connect signals
   - Essential for UI interactions (button clicks, etc.)
 
 - **`GodotInputEventPlugin`**: Raw input events
@@ -135,9 +135,7 @@ Add only the plugins you need:
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotTransformSyncPlugin::default())  // Move nodes
-        .add_plugins(GodotAudioPlugin)                    // Play sounds
-        .add_plugins(BevyInputBridgePlugin);              // Handle input
+{{#include ../../../book-tests/src/plugins.rs:adding_features}}
 
     app.add_systems(Update, my_game_systems);
 }
@@ -150,7 +148,7 @@ For all features or easy migration from older versions:
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotDefaultPlugins);  // All optional features
+{{#include ../../../book-tests/src/plugins.rs:everything}}
     app.add_systems(Update, my_game_systems);
 }
 ```
@@ -162,10 +160,7 @@ fn build_app(app: &mut App) {
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotTransformSyncPlugin::default())  // Move entities
-        .add_plugins(GodotAudioPlugin)                    // Play sounds
-        .add_plugins(BevyInputBridgePlugin);              // Input handling
-    // Core plugins handle entity creation
+{{#include ../../../book-tests/src/plugins.rs:pure_ecs}}
 }
 ```
 
@@ -174,12 +169,7 @@ fn build_app(app: &mut App) {
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotTransformSyncPlugin {
-            sync_mode: TransformSyncMode::Disabled,  // Use Godot physics
-        })
-        .add_plugins(GodotCollisionsPlugin)         // Detect collisions
-        .add_plugins(GodotTypedSignalsPlugin::<UiSignal>::default()) // Handle signals
-        .add_plugins(GodotAudioPlugin);             // Play sounds
+{{#include ../../../book-tests/src/plugins.rs:physics_platformer}}
 }
 ```
 
@@ -188,10 +178,7 @@ fn build_app(app: &mut App) {
 ```rust
 #[bevy_app]
 fn build_app(app: &mut App) {
-    app.add_plugins(GodotTypedSignalsPlugin::<UiSignal>::default()) // Button clicks, etc.
-        .add_plugins(BevyInputBridgePlugin)        // Keyboard shortcuts
-        .add_plugins(GodotAudioPlugin);            // UI sounds
-    // Don't need transform sync for UI
+{{#include ../../../book-tests/src/plugins.rs:ui_heavy}}
 }
 ```
 
@@ -200,18 +187,7 @@ fn build_app(app: &mut App) {
 ### Transform Sync Modes
 
 ```rust
-// Default: One-way sync (Bevy → Godot)
-app.add_plugins(GodotTransformSyncPlugin::default());
-
-// Two-way sync (Bevy ↔ Godot)
-app.add_plugins(GodotTransformSyncPlugin {
-    sync_mode: TransformSyncMode::TwoWay,
-});
-
-// Disabled (use Godot physics directly)
-app.add_plugins(GodotTransformSyncPlugin {
-    sync_mode: TransformSyncMode::Disabled,
-});
+{{#include ../../../book-tests/src/plugins.rs:transform_sync_modes}}
 ```
 
 ### Scene Tree Configuration
@@ -237,7 +213,7 @@ Some plugins automatically include their dependencies:
 1. **Do I want to load Godot resources through Bevy's asset system?** → Add `GodotAssetsPlugin`
 2. **Do I want to move/position nodes from Bevy?** → Add `GodotTransformSyncPlugin`
 3. **Do I want to play sounds and music?** → Add `GodotAudioPlugin`
-4. **Do I want to respond to UI signals?** → Add `GodotTypedSignalsPlugin::<YourMessage>`
+4. **Do I want to respond to UI signals?** → Add `GodotSignalsPlugin::<YourMessage>`
 5. **Do I want to detect collisions?** → Add `GodotCollisionsPlugin`
 6. **Do I want to handle input?** → Add `BevyInputBridgePlugin` or `GodotInputEventPlugin`
 7. **Do I want to spawn scenes at runtime?** → Add `GodotPackedScenePlugin`
