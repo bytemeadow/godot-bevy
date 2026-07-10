@@ -1,25 +1,20 @@
-# https://devenv.sh/reference/yaml-options/
 inputs:
-  # By default, devenv uses a fork of nixpkgs with additional fixes. This fork can
-  # be several months behind nixpkgs-unstable. You can still get a more recently
-  # updated package from nixpkgs-unstable into your devenv.
-  # https://devenv.sh/common-patterns/
   nixpkgs:
     url: github:nixos/nixpkgs/nixpkgs-unstable
-  # Pinned nixpkgs for emscripten 3.1.73 (required for Godot 4.3+ web exports)
-  # The latest nixpkgs has emscripten 4.x which is incompatible with godot-rust
-  # This commit introduced 3.1.73 and should have working builds
+  # pinned for emscripten 3.1.73 (godot-rust web exports; 4.x breaks the linker)
   nixpkgs-emscripten:
     url: github:nixos/nixpkgs/e255a9090e25aed2486f9fb00e5d645fb342d654
+  # tracy 0.12.2 must match bevy's tracy-client
   tracy:
-    # tracy 0.12.2 - version must align with bevy's tracy-client
-    # see https://github.com/bevyengine/bevy/blob/main/docs/profiling.md
     url: github:allyourcodebase/tracy/2ffcfc74dd24e77113fb07b3044a3fb2f5c2c325
   rust-overlay:
     url: github:oxalica/rust-overlay
     inputs:
       nixpkgs:
         follows: nixpkgs
-# If you're using non-OSS software, you can set allowUnfree to true.
-# in our case, `steam-run`
-allowUnfree: true
+  git-hooks:
+    url: github:cachix/git-hooks.nix
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
+allowUnfree: true # steam-run

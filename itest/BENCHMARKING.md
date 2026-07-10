@@ -222,7 +222,12 @@ fn my_new_benchmark() -> i32 {
 - Clean up nodes with `node.free()`, not `queue_free()` — benchmarks run
   synchronously within one frame, so deferred frees accumulate in the scene
   tree across iterations and skew later benchmarks
-- Test the real plugin/system, not raw FFI (see [CLAUDE.md](../CLAUDE.md) Benchmark Philosophy)
+- Hand-built bench `App`s need `app.insert_non_send_resource(GodotMainThread)`
+  before running plugin systems — every existing benchmark does this
+- Initialize and run the schedules the plugin actually registers into — check
+  its `Plugin::build`. Transform sync reads in `FixedFirst` and writes in
+  `FixedLast`; running `Last` measures an empty schedule and reports ~0
+- Test the real plugin/system, not raw FFI (see [AGENTS.md](../AGENTS.md) Benchmark Philosophy)
 
 ### 2. Run Locally
 
@@ -394,6 +399,27 @@ for node in nodes {
 }
 ```
 
+## Decision Records
+
+### GDScript scene-tree watcher vs pure FFI (Jan 2026)
+
+The `OptimizedSceneTreeWatcher` (GDScript) pre-computes node metadata
+(`get_class`, name, parent id, collision mask, groups) and batches it to Rust
+in one call, instead of Rust pulling each field over FFI per node. Benchmarked
+at 500 nodes in a release build:
+
+| Approach | Time |
+|----------|------|
+| GDScript full (all metadata) | ~203µs |
+| GDScript type + FFI (hybrid) | ~202µs |
+| Pure FFI (metadata only) | ~381µs |
+
+Pure FFI is ~2x slower even in release, and the hybrid's <1% gain isn't worth
+the complexity — don't replace the GDScript watcher with pure-FFI scene tree
+analysis. (The hybrid variant was removed from the suite after this
+comparison; today's equivalents are `scene_tree_process_node_added_optimized`
+vs `_fallback`.)
+
 ## Future Improvements
 
 - [ ] Benchmark asset loading performance
@@ -403,6 +429,6 @@ for node in nodes {
 
 ## References
 
-- [CLAUDE.md](../CLAUDE.md) - Benchmark philosophy, PackedArray optimization pattern
+- [AGENTS.md](../AGENTS.md) - Benchmark philosophy, PackedArray optimization pattern
 - [gdext benchmarking](https://github.com/godot-rust/gdext/tree/master/itest) - Inspiration for this system
 - [Criterion.rs](https://github.com/bheisler/criterion.rs) - Statistical benchmarking (not used, but relevant)
