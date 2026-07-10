@@ -606,7 +606,7 @@ fn create_scene_tree_entity(
 
     // Collect collision bodies for batched signal connection
     // Tuple: (instance_id as i64, collision_mask as u8)
-    let mut pending_collision_bodies: Vec<(i64, u8, ColliderKind)> = Vec::new();
+    let mut pending_collision_bodies: Vec<(Gd<Node>, u8, ColliderKind)> = Vec::new();
 
     for message in messages.into_iter() {
         trace!(target: "godot_scene_tree_messages", message = ?message);
@@ -698,7 +698,7 @@ fn create_scene_tree_entity(
                             } else {
                                 ColliderKind::Other
                             };
-                            pending_collision_bodies.push((instance_id.to_i64(), mask, kind));
+                            pending_collision_bodies.push((node.clone(), mask, kind));
                         }
                     }
                     // Use pre-analyzed groups from GDScript watcher if available, otherwise
@@ -845,7 +845,7 @@ enum ColliderKind {
 
 fn batch_connect_collision_signals(
     collision_watcher: &Gd<Node>,
-    pending_bodies: &[(i64, u8, ColliderKind)],
+    pending_bodies: &[(Gd<Node>, u8, ColliderKind)],
 ) {
     use godot::builtin::PackedInt64Array;
 
@@ -854,7 +854,10 @@ fn batch_connect_collision_signals(
 
     if let Some(mut bulk_ops) = bulk_ops {
         // Use batched GDScript call
-        let instance_ids: Vec<i64> = pending_bodies.iter().map(|(id, _, _)| *id).collect();
+        let instance_ids: Vec<i64> = pending_bodies
+            .iter()
+            .map(|(node, _, _)| node.instance_id().to_i64())
+            .collect();
         let collision_masks: Vec<i64> = pending_bodies
             .iter()
             .map(|(_, mask, _)| i64::from(*mask))
@@ -873,17 +876,11 @@ fn batch_connect_collision_signals(
         );
     } else {
         // Fallback: connect signals individually
-        for (instance_id, mask, _) in pending_bodies {
-            let instance_id = InstanceId::from_i64(*instance_id);
-            if !instance_id.lookup_validity() {
+        for (node, mask, _) in pending_bodies {
+            if !node.is_instance_valid() {
                 continue;
             }
-
-            // Get the node from instance ID
-            let Some(mut node) = Gd::<Node>::try_from_instance_id(instance_id).ok() else {
-                continue;
-            };
-
+            let mut node = node.clone();
             let node_clone = node.clone();
 
             // Guard each connect: a reparent re-processes the node, and Godot rejects a
@@ -938,27 +935,26 @@ fn batch_connect_collision_signals(
     // Seed pre-existing overlaps (Area only) and warn on contact-monitor-less
     // RigidBodies. Runs after connect for both the bulk and fallback paths, one-time
     // per new collider at scene-tree add.
-    for (instance_id, _mask, kind) in pending_bodies {
-        let instance_id = InstanceId::from_i64(*instance_id);
-        let Some(node) = Gd::<Node>::try_from_instance_id(instance_id).ok() else {
+    for (node, _mask, kind) in pending_bodies {
+        if !node.is_instance_valid() {
             continue;
-        };
+        }
 
         // try_cast still gates, so a stale kind fails safe to "no seed".
         match kind {
             ColliderKind::Area2D => {
-                if let Ok(area) = node.try_cast::<Area2D>() {
+                if let Ok(area) = node.clone().try_cast::<Area2D>() {
                     seed_overlaps_2d(&area, collision_watcher);
                 }
             }
             ColliderKind::Area3D => {
-                if let Ok(area) = node.try_cast::<Area3D>() {
+                if let Ok(area) = node.clone().try_cast::<Area3D>() {
                     seed_overlaps_3d(&area, collision_watcher);
                 }
             }
             ColliderKind::Other => {
-                if is_rigid_body_without_contact_monitor(&node) {
-                    warn_dead_contact_monitor(&node);
+                if is_rigid_body_without_contact_monitor(node) {
+                    warn_dead_contact_monitor(node);
                 }
             }
         }
