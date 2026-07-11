@@ -8,8 +8,6 @@ use bevy::utils::default;
 use bevy::{math::ops::cos, transform::components::Transform};
 use godot::classes::Engine;
 use godot::obj::Singleton;
-use godot_bevy::prelude::godot_prelude::ExtensionLibrary;
-use godot_bevy::prelude::godot_prelude::gdextension;
 use godot_bevy::prelude::{GodotBevyLogPlugin, MeshInstance2DMarker};
 use godot_bevy::prelude::{GodotTransformSyncPlugin, TransformSyncMode, bevy_app};
 

@@ -1,11 +1,7 @@
 use bevy::{prelude::*, state::app::StatesPlugin};
 use bevy_asset_loader::prelude::*;
 use gameplay::audio::GameAudio;
-use godot_bevy::prelude::{
-    GodotDefaultPlugins,
-    godot_prelude::{ExtensionLibrary, gdextension},
-    *,
-};
+use godot_bevy::prelude::{GodotDefaultPlugins, *};
 
 mod components;
 mod gameplay;

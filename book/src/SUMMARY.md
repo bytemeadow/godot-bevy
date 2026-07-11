@@ -5,6 +5,7 @@
 - [Getting Started](./getting-started/index.md)
   - [Installation](./getting-started/installation.md)
     - [Cargo Run Godot](./getting-started/gdenv.md)
+  - [Adding to an Existing gdext Project](./getting-started/existing-gdext-project.md)
   - [Basic Concepts](./getting-started/basic-concepts.md)
   - [Plugin System](./getting-started/plugins.md)
   - [Examples](./getting-started/examples.md)

@@ -21,6 +21,37 @@ pub struct BevyAppConfig {
     pub scene_tree_auto_despawn_children: bool,
 }
 
+impl Default for BevyAppConfig {
+    fn default() -> Self {
+        Self {
+            scene_tree_auto_despawn_children: true,
+        }
+    }
+}
+
+/// Register a Bevy app builder with default configuration. See [`init_with_config`].
+pub fn init(init_fn: impl Fn(&mut App) + Send + Sync + 'static) {
+    init_with_config(BevyAppConfig::default(), init_fn);
+}
+
+/// Register a Bevy app builder and its configuration, then start profiling.
+///
+/// Call this from your own `ExtensionLibrary::on_stage_init` during
+/// `InitStage::Core` when you can't use `#[bevy_app]` -- e.g. an existing gdext
+/// project that already defines an `ExtensionLibrary`. `#[bevy_app]` is sugar over
+/// this. Pair it with [`deinit`] in `on_stage_deinit`.
+pub fn init_with_config(config: BevyAppConfig, init_fn: impl Fn(&mut App) + Send + Sync + 'static) {
+    let _ = BEVY_APP_CONFIG.set(config);
+    let _ = BEVY_INIT_FUNC.get_or_init(|| Box::new(init_fn));
+    crate::profiling::init_profiler();
+}
+
+/// Shut godot-bevy profiling down. Call from your `ExtensionLibrary::on_stage_deinit`
+/// during `InitStage::Core` when using the manual entry path.
+pub fn deinit() {
+    crate::profiling::shutdown_profiler();
+}
+
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct BevyApp {

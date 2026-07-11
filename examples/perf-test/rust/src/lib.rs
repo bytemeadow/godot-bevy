@@ -1,11 +1,7 @@
 #![allow(clippy::type_complexity)]
 
 use bevy::prelude::*;
-use godot_bevy::prelude::{
-    GodotTransformSyncPlugin,
-    godot_prelude::{ExtensionLibrary, gdextension},
-    *,
-};
+use godot_bevy::prelude::{GodotTransformSyncPlugin, *};
 
 use crate::particle_rain::ParticleRainPlugin;
 

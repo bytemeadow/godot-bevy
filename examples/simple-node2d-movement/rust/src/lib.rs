@@ -6,8 +6,6 @@ use bevy::transform::components::Transform;
 use godot::builtin::Vector2;
 use godot::classes::Sprite2D;
 use godot::global::godot_print;
-use godot_bevy::prelude::godot_prelude::ExtensionLibrary;
-use godot_bevy::prelude::godot_prelude::gdextension;
 use godot_bevy::prelude::{
     GodotAccess, GodotNodeHandle, GodotTransformSyncPlugin, Sprite2DMarker, bevy_app,
 };
