@@ -92,6 +92,30 @@ What this guarantees and what it doesn't:
 > `FixedFirst` runs. Read this-frame's Godot value in `FixedUpdate` onward or in the
 > `Update` suffix, not in a prefix schedule.
 
+## Opting out of reads
+
+In `TwoWay` mode the Godot→Bevy read polls every mirrored `Node2D`/`Node3D` each physics
+step. If a specific entity should be **Bevy-authoritative** -- ECS owns its transform and
+Godot-side moves should be ignored -- opt it out of the read with `DisableGodotTransformRead`.
+The write path is unaffected, so the entity still pushes its Bevy `Transform` to Godot; it
+just stops reading Godot back.
+
+The easiest way is by Godot group: add the node to the `NO_TRANSFORM_READ_GROUP` group
+(`"godot_bevy_no_transform_read"`) and it is tagged at spawn.
+
+```gdscript
+$Player.add_to_group("godot_bevy_no_transform_read")
+```
+
+Or attach the marker directly from a system:
+
+```rust
+commands.entity(entity).insert(DisableGodotTransformRead);
+```
+
+Skipping the read leaves the entity's shadow stale, so Godot-side moves are silently
+ignored -- that is the point of one-way ownership, but it is a real behavior to keep in mind.
+
 ## Configuration
 
 Configure the sync mode in your `#[bevy_app]` function:
