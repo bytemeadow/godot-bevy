@@ -85,6 +85,86 @@ fn test_bevy_exclude_skips_subtree(ctx: &TestContext) -> godot::task::TaskHandle
     })
 }
 
+/// A node reparented under a subtree carrying `_bevy_exclude` is torn down: its
+/// NodeAdded is dropped by the watcher, so the entity must not linger with a stale
+/// parent and keep syncing.
+#[itest(async)]
+fn test_reparent_into_excluded_tears_down_entity(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+
+        let (node, _entity) = app.add_node::<godot::classes::Node>("Reparented").await;
+        let node_id = node.instance_id();
+        assert!(
+            app.has_entity_for_node(node_id),
+            "node should be mirrored before the reparent"
+        );
+
+        let mut excluded_parent = Node::new_alloc();
+        excluded_parent.set_meta("_bevy_exclude", &true.to_variant());
+        ctx_clone.scene_tree.clone().add_child(&excluded_parent);
+        app.updates(2).await;
+
+        node.clone().reparent(&excluded_parent);
+        app.updates(3).await;
+
+        assert!(
+            !app.has_entity_for_node(node_id),
+            "entity must be torn down after reparenting into an excluded subtree"
+        );
+
+        app.cleanup().await;
+        excluded_parent.free();
+    })
+}
+
+/// Reparenting a mirrored node out to the scene root drops its `GodotChildOf`, so the
+/// ECS hierarchy stops reflecting the old parent instead of stranding a stale edge.
+#[itest(async)]
+fn test_reparent_to_root_clears_godot_child_of(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+
+        let (parent, _pe) = app.add_node::<godot::classes::Node>("RtrParent").await;
+        let child = Node::new_alloc();
+        let child_id = child.instance_id();
+        parent.clone().add_child(&child);
+
+        let mut entity = None;
+        for _ in 0..4 {
+            app.update().await;
+            if let Some(e) = app.entity_for_node(child_id) {
+                entity = Some(e);
+                break;
+            }
+        }
+        let entity = entity.expect("entity for child");
+        assert!(
+            app.with_world(|w| w.get::<GodotChildOf>(entity).is_some()),
+            "child under a mirrored parent should have GodotChildOf"
+        );
+
+        let root = ctx_clone.scene_tree.get_tree().get_root().unwrap();
+        child
+            .clone()
+            .reparent(&root.upcast::<godot::classes::Node>());
+        app.updates(3).await;
+
+        assert!(
+            app.with_world(|w| w.get::<GodotChildOf>(entity).is_none()),
+            "GodotChildOf must be cleared after reparenting to the scene root"
+        );
+
+        app.cleanup().await;
+        child.free();
+        parent.free();
+    })
+}
+
 /// Test that removing a node generates appropriate events/cleanup
 #[itest(async)]
 fn test_node_removed_cleanup(ctx: &TestContext) -> godot::task::TaskHandle {

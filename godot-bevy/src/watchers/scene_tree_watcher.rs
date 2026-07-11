@@ -187,7 +187,7 @@ impl SceneTreeWatcher {
 /// subtree-wide -- a node under an excluded root is never mirrored -- and only the
 /// mirror-in decision (`NodeAdded`) consults it; removals stay unconditional so an
 /// already-mirrored node is never leaked.
-fn is_excluded_from_mirror(node: &Gd<Node>) -> bool {
+pub(crate) fn is_excluded_from_mirror(node: &Gd<Node>) -> bool {
     let mut current = Some(node.clone());
     while let Some(n) = current {
         if n.has_meta("_bevy_exclude") {
