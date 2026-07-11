@@ -42,6 +42,49 @@ fn test_node_added_creates_entity(ctx: &TestContext) -> godot::task::TaskHandle 
     })
 }
 
+/// `_bevy_exclude` is subtree-wide: neither the marked node nor its descendants are
+/// mirrored, while unmarked siblings still are. Exercises the runtime NodeAdded path's
+/// ancestor walk (the child's parent carries the meta, not the child itself).
+#[itest(async)]
+fn test_bevy_exclude_skips_subtree(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+
+        let mut excluded = Node::new_alloc();
+        excluded.set_meta("_bevy_exclude", &true.to_variant());
+        let excluded_child = Node::new_alloc();
+        let excluded_child_id = excluded_child.instance_id();
+        excluded.clone().add_child(&excluded_child);
+
+        let sibling = Node::new_alloc();
+        let sibling_id = sibling.instance_id();
+
+        ctx_clone.scene_tree.clone().add_child(&excluded);
+        ctx_clone.scene_tree.clone().add_child(&sibling);
+
+        app.updates(3).await;
+
+        assert!(
+            !app.has_entity_for_node(excluded.instance_id()),
+            "node carrying _bevy_exclude must not be mirrored"
+        );
+        assert!(
+            !app.has_entity_for_node(excluded_child_id),
+            "descendant of an excluded node must not be mirrored (subtree-wide)"
+        );
+        assert!(
+            app.has_entity_for_node(sibling_id),
+            "an unmarked sibling must still be mirrored"
+        );
+
+        app.cleanup().await;
+        excluded.free();
+        sibling.free();
+    })
+}
+
 /// Test that removing a node generates appropriate events/cleanup
 #[itest(async)]
 fn test_node_removed_cleanup(ctx: &TestContext) -> godot::task::TaskHandle {

@@ -349,6 +349,11 @@ fn initialize_scene_tree(
 
 fn traverse_fallback(node: Gd<Node>) -> Vec<SceneTreeMessage> {
     fn traverse_recursive(node: Gd<Node>, messages: &mut Vec<SceneTreeMessage>) {
+        // Exclusion is subtree-wide: returning here skips this node and, because the
+        // child recursion is below, everything under it.
+        if node.has_meta("_bevy_exclude") {
+            return;
+        }
         messages.push(SceneTreeMessage {
             node_id: GodotNodeHandle::from(node.instance_id()),
             message_type: SceneTreeMessageType::NodeAdded,

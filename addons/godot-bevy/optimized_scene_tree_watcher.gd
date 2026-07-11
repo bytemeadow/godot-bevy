@@ -1,8 +1,7 @@
 class_name OptimizedSceneTreeWatcher
 extends Node
 
-# 🤖 This file is generated. Changes to it will be lost.
-# To regenerate: uv run python -m godot_bevy_codegen
+# Runtime scene-tree watcher. Hand-maintained -- no codegen step currently emits it.
 
 ## Optimized Scene Tree Watcher
 ##
@@ -54,6 +53,17 @@ func set_rust_watcher(watcher: Node):
     rust_watcher = watcher
 
 
+func _is_excluded_from_mirror(node: Node) -> bool:
+    # True if this node or any ancestor carries the _bevy_exclude meta. Exclusion is
+    # subtree-wide, matching the initial walk's recursion-halt.
+    var current: Node = node
+    while current:
+        if current.has_meta("_bevy_exclude"):
+            return true
+        current = current.get_parent()
+    return false
+
+
 func _on_node_added(node: Node):
     """Handle node added events with type optimization"""
     if not rust_watcher:
@@ -63,8 +73,7 @@ func _on_node_added(node: Node):
     if not is_instance_valid(node):
         return
 
-    # Check if node is marked to be excluded from scene tree watcher
-    if node.has_meta("_bevy_exclude"):
+    if _is_excluded_from_mirror(node):
         return
 
     # Analyze node type on GDScript side - this is much faster than FFI
