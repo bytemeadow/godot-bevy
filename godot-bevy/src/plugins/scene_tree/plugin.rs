@@ -647,11 +647,9 @@ fn create_scene_tree_entity(
                 let mut node = node_accessor.get::<Node>();
 
                 let node_name = node_name.unwrap_or_else(|| node.get_name().to_string());
-                new_entity_commands
-                    .insert(node_id)
-                    .insert(Name::from(node_name));
 
                 let new_entity = if already_decorated {
+                    new_entity_commands.insert((node_id, Name::from(node_name)));
                     new_entity_commands.id()
                 } else {
                     // Compute the class hierarchy once; reused for markers and autosync.
@@ -700,14 +698,17 @@ fn create_scene_tree_entity(
                             pending_collision_bodies.push((node.clone(), mask, kind));
                         }
                     }
-                    // Use pre-analyzed groups from GDScript watcher if available, otherwise
-                    // fallback to FFI. SceneTreeDecorated rides this insert to avoid a
-                    // separate archetype transition.
-                    if let Some(groups_vec) = groups {
-                        new_entity_commands.insert((Groups::from(groups_vec), SceneTreeDecorated));
-                    } else {
-                        new_entity_commands.insert((Groups::from(&node), SceneTreeDecorated));
-                    }
+                    // Groups come pre-analyzed from the GDScript watcher, or fall back to FFI.
+                    let groups = match groups {
+                        Some(groups_vec) => Groups::from(groups_vec),
+                        None => Groups::from(&node),
+                    };
+                    new_entity_commands.insert((
+                        node_id,
+                        Name::from(node_name),
+                        groups,
+                        SceneTreeDecorated,
+                    ));
 
                     // Add all components registered by plugins
                     component_registry.add_to_entity(&mut new_entity_commands, &mut node_accessor);
