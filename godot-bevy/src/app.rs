@@ -52,6 +52,29 @@ pub fn deinit() {
     crate::profiling::shutdown_profiler();
 }
 
+/// Print the active godot-bevy plugin table to Godot's output panel at startup, so a
+/// silent misconfiguration -- most often a forgotten `GodotTransformSyncPlugin` -- is
+/// visible instead of showing up as a query that quietly matches nothing. Dev builds only.
+#[cfg(debug_assertions)]
+fn log_plugin_diagnostics(app: &App) {
+    use crate::plugins::{
+        GodotAssetsPlugin, GodotAudioPlugin, GodotCollisionsPlugin, GodotDebuggerPlugin,
+        GodotInputEventPlugin, GodotPackedScenePlugin, GodotTransformSyncPlugin,
+    };
+
+    let on = |added: bool| if added { "on" } else { "off" };
+    godot::global::godot_print!(
+        "[godot-bevy] plugins -- transform_sync:{} assets:{} collisions:{} input:{} audio:{} packed_scene:{} debugger:{}. Missing one you expected? Add it, or use GodotDefaultPlugins.",
+        on(app.is_plugin_added::<GodotTransformSyncPlugin>()),
+        on(app.is_plugin_added::<GodotAssetsPlugin>()),
+        on(app.is_plugin_added::<GodotCollisionsPlugin>()),
+        on(app.is_plugin_added::<GodotInputEventPlugin>()),
+        on(app.is_plugin_added::<GodotAudioPlugin>()),
+        on(app.is_plugin_added::<GodotPackedScenePlugin>()),
+        on(app.is_plugin_added::<GodotDebuggerPlugin>()),
+    );
+}
+
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct BevyApp {
@@ -177,6 +200,9 @@ impl BevyApp {
         } else if let Some(app_builder_func) = BEVY_INIT_FUNC.get() {
             app_builder_func(&mut app);
         }
+
+        #[cfg(debug_assertions)]
+        log_plugin_diagnostics(&app);
 
         use crate::plugins::scene_tree::SceneTreeMessage;
         if app

@@ -208,19 +208,21 @@ Some plugins automatically include their dependencies:
 
 ## Choosing the Right Plugins
 
-### Ask Yourself:
+**Start with `GodotDefaultPlugins`.** It bundles everything most games need, so the first
+tutorial and `Query<&mut Transform>` just work rather than silently matching nothing. Once
+your game runs, strip the plugins you don't use for smaller binaries and fewer systems --
+each one maps to a single feature:
 
-1. **Do I want to load Godot resources through Bevy's asset system?** → Add `GodotAssetsPlugin`
-2. **Do I want to move/position nodes from Bevy?** → Add `GodotTransformSyncPlugin`
-3. **Do I want to play sounds and music?** → Add `GodotAudioPlugin`
-4. **Do I want to respond to UI signals?** → Add `GodotSignalsPlugin::<YourMessage>`
-5. **Do I want to detect collisions?** → Add `GodotCollisionsPlugin`
-6. **Do I want to handle input?** → Add `BevyInputBridgePlugin` or `GodotInputEventPlugin`
-7. **Do I want to spawn scenes at runtime?** → Add `GodotPackedScenePlugin`
+- **Load Godot resources through Bevy's asset system** → `GodotAssetsPlugin`
+- **Move/position nodes from Bevy** → `GodotTransformSyncPlugin`
+- **Play sounds and music** → `GodotAudioPlugin`
+- **Respond to UI signals** → `GodotSignalsPlugin::<YourMessage>`
+- **Detect collisions** → `GodotCollisionsPlugin`
+- **Handle input** → `BevyInputBridgePlugin` or `GodotInputEventPlugin`
+- **Spawn scenes at runtime** → `GodotPackedScenePlugin`
 
-### When in Doubt:
-
-Start with `GodotDefaultPlugins` and optimize later by removing unused plugins.
+In dev builds, godot-bevy prints the active plugin table to Godot's output panel at startup.
+If a feature silently is not working, check there first -- a missing plugin shows up as `off`.
 
 ## Benefits
 
