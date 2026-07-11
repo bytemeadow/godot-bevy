@@ -15,3 +15,16 @@ pub struct TransformSyncMetadata {
     pub shadow: BevyTransform,
     pub written_once: bool,
 }
+
+/// Opt an entity out of Godot->Bevy transform reads. The Bevy->Godot write path is
+/// unaffected, so the entity becomes Bevy-authoritative (one-way). Skipping the read
+/// leaves the shadow stale, so Godot-side moves are ignored -- that is the intended
+/// one-way ownership. Attach it directly, or add the node to the
+/// [`NO_TRANSFORM_READ_GROUP`] Godot group to author the opt-out in-editor.
+#[derive(Component, Default, Debug, Clone, Copy, Reflect)]
+#[reflect(Component)]
+pub struct DisableGodotTransformRead;
+
+/// Godot group whose members are decorated with [`DisableGodotTransformRead`] at spawn
+/// while `GodotTransformSyncPlugin` is active.
+pub const NO_TRANSFORM_READ_GROUP: &str = "godot_bevy_no_transform_read";
