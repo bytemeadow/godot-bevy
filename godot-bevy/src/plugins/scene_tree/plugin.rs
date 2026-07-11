@@ -350,8 +350,7 @@ fn initialize_scene_tree(
 
 fn traverse_fallback(node: Gd<Node>) -> Vec<SceneTreeMessage> {
     fn traverse_recursive(node: Gd<Node>, messages: &mut Vec<SceneTreeMessage>) {
-        // Exclusion is subtree-wide: returning here skips this node and, because the
-        // child recursion is below, everything under it.
+        // Excluded subtree: skip this node and (recursion is below) all descendants.
         if node.has_meta("_bevy_exclude") {
             return;
         }

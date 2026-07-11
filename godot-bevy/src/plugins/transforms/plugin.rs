@@ -69,7 +69,7 @@ impl Plugin for GodotTransformSyncPlugin {
         // Only add automatic sync systems if auto_sync is enabled
         if self.auto_sync {
             // Members of the reserved group opt out of the Godot->Bevy read at spawn, so the
-            // opt-out can be authored in-editor. Attaching the marker directly works too.
+            // opt-out can be authored in-editor.
             app.register_scene_tree_component_with_init::<DisableGodotTransformRead, _>(
                 |entity, node| {
                     if node
