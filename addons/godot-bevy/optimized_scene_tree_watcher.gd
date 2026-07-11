@@ -1,8 +1,6 @@
 class_name OptimizedSceneTreeWatcher
 extends Node
 
-# Runtime scene-tree watcher. Hand-maintained -- no codegen step currently emits it.
-
 ## Optimized Scene Tree Watcher
 ##
 ## This GDScript class serves as a high-performance bridge between Godot's scene tree
