@@ -88,6 +88,8 @@ Each approach has different performance characteristics:
 - **Direct Physics**: Zero sync overhead
 - **Hybrid**: Depends on usage pattern
 
+If transform sync feels slow in a debug build, see [Debug Build Performance](../profiling/debug-performance.md) -- most of the gap is unoptimized dependencies rather than the sync itself.
+
 ## Next Steps
 
 - Learn about [Sync Modes](./sync-modes.md) in detail

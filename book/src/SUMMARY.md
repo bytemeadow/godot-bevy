@@ -48,6 +48,7 @@
 ---
 
 - [Bevy Godot Profiling](./profiling/profiling.md)
+  - [Debug Build Performance](./profiling/debug-performance.md)
 
 ---
 
