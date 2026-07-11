@@ -659,11 +659,17 @@ fn create_scene_tree_entity(
                             .unwrap_or_else(|| node.get_class().to_string())
                             .as_str(),
                     );
+                    // The first matching arm inserts the whole ancestor-marker chain in one
+                    // move, so stop -- continuing would redundantly re-insert those markers. An
+                    // unknown leaf (e.g. a GDExtension class) returns false and falls through to
+                    // its first native ancestor.
                     for class_name in class_hierarchy.iter() {
-                        add_node_type_markers_from_string(
+                        if add_node_type_markers_from_string(
                             &mut new_entity_commands,
                             class_name.as_str(),
-                        );
+                        ) {
+                            break;
+                        }
                     }
 
                     // Check if the node is a collision body (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.)

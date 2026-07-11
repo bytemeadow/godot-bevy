@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use godot::prelude::*;
+use godot_bevy::interop::{CanvasItemMarker, Node2DMarker, NodeMarker};
 use godot_bevy::prelude::*;
 use godot_bevy_test::prelude::*;
 
@@ -101,6 +102,65 @@ fn reparent_preserves_autosync_component(ctx: &TestContext) -> godot::task::Task
         app.cleanup().await;
         parent1.free();
         parent2.free();
+    })
+}
+
+/// Node-type markers must cover a node's whole native ancestry in one shot. A plain
+/// Node2D takes the native-leaf path; a GDExtension node (leaf class "AutoSyncPlayerNode",
+/// not a Godot class) must still get the Node2D ancestor markers -- the decoration skips
+/// the unknown leaf and matches its first native ancestor.
+#[itest(async)]
+fn node_type_markers_cover_native_ancestors(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx = ctx.clone();
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx, |_app| {}).await;
+
+        let custom = AutoSyncPlayerNode::new_alloc();
+        app.ctx()
+            .scene_tree
+            .clone()
+            .add_child(&custom.clone().upcast::<godot::classes::Node>());
+
+        let plain = godot::classes::Node2D::new_alloc();
+        app.ctx()
+            .scene_tree
+            .clone()
+            .add_child(&plain.clone().upcast::<godot::classes::Node>());
+
+        let mut custom_entity = None;
+        let mut plain_entity = None;
+        for _ in 0..4 {
+            app.update().await;
+            custom_entity = custom_entity.or_else(|| app.entity_for_node(custom.instance_id()));
+            plain_entity = plain_entity.or_else(|| app.entity_for_node(plain.instance_id()));
+            if custom_entity.is_some() && plain_entity.is_some() {
+                break;
+            }
+        }
+        let custom_entity = custom_entity.expect("entity for AutoSyncPlayerNode");
+        let plain_entity = plain_entity.expect("entity for Node2D");
+
+        for (label, entity) in [
+            ("AutoSyncPlayerNode", custom_entity),
+            ("Node2D", plain_entity),
+        ] {
+            assert!(
+                app.with_world(|w| w.get::<Node2DMarker>(entity).is_some()),
+                "{label} missing Node2DMarker"
+            );
+            assert!(
+                app.with_world(|w| w.get::<CanvasItemMarker>(entity).is_some()),
+                "{label} missing CanvasItemMarker"
+            );
+            assert!(
+                app.with_world(|w| w.get::<NodeMarker>(entity).is_some()),
+                "{label} missing NodeMarker"
+            );
+        }
+
+        app.cleanup().await;
+        custom.free();
+        plain.free();
     })
 }
 

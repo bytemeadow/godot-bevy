@@ -42,7 +42,7 @@ def generate_type_checking_code(
         pub fn add_node_type_markers_from_string(
             ec: &mut EntityCommands,
             node_type: &str,
-        ) {{
+        ) -> bool {{
             // Add appropriate markers based on the type string
             {textwrap.indent(_generate_string_match_marker_insertion(api), "            ").strip()}
         }}
@@ -130,6 +130,19 @@ def _count_parents(node_type: str, parent_map: Dict[str, str]) -> int:
     return count
 
 
+def _ancestor_chain(node_type: str, parent_map: Dict[str, str]) -> List[str]:
+    """Return the class and its ancestors up to and including Node, leaf -> root"""
+    chain = [node_type]
+    current = node_type
+    while current != "Node":
+        parent = parent_map.get(current)
+        if parent is None:
+            break
+        chain.append(parent)
+        current = parent
+    return chain
+
+
 def _generate_string_match_marker_insertion(
     api: ExtensionApi,
 ) -> str:
@@ -151,11 +164,16 @@ def _generate_string_match_marker_insertion(
         if cfg_attr:
             lines.append(f"    {cfg_attr}")
 
-        lines.append(f'    "{node_type}" => ec.insert({node_type}Marker),')
+        markers = [f"{c}Marker" for c in _ancestor_chain(node_type, parent_map)]
+        if len(markers) == 1:
+            insert_arg = markers[0]
+        else:
+            insert_arg = f"({', '.join(markers)})"
+        lines.append(f'    "{node_type}" => {{ ec.insert({insert_arg}); true }}')
 
     lines.append("    // Custom user types that extend Godot nodes")
-    lines.append("    _ => ec")
-    lines.append("};")
+    lines.append("    _ => false,")
+    lines.append("}")
 
     return "\n".join(lines)
 
@@ -200,21 +218,12 @@ class Tests(unittest.TestCase):
         )
         self.assertEqual(
             textwrap.dedent("""\
-                ec.insert(NodeMarker);
-
                 match node_type {
-                    "Node" => {
-                        // NodeMarker added above for all nodes.
-                    },
-                    "Child1" => {
-                        ec.insert(Child1Marker);
-                    },
-                    "Child2" => {
-                        ec.insert(Child2Marker);
-                        ec.insert(Child1Marker);
-                    },
+                    "Node" => { ec.insert(NodeMarker); true }
+                    "Child1" => { ec.insert((Child1Marker, NodeMarker)); true }
+                    "Child2" => { ec.insert((Child2Marker, Child1Marker, NodeMarker)); true }
                     // Custom user types that extend Godot nodes
-                    _ => {}
+                    _ => false,
                 }"""),
             _generate_string_match_marker_insertion(api),
         )

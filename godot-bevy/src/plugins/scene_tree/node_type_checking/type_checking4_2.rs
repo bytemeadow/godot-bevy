@@ -8,260 +8,1873 @@ use bevy_ecs::system::EntityCommands;
 /// This avoids FFI calls by using type information determined on the GDScript side.
 /// This provides significant performance improvements by eliminating multiple
 /// GodotNode::try_get calls for each node.
-pub fn add_node_type_markers_from_string(ec: &mut EntityCommands, node_type: &str) {
+pub fn add_node_type_markers_from_string(ec: &mut EntityCommands, node_type: &str) -> bool {
     // Add appropriate markers based on the type string
     match node_type {
-        "Node" => ec.insert(NodeMarker),
-        "AnimationMixer" => ec.insert(AnimationMixerMarker),
-        "AudioStreamPlayer" => ec.insert(AudioStreamPlayerMarker),
-        "CanvasItem" => ec.insert(CanvasItemMarker),
-        "CanvasLayer" => ec.insert(CanvasLayerMarker),
-        "EditorFileSystem" => ec.insert(EditorFileSystemMarker),
-        "EditorPlugin" => ec.insert(EditorPluginMarker),
-        "EditorResourcePreview" => ec.insert(EditorResourcePreviewMarker),
-        "HTTPRequest" => ec.insert(HTTPRequestMarker),
-        "InstancePlaceholder" => ec.insert(InstancePlaceholderMarker),
-        "MissingNode" => ec.insert(MissingNodeMarker),
-        "MultiplayerSpawner" => ec.insert(MultiplayerSpawnerMarker),
-        "MultiplayerSynchronizer" => ec.insert(MultiplayerSynchronizerMarker),
+        "Node" => {
+            ec.insert(NodeMarker);
+            true
+        }
+        "AnimationMixer" => {
+            ec.insert((AnimationMixerMarker, NodeMarker));
+            true
+        }
+        "AudioStreamPlayer" => {
+            ec.insert((AudioStreamPlayerMarker, NodeMarker));
+            true
+        }
+        "CanvasItem" => {
+            ec.insert((CanvasItemMarker, NodeMarker));
+            true
+        }
+        "CanvasLayer" => {
+            ec.insert((CanvasLayerMarker, NodeMarker));
+            true
+        }
+        "EditorFileSystem" => {
+            ec.insert((EditorFileSystemMarker, NodeMarker));
+            true
+        }
+        "EditorPlugin" => {
+            ec.insert((EditorPluginMarker, NodeMarker));
+            true
+        }
+        "EditorResourcePreview" => {
+            ec.insert((EditorResourcePreviewMarker, NodeMarker));
+            true
+        }
+        "HTTPRequest" => {
+            ec.insert((HTTPRequestMarker, NodeMarker));
+            true
+        }
+        "InstancePlaceholder" => {
+            ec.insert((InstancePlaceholderMarker, NodeMarker));
+            true
+        }
+        "MissingNode" => {
+            ec.insert((MissingNodeMarker, NodeMarker));
+            true
+        }
+        "MultiplayerSpawner" => {
+            ec.insert((MultiplayerSpawnerMarker, NodeMarker));
+            true
+        }
+        "MultiplayerSynchronizer" => {
+            ec.insert((MultiplayerSynchronizerMarker, NodeMarker));
+            true
+        }
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationAgent2D" => ec.insert(NavigationAgent2DMarker),
+        "NavigationAgent2D" => {
+            ec.insert((NavigationAgent2DMarker, NodeMarker));
+            true
+        }
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationAgent3D" => ec.insert(NavigationAgent3DMarker),
-        "Node3D" => ec.insert(Node3DMarker),
-        "ResourcePreloader" => ec.insert(ResourcePreloaderMarker),
-        "ShaderGlobalsOverride" => ec.insert(ShaderGlobalsOverrideMarker),
-        "SkeletonIK3D" => ec.insert(SkeletonIK3DMarker),
-        "Timer" => ec.insert(TimerMarker),
-        "Viewport" => ec.insert(ViewportMarker),
-        "WorldEnvironment" => ec.insert(WorldEnvironmentMarker),
-        "AnimationPlayer" => ec.insert(AnimationPlayerMarker),
-        "AnimationTree" => ec.insert(AnimationTreeMarker),
-        "AudioListener3D" => ec.insert(AudioListener3DMarker),
-        "AudioStreamPlayer3D" => ec.insert(AudioStreamPlayer3DMarker),
-        "BoneAttachment3D" => ec.insert(BoneAttachment3DMarker),
-        "Camera3D" => ec.insert(Camera3DMarker),
-        "CollisionObject3D" => ec.insert(CollisionObject3DMarker),
-        "CollisionPolygon3D" => ec.insert(CollisionPolygon3DMarker),
-        "CollisionShape3D" => ec.insert(CollisionShape3DMarker),
-        "Control" => ec.insert(ControlMarker),
-        "GridMap" => ec.insert(GridMapMarker),
-        "ImporterMeshInstance3D" => ec.insert(ImporterMeshInstance3DMarker),
-        "Joint3D" => ec.insert(Joint3DMarker),
-        "LightmapProbe" => ec.insert(LightmapProbeMarker),
-        "Marker3D" => ec.insert(Marker3DMarker),
+        "NavigationAgent3D" => {
+            ec.insert((NavigationAgent3DMarker, NodeMarker));
+            true
+        }
+        "Node3D" => {
+            ec.insert((Node3DMarker, NodeMarker));
+            true
+        }
+        "ResourcePreloader" => {
+            ec.insert((ResourcePreloaderMarker, NodeMarker));
+            true
+        }
+        "ShaderGlobalsOverride" => {
+            ec.insert((ShaderGlobalsOverrideMarker, NodeMarker));
+            true
+        }
+        "SkeletonIK3D" => {
+            ec.insert((SkeletonIK3DMarker, NodeMarker));
+            true
+        }
+        "Timer" => {
+            ec.insert((TimerMarker, NodeMarker));
+            true
+        }
+        "Viewport" => {
+            ec.insert((ViewportMarker, NodeMarker));
+            true
+        }
+        "WorldEnvironment" => {
+            ec.insert((WorldEnvironmentMarker, NodeMarker));
+            true
+        }
+        "AnimationPlayer" => {
+            ec.insert((AnimationPlayerMarker, AnimationMixerMarker, NodeMarker));
+            true
+        }
+        "AnimationTree" => {
+            ec.insert((AnimationTreeMarker, AnimationMixerMarker, NodeMarker));
+            true
+        }
+        "AudioListener3D" => {
+            ec.insert((AudioListener3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "AudioStreamPlayer3D" => {
+            ec.insert((AudioStreamPlayer3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "BoneAttachment3D" => {
+            ec.insert((BoneAttachment3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "Camera3D" => {
+            ec.insert((Camera3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "CollisionObject3D" => {
+            ec.insert((CollisionObject3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "CollisionPolygon3D" => {
+            ec.insert((CollisionPolygon3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "CollisionShape3D" => {
+            ec.insert((CollisionShape3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "Control" => {
+            ec.insert((ControlMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "GridMap" => {
+            ec.insert((GridMapMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "ImporterMeshInstance3D" => {
+            ec.insert((ImporterMeshInstance3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "Joint3D" => {
+            ec.insert((Joint3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "LightmapProbe" => {
+            ec.insert((LightmapProbeMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "Marker3D" => {
+            ec.insert((Marker3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationLink3D" => ec.insert(NavigationLink3DMarker),
+        "NavigationLink3D" => {
+            ec.insert((NavigationLink3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationObstacle3D" => ec.insert(NavigationObstacle3DMarker),
+        "NavigationObstacle3D" => {
+            ec.insert((NavigationObstacle3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationRegion3D" => ec.insert(NavigationRegion3DMarker),
-        "Node2D" => ec.insert(Node2DMarker),
-        "OccluderInstance3D" => ec.insert(OccluderInstance3DMarker),
-        "OpenXRHand" => ec.insert(OpenXRHandMarker),
-        "ParallaxBackground" => ec.insert(ParallaxBackgroundMarker),
-        "Path3D" => ec.insert(Path3DMarker),
-        "PathFollow3D" => ec.insert(PathFollow3DMarker),
-        "RayCast3D" => ec.insert(RayCast3DMarker),
-        "RemoteTransform3D" => ec.insert(RemoteTransform3DMarker),
-        "ShapeCast3D" => ec.insert(ShapeCast3DMarker),
-        "Skeleton3D" => ec.insert(Skeleton3DMarker),
-        "SpringArm3D" => ec.insert(SpringArm3DMarker),
-        "SubViewport" => ec.insert(SubViewportMarker),
-        "VehicleWheel3D" => ec.insert(VehicleWheel3DMarker),
-        "VisualInstance3D" => ec.insert(VisualInstance3DMarker),
-        "Window" => ec.insert(WindowMarker),
-        "XRNode3D" => ec.insert(XRNode3DMarker),
-        "XROrigin3D" => ec.insert(XROrigin3DMarker),
-        "AcceptDialog" => ec.insert(AcceptDialogMarker),
-        "AnimatedSprite2D" => ec.insert(AnimatedSprite2DMarker),
-        "Area3D" => ec.insert(Area3DMarker),
-        "AudioListener2D" => ec.insert(AudioListener2DMarker),
-        "AudioStreamPlayer2D" => ec.insert(AudioStreamPlayer2DMarker),
-        "BackBufferCopy" => ec.insert(BackBufferCopyMarker),
-        "BaseButton" => ec.insert(BaseButtonMarker),
-        "Bone2D" => ec.insert(Bone2DMarker),
-        "CPUParticles2D" => ec.insert(CPUParticles2DMarker),
-        "Camera2D" => ec.insert(Camera2DMarker),
-        "CanvasGroup" => ec.insert(CanvasGroupMarker),
-        "CanvasModulate" => ec.insert(CanvasModulateMarker),
-        "CollisionObject2D" => ec.insert(CollisionObject2DMarker),
-        "CollisionPolygon2D" => ec.insert(CollisionPolygon2DMarker),
-        "CollisionShape2D" => ec.insert(CollisionShape2DMarker),
-        "ColorRect" => ec.insert(ColorRectMarker),
-        "ConeTwistJoint3D" => ec.insert(ConeTwistJoint3DMarker),
-        "Container" => ec.insert(ContainerMarker),
-        "Decal" => ec.insert(DecalMarker),
-        "FogVolume" => ec.insert(FogVolumeMarker),
-        "GPUParticles2D" => ec.insert(GPUParticles2DMarker),
-        "GPUParticlesAttractor3D" => ec.insert(GPUParticlesAttractor3DMarker),
-        "GPUParticlesCollision3D" => ec.insert(GPUParticlesCollision3DMarker),
-        "Generic6DOFJoint3D" => ec.insert(Generic6DOFJoint3DMarker),
-        "GeometryInstance3D" => ec.insert(GeometryInstance3DMarker),
+        "NavigationRegion3D" => {
+            ec.insert((NavigationRegion3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "Node2D" => {
+            ec.insert((Node2DMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "OccluderInstance3D" => {
+            ec.insert((OccluderInstance3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "OpenXRHand" => {
+            ec.insert((OpenXRHandMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "ParallaxBackground" => {
+            ec.insert((ParallaxBackgroundMarker, CanvasLayerMarker, NodeMarker));
+            true
+        }
+        "Path3D" => {
+            ec.insert((Path3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "PathFollow3D" => {
+            ec.insert((PathFollow3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "RayCast3D" => {
+            ec.insert((RayCast3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "RemoteTransform3D" => {
+            ec.insert((RemoteTransform3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "ShapeCast3D" => {
+            ec.insert((ShapeCast3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "Skeleton3D" => {
+            ec.insert((Skeleton3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "SpringArm3D" => {
+            ec.insert((SpringArm3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "SubViewport" => {
+            ec.insert((SubViewportMarker, ViewportMarker, NodeMarker));
+            true
+        }
+        "VehicleWheel3D" => {
+            ec.insert((VehicleWheel3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "VisualInstance3D" => {
+            ec.insert((VisualInstance3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "Window" => {
+            ec.insert((WindowMarker, ViewportMarker, NodeMarker));
+            true
+        }
+        "XRNode3D" => {
+            ec.insert((XRNode3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "XROrigin3D" => {
+            ec.insert((XROrigin3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "AcceptDialog" => {
+            ec.insert((AcceptDialogMarker, WindowMarker, ViewportMarker, NodeMarker));
+            true
+        }
+        "AnimatedSprite2D" => {
+            ec.insert((
+                AnimatedSprite2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Area3D" => {
+            ec.insert((
+                Area3DMarker,
+                CollisionObject3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "AudioListener2D" => {
+            ec.insert((
+                AudioListener2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "AudioStreamPlayer2D" => {
+            ec.insert((
+                AudioStreamPlayer2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "BackBufferCopy" => {
+            ec.insert((
+                BackBufferCopyMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "BaseButton" => {
+            ec.insert((
+                BaseButtonMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Bone2D" => {
+            ec.insert((Bone2DMarker, Node2DMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "CPUParticles2D" => {
+            ec.insert((
+                CPUParticles2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Camera2D" => {
+            ec.insert((Camera2DMarker, Node2DMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "CanvasGroup" => {
+            ec.insert((
+                CanvasGroupMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CanvasModulate" => {
+            ec.insert((
+                CanvasModulateMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CollisionObject2D" => {
+            ec.insert((
+                CollisionObject2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CollisionPolygon2D" => {
+            ec.insert((
+                CollisionPolygon2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CollisionShape2D" => {
+            ec.insert((
+                CollisionShape2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "ColorRect" => {
+            ec.insert((ColorRectMarker, ControlMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "ConeTwistJoint3D" => {
+            ec.insert((
+                ConeTwistJoint3DMarker,
+                Joint3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Container" => {
+            ec.insert((ContainerMarker, ControlMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "Decal" => {
+            ec.insert((
+                DecalMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "FogVolume" => {
+            ec.insert((
+                FogVolumeMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "GPUParticles2D" => {
+            ec.insert((
+                GPUParticles2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "GPUParticlesAttractor3D" => {
+            ec.insert((
+                GPUParticlesAttractor3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "GPUParticlesCollision3D" => {
+            ec.insert((
+                GPUParticlesCollision3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Generic6DOFJoint3D" => {
+            ec.insert((
+                Generic6DOFJoint3DMarker,
+                Joint3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "GeometryInstance3D" => {
+            ec.insert((
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
         #[cfg(feature = "experimental-godot-api")]
-        "GraphEdit" => ec.insert(GraphEditMarker),
-        "HingeJoint3D" => ec.insert(HingeJoint3DMarker),
-        "ItemList" => ec.insert(ItemListMarker),
-        "Joint2D" => ec.insert(Joint2DMarker),
-        "Label" => ec.insert(LabelMarker),
-        "Light2D" => ec.insert(Light2DMarker),
-        "Light3D" => ec.insert(Light3DMarker),
-        "LightOccluder2D" => ec.insert(LightOccluder2DMarker),
-        "LightmapGI" => ec.insert(LightmapGIMarker),
-        "Line2D" => ec.insert(Line2DMarker),
-        "LineEdit" => ec.insert(LineEditMarker),
-        "Marker2D" => ec.insert(Marker2DMarker),
-        "MenuBar" => ec.insert(MenuBarMarker),
-        "MeshInstance2D" => ec.insert(MeshInstance2DMarker),
-        "MultiMeshInstance2D" => ec.insert(MultiMeshInstance2DMarker),
+        "GraphEdit" => {
+            ec.insert((GraphEditMarker, ControlMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "HingeJoint3D" => {
+            ec.insert((HingeJoint3DMarker, Joint3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "ItemList" => {
+            ec.insert((ItemListMarker, ControlMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "Joint2D" => {
+            ec.insert((Joint2DMarker, Node2DMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "Label" => {
+            ec.insert((LabelMarker, ControlMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "Light2D" => {
+            ec.insert((Light2DMarker, Node2DMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "Light3D" => {
+            ec.insert((
+                Light3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "LightOccluder2D" => {
+            ec.insert((
+                LightOccluder2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "LightmapGI" => {
+            ec.insert((
+                LightmapGIMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Line2D" => {
+            ec.insert((Line2DMarker, Node2DMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "LineEdit" => {
+            ec.insert((LineEditMarker, ControlMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "Marker2D" => {
+            ec.insert((Marker2DMarker, Node2DMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "MenuBar" => {
+            ec.insert((MenuBarMarker, ControlMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "MeshInstance2D" => {
+            ec.insert((
+                MeshInstance2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "MultiMeshInstance2D" => {
+            ec.insert((
+                MultiMeshInstance2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationLink2D" => ec.insert(NavigationLink2DMarker),
+        "NavigationLink2D" => {
+            ec.insert((
+                NavigationLink2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationObstacle2D" => ec.insert(NavigationObstacle2DMarker),
+        "NavigationObstacle2D" => {
+            ec.insert((
+                NavigationObstacle2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
         #[cfg(feature = "experimental-godot-api")]
-        "NavigationRegion2D" => ec.insert(NavigationRegion2DMarker),
-        "NinePatchRect" => ec.insert(NinePatchRectMarker),
-        "Panel" => ec.insert(PanelMarker),
-        "ParallaxLayer" => ec.insert(ParallaxLayerMarker),
-        "Path2D" => ec.insert(Path2DMarker),
-        "PathFollow2D" => ec.insert(PathFollow2DMarker),
-        "PhysicsBody3D" => ec.insert(PhysicsBody3DMarker),
-        "PinJoint3D" => ec.insert(PinJoint3DMarker),
-        "Polygon2D" => ec.insert(Polygon2DMarker),
-        "Popup" => ec.insert(PopupMarker),
-        "Range" => ec.insert(RangeMarker),
-        "RayCast2D" => ec.insert(RayCast2DMarker),
-        "ReferenceRect" => ec.insert(ReferenceRectMarker),
-        "ReflectionProbe" => ec.insert(ReflectionProbeMarker),
-        "RemoteTransform2D" => ec.insert(RemoteTransform2DMarker),
-        "RichTextLabel" => ec.insert(RichTextLabelMarker),
-        "RootMotionView" => ec.insert(RootMotionViewMarker),
-        "Separator" => ec.insert(SeparatorMarker),
-        "ShapeCast2D" => ec.insert(ShapeCast2DMarker),
-        "Skeleton2D" => ec.insert(Skeleton2DMarker),
-        "SliderJoint3D" => ec.insert(SliderJoint3DMarker),
-        "Sprite2D" => ec.insert(Sprite2DMarker),
-        "TabBar" => ec.insert(TabBarMarker),
-        "TextEdit" => ec.insert(TextEditMarker),
-        "TextureRect" => ec.insert(TextureRectMarker),
-        "TileMap" => ec.insert(TileMapMarker),
-        "TouchScreenButton" => ec.insert(TouchScreenButtonMarker),
-        "Tree" => ec.insert(TreeMarker),
-        "VideoStreamPlayer" => ec.insert(VideoStreamPlayerMarker),
-        "VisibleOnScreenNotifier2D" => ec.insert(VisibleOnScreenNotifier2DMarker),
-        "VisibleOnScreenNotifier3D" => ec.insert(VisibleOnScreenNotifier3DMarker),
-        "VoxelGI" => ec.insert(VoxelGIMarker),
-        "XRAnchor3D" => ec.insert(XRAnchor3DMarker),
-        "XRCamera3D" => ec.insert(XRCamera3DMarker),
-        "XRController3D" => ec.insert(XRController3DMarker),
-        "Area2D" => ec.insert(Area2DMarker),
-        "AspectRatioContainer" => ec.insert(AspectRatioContainerMarker),
-        "BoxContainer" => ec.insert(BoxContainerMarker),
-        "Button" => ec.insert(ButtonMarker),
-        "CPUParticles3D" => ec.insert(CPUParticles3DMarker),
-        "CSGShape3D" => ec.insert(CSGShape3DMarker),
-        "CenterContainer" => ec.insert(CenterContainerMarker),
-        "CharacterBody3D" => ec.insert(CharacterBody3DMarker),
-        "CodeEdit" => ec.insert(CodeEditMarker),
-        "ConfirmationDialog" => ec.insert(ConfirmationDialogMarker),
-        "DampedSpringJoint2D" => ec.insert(DampedSpringJoint2DMarker),
-        "DirectionalLight2D" => ec.insert(DirectionalLight2DMarker),
-        "DirectionalLight3D" => ec.insert(DirectionalLight3DMarker),
-        "EditorProperty" => ec.insert(EditorPropertyMarker),
-        "EditorSpinSlider" => ec.insert(EditorSpinSliderMarker),
-        "FlowContainer" => ec.insert(FlowContainerMarker),
-        "GPUParticles3D" => ec.insert(GPUParticles3DMarker),
-        "GPUParticlesAttractorBox3D" => ec.insert(GPUParticlesAttractorBox3DMarker),
-        "GPUParticlesAttractorSphere3D" => ec.insert(GPUParticlesAttractorSphere3DMarker),
-        "GPUParticlesAttractorVectorField3D" => ec.insert(GPUParticlesAttractorVectorField3DMarker),
-        "GPUParticlesCollisionBox3D" => ec.insert(GPUParticlesCollisionBox3DMarker),
-        "GPUParticlesCollisionHeightField3D" => ec.insert(GPUParticlesCollisionHeightField3DMarker),
-        "GPUParticlesCollisionSDF3D" => ec.insert(GPUParticlesCollisionSDF3DMarker),
-        "GPUParticlesCollisionSphere3D" => ec.insert(GPUParticlesCollisionSphere3DMarker),
+        "NavigationRegion2D" => {
+            ec.insert((
+                NavigationRegion2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "NinePatchRect" => {
+            ec.insert((
+                NinePatchRectMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Panel" => {
+            ec.insert((PanelMarker, ControlMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "ParallaxLayer" => {
+            ec.insert((
+                ParallaxLayerMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Path2D" => {
+            ec.insert((Path2DMarker, Node2DMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "PathFollow2D" => {
+            ec.insert((
+                PathFollow2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "PhysicsBody3D" => {
+            ec.insert((
+                PhysicsBody3DMarker,
+                CollisionObject3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "PinJoint3D" => {
+            ec.insert((PinJoint3DMarker, Joint3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "Polygon2D" => {
+            ec.insert((Polygon2DMarker, Node2DMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "Popup" => {
+            ec.insert((PopupMarker, WindowMarker, ViewportMarker, NodeMarker));
+            true
+        }
+        "Range" => {
+            ec.insert((RangeMarker, ControlMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "RayCast2D" => {
+            ec.insert((RayCast2DMarker, Node2DMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "ReferenceRect" => {
+            ec.insert((
+                ReferenceRectMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "ReflectionProbe" => {
+            ec.insert((
+                ReflectionProbeMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "RemoteTransform2D" => {
+            ec.insert((
+                RemoteTransform2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "RichTextLabel" => {
+            ec.insert((
+                RichTextLabelMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "RootMotionView" => {
+            ec.insert((
+                RootMotionViewMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Separator" => {
+            ec.insert((SeparatorMarker, ControlMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "ShapeCast2D" => {
+            ec.insert((
+                ShapeCast2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Skeleton2D" => {
+            ec.insert((Skeleton2DMarker, Node2DMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "SliderJoint3D" => {
+            ec.insert((SliderJoint3DMarker, Joint3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "Sprite2D" => {
+            ec.insert((Sprite2DMarker, Node2DMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "TabBar" => {
+            ec.insert((TabBarMarker, ControlMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "TextEdit" => {
+            ec.insert((TextEditMarker, ControlMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "TextureRect" => {
+            ec.insert((
+                TextureRectMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "TileMap" => {
+            ec.insert((TileMapMarker, Node2DMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "TouchScreenButton" => {
+            ec.insert((
+                TouchScreenButtonMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Tree" => {
+            ec.insert((TreeMarker, ControlMarker, CanvasItemMarker, NodeMarker));
+            true
+        }
+        "VideoStreamPlayer" => {
+            ec.insert((
+                VideoStreamPlayerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "VisibleOnScreenNotifier2D" => {
+            ec.insert((
+                VisibleOnScreenNotifier2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "VisibleOnScreenNotifier3D" => {
+            ec.insert((
+                VisibleOnScreenNotifier3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "VoxelGI" => {
+            ec.insert((
+                VoxelGIMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "XRAnchor3D" => {
+            ec.insert((XRAnchor3DMarker, XRNode3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "XRCamera3D" => {
+            ec.insert((XRCamera3DMarker, Camera3DMarker, Node3DMarker, NodeMarker));
+            true
+        }
+        "XRController3D" => {
+            ec.insert((
+                XRController3DMarker,
+                XRNode3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Area2D" => {
+            ec.insert((
+                Area2DMarker,
+                CollisionObject2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "AspectRatioContainer" => {
+            ec.insert((
+                AspectRatioContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "BoxContainer" => {
+            ec.insert((
+                BoxContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Button" => {
+            ec.insert((
+                ButtonMarker,
+                BaseButtonMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CPUParticles3D" => {
+            ec.insert((
+                CPUParticles3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CSGShape3D" => {
+            ec.insert((
+                CSGShape3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CenterContainer" => {
+            ec.insert((
+                CenterContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CharacterBody3D" => {
+            ec.insert((
+                CharacterBody3DMarker,
+                PhysicsBody3DMarker,
+                CollisionObject3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CodeEdit" => {
+            ec.insert((
+                CodeEditMarker,
+                TextEditMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "ConfirmationDialog" => {
+            ec.insert((
+                ConfirmationDialogMarker,
+                AcceptDialogMarker,
+                WindowMarker,
+                ViewportMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "DampedSpringJoint2D" => {
+            ec.insert((
+                DampedSpringJoint2DMarker,
+                Joint2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "DirectionalLight2D" => {
+            ec.insert((
+                DirectionalLight2DMarker,
+                Light2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "DirectionalLight3D" => {
+            ec.insert((
+                DirectionalLight3DMarker,
+                Light3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "EditorProperty" => {
+            ec.insert((
+                EditorPropertyMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "EditorSpinSlider" => {
+            ec.insert((
+                EditorSpinSliderMarker,
+                RangeMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "FlowContainer" => {
+            ec.insert((
+                FlowContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "GPUParticles3D" => {
+            ec.insert((
+                GPUParticles3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "GPUParticlesAttractorBox3D" => {
+            ec.insert((
+                GPUParticlesAttractorBox3DMarker,
+                GPUParticlesAttractor3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "GPUParticlesAttractorSphere3D" => {
+            ec.insert((
+                GPUParticlesAttractorSphere3DMarker,
+                GPUParticlesAttractor3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "GPUParticlesAttractorVectorField3D" => {
+            ec.insert((
+                GPUParticlesAttractorVectorField3DMarker,
+                GPUParticlesAttractor3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "GPUParticlesCollisionBox3D" => {
+            ec.insert((
+                GPUParticlesCollisionBox3DMarker,
+                GPUParticlesCollision3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "GPUParticlesCollisionHeightField3D" => {
+            ec.insert((
+                GPUParticlesCollisionHeightField3DMarker,
+                GPUParticlesCollision3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "GPUParticlesCollisionSDF3D" => {
+            ec.insert((
+                GPUParticlesCollisionSDF3DMarker,
+                GPUParticlesCollision3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "GPUParticlesCollisionSphere3D" => {
+            ec.insert((
+                GPUParticlesCollisionSphere3DMarker,
+                GPUParticlesCollision3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
         #[cfg(feature = "experimental-godot-api")]
-        "GraphElement" => ec.insert(GraphElementMarker),
-        "GridContainer" => ec.insert(GridContainerMarker),
-        "GrooveJoint2D" => ec.insert(GrooveJoint2DMarker),
-        "HSeparator" => ec.insert(HSeparatorMarker),
-        "Label3D" => ec.insert(Label3DMarker),
-        "LinkButton" => ec.insert(LinkButtonMarker),
-        "MarginContainer" => ec.insert(MarginContainerMarker),
-        "MeshInstance3D" => ec.insert(MeshInstance3DMarker),
-        "MultiMeshInstance3D" => ec.insert(MultiMeshInstance3DMarker),
-        "OmniLight3D" => ec.insert(OmniLight3DMarker),
-        "PanelContainer" => ec.insert(PanelContainerMarker),
-        "PhysicalBone3D" => ec.insert(PhysicalBone3DMarker),
-        "PhysicsBody2D" => ec.insert(PhysicsBody2DMarker),
-        "PinJoint2D" => ec.insert(PinJoint2DMarker),
-        "PointLight2D" => ec.insert(PointLight2DMarker),
-        "PopupMenu" => ec.insert(PopupMenuMarker),
-        "PopupPanel" => ec.insert(PopupPanelMarker),
-        "ProgressBar" => ec.insert(ProgressBarMarker),
-        "RigidBody3D" => ec.insert(RigidBody3DMarker),
-        "ScrollBar" => ec.insert(ScrollBarMarker),
-        "ScrollContainer" => ec.insert(ScrollContainerMarker),
-        "Slider" => ec.insert(SliderMarker),
-        "SpinBox" => ec.insert(SpinBoxMarker),
-        "SplitContainer" => ec.insert(SplitContainerMarker),
-        "SpotLight3D" => ec.insert(SpotLight3DMarker),
-        "SpriteBase3D" => ec.insert(SpriteBase3DMarker),
-        "StaticBody3D" => ec.insert(StaticBody3DMarker),
-        "SubViewportContainer" => ec.insert(SubViewportContainerMarker),
-        "TabContainer" => ec.insert(TabContainerMarker),
-        "TextureButton" => ec.insert(TextureButtonMarker),
-        "TextureProgressBar" => ec.insert(TextureProgressBarMarker),
-        "VSeparator" => ec.insert(VSeparatorMarker),
-        "VisibleOnScreenEnabler2D" => ec.insert(VisibleOnScreenEnabler2DMarker),
-        "VisibleOnScreenEnabler3D" => ec.insert(VisibleOnScreenEnabler3DMarker),
-        "AnimatableBody3D" => ec.insert(AnimatableBody3DMarker),
-        "AnimatedSprite3D" => ec.insert(AnimatedSprite3DMarker),
-        "CSGCombiner3D" => ec.insert(CSGCombiner3DMarker),
-        "CSGPrimitive3D" => ec.insert(CSGPrimitive3DMarker),
-        "CharacterBody2D" => ec.insert(CharacterBody2DMarker),
-        "CheckBox" => ec.insert(CheckBoxMarker),
-        "CheckButton" => ec.insert(CheckButtonMarker),
-        "ColorPickerButton" => ec.insert(ColorPickerButtonMarker),
-        "EditorCommandPalette" => ec.insert(EditorCommandPaletteMarker),
-        "EditorFileDialog" => ec.insert(EditorFileDialogMarker),
-        "EditorInspector" => ec.insert(EditorInspectorMarker),
-        "FileDialog" => ec.insert(FileDialogMarker),
+        "GraphElement" => {
+            ec.insert((
+                GraphElementMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "GridContainer" => {
+            ec.insert((
+                GridContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "GrooveJoint2D" => {
+            ec.insert((
+                GrooveJoint2DMarker,
+                Joint2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "HSeparator" => {
+            ec.insert((
+                HSeparatorMarker,
+                SeparatorMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Label3D" => {
+            ec.insert((
+                Label3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "LinkButton" => {
+            ec.insert((
+                LinkButtonMarker,
+                BaseButtonMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "MarginContainer" => {
+            ec.insert((
+                MarginContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "MeshInstance3D" => {
+            ec.insert((
+                MeshInstance3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "MultiMeshInstance3D" => {
+            ec.insert((
+                MultiMeshInstance3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "OmniLight3D" => {
+            ec.insert((
+                OmniLight3DMarker,
+                Light3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "PanelContainer" => {
+            ec.insert((
+                PanelContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "PhysicalBone3D" => {
+            ec.insert((
+                PhysicalBone3DMarker,
+                PhysicsBody3DMarker,
+                CollisionObject3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "PhysicsBody2D" => {
+            ec.insert((
+                PhysicsBody2DMarker,
+                CollisionObject2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "PinJoint2D" => {
+            ec.insert((
+                PinJoint2DMarker,
+                Joint2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "PointLight2D" => {
+            ec.insert((
+                PointLight2DMarker,
+                Light2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "PopupMenu" => {
+            ec.insert((
+                PopupMenuMarker,
+                PopupMarker,
+                WindowMarker,
+                ViewportMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "PopupPanel" => {
+            ec.insert((
+                PopupPanelMarker,
+                PopupMarker,
+                WindowMarker,
+                ViewportMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "ProgressBar" => {
+            ec.insert((
+                ProgressBarMarker,
+                RangeMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "RigidBody3D" => {
+            ec.insert((
+                RigidBody3DMarker,
+                PhysicsBody3DMarker,
+                CollisionObject3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "ScrollBar" => {
+            ec.insert((
+                ScrollBarMarker,
+                RangeMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "ScrollContainer" => {
+            ec.insert((
+                ScrollContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Slider" => {
+            ec.insert((
+                SliderMarker,
+                RangeMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "SpinBox" => {
+            ec.insert((
+                SpinBoxMarker,
+                RangeMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "SplitContainer" => {
+            ec.insert((
+                SplitContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "SpotLight3D" => {
+            ec.insert((
+                SpotLight3DMarker,
+                Light3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "SpriteBase3D" => {
+            ec.insert((
+                SpriteBase3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "StaticBody3D" => {
+            ec.insert((
+                StaticBody3DMarker,
+                PhysicsBody3DMarker,
+                CollisionObject3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "SubViewportContainer" => {
+            ec.insert((
+                SubViewportContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "TabContainer" => {
+            ec.insert((
+                TabContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "TextureButton" => {
+            ec.insert((
+                TextureButtonMarker,
+                BaseButtonMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "TextureProgressBar" => {
+            ec.insert((
+                TextureProgressBarMarker,
+                RangeMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "VSeparator" => {
+            ec.insert((
+                VSeparatorMarker,
+                SeparatorMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "VisibleOnScreenEnabler2D" => {
+            ec.insert((
+                VisibleOnScreenEnabler2DMarker,
+                VisibleOnScreenNotifier2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "VisibleOnScreenEnabler3D" => {
+            ec.insert((
+                VisibleOnScreenEnabler3DMarker,
+                VisibleOnScreenNotifier3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "AnimatableBody3D" => {
+            ec.insert((
+                AnimatableBody3DMarker,
+                StaticBody3DMarker,
+                PhysicsBody3DMarker,
+                CollisionObject3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "AnimatedSprite3D" => {
+            ec.insert((
+                AnimatedSprite3DMarker,
+                SpriteBase3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CSGCombiner3D" => {
+            ec.insert((
+                CSGCombiner3DMarker,
+                CSGShape3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CSGPrimitive3D" => {
+            ec.insert((
+                CSGPrimitive3DMarker,
+                CSGShape3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CharacterBody2D" => {
+            ec.insert((
+                CharacterBody2DMarker,
+                PhysicsBody2DMarker,
+                CollisionObject2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CheckBox" => {
+            ec.insert((
+                CheckBoxMarker,
+                ButtonMarker,
+                BaseButtonMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CheckButton" => {
+            ec.insert((
+                CheckButtonMarker,
+                ButtonMarker,
+                BaseButtonMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "ColorPickerButton" => {
+            ec.insert((
+                ColorPickerButtonMarker,
+                ButtonMarker,
+                BaseButtonMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "EditorCommandPalette" => {
+            ec.insert((
+                EditorCommandPaletteMarker,
+                ConfirmationDialogMarker,
+                AcceptDialogMarker,
+                WindowMarker,
+                ViewportMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "EditorFileDialog" => {
+            ec.insert((
+                EditorFileDialogMarker,
+                ConfirmationDialogMarker,
+                AcceptDialogMarker,
+                WindowMarker,
+                ViewportMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "EditorInspector" => {
+            ec.insert((
+                EditorInspectorMarker,
+                ScrollContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "FileDialog" => {
+            ec.insert((
+                FileDialogMarker,
+                ConfirmationDialogMarker,
+                AcceptDialogMarker,
+                WindowMarker,
+                ViewportMarker,
+                NodeMarker,
+            ));
+            true
+        }
         #[cfg(feature = "experimental-godot-api")]
-        "GraphNode" => ec.insert(GraphNodeMarker),
-        "HBoxContainer" => ec.insert(HBoxContainerMarker),
-        "HFlowContainer" => ec.insert(HFlowContainerMarker),
-        "HScrollBar" => ec.insert(HScrollBarMarker),
-        "HSlider" => ec.insert(HSliderMarker),
-        "HSplitContainer" => ec.insert(HSplitContainerMarker),
-        "MenuButton" => ec.insert(MenuButtonMarker),
-        "OptionButton" => ec.insert(OptionButtonMarker),
-        "RigidBody2D" => ec.insert(RigidBody2DMarker),
-        "ScriptCreateDialog" => ec.insert(ScriptCreateDialogMarker),
-        "ScriptEditor" => ec.insert(ScriptEditorMarker),
-        "SoftBody3D" => ec.insert(SoftBody3DMarker),
-        "Sprite3D" => ec.insert(Sprite3DMarker),
-        "StaticBody2D" => ec.insert(StaticBody2DMarker),
-        "VBoxContainer" => ec.insert(VBoxContainerMarker),
-        "VFlowContainer" => ec.insert(VFlowContainerMarker),
-        "VScrollBar" => ec.insert(VScrollBarMarker),
-        "VSlider" => ec.insert(VSliderMarker),
-        "VSplitContainer" => ec.insert(VSplitContainerMarker),
-        "VehicleBody3D" => ec.insert(VehicleBody3DMarker),
-        "AnimatableBody2D" => ec.insert(AnimatableBody2DMarker),
-        "CSGBox3D" => ec.insert(CSGBox3DMarker),
-        "CSGCylinder3D" => ec.insert(CSGCylinder3DMarker),
-        "CSGMesh3D" => ec.insert(CSGMesh3DMarker),
-        "CSGPolygon3D" => ec.insert(CSGPolygon3DMarker),
-        "CSGSphere3D" => ec.insert(CSGSphere3DMarker),
-        "CSGTorus3D" => ec.insert(CSGTorus3DMarker),
-        "ColorPicker" => ec.insert(ColorPickerMarker),
-        "EditorResourcePicker" => ec.insert(EditorResourcePickerMarker),
-        "FileSystemDock" => ec.insert(FileSystemDockMarker),
-        "PhysicalBone2D" => ec.insert(PhysicalBone2DMarker),
-        "ScriptEditorBase" => ec.insert(ScriptEditorBaseMarker),
-        "EditorScriptPicker" => ec.insert(EditorScriptPickerMarker),
+        "GraphNode" => {
+            ec.insert((
+                GraphNodeMarker,
+                GraphElementMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "HBoxContainer" => {
+            ec.insert((
+                HBoxContainerMarker,
+                BoxContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "HFlowContainer" => {
+            ec.insert((
+                HFlowContainerMarker,
+                FlowContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "HScrollBar" => {
+            ec.insert((
+                HScrollBarMarker,
+                ScrollBarMarker,
+                RangeMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "HSlider" => {
+            ec.insert((
+                HSliderMarker,
+                SliderMarker,
+                RangeMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "HSplitContainer" => {
+            ec.insert((
+                HSplitContainerMarker,
+                SplitContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "MenuButton" => {
+            ec.insert((
+                MenuButtonMarker,
+                ButtonMarker,
+                BaseButtonMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "OptionButton" => {
+            ec.insert((
+                OptionButtonMarker,
+                ButtonMarker,
+                BaseButtonMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "RigidBody2D" => {
+            ec.insert((
+                RigidBody2DMarker,
+                PhysicsBody2DMarker,
+                CollisionObject2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "ScriptCreateDialog" => {
+            ec.insert((
+                ScriptCreateDialogMarker,
+                ConfirmationDialogMarker,
+                AcceptDialogMarker,
+                WindowMarker,
+                ViewportMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "ScriptEditor" => {
+            ec.insert((
+                ScriptEditorMarker,
+                PanelContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "SoftBody3D" => {
+            ec.insert((
+                SoftBody3DMarker,
+                MeshInstance3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "Sprite3D" => {
+            ec.insert((
+                Sprite3DMarker,
+                SpriteBase3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "StaticBody2D" => {
+            ec.insert((
+                StaticBody2DMarker,
+                PhysicsBody2DMarker,
+                CollisionObject2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "VBoxContainer" => {
+            ec.insert((
+                VBoxContainerMarker,
+                BoxContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "VFlowContainer" => {
+            ec.insert((
+                VFlowContainerMarker,
+                FlowContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "VScrollBar" => {
+            ec.insert((
+                VScrollBarMarker,
+                ScrollBarMarker,
+                RangeMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "VSlider" => {
+            ec.insert((
+                VSliderMarker,
+                SliderMarker,
+                RangeMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "VSplitContainer" => {
+            ec.insert((
+                VSplitContainerMarker,
+                SplitContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "VehicleBody3D" => {
+            ec.insert((
+                VehicleBody3DMarker,
+                RigidBody3DMarker,
+                PhysicsBody3DMarker,
+                CollisionObject3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "AnimatableBody2D" => {
+            ec.insert((
+                AnimatableBody2DMarker,
+                StaticBody2DMarker,
+                PhysicsBody2DMarker,
+                CollisionObject2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CSGBox3D" => {
+            ec.insert((
+                CSGBox3DMarker,
+                CSGPrimitive3DMarker,
+                CSGShape3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CSGCylinder3D" => {
+            ec.insert((
+                CSGCylinder3DMarker,
+                CSGPrimitive3DMarker,
+                CSGShape3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CSGMesh3D" => {
+            ec.insert((
+                CSGMesh3DMarker,
+                CSGPrimitive3DMarker,
+                CSGShape3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CSGPolygon3D" => {
+            ec.insert((
+                CSGPolygon3DMarker,
+                CSGPrimitive3DMarker,
+                CSGShape3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CSGSphere3D" => {
+            ec.insert((
+                CSGSphere3DMarker,
+                CSGPrimitive3DMarker,
+                CSGShape3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "CSGTorus3D" => {
+            ec.insert((
+                CSGTorus3DMarker,
+                CSGPrimitive3DMarker,
+                CSGShape3DMarker,
+                GeometryInstance3DMarker,
+                VisualInstance3DMarker,
+                Node3DMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "ColorPicker" => {
+            ec.insert((
+                ColorPickerMarker,
+                VBoxContainerMarker,
+                BoxContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "EditorResourcePicker" => {
+            ec.insert((
+                EditorResourcePickerMarker,
+                HBoxContainerMarker,
+                BoxContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "FileSystemDock" => {
+            ec.insert((
+                FileSystemDockMarker,
+                VBoxContainerMarker,
+                BoxContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "PhysicalBone2D" => {
+            ec.insert((
+                PhysicalBone2DMarker,
+                RigidBody2DMarker,
+                PhysicsBody2DMarker,
+                CollisionObject2DMarker,
+                Node2DMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "ScriptEditorBase" => {
+            ec.insert((
+                ScriptEditorBaseMarker,
+                VBoxContainerMarker,
+                BoxContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
+        "EditorScriptPicker" => {
+            ec.insert((
+                EditorScriptPickerMarker,
+                EditorResourcePickerMarker,
+                HBoxContainerMarker,
+                BoxContainerMarker,
+                ContainerMarker,
+                ControlMarker,
+                CanvasItemMarker,
+                NodeMarker,
+            ));
+            true
+        }
         // Custom user types that extend Godot nodes
-        _ => ec,
-    };
+        _ => false,
+    }
 }
 
 pub fn remove_comprehensive_node_type_markers(ec: &mut EntityCommands) {
