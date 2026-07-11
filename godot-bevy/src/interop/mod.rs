@@ -2,8 +2,6 @@ pub mod godot_node_handle;
 pub use godot_node_handle::*;
 
 pub mod godot_access;
-#[cfg(debug_assertions)]
-pub use godot_access::BulkOperationsCache;
 pub use godot_access::*;
 
 pub mod godot_resource_handle;
