@@ -184,6 +184,12 @@ impl BevyApp {
         self.started = false;
         self.prefix_done_this_frame = false;
 
+        // process_mode = ALWAYS keeps both callbacks firing under SceneTree.paused, so the
+        // ECS ticks through a tree-pause; pause coherence is enforced in the schedules (the
+        // FixedMain gate), not by freezing Godot's callbacks.
+        self.base_mut()
+            .set_process_mode(godot::classes::node::ProcessMode::ALWAYS);
+
         let mut app = App::new();
 
         let config = BEVY_APP_CONFIG.get().copied().unwrap_or(BevyAppConfig {

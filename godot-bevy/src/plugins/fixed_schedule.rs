@@ -92,6 +92,13 @@ pub(crate) fn host_fixed_main_loop(app: &mut App) {
 /// up automatically. `overstep_fraction()` is 0 because each step advances exactly
 /// one timestep: Godot owns fixed-step interpolation, not Bevy's accumulator.
 fn godot_fixed_driver(world: &mut World) {
+    // Freeze FixedMain (and Time<Fixed>) wholesale under pause. Keyed on
+    // Time<Virtual>::is_paused() -- set by both a tree-pause and a user's own pause() --
+    // not delta==0, so a time_scale==0 hitstop still steps. Returning here leaves the
+    // input-clock pair unentered (balanced) and the generic Time on Virtual.
+    if world.resource::<Time<Virtual>>().is_paused() {
+        return;
+    }
     let delta = world.resource::<GodotFixedDelta>().0;
     let mut fixed = world.resource_mut::<Time<Fixed>>();
     // Godot passes delta 0 when Engine.time_scale == 0 (freeze/hitstop); set_timestep
