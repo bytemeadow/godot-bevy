@@ -22,6 +22,7 @@ mod real_frame_tests;
 mod scene_tree_tests;
 mod scene_tree_watcher_init_tests;
 mod signal_tests;
+mod time_scale_tests;
 mod transform_sync_tests;
 
 #[gdextension(entry_symbol = godot_bevy_itest)]

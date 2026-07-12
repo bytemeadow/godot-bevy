@@ -539,12 +539,14 @@ impl INode for BevyApp {
         if let Some(app) = self.app.as_mut()
             && let Err(e) = catch_unwind(AssertUnwindSafe(|| {
                 let world = app.world_mut();
-                run_physics_step(
-                    world,
-                    need_startup,
-                    need_prefix,
-                    std::time::Duration::from_secs_f64(delta as f64),
-                );
+                // Clamp the Godot delta: a negative, NaN, infinite, or overflowing
+                // value (an extreme Engine.time_scale can produce one) would panic
+                // Duration and tear the app down. try_from_secs_f64 rejects every such
+                // case; freeze on a bad delta instead -- godot_fixed_driver already
+                // no-ops a 0-duration step.
+                let step = std::time::Duration::try_from_secs_f64(delta as f64)
+                    .unwrap_or(std::time::Duration::ZERO);
+                run_physics_step(world, need_startup, need_prefix, step);
                 crate::profiling::secondary_frame_mark("physics");
             }))
         {
