@@ -1,19 +1,12 @@
-//! Pause coherence (Leg B). Two pause surfaces must agree:
+//! Pause coherence: `SceneTree.paused` mirrors onto `Time<Virtual>` (edge-triggered, one-way),
+//! and the Godot-driven fixed schedule freezes whenever `Time<Virtual>` is paused.
 //!
-//! - `SceneTree.paused` is mirrored onto `Time<Virtual>` (edge-triggered, one-way), and
-//! - the Godot-driven fixed schedule is frozen whenever `Time<Virtual>` is paused.
+//! `BevyApp` is `process_mode = ALWAYS`, so both callbacks keep firing under a tree-pause and
+//! these awaits resolve; a regression to PAUSABLE would hang the suite until `--quit-after`.
+//! `SceneTree` and `Time<Virtual>` are process-global, so every test resets pause via a drop guard.
 //!
-//! Because `BevyApp` is now `process_mode = ALWAYS`, both callbacks keep firing under a
-//! tree-pause, so the frame signal still resolves and these awaits never deadlock. A
-//! regression to PAUSABLE would instead hang the await forever: the itest runner is
-//! sequential and the drop guard only runs on unwind, so the hang stalls the whole suite
-//! until `--quit-after` fires -- it surfaces as a global timeout, not a single red test.
-//! `SceneTree` and `Time<Virtual>` are process-global, so every test resets pause through a
-//! drop guard -- a failed assert can't leave the tree paused for the next test.
-//!
-//! Counting rule: physics_process still fires under pause, so the frame signal's step
-//! count is NOT a measure of FixedUpdate runs. We count FixedUpdate runs with our own
-//! counter resource instead.
+//! Counting rule: physics_process still fires under pause, so the frame signal's step count is
+//! NOT FixedUpdate runs -- tests count those with their own counter resource.
 
 use bevy::prelude::*;
 use godot::obj::NewAlloc;
@@ -58,7 +51,7 @@ async fn app_with_counters(ctx: &TestContext) -> (TestApp, Counter, Counter) {
     (app, fixed, update)
 }
 
-/// (a)+(b) A tree-pause freezes FixedUpdate wholesale while a non-delta-scaled Update
+/// A tree-pause freezes FixedUpdate wholesale while a non-delta-scaled Update
 /// system keeps running -- the breaking change from `process_mode = ALWAYS`.
 #[itest(async)]
 fn test_tree_pause_freezes_fixed_runs_update(ctx: &TestContext) -> godot::task::TaskHandle {
@@ -93,7 +86,7 @@ fn test_tree_pause_freezes_fixed_runs_update(ctx: &TestContext) -> godot::task::
     })
 }
 
-/// (c) Bevy-only pause: `Time<Virtual>::pause()` with the tree UNPAUSED freezes FixedUpdate
+/// Bevy-only pause: `Time<Virtual>::pause()` with the tree UNPAUSED freezes FixedUpdate
 /// (the driver keys on `Time<Virtual>`) while Update runs, and the edge mirror is one-way,
 /// so `SceneTree.paused` stays false.
 #[itest(async)]
@@ -131,7 +124,7 @@ fn test_bevy_only_pause_freezes_fixed_tree_untouched(ctx: &TestContext) -> godot
     })
 }
 
-/// (d) Edge no-clobber: a user's `Time<Virtual>::pause()` is not cleared while the tree
+/// Edge no-clobber: a user's `Time<Virtual>::pause()` is not cleared while the tree
 /// stays unpaused across many frames. A blind per-frame `set_paused(tree.is_paused())`
 /// would unpause virtual every frame; the edge trigger must leave it alone.
 #[itest(async)]
@@ -166,7 +159,7 @@ fn test_edge_mirror_does_not_clobber_user_pause(ctx: &TestContext) -> godot::tas
     })
 }
 
-/// (d2) Provenance: a user's `Time<Virtual>::pause()` survives a full tree pause/unpause
+/// Provenance: a user's `Time<Virtual>::pause()` survives a full tree pause/unpause
 /// cycle. The mirror resumes only the pause it applied itself, so opening then closing a
 /// SceneTree pause menu over an existing Bevy pause (e.g. a cutscene) must not clear it.
 #[itest(async)]
@@ -202,7 +195,7 @@ fn test_user_pause_survives_tree_pause_cycle(ctx: &TestContext) -> godot::task::
     })
 }
 
-/// (e) Unpausing the tree resumes FixedUpdate (falling edge -> Time<Virtual>::unpause()).
+/// Unpausing the tree resumes FixedUpdate (falling edge -> Time<Virtual>::unpause()).
 #[itest(async)]
 fn test_unpause_resumes_fixedupdate(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx = ctx.clone();
@@ -230,10 +223,10 @@ fn test_unpause_resumes_fixedupdate(ctx: &TestContext) -> godot::task::TaskHandl
     })
 }
 
-/// (f) Transform sync (TwoWay) is frozen under pause: a Godot-side node move is NOT read
+/// Transform sync (TwoWay) is frozen under pause: a Godot-side node move is NOT read
 /// into Bevy while paused (the FixedFirst read rides inside the frozen fixed driver), then
-/// is picked up once the tree is unpaused. Exercises decision #2's driver gate; the
-/// PreUpdate 0-tick fallback gate (decision #4) is not reachable here because the harness
+/// is picked up once the tree is unpaused. This exercises the fixed-driver pause gate; the
+/// PreUpdate 0-tick fallback gate isn't reachable here because the harness
 /// runs `--fixed-fps 60`, so every render frame runs exactly one physics step.
 #[itest(async)]
 fn test_transform_read_frozen_under_pause(ctx: &TestContext) -> godot::task::TaskHandle {

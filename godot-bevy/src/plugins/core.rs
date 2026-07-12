@@ -154,14 +154,11 @@ impl Plugin for GodotBaseCorePlugin {
     }
 }
 
-/// Mirror Godot's `Engine.time_scale` onto `Time<Virtual>` so the Update clock
-/// scales with it while `Time<Real>` stays truthful. Runs before `TimeSystems` so
-/// `time_system` applies the speed the same frame -- a byte-for-byte no-op at 1.0.
-/// `GodotAccess` is the main-thread pin: `get_time_scale` is Godot FFI and panics
-/// off the main thread.
+/// Scale `Time<Virtual>` (the Update clock) by `Engine.time_scale`, leaving `Time<Real>`
+/// truthful. `GodotAccess` is a main-thread pin -- `get_time_scale` is FFI, unsound off
+/// the main thread.
 fn apply_godot_time_scale(_godot: GodotAccess, mut virt: ResMut<Time<Virtual>>) {
-    // set_relative_speed_f64 panics on non-finite or negative input; drop NaN/inf
-    // and clamp a negative scale to 0 (freeze) rather than tear the app down.
+    // set_relative_speed_f64 panics on non-finite/negative input, which tears the app down.
     let raw = godot::classes::Engine::singleton().get_time_scale();
     if raw.is_finite() {
         virt.set_relative_speed_f64(raw.max(0.0));

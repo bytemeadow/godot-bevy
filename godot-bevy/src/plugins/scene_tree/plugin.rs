@@ -231,9 +231,7 @@ impl Default for SceneTreeRefImpl {
     }
 }
 
-/// Edge state for `mirror_tree_pause_to_virtual`: the last-seen `SceneTree.paused` (so it
-/// acts only on an edge) and whether the mirror -- not the user -- applied the current
-/// virtual pause (so a falling edge resumes only the mirror's own pause).
+/// Edge state for `mirror_tree_pause_to_virtual`.
 #[derive(Resource, Default)]
 struct PauseBridge {
     last_tree_paused: bool,
@@ -241,18 +239,15 @@ struct PauseBridge {
 }
 
 /// Mirror `SceneTree.paused` onto `Time<Virtual>`, one-way and edge-triggered: a rising edge
-/// pauses virtual time and a falling edge unpauses it -- but only the pause the mirror itself
-/// applied. A user's own `Time<Virtual>::pause()` (e.g. a cutscene) is never clobbered, even
-/// across a tree pause/unpause cycle. Runs in `First` before `TimeSystems` (and before the
-/// fixed driver reads `is_paused()`) so the pause takes effect the same frame. `SceneTreeRef`
-/// pins it to the main thread and hands back the cached `Gd<SceneTree>`.
+/// pauses, a falling edge unpauses -- but only the pause the mirror itself applied, so a
+/// user's own `Time<Virtual>::pause()` survives a tree pause/unpause cycle. `SceneTreeRef` is
+/// a main-thread pin holding the cached `Gd<SceneTree>`.
 fn mirror_tree_pause_to_virtual(
     mut scene_tree: SceneTreeRef,
     virt: Option<ResMut<Time<Virtual>>>,
     mut bridge: ResMut<PauseBridge>,
 ) {
-    // Standalone/benchmark apps compose this plugin without TimePlugin; with no
-    // Time<Virtual> there is nothing to mirror.
+    // No TimePlugin (standalone/benchmark apps): nothing to mirror.
     let Some(mut virt) = virt else {
         return;
     };

@@ -95,9 +95,6 @@ impl Plugin for GodotTransformSyncPlugin {
                 pre_update_godot_transforms::<Without<DisableGodotTransformRead>>
                     .run_if(transform_sync_twoway_enabled)
                     .run_if(prefix_ran_in_process_fallback)
-                    // Freeze the 0-tick fallback read under pause too. The FixedFirst read
-                    // is already frozen by the driver gate; this closes the last
-                    // Godot->Bevy leak for a strict two-way pause on step-less frames.
                     .run_if(transform_read_not_paused),
             );
             app.add_systems(
@@ -123,9 +120,8 @@ fn transform_sync_enabled(config: Res<GodotTransformConfig>) -> bool {
     config.sync_mode != TransformSyncMode::Disabled
 }
 
-/// Freeze the 0-tick fallback read while `Time<Virtual>` is paused. Taken as an
-/// `Option` so `GodotTransformSyncPlugin` stays usable without `TimePlugin` -- a
-/// bare transform-sync app has no virtual clock; treat "no clock" as "running".
+/// Freeze the read while `Time<Virtual>` is paused. `Option` so the plugin stays usable
+/// without `TimePlugin` -- no virtual clock means "not paused".
 fn transform_read_not_paused(time: Option<Res<Time<Virtual>>>) -> bool {
     time.is_none_or(|t| !t.is_paused())
 }

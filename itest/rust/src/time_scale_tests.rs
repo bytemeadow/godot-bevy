@@ -1,8 +1,6 @@
-//! Engine.time_scale must scale Time<Virtual> (the Update clock) without touching
-//! Time<Real>. time_scale is global process state -- every test resets it to 1.0
-//! through a drop guard so a failed assert can't bleed a stale scale into the next
-//! test. Assertions use tolerant, magnitude-independent ratios over multi-frame
-//! windows to survive the harness's +/-1 frame slop.
+//! Engine.time_scale scales Time<Virtual> (the Update clock) but not Time<Real>. It's
+//! global process state, so every test resets it via a drop guard. Assertions use tolerant
+//! ratios over multi-frame windows to survive the harness's +/-1 frame slop.
 
 use bevy::prelude::*;
 use godot::obj::Singleton;
@@ -29,10 +27,9 @@ struct RatioProbe {
     frames: u32,
 }
 
-/// Accumulate per-frame Virtual/Real deltas, skipping frames whose Real delta nears
-/// the Time<Virtual> max_delta clamp (0.25s) -- a clamped frame would distort the
-/// ratio. Below the clamp, Virtual.delta == Real.delta * relative_speed exactly, so
-/// the ratio of sums is the scale regardless of per-frame wall-clock jitter.
+/// Accumulate per-frame Virtual/Real deltas, skipping frames near the Time<Virtual>
+/// max_delta clamp (0.25s) that would distort the ratio. Below the clamp Virtual.delta ==
+/// Real.delta * relative_speed, so the ratio of sums is the scale despite wall-clock jitter.
 fn sample_ratio(virt: Res<Time<Virtual>>, real: Res<Time<Real>>, mut probe: ResMut<RatioProbe>) {
     let r = real.delta_secs_f64();
     if r > 0.0 && r < 0.1 {
@@ -104,9 +101,7 @@ fn test_time_scale_half_scales_virtual_not_real(ctx: &TestContext) -> godot::tas
             "Virtual/Real delta ratio {ratio} should track time_scale 0.5"
         );
 
-        // Real is unscaled: its elapsed keeps pace with the test's own wall clock. A
-        // Real wrongly scaled by 0.5 would grow ~half as fast (ratio ~0.5); the
-        // airtight version of this is test_time_scale_zero_freezes_virtual_real_climbs.
+        // Real is unscaled: its elapsed keeps pace with the test's own wall clock.
         let real_elapsed = real1 - real0;
         assert!(
             real_elapsed > 0.6 * wall_elapsed,
@@ -194,10 +189,8 @@ fn test_time_scale_one_is_noop(ctx: &TestContext) -> godot::task::TaskHandle {
     })
 }
 
-/// Non-finite and negative time_scale must not tear the app down. Unguarded, each
-/// would panic a system -- set_relative_speed_f64 on the value, or (via a negative or
-/// infinite Godot delta) Duration::from_secs_f64 in the physics driver. Guarded, the
-/// app keeps stepping, so the Update counter keeps advancing.
+/// Non-finite and negative time_scale must not tear the app down (unguarded they panic
+/// set_relative_speed_f64 or the driver's Duration::from_secs_f64). The counter keeps advancing.
 #[itest(async)]
 fn test_pathological_time_scale_does_not_tear_down(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx = ctx.clone();
