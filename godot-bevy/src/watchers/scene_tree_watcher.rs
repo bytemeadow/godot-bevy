@@ -29,9 +29,10 @@ impl INode for SceneTreeWatcher {
 impl SceneTreeWatcher {
     #[func]
     pub fn scene_tree_event(&self, node: Gd<Node>, message_type: SceneTreeMessageType) {
-        // Check if node is marked to be excluded from scene tree watcher
-        // This is used by godot-bevy-inspector and other tools
-        if node.has_meta("_bevy_exclude") {
+        // Fallback direct-signal entry. The optimized GDScript watcher filters excluded
+        // subtrees before they cross FFI, so only this path re-checks in Rust.
+        if matches!(message_type, SceneTreeMessageType::NodeAdded) && is_excluded_from_mirror(&node)
+        {
             return;
         }
 
@@ -55,12 +56,6 @@ impl SceneTreeWatcher {
         message_type: SceneTreeMessageType,
         node_type: String,
     ) {
-        // Check if node is marked to be excluded from scene tree watcher
-        // This is used by godot-bevy-inspector and other tools
-        if node.has_meta("_bevy_exclude") {
-            return;
-        }
-
         if let Some(channel) = self.notification_channel.as_ref() {
             let _ = channel.send(SceneTreeMessage {
                 node_id: GodotNodeHandle::from(node.instance_id()),
@@ -84,10 +79,6 @@ impl SceneTreeWatcher {
         parent_id: i64,
         collision_mask: i64,
     ) {
-        if node.has_meta("_bevy_exclude") {
-            return;
-        }
-
         let node_type = if node_type.is_empty() {
             None
         } else {
@@ -130,10 +121,6 @@ impl SceneTreeWatcher {
         collision_mask: i64,
         groups: PackedStringArray,
     ) {
-        if node.has_meta("_bevy_exclude") {
-            return;
-        }
-
         let node_type = if node_type.is_empty() {
             None
         } else {
@@ -176,10 +163,6 @@ impl SceneTreeWatcher {
         message_type: SceneTreeMessageType,
         node_name: String,
     ) {
-        if node.has_meta("_bevy_exclude") {
-            return;
-        }
-
         let node_name = if node_name.is_empty() {
             None
         } else {
@@ -198,4 +181,19 @@ impl SceneTreeWatcher {
             });
         }
     }
+}
+
+/// True if `node` or any ancestor carries the `_bevy_exclude` meta. Exclusion is
+/// subtree-wide -- a node under an excluded root is never mirrored -- and only the
+/// mirror-in decision (`NodeAdded`) consults it; removals stay unconditional so an
+/// already-mirrored node is never leaked.
+pub(crate) fn is_excluded_from_mirror(node: &Gd<Node>) -> bool {
+    let mut current = Some(node.clone());
+    while let Some(n) = current {
+        if n.has_meta("_bevy_exclude") {
+            return true;
+        }
+        current = n.get_parent();
+    }
+    false
 }

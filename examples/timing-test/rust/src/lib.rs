@@ -1,10 +1,7 @@
 #![allow(clippy::type_complexity)]
 
 use bevy::prelude::*;
-use godot_bevy::prelude::{
-    godot_prelude::{ExtensionLibrary, gdextension, godot_print},
-    *,
-};
+use godot_bevy::prelude::{godot_prelude::godot_print, *};
 
 #[bevy_app]
 fn build_app(app: &mut App) {

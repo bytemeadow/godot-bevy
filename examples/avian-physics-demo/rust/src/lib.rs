@@ -14,7 +14,6 @@ use bevy_asset_loader::{
 use godot_bevy::prelude::{
     GodotAssetsPlugin, GodotBevyLogPlugin, GodotPackedScenePlugin, GodotResource,
     GodotTransformSyncPlugin, bevy_app,
-    godot_prelude::{ExtensionLibrary, gdextension},
 };
 use std::fmt::Debug;
 

@@ -37,3 +37,7 @@ godot-bevy-macros = { version = "0.11.0", path = "godot-bevy-macros" }
 godot-bevy-test = { version = "0.11.0", path = "godot-bevy-test" }
 godot-bevy-test-macros = { version = "0.11.0", path = "godot-bevy-test-macros" }
 cargo-godot-lib = "0.2.0"
+
+# Optimize dependencies in debug builds for faster iteration.
+[profile.dev.package."*"]
+opt-level = 3

@@ -58,7 +58,6 @@ The plugin provides additional useful features:
 
 - **Add BevyApp Singleton Only**: If you already have a Rust project, use **Project > Tools > Add BevyApp Singleton** to just create and register the singleton
 - **Build Rust Project**: Use **Project > Tools > Build Rust Project** to rebuild without restarting the editor
-- **Bulk Transform Optimization**: The generated singleton includes optimized bulk transform methods that godot-bevy automatically detects and uses for better performance
 
 ## Manual Installation
 
@@ -218,7 +217,5 @@ cargo build
 ## Next Steps
 
 Congratulations! You've successfully set up godot-bevy using either the plugin or manual installation method.
-
-The plugin installation automatically includes the new bulk transform API optimizations, while manual installations can add these by updating their BevyApp singleton scene.
 
 Continue to [Basic Concepts](./basic-concepts.md) to learn more about godot-bevy's architecture and capabilities.

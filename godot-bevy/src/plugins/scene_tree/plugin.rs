@@ -3,6 +3,7 @@ use super::node_type_checking::{
 };
 use crate::plugins::core::SceneTreeComponentRegistry;
 use crate::prelude::GodotScene;
+use crate::watchers::scene_tree_watcher::is_excluded_from_mirror;
 use crate::{
     interop::{GodotAccess, GodotNodeHandle},
     plugins::collisions::{
@@ -349,6 +350,10 @@ fn initialize_scene_tree(
 
 fn traverse_fallback(node: Gd<Node>) -> Vec<SceneTreeMessage> {
     fn traverse_recursive(node: Gd<Node>, messages: &mut Vec<SceneTreeMessage>) {
+        // Excluded subtree: skip this node and (recursion is below) all descendants.
+        if node.has_meta("_bevy_exclude") {
+            return;
+        }
         messages.push(SceneTreeMessage {
             node_id: GodotNodeHandle::from(node.instance_id()),
             message_type: SceneTreeMessageType::NodeAdded,
@@ -647,11 +652,9 @@ fn create_scene_tree_entity(
                 let mut node = node_accessor.get::<Node>();
 
                 let node_name = node_name.unwrap_or_else(|| node.get_name().to_string());
-                new_entity_commands
-                    .insert(node_id)
-                    .insert(Name::from(node_name));
 
                 let new_entity = if already_decorated {
+                    new_entity_commands.insert((node_id, Name::from(node_name)));
                     new_entity_commands.id()
                 } else {
                     // Compute the class hierarchy once; reused for markers and autosync.
@@ -661,11 +664,17 @@ fn create_scene_tree_entity(
                             .unwrap_or_else(|| node.get_class().to_string())
                             .as_str(),
                     );
+                    // The first matching arm inserts the whole ancestor-marker chain in one
+                    // move, so stop -- continuing would redundantly re-insert those markers. An
+                    // unknown leaf (e.g. a GDExtension class) returns false and falls through to
+                    // its first native ancestor.
                     for class_name in class_hierarchy.iter() {
-                        add_node_type_markers_from_string(
+                        if add_node_type_markers_from_string(
                             &mut new_entity_commands,
                             class_name.as_str(),
-                        );
+                        ) {
+                            break;
+                        }
                     }
 
                     // Check if the node is a collision body (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.)
@@ -700,14 +709,17 @@ fn create_scene_tree_entity(
                             pending_collision_bodies.push((node.clone(), mask, kind));
                         }
                     }
-                    // Use pre-analyzed groups from GDScript watcher if available, otherwise
-                    // fallback to FFI. SceneTreeDecorated rides this insert to avoid a
-                    // separate archetype transition.
-                    if let Some(groups_vec) = groups {
-                        new_entity_commands.insert((Groups::from(groups_vec), SceneTreeDecorated));
-                    } else {
-                        new_entity_commands.insert((Groups::from(&node), SceneTreeDecorated));
-                    }
+                    // Groups come pre-analyzed from the GDScript watcher, or fall back to FFI.
+                    let groups = match groups {
+                        Some(groups_vec) => Groups::from(groups_vec),
+                        None => Groups::from(&node),
+                    };
+                    new_entity_commands.insert((
+                        node_id,
+                        Name::from(node_name),
+                        groups,
+                        SceneTreeDecorated,
+                    ));
 
                     // Add all components registered by plugins
                     component_registry.add_to_entity(&mut new_entity_commands, &mut node_accessor);
@@ -727,22 +739,26 @@ fn create_scene_tree_entity(
                     new_entity
                 };
 
-                // (Re)insert the GodotChildOf relationship to mirror Godot's scene tree
-                // hierarchy. Runs in both branches: updating the parent is the whole point
-                // of processing a reparent NodeAdded.
+                // Reconcile GodotChildOf with the node's current parent (the point of a reparent
+                // NodeAdded): link to a mirrored parent, else drop any stale edge.
                 let parent_id = parent_id_from_gdscript
-                    .or_else(|| node.get_parent().map(|parent| parent.instance_id()));
-                if let Some(parent_id) = parent_id
-                    && parent_id != scene_root.instance_id()
-                {
-                    if let Some(parent_entity) = node_index.get(parent_id) {
+                    .or_else(|| node.get_parent().map(|parent| parent.instance_id()))
+                    .filter(|parent_id| *parent_id != scene_root.instance_id());
+                match parent_id.and_then(|parent_id| node_index.get(parent_id)) {
+                    Some(parent_entity) => {
                         commands
                             .entity(new_entity)
                             .insert(super::relationship::GodotChildOf(parent_entity));
-                    } else {
-                        warn!(target: "godot_scene_tree_messages",
-                            "Parent entity with ID {} not found in NodeEntityIndex. This might indicate a missing or incorrect mapping. Path={}",
-                            parent_id, node.get_path());
+                    }
+                    None => {
+                        commands
+                            .entity(new_entity)
+                            .remove::<super::relationship::GodotChildOf>();
+                        if let Some(parent_id) = parent_id {
+                            warn!(target: "godot_scene_tree_messages",
+                                "Parent entity with ID {} not found in NodeEntityIndex. This might indicate a missing or incorrect mapping. Path={}",
+                                parent_id, node.get_path());
+                        }
                     }
                 }
             }
@@ -758,10 +774,21 @@ fn create_scene_tree_entity(
                         .unwrap_or(false);
 
                     if is_reparenting {
-                        // Node is being reparented - don't despawn entity, it will be re-added
-                        trace!(target: "godot_scene_tree_events",
-                            "Node is being reparented, preserving entity");
-                        // Don't remove from ent_mapping - entity still valid
+                        // A node reparented under an excluded subtree has its NodeAdded dropped
+                        // by the watcher, so preserving the entity here would strand it with a
+                        // stale parent and keep it syncing. Reconcile against exclusion: tear it
+                        // down instead. Otherwise it moved within the mirrored tree -- preserve it.
+                        let into_excluded = godot
+                            .try_get::<Node>(node_handle)
+                            .map(|n| is_excluded_from_mirror(&n))
+                            .unwrap_or(false);
+                        if into_excluded {
+                            commands.entity(ent).despawn();
+                            node_index.remove(instance_id);
+                        } else {
+                            trace!(target: "godot_scene_tree_events",
+                                "Node is being reparented, preserving entity");
+                        }
                     } else {
                         // Truly removed. Read protected from the world; same-batch
                         // spawns aren't queryable yet but are never protected.

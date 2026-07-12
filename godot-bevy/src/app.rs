@@ -21,6 +21,60 @@ pub struct BevyAppConfig {
     pub scene_tree_auto_despawn_children: bool,
 }
 
+impl Default for BevyAppConfig {
+    fn default() -> Self {
+        Self {
+            scene_tree_auto_despawn_children: true,
+        }
+    }
+}
+
+/// Register a Bevy app builder with default configuration. See [`init_with_config`].
+pub fn init(init_fn: impl Fn(&mut App) + Send + Sync + 'static) {
+    init_with_config(BevyAppConfig::default(), init_fn);
+}
+
+/// Register a Bevy app builder and its configuration, then start profiling.
+///
+/// Call this from your own `ExtensionLibrary::on_stage_init` during
+/// `InitStage::Core` when you can't use `#[bevy_app]` -- e.g. an existing gdext
+/// project that already defines an `ExtensionLibrary`. `#[bevy_app]` is sugar over
+/// this. Pair it with [`deinit`] in `on_stage_deinit`.
+pub fn init_with_config(config: BevyAppConfig, init_fn: impl Fn(&mut App) + Send + Sync + 'static) {
+    let _ = BEVY_APP_CONFIG.set(config);
+    let _ = BEVY_INIT_FUNC.get_or_init(|| Box::new(init_fn));
+    crate::profiling::init_profiler();
+}
+
+/// Shut godot-bevy profiling down. Call from your `ExtensionLibrary::on_stage_deinit`
+/// during `InitStage::Core` when using the manual entry path.
+pub fn deinit() {
+    crate::profiling::shutdown_profiler();
+}
+
+/// Print the active godot-bevy plugin table to Godot's output panel at startup, so a
+/// silent misconfiguration -- most often a forgotten `GodotTransformSyncPlugin` -- is
+/// visible instead of showing up as a query that quietly matches nothing. Dev builds only.
+#[cfg(debug_assertions)]
+fn log_plugin_diagnostics(app: &App) {
+    use crate::plugins::{
+        GodotAssetsPlugin, GodotAudioPlugin, GodotCollisionsPlugin, GodotDebuggerPlugin,
+        GodotInputEventPlugin, GodotPackedScenePlugin, GodotTransformSyncPlugin,
+    };
+
+    let on = |added: bool| if added { "on" } else { "off" };
+    godot::global::godot_print!(
+        "[godot-bevy] plugins -- transform_sync:{} assets:{} collisions:{} input:{} audio:{} packed_scene:{} debugger:{}. Missing one you expected? Add it, or use GodotDefaultPlugins.",
+        on(app.is_plugin_added::<GodotTransformSyncPlugin>()),
+        on(app.is_plugin_added::<GodotAssetsPlugin>()),
+        on(app.is_plugin_added::<GodotCollisionsPlugin>()),
+        on(app.is_plugin_added::<GodotInputEventPlugin>()),
+        on(app.is_plugin_added::<GodotAudioPlugin>()),
+        on(app.is_plugin_added::<GodotPackedScenePlugin>()),
+        on(app.is_plugin_added::<GodotDebuggerPlugin>()),
+    );
+}
+
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct BevyApp {
@@ -147,6 +201,9 @@ impl BevyApp {
             app_builder_func(&mut app);
         }
 
+        #[cfg(debug_assertions)]
+        log_plugin_diagnostics(&app);
+
         use crate::plugins::scene_tree::SceneTreeMessage;
         if app
             .world()
@@ -171,9 +228,6 @@ impl BevyApp {
         {
             self.register_input_event_watcher(&mut app);
         }
-
-        #[cfg(debug_assertions)]
-        self.cache_bulk_operations(&mut app);
 
         if app.plugins_state() != PluginsState::Cleaned {
             while app.plugins_state() == PluginsState::Adding {
@@ -266,8 +320,8 @@ impl BevyApp {
         }
     }
 
-    /// Register the OptimizedBulkOperations GDScript node as a child.
-    /// This is called early (before app creation) so benchmarks can use it.
+    /// Register the OptimizedBulkOperations GDScript node as a child (unless a
+    /// scene already provides one). Backs collision-signal batching.
     #[cfg(debug_assertions)]
     fn register_optimized_bulk_operations(&mut self) {
         // Check if OptimizedBulkOperations already exists (e.g., loaded from tscn)
@@ -298,25 +352,6 @@ impl BevyApp {
             }
         } else {
             tracing::debug!("OptimizedBulkOperations not available");
-        }
-    }
-
-    /// Cache the OptimizedBulkOperations node reference in the Bevy app.
-    /// This avoids repeated scene tree lookups every frame.
-    #[cfg(debug_assertions)]
-    fn cache_bulk_operations(&self, app: &mut App) {
-        use crate::interop::BulkOperationsCache;
-
-        if let Some(node) = self
-            .base()
-            .get_node_or_null("OptimizedBulkOperations")
-            .map(|n| n.upcast::<godot::classes::Object>())
-        {
-            app.insert_non_send(BulkOperationsCache::new(node));
-            tracing::debug!("Cached OptimizedBulkOperations node reference");
-        } else {
-            // Initialize empty cache so systems don't need to check for resource existence
-            app.init_non_send::<BulkOperationsCache>();
         }
     }
 }
@@ -398,9 +433,8 @@ impl INode for BevyApp {
             return;
         }
 
-        // Register bulk operations helper (used by transform sync, input systems, and benchmarks)
-        // Only registered in debug builds where bulk FFI is faster than individual calls
-        // This is done before the init check so benchmarks can use it without a full Bevy app
+        // The OptimizedBulkOperations helper node backs collision-signal batching.
+        // Registered before the init check so it exists without a full Bevy app.
         #[cfg(debug_assertions)]
         self.register_optimized_bulk_operations();
 

@@ -37,8 +37,9 @@ pub use crate::plugins::{
     signals::{DeferredSignalConnections, GodotSignals, GodotSignalsPlugin},
     // Scene tree
     transforms::{
-        GodotTransformConfig, GodotTransformSyncPlugin, GodotTransformSyncPluginExt,
-        TransformSyncMetadata, TransformSyncMode, add_transform_sync_systems,
+        DisableGodotTransformRead, GodotTransformConfig, GodotTransformSyncPlugin,
+        GodotTransformSyncPluginExt, NO_TRANSFORM_READ_GROUP, TransformSyncMetadata,
+        TransformSyncMode, add_transform_sync_systems,
     },
 };
 pub use bevy_ecs::prelude as bevy_ecs_prelude;

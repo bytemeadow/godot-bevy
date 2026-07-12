@@ -26,35 +26,26 @@ pub fn bevy_app(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let scene_tree_auto_despawn_children = config.scene_tree_auto_despawn_children;
 
+    // Fully-qualified paths so a user's crate needs no `use godot::init::{...}`.
     let expanded = quote! {
         struct BevyExtensionLibrary;
 
-        #[gdextension]
-        unsafe impl ExtensionLibrary for BevyExtensionLibrary {
+        #[godot::init::gdextension]
+        unsafe impl godot::init::ExtensionLibrary for BevyExtensionLibrary {
             fn on_stage_init(stage: godot::prelude::InitStage) {
                 if stage == godot::prelude::InitStage::Core {
-
-                    // Store the scene tree configuration
-                    let _ = godot_bevy::app::BEVY_APP_CONFIG.set(godot_bevy::app::BevyAppConfig {
-                        scene_tree_auto_despawn_children: #scene_tree_auto_despawn_children,
-                    });
-
-                    // Stores the client's entrypoint, which we'll call shortly when our `BevyApp`
-                    // Godot Node has its `ready()` invoked
-                    let _ = godot_bevy::app::BEVY_INIT_FUNC.get_or_init(|| Box::new(#name));
-
-                    // Initialize profiling (Tracy or other backends)
-                    // This function handles all feature gating internally
-                    godot_bevy::profiling::init_profiler();
+                    godot_bevy::app::init_with_config(
+                        godot_bevy::app::BevyAppConfig {
+                            scene_tree_auto_despawn_children: #scene_tree_auto_despawn_children,
+                        },
+                        #name,
+                    );
                 }
             }
 
-
             fn on_stage_deinit(stage: godot::prelude::InitStage) {
                 if stage == godot::prelude::InitStage::Core {
-                    // Shutdown profiling cleanly
-                    // This function handles all feature gating internally
-                    godot_bevy::profiling::shutdown_profiler();
+                    godot_bevy::app::deinit();
                 }
             }
         }

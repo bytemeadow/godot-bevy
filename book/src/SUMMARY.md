@@ -14,6 +14,7 @@
 - [Scene Tree](./scene-tree/index.md)
   - [Initialization and Timing](./scene-tree/timing.md)
   - [Querying with Node Type Markers](./scene-tree/querying.md)
+  - [Excluding Nodes](./scene-tree/excluding-nodes.md)
   - [Custom Nodes](./scene-tree/custom-nodes/index.md)
     - [Automatic Markers](./scene-tree/custom-nodes/automatic-markers.md) 
     - [Property Mapping](./scene-tree/custom-nodes/property-mapping-with-bevy-bundle.md)
@@ -47,6 +48,7 @@
 ---
 
 - [Bevy Godot Profiling](./profiling/profiling.md)
+  - [Debug Build Performance](./profiling/debug-performance.md)
 
 ---
 

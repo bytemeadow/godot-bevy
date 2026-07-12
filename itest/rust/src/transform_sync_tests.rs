@@ -126,6 +126,69 @@ fn test_godot_to_bevy_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
     })
 }
 
+/// A node in the `NO_TRANSFORM_READ_GROUP` group is decorated with
+/// `DisableGodotTransformRead`, so the Godot->Bevy read skips it (Bevy stays
+/// authoritative) while an unmarked sibling still syncs. The write path is unaffected.
+#[itest(async)]
+fn test_disable_godot_transform_read_via_group(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        let mut opted_out = godot::classes::Node2D::new_alloc();
+        opted_out.set_name("OptedOut");
+        opted_out.set_position(Vector2::new(0.0, 0.0));
+        opted_out.add_to_group(NO_TRANSFORM_READ_GROUP);
+        ctx_clone.scene_tree.clone().add_child(&opted_out);
+
+        let mut synced = godot::classes::Node2D::new_alloc();
+        synced.set_name("Synced");
+        synced.set_position(Vector2::new(0.0, 0.0));
+        ctx_clone.scene_tree.clone().add_child(&synced);
+
+        let mut app = TestApp::new(&ctx_clone, move |app| {
+            app.add_plugins(GodotTransformSyncPlugin::default());
+            app.insert_resource(GodotTransformConfig::two_way());
+        })
+        .await;
+
+        let opted_entity = app
+            .entity_for_node(opted_out.instance_id())
+            .expect("entity for opted-out node");
+        let synced_entity = app
+            .entity_for_node(synced.instance_id())
+            .expect("entity for synced node");
+
+        assert!(
+            app.with_world(|w| w.get::<DisableGodotTransformRead>(opted_entity).is_some()),
+            "group member should be decorated with DisableGodotTransformRead"
+        );
+        assert!(
+            app.with_world(|w| w.get::<DisableGodotTransformRead>(synced_entity).is_none()),
+            "a non-member must not receive the marker"
+        );
+
+        opted_out.set_position(Vector2::new(10.0, 0.0));
+        synced.set_position(Vector2::new(10.0, 0.0));
+        app.updates(2).await;
+
+        let opted_x = app.with_world(|w| w.get::<Transform>(opted_entity).unwrap().translation.x);
+        let synced_x = app.with_world(|w| w.get::<Transform>(synced_entity).unwrap().translation.x);
+
+        assert!(
+            opted_x.abs() < 0.1,
+            "opted-out Transform must not follow the Godot move (read skipped), got {opted_x:.1}"
+        );
+        assert!(
+            (synced_x - 10.0).abs() < 0.1,
+            "synced Transform must follow the Godot move, got {synced_x:.1}"
+        );
+
+        app.cleanup().await;
+        opted_out.free();
+        synced.free();
+    })
+}
+
 /// Test bidirectional transform sync (TwoWay mode)
 #[itest(async)]
 fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHandle {

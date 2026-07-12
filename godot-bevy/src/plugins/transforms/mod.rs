@@ -7,7 +7,9 @@ pub mod plugin;
 pub mod sync_systems;
 
 // Re-export main components and types
-pub use change_filter::TransformSyncMetadata;
+pub use change_filter::{
+    DisableGodotTransformRead, NO_TRANSFORM_READ_GROUP, TransformSyncMetadata,
+};
 pub use config::{GodotTransformConfig, TransformSyncMode};
 pub use conversions::{IntoBevyTransform, IntoGodotTransform, IntoGodotTransform2D};
 pub use custom_sync::{GodotTransformSyncPluginExt, add_transform_sync_systems};
