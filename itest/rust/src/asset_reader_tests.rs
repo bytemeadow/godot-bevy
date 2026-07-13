@@ -17,6 +17,13 @@ use bevy::prelude::*;
 use godot::classes::PackedScene;
 use godot_bevy::prelude::*;
 use godot_bevy_test::prelude::*;
+use std::time::{Duration, Instant};
+
+/// Wall-clock budget for an async load to reach a terminal `LoadState`. Loads run on a worker
+/// thread, so the number of frames until completion is undetermined -- bound the wait by real
+/// time (as production code does), not a frame count that doesn't map to wall-clock in headless.
+/// Generous because it's only a hang guard; a healthy load resolves in a handful of frames.
+const LOAD_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Test-only byte loader: reads raw bytes and stores them as a string. `.greeting`
 /// is not in `GodotResourceAssetLoader::extensions()`, so it routes here and proves
@@ -66,8 +73,9 @@ fn test_read_delivers_real_bytes(ctx: &TestContext) -> godot::task::TaskHandle {
                 .load("res://itest_assets/hello.greeting")
         });
 
+        let deadline = Instant::now() + LOAD_TIMEOUT;
         let mut loaded = false;
-        for _ in 0..120 {
+        while Instant::now() < deadline {
             app.update().await;
             match app.with_world(|w| w.resource::<AssetServer>().get_load_state(&handle)) {
                 Some(LoadState::Loaded) => {
@@ -111,8 +119,9 @@ fn test_godot_resource_tscn_does_not_regress(ctx: &TestContext) -> godot::task::
                 .load("res://test_spawn_scene.tscn")
         });
 
+        let deadline = Instant::now() + LOAD_TIMEOUT;
         let mut loaded = false;
-        for _ in 0..120 {
+        while Instant::now() < deadline {
             app.update().await;
             match app.with_world(|w| w.resource::<AssetServer>().get_load_state(&handle)) {
                 Some(LoadState::Loaded) => {
@@ -161,8 +170,9 @@ fn test_missing_data_file_fails_cleanly(ctx: &TestContext) -> godot::task::TaskH
                 .load("res://itest_assets/nope.greeting")
         });
 
+        let deadline = Instant::now() + LOAD_TIMEOUT;
         let mut failed = false;
-        for _ in 0..120 {
+        while Instant::now() < deadline {
             app.update().await;
             if let Some(LoadState::Failed(_)) =
                 app.with_world(|w| w.resource::<AssetServer>().get_load_state(&missing))
@@ -181,8 +191,9 @@ fn test_missing_data_file_fails_cleanly(ctx: &TestContext) -> godot::task::TaskH
                 .load("res://itest_assets/hello.greeting")
         });
 
+        let deadline = Instant::now() + LOAD_TIMEOUT;
         let mut loaded = false;
-        for _ in 0..120 {
+        while Instant::now() < deadline {
             app.update().await;
             match app.with_world(|w| w.resource::<AssetServer>().get_load_state(&good)) {
                 Some(LoadState::Loaded) => {
