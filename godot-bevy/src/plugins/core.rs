@@ -1,15 +1,18 @@
-use bevy_app::{App, Plugin};
+use bevy_app::{App, First, Plugin};
 use bevy_ecs::component::Component;
 use bevy_ecs::event::EntityEvent;
 use bevy_ecs::lifecycle::Remove;
 use bevy_ecs::observer::On;
 use bevy_ecs::prelude::{Name, Resource};
-use bevy_ecs::system::Query;
+use bevy_ecs::schedule::IntoScheduleConfigs;
+use bevy_ecs::system::{Query, ResMut};
+use bevy_time::{Time, Virtual};
 use std::any::TypeId;
 
 use crate::interop::{GodotAccess, GodotMainThread, GodotNode, GodotNodeHandle};
 use bevy_ecs::system::EntityCommands;
 use godot::classes::Node;
+use godot::obj::Singleton;
 use tracing::debug;
 
 /// Function that adds a component to an entity with access to the Godot node
@@ -132,6 +135,7 @@ pub struct GodotBaseCorePlugin;
 impl Plugin for GodotBaseCorePlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(bevy_time::TimePlugin)
+            .add_systems(First, apply_godot_time_scale.before(bevy_time::TimeSystems))
             .add_plugins(bevy_app::TaskPoolPlugin::default())
             .add_plugins(bevy_diagnostic::FrameCountPlugin)
             .add_plugins(bevy_diagnostic::DiagnosticsPlugin)
@@ -147,6 +151,17 @@ impl Plugin for GodotBaseCorePlugin {
         // receive events; `add_godot_event` installs the GDScript decoder
         // registry on demand.
         crate::plugins::event_bridge::ensure_event_channel(app);
+    }
+}
+
+/// Scale `Time<Virtual>` (the Update clock) by `Engine.time_scale`, leaving `Time<Real>`
+/// truthful. `GodotAccess` is a main-thread pin -- `get_time_scale` is FFI, unsound off
+/// the main thread.
+fn apply_godot_time_scale(_godot: GodotAccess, mut virt: ResMut<Time<Virtual>>) {
+    // set_relative_speed_f64 panics on non-finite/negative input, which tears the app down.
+    let raw = godot::classes::Engine::singleton().get_time_scale();
+    if raw.is_finite() {
+        virt.set_relative_speed_f64(raw.max(0.0));
     }
 }
 

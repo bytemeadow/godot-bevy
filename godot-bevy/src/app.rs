@@ -184,6 +184,11 @@ impl BevyApp {
         self.started = false;
         self.prefix_done_this_frame = false;
 
+        // process_mode = ALWAYS keeps both callbacks firing under SceneTree.paused; pause is
+        // enforced in the schedules (the FixedMain gate), not by freezing Godot's callbacks.
+        self.base_mut()
+            .set_process_mode(godot::classes::node::ProcessMode::ALWAYS);
+
         let mut app = App::new();
 
         let config = BEVY_APP_CONFIG.get().copied().unwrap_or(BevyAppConfig {
@@ -539,12 +544,12 @@ impl INode for BevyApp {
         if let Some(app) = self.app.as_mut()
             && let Err(e) = catch_unwind(AssertUnwindSafe(|| {
                 let world = app.world_mut();
-                run_physics_step(
-                    world,
-                    need_startup,
-                    need_prefix,
-                    std::time::Duration::from_secs_f64(delta as f64),
-                );
+                // The delta is Godot's physics_step * time_scale; a pathological time_scale can
+                // make it non-finite/negative/overflow-large, which panics from_secs_f64.
+                // try_from_secs_f64 degrades a bad delta to a frozen 0-duration step, as at time_scale==0.
+                let step = std::time::Duration::try_from_secs_f64(delta as f64)
+                    .unwrap_or(std::time::Duration::ZERO);
+                run_physics_step(world, need_startup, need_prefix, step);
                 crate::profiling::secondary_frame_mark("physics");
             }))
         {

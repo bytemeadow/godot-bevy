@@ -1,5 +1,6 @@
 use bevy_app::{App, FixedFirst, FixedLast, Plugin, PreUpdate};
 use bevy_ecs::{query::Without, schedule::IntoScheduleConfigs, system::Res};
+use bevy_time::{Time, Virtual};
 use bevy_transform::components::Transform;
 use godot::classes::{Node, Node2D, Node3D};
 
@@ -93,7 +94,8 @@ impl Plugin for GodotTransformSyncPlugin {
                 PreUpdate,
                 pre_update_godot_transforms::<Without<DisableGodotTransformRead>>
                     .run_if(transform_sync_twoway_enabled)
-                    .run_if(prefix_ran_in_process_fallback),
+                    .run_if(prefix_ran_in_process_fallback)
+                    .run_if(transform_read_not_paused),
             );
             app.add_systems(
                 FixedFirst,
@@ -116,6 +118,12 @@ impl Plugin for GodotTransformSyncPlugin {
 fn transform_sync_enabled(config: Res<GodotTransformConfig>) -> bool {
     // aka one way or two way
     config.sync_mode != TransformSyncMode::Disabled
+}
+
+/// Freeze the read while `Time<Virtual>` is paused. `Option` so the plugin stays usable
+/// without `TimePlugin` -- no virtual clock means "not paused".
+fn transform_read_not_paused(time: Option<Res<Time<Virtual>>>) -> bool {
+    time.is_none_or(|t| !t.is_paused())
 }
 
 fn transform_sync_twoway_enabled(config: Res<GodotTransformConfig>) -> bool {

@@ -23,6 +23,7 @@ use bevy_ecs::{
     world::DeferredWorld,
 };
 use bevy_reflect::Reflect;
+use bevy_time::{Time, TimeSystems, Virtual};
 use godot::classes::ClassDb;
 use godot::tools::try_get_autoload_by_name;
 use godot::{
@@ -170,6 +171,7 @@ impl Plugin for GodotSceneTreePlugin {
 
         app.init_non_send::<SceneTreeRefImpl>()
             .init_resource::<NodeEntityIndex>()
+            .init_resource::<PauseBridge>()
             .insert_resource(SceneTreeConfig {
                 auto_despawn_children: self.auto_despawn_children,
             })
@@ -183,6 +185,7 @@ impl Plugin for GodotSceneTreePlugin {
                 (
                     write_scene_tree_messages.before(message_update_system),
                     read_scene_tree_messages.before(message_update_system),
+                    mirror_tree_pause_to_virtual.before(TimeSystems),
                 ),
             );
 
@@ -226,6 +229,43 @@ impl Default for SceneTreeRefImpl {
     fn default() -> Self {
         Self(Self::get_ref())
     }
+}
+
+/// Edge state for `mirror_tree_pause_to_virtual`.
+#[derive(Resource, Default)]
+struct PauseBridge {
+    last_tree_paused: bool,
+    paused_by_mirror: bool,
+}
+
+/// Mirror `SceneTree.paused` onto `Time<Virtual>`, one-way and edge-triggered: a rising edge
+/// pauses, a falling edge unpauses -- but only the pause the mirror itself applied, so a
+/// user's own `Time<Virtual>::pause()` survives a tree pause/unpause cycle. `SceneTreeRef` is
+/// a main-thread pin holding the cached `Gd<SceneTree>`.
+fn mirror_tree_pause_to_virtual(
+    mut scene_tree: SceneTreeRef,
+    virt: Option<ResMut<Time<Virtual>>>,
+    mut bridge: ResMut<PauseBridge>,
+) {
+    // No TimePlugin (standalone/benchmark apps): nothing to mirror.
+    let Some(mut virt) = virt else {
+        return;
+    };
+    let tree_paused = scene_tree.get().is_paused();
+    if tree_paused == bridge.last_tree_paused {
+        return;
+    }
+    if tree_paused {
+        // Don't stack onto a user's existing pause -- only claim the pause we apply.
+        if !virt.is_paused() {
+            virt.pause();
+            bridge.paused_by_mirror = true;
+        }
+    } else if bridge.paused_by_mirror {
+        virt.unpause();
+        bridge.paused_by_mirror = false;
+    }
+    bridge.last_tree_paused = tree_paused;
 }
 
 fn initialize_scene_tree(
