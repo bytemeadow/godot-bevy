@@ -132,7 +132,7 @@ fn bench(c: &mut Criterion) {
     let threads = ComputeTaskPool::get().thread_num();
 
     let mut group = c.benchmark_group("transform_read");
-    for &n in &[1_000usize, 5_000, 20_000] {
+    for &n in &[50usize, 100, 250, 500, 1_000, 2_000, 5_000] {
         let mut world = setup_world(n);
         let mut state = world.query::<(&mut BevyTransform, &GodotVal, &mut Shadow)>();
 
