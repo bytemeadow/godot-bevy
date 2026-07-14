@@ -75,3 +75,7 @@ test-frame-signal = []
 [dev-dependencies]
 bevy_state = {version = "0.19", default-features = false, features = ["bevy_app"]}
 criterion = {version = "0.5", features = ["html_reports"]}
+
+[[bench]]
+name = "transform_read_split"
+harness = false
