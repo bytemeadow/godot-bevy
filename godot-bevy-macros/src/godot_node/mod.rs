@@ -9,3 +9,9 @@ pub fn derive_bevy_components(input: syn::DeriveInput) -> syn::Result<proc_macro
     let plan = crate::bevy_attr::parse_godot_first(&input)?;
     Ok(crate::emit::emit(&plan, &input))
 }
+
+pub fn derive_attachable_component(
+    input: syn::DeriveInput,
+) -> syn::Result<proc_macro2::TokenStream> {
+    crate::bevy_attr::parse_attachable_component(&input)
+}

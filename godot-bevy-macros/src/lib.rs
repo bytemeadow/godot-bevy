@@ -3,7 +3,9 @@ mod emit;
 mod godot_node;
 mod node_tree_view;
 
-use crate::godot_node::{derive_bevy_components, derive_godot_node_component};
+use crate::godot_node::{
+    derive_attachable_component, derive_bevy_components, derive_godot_node_component,
+};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::Parser;
@@ -292,6 +294,78 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
     let parsed: DeriveInput = parse_macro_input!(input as DeriveInput);
     derive_godot_node_component(parsed)
+        .unwrap_or_else(Error::into_compile_error)
+        .into()
+}
+
+/// # Converts a pure Godot class into a Bevy component (editor-first)
+///
+/// Derive `AttachableComponent` alongside `GodotClass` when you author the Godot class
+/// yourself using standard `godot-rust` bindings, and want to automatically map it to a
+/// Bevy component when the node enters the scene tree.
+///
+/// ## How it works
+///
+/// 1. Annotate your Godot class with `#[derive(AttachableComponent)]`.
+/// 2. Specify the target Bevy component using `#[gdbevy(target = YourBevyComponent)]`.
+/// 3. Implement `From<&YourGodotClass> for YourBevyComponent` to define the conversion.
+///
+/// When the node is added to the scene tree, `godot-bevy` will automatically:
+/// - Look up the registered target component for this Godot class.
+/// - Call your `From` implementation to convert the Godot node reference.
+/// - Insert the resulting component onto the parent Bevy entity.
+/// - Queue the original Godot node for `free()` to prevent state duplication.
+///
+/// ## Example
+///
+/// ```rust,ignore
+/// use godot::prelude::*;
+/// use godot_bevy::prelude::*;
+///
+/// #[derive(AttachableComponent, GodotClass)]
+/// #[class(init, base=Node)]
+/// #[gdbevy(target = Movement)]
+/// struct MovementComponent {
+///     #[export]
+///     max_speed: f32,
+///     #[export]
+///     jump_height: f32,
+///     #[export]
+///     character_body: OnEditor<Gd<CharacterBody3D>>,
+/// }
+///
+/// // The target Bevy component
+/// #[derive(Component)]
+/// struct Movement {
+///     max_speed: f32,
+///     jump_height: f32,
+///     character_body_3d: GodotNodeHandle,
+///     desired_direction: Vec2,
+/// }
+///
+/// // Manual conversion from the Godot class to the Bevy component
+/// impl From<&MovementComponent> for Movement {
+///     fn from(value: &MovementComponent) -> Movement {
+///         Movement {
+///             max_speed: value.max_speed,
+///             jump_height: value.jump_height,
+///             character_body_3d: GodotNodeHandle::new(value.character_body.clone()),
+///             desired_direction: Vec2::ZERO,
+///         }
+///     }
+/// }
+/// ```
+///
+/// ## Struct-level attributes
+///
+/// The only required key on the struct-level `#[gdbevy(...)]` attribute is:
+/// - `target = Comp` (**required**) — the Bevy component type to insert onto the parent entity.
+///
+/// *Note:* The target component type must implement `From<&YourGodotClass>`.
+#[proc_macro_derive(AttachableComponent, attributes(gdbevy))]
+pub fn derive_attachable_component_entry(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    derive_attachable_component(input)
         .unwrap_or_else(Error::into_compile_error)
         .into()
 }
