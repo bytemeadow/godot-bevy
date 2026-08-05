@@ -1,4 +1,5 @@
-use quote::format_ident;
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
 use std::collections::HashSet;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
@@ -615,6 +616,67 @@ pub fn parse_godot_first(input: &DeriveInput) -> syn::Result<ClassPlan> {
     })
 }
 
+/// Parses the `#[derive(AttachableComponent)]` macro input.
+///
+/// Extracts the `#[gdbevy(target = YourBevyComponent)]` attribute and generates
+/// a function that converts the Godot class into the specified Bevy component,
+/// registering it with the `AttachComponentRegistry` via `inventory::submit!`.
+pub fn parse_attachable_component(input: &DeriveInput) -> syn::Result<TokenStream> {
+    let class = &input.ident;
+
+    let mut target_type: Option<Path> = None;
+
+    // Parse the #[godot_sync(target = YourBevyComponent)] attribute
+    for attr in &input.attrs {
+        if attr.path().is_ident("gdbevy") {
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("target") {
+                    target_type = Some(meta.value()?.parse()?);
+                    Ok(())
+                } else {
+                    Err(meta.error("unsupported property, expected `target`"))
+                }
+            })?
+        }
+    }
+
+    let target = target_type.ok_or_else(|| {
+        Error::new(
+            input.ident.span(),
+            "Missing #[gdbevy(target = YourBevyComponent)] attribute",
+        )
+    })?;
+
+    let sync_fn_name = format_ident!("__{}_attach_component_fn", class.to_string().to_lowercase());
+
+    let expanded = quote! {
+        fn #sync_fn_name(
+            commands: &mut godot_bevy::bevy_ecs::system::Commands,
+            parent: godot_bevy::bevy_ecs::entity::Entity,
+            godot: &mut godot_bevy::interop::GodotAccess,
+            handle: godot_bevy::interop::GodotNodeHandle,
+        ) -> bool {
+            if let Some(mut gd) = godot.try_get::<#class>(handle) {
+                let bevy_component = <#target as ::core::convert::From<_>>::from(::core::ops::Deref::deref(&gd.bind()));
+                commands.entity(parent).insert(bevy_component);
+                true
+            } else {
+                false
+            }
+        }
+
+        godot_bevy::inventory::submit! {
+            godot_bevy::prelude::AttachComponentRegistry {
+                godot_class_name: stringify!(#class),
+                godot_class_id_fn: || <#class as ::godot::prelude::GodotClass>::class_id(),
+                attach_component_fn: #sync_fn_name,
+            }
+        };
+    };
+
+    Ok(expanded)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -930,6 +992,61 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .contains("not yet available")
+        );
+    }
+
+    #[test]
+    fn attachable_component_success() {
+        let di: syn::DeriveInput = parse_quote! {
+            #[derive(AttachableComponent, GodotClass)]
+            #[class(init, base=Node)]
+            #[gdbevy(target = Movement)]
+            struct MovementComponent {
+                #[export]
+                max_speed: f32,
+            }
+        };
+        let tokens = parse_attachable_component(&di).unwrap();
+        let code = tokens.to_string();
+
+        // Verify the target type, struct name, and the generated function name are present
+        assert!(code.contains("Movement"));
+        assert!(code.contains("MovementComponent"));
+        assert!(code.contains("__movementcomponent"));
+    }
+
+    #[test]
+    fn attachable_component_missing_target() {
+        let di: syn::DeriveInput = parse_quote! {
+            #[derive(AttachableComponent, GodotClass)]
+            #[class(init, base=Node)]
+            struct MovementComponent {
+                #[export]
+                max_speed: f32,
+            }
+        };
+        let err = parse_attachable_component(&di).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("Missing #[gdbevy(target = YourBevyComponent)] attribute")
+        );
+    }
+
+    #[test]
+    fn attachable_component_unsupported_property() {
+        let di: syn::DeriveInput = parse_quote! {
+            #[derive(AttachableComponent, GodotClass)]
+            #[class(init, base=Node)]
+            #[gdbevy(foo = "bar")]
+            struct MovementComponent {
+                #[export]
+                max_speed: f32,
+            }
+        };
+        let err = parse_attachable_component(&di).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("unsupported property, expected `target`")
         );
     }
 }

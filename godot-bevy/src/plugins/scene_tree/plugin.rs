@@ -168,6 +168,7 @@ impl Plugin for GodotSceneTreePlugin {
         // Auto-register all discovered AutoSyncBundle plugins
         super::autosync::register_all_autosync_bundles(app);
         super::autosync::register_all_required_components(app);
+        super::autosync::register_all_attach_components(app);
 
         app.init_non_send::<SceneTreeRefImpl>()
             .init_resource::<NodeEntityIndex>()
@@ -675,6 +676,30 @@ fn create_scene_tree_entity(
                     continue;
                 }
 
+                let mut node_accessor = godot.node(node_handle);
+                let mut node = node_accessor.get::<Node>();
+
+                let class_name = node_type
+                    // Fall back to getting node-type from node if not provided by message
+                    .unwrap_or_else(|| node.get_class().to_string());
+
+                let parent_id = parent_id_from_gdscript
+                    .or_else(|| node.get_parent().map(|parent| parent.instance_id()))
+                    .filter(|parent_id| *parent_id != scene_root.instance_id());
+                let parent = parent_id.and_then(|parent_id| node_index.get(parent_id));
+                if let Some(parent) = parent
+                    && super::autosync::try_attach_component_to_parent(
+                        commands,
+                        parent,
+                        godot,
+                        node_handle,
+                        &class_name,
+                    )
+                {
+                    node.queue_free();
+                    continue;
+                }
+
                 // A prior batch already decorated this entity, so it is queryable now;
                 // skip re-decorating (see SceneTreeDecorated).
                 let already_decorated = existing_entity
@@ -698,12 +723,7 @@ fn create_scene_tree_entity(
                     new_entity_commands.id()
                 } else {
                     // Compute the class hierarchy once; reused for markers and autosync.
-                    let class_hierarchy = get_inheritance_hierarchy(
-                        node_type
-                            // Fall back to getting node-type from node if not provided by message
-                            .unwrap_or_else(|| node.get_class().to_string())
-                            .as_str(),
-                    );
+                    let class_hierarchy = get_inheritance_hierarchy(&class_name);
                     // The first matching arm inserts the whole ancestor-marker chain in one
                     // move, so stop -- continuing would redundantly re-insert those markers. An
                     // unknown leaf (e.g. a GDExtension class) returns false and falls through to
@@ -781,10 +801,7 @@ fn create_scene_tree_entity(
 
                 // Reconcile GodotChildOf with the node's current parent (the point of a reparent
                 // NodeAdded): link to a mirrored parent, else drop any stale edge.
-                let parent_id = parent_id_from_gdscript
-                    .or_else(|| node.get_parent().map(|parent| parent.instance_id()))
-                    .filter(|parent_id| *parent_id != scene_root.instance_id());
-                match parent_id.and_then(|parent_id| node_index.get(parent_id)) {
+                match parent {
                     Some(parent_entity) => {
                         commands
                             .entity(new_entity)
