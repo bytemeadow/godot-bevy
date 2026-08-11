@@ -37,6 +37,24 @@ pub struct Enemy;
 
 Each inner `field(as = T, …)` follows the same `as`/`default`/`with` grammar as the newtype form. The name before `:` (e.g. `stats`) is required by the grammar but ignored — the generated export properties use the inner field names (`health`, `mana`).
 
+### Inspector metadata for generated exports
+
+Generated exports can carry Inspector metadata:
+
+```rust
+#[gdbevy(require(
+    kind: WeaponKind,
+    as = String,
+    description = "Weapon selected by the designer",
+    hint = ENUM,
+    hint_string = "Hands,Knife"
+))]
+```
+
+`description` becomes the Godot property description. `hint` names a Godot
+`PropertyHint` variant, and `hint_string` supplies its optional string. A
+`hint_string` requires `hint`.
+
 ### Marker companion
 
 Insert a component via `Default` with no exported property:
@@ -138,6 +156,10 @@ pub struct PlayerNode {
 | struct | `require(Comp { bevy_field: godot_field, … })` | no | Build struct component from existing exports |
 | field | `component = Comp` | **yes** | Bevy component type (`Comp(value)`) |
 | field | `with = fn` | no | Godot-value → component-value conversion |
+
+Godot-first classes own their gdext declaration, so use gdext's native
+`#[var(hint = ..., hint_string = ...)]` and Rust documentation attributes for
+Inspector metadata on those fields.
 
 ## Reserved keys
 

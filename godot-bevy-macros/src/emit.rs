@@ -67,8 +67,24 @@ fn export_field(m: &Mapping, ty: Option<Type>) -> TokenStream2 {
         let val = paren_wrap(d);
         quote!(#[init(val = #val)])
     });
+    let docs = &m.docs;
+    let description = m
+        .description
+        .as_ref()
+        .map(|description| quote!(#[doc = #description]));
+    let hint = match (&m.hint, &m.hint_string) {
+        (Some(hint), Some(hint_string)) => {
+            quote!(#[var(hint = #hint, hint_string = #hint_string)])
+        }
+        (Some(hint), None) => quote!(#[var(hint = #hint)]),
+        (None, None) => quote!(),
+        (None, Some(_)) => unreachable!("`hint_string` is valid only with `hint`"),
+    };
     quote! {
+        #(#docs)*
+        #description
         #[export]
+        #hint
         #init
         #prop: #ty
     }
@@ -377,6 +393,50 @@ mod tests {
         assert!(out.contains("Player :: default ()"));
         assert!(!out.contains("GodotRequiredComponents")); // GF has no trigger
         assert!(!out.contains("bevy_bundle"));
+    }
+
+    #[test]
+    fn emits_docs_and_hints_for_generated_exports() {
+        let di: syn::DeriveInput = syn::parse_quote! {
+            #[derive(Component, GodotNode, Default)]
+            #[gdbevy(base = Node2D, class_name = WeaponNode)]
+            #[gdbevy(require(
+                kind: WeaponKind,
+                as = String,
+                description = "Weapon kind",
+                hint = ENUM,
+                hint_string = "Hands,Knife"
+            ))]
+            struct Weapon;
+        };
+        let out = crate::godot_node::derive_godot_node_component(di)
+            .unwrap()
+            .to_string();
+        assert!(out.contains("# [doc = \"Weapon kind\"]"));
+        assert!(out.contains("# [var (hint = ENUM , hint_string = \"Hands,Knife\")]"));
+    }
+
+    #[test]
+    fn forwards_field_docs_to_generated_exports() {
+        let di: syn::DeriveInput = syn::parse_quote! {
+            /// Player settings.
+            #[derive(Component, GodotNode, Default)]
+            #[gdbevy(base = Node2D, class_name = PlayerNode)]
+            struct Player {
+                /// Movement speed in pixels per second.
+                #[gdbevy(export)]
+                speed: f32,
+                /// Weapon kind
+                #[gdbevy(export, hint = ENUM, hint_string = "Hands,Knife")]
+                kind: String,
+            }
+        };
+        let out = crate::godot_node::derive_godot_node_component(di)
+            .unwrap()
+            .to_string();
+        assert!(out.contains("Movement speed in pixels per second."));
+        assert!(out.contains("Weapon kind"));
+        assert!(out.contains("# [var (hint = ENUM , hint_string = \"Hands,Knife\")]"));
     }
 
     #[test]

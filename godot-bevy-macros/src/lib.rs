@@ -170,6 +170,7 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
 /// - `component = Comp` (**required**) — the Bevy component type to insert.
 /// - `with = fn` — a function `fn(T) -> T` (or any `Into` adapter) applied to the Godot
 ///   value before it is passed to the component constructor.
+/// - `hint = NAME` and `hint_string = expr` configure the Godot Inspector property hint.
 /// - `as` and `default` are **not** allowed on Godot-first field bindings.
 ///
 /// ## Struct-level companions
@@ -283,11 +284,15 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 /// | `as = T` | Godot export type (defaults to the field's Rust type when omitted). |
 /// | `default = expr` | Editor default value passed to `#[init(val = …)]`. A pure-Bevy `spawn(T)` uses the struct's own `Default` — make them agree if you rely on `spawn(T)`. |
 /// | `with = fn` | Converts the Godot export value before assigning to the field. |
+/// | `description = "..."` | Adds an Inspector description for generated `require(...)` exports. |
+/// | `hint = NAME` | Sets the Godot `PropertyHint` variant. |
+/// | `hint_string = expr` | Supplies the hint string; requires `hint = NAME`. |
+///
+/// Rust `///` comments on primary exported fields are forwarded as Godot property descriptions.
 ///
 /// ## Reserved keys
 ///
-/// `into` and `sync` are reserved for the deferred component-sync feature and will produce
-/// a compile error if used.
+/// `into` and `sync` remain reserved for future mapping features and produce a compile error.
 #[proc_macro_derive(GodotNode, attributes(gdbevy))]
 pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
     let parsed: DeriveInput = parse_macro_input!(input as DeriveInput);

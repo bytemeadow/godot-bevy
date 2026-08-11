@@ -17,7 +17,14 @@ struct TestGrounded;
 
 #[derive(Component, GodotNode, Default)]
 #[gdbevy(base = Node2D, class_name = AutoSyncPlayerNode)]
-#[gdbevy(require(TestGrounded), require(speed: TestSpeed, as = f32, default = 250.0))]
+#[gdbevy(require(TestGrounded), require(
+    speed: TestSpeed,
+    as = f32,
+    default = 250.0,
+    description = "Movement speed",
+    hint = RANGE,
+    hint_string = "0,1000,1"
+))]
 struct AutoSyncPlayer;
 
 #[itest(async)]
