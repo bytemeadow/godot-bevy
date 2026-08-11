@@ -4,7 +4,7 @@ use crate::plugins::{
 use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
 use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
-use bevy_app::{App, PluginsState};
+use bevy_app::{App, AppExit, Last, PluginsState};
 use bevy_ecs::message::Messages;
 use crossbeam_channel::unbounded;
 use godot::prelude::*;
@@ -465,6 +465,18 @@ impl INode for BevyApp {
         }
 
         self.do_initialize();
+    }
+
+    /// Give Bevy's final schedule a chance to observe shutdown before Godot
+    /// releases this node and the embedded app is dropped.
+    fn exit_tree(&mut self) {
+        if let Some(app) = self.app.as_mut() {
+            app.world_mut().write_message(AppExit::Success);
+            app.world_mut().run_schedule(Last);
+        }
+        // `teardown` clears `self.app`, so a later explicit teardown or a
+        // duplicate Godot notification is harmless and cannot run `Last` twice.
+        self.teardown();
     }
 
     #[tracing::instrument(skip_all)]

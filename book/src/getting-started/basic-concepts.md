@@ -87,6 +87,16 @@ This macro:
 3. Integrates with Godot's lifecycle
 4. Handles all the bridging magic
 
+### Shutdown lifecycle
+
+When a `BevyApp` node leaves the Godot scene tree, godot-bevy writes
+`AppExit::Success` and runs Bevy's `Last` schedule before tearing down the embedded
+app. Use `Last` systems for per-instance cleanup that must run when that node exits.
+
+The extension's `on_stage_deinit` hook is a separate process-level lifecycle event;
+it shuts down extension-wide services such as profiling and is not a replacement for
+per-`BevyApp` shutdown.
+
 ### Configuring Core Behavior
 
 The `#[bevy_app]` macro accepts configuration attributes to customize godot-bevy's core behavior:
