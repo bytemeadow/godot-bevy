@@ -467,15 +467,12 @@ impl INode for BevyApp {
         self.do_initialize();
     }
 
-    /// Give Bevy's final schedule a chance to observe shutdown before Godot
-    /// releases this node and the embedded app is dropped.
+    /// Allows Bevy to properly cleanup resources before Godot fully removes from tree
     fn exit_tree(&mut self) {
         if let Some(app) = self.app.as_mut() {
             app.world_mut().write_message(AppExit::Success);
             app.world_mut().run_schedule(Last);
         }
-        // `teardown` clears `self.app`, so a later explicit teardown or a
-        // duplicate Godot notification is harmless and cannot run `Last` twice.
         self.teardown();
     }
 

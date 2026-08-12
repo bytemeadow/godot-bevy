@@ -292,7 +292,8 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 ///
 /// ## Reserved keys
 ///
-/// `into` and `sync` remain reserved for future mapping features and produce a compile error.
+/// `into` and `sync` are reserved for the deferred component-sync feature and will produce
+/// a compile error if used.
 #[proc_macro_derive(GodotNode, attributes(gdbevy))]
 pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
     let parsed: DeriveInput = parse_macro_input!(input as DeriveInput);
