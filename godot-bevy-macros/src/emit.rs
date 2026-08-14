@@ -1,4 +1,6 @@
-use crate::bevy_attr::{ClassPlan, ComponentInit, ComponentPlan, Mapping, PrimaryPlan};
+use crate::bevy_attr::{
+    ClassPlan, ComponentInit, ComponentPlan, Mapping, PrimaryPlan, TUPLE_FIELD_PREFIX,
+};
 use proc_macro2::{TokenStream as TokenStream2, TokenTree};
 use quote::{ToTokens, format_ident, quote};
 use std::collections::HashSet;
@@ -14,7 +16,7 @@ pub fn emit(plan: &ClassPlan, input: &DeriveInput) -> TokenStream2 {
     if plan.emit_node_class {
         out.extend(emit_node_class(plan, input));
     }
-    out.extend(emit_autosync(plan));
+    out.extend(emit_autosync(plan, input));
     if let Some(trigger) = &plan.trigger {
         let sibling = collect_require_idents(&input.attrs);
         out.extend(emit_required_registration(plan, trigger, &sibling));
@@ -76,12 +78,12 @@ fn export_field(m: &Mapping, ty: Option<Type>) -> TokenStream2 {
 
 /// The autosync `create_bundle_fn` + its `inventory::submit!`. Reads the editor-authored
 /// `#[export]` values off the node and inserts them as a direct component tuple.
-fn emit_autosync(plan: &ClassPlan) -> TokenStream2 {
+fn emit_autosync(plan: &ClassPlan, input: &DeriveInput) -> TokenStream2 {
     let class = &plan.godot_class;
     let fn_name = format_ident!("__create_{}_bundle", class.to_string().to_lowercase());
 
     let mut values: Vec<TokenStream2> = Vec::new();
-    if let Some(pv) = primary_value(&plan.primary) {
+    if let Some(pv) = primary_value(&plan.primary, input) {
         values.push(pv);
     }
     for c in &plan.companions {
@@ -113,7 +115,7 @@ fn emit_autosync(plan: &ClassPlan) -> TokenStream2 {
     }
 }
 
-fn primary_value(primary: &PrimaryPlan) -> Option<TokenStream2> {
+fn primary_value(primary: &PrimaryPlan, input: &DeriveInput) -> Option<TokenStream2> {
     if primary.path.segments.is_empty() {
         return None;
     }
@@ -121,8 +123,19 @@ fn primary_value(primary: &PrimaryPlan) -> Option<TokenStream2> {
     if primary.fields.is_empty() {
         return Some(quote!(#path::default()));
     }
-    let inits = primary.fields.iter().map(field_init);
-    Some(quote!(#path { #(#inits,)* ..Default::default() }))
+
+    let is_tuple = match &input.data {
+        Data::Struct(s) => matches!(s.fields, syn::Fields::Unnamed(_)),
+        _ => false,
+    };
+
+    if is_tuple {
+        let inits = primary.fields.iter().map(read_prop);
+        Some(quote!(#path( #(#inits),* )))
+    } else {
+        let inits = primary.fields.iter().map(field_init);
+        Some(quote!(#path { #(#inits,)* ..Default::default() }))
+    }
 }
 
 fn companion_value(c: &ComponentPlan) -> TokenStream2 {
@@ -260,10 +273,23 @@ fn primary_field_type(input: &DeriveInput, ident: &Ident) -> Option<Type> {
     let Data::Struct(s) = &input.data else {
         return None;
     };
-    s.fields
-        .iter()
-        .find(|f| f.ident.as_ref() == Some(ident))
-        .map(|f| f.ty.clone())
+    match &s.fields {
+        syn::Fields::Named(n) => n
+            .named
+            .iter()
+            .find(|f| f.ident.as_ref() == Some(ident))
+            .map(|f| f.ty.clone()),
+        syn::Fields::Unnamed(u) => {
+            let name = ident.to_string();
+            if let Some(idx_str) = name.strip_prefix(TUPLE_FIELD_PREFIX) {
+                if let Ok(idx) = idx_str.parse::<usize>() {
+                    return u.unnamed.iter().nth(idx).map(|f| f.ty.clone());
+                }
+            }
+            None
+        }
+        syn::Fields::Unit => None,
+    }
 }
 
 /// gdext parses `#[init(val = expr)]` as an attribute, so a top-level comma in `expr` would be

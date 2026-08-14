@@ -8,6 +8,8 @@ use syn::{
     braced, parenthesized, parse_quote,
 };
 
+pub const TUPLE_FIELD_PREFIX: &str = "value";
+
 /// The Godot class + Bevy components a single derive expands to.
 ///
 /// Two front-ends share this IR: component-first (`GodotNode`, which generates the
@@ -306,10 +308,7 @@ fn struct_fields(input: &DeriveInput) -> syn::Result<Vec<&Field>> {
         Data::Struct(s) => match &s.fields {
             Fields::Named(n) => Ok(n.named.iter().collect()),
             Fields::Unit => Ok(Vec::new()),
-            Fields::Unnamed(_) => Err(Error::new_spanned(
-                input,
-                "tuple structs are not supported; use a named-field or unit struct",
-            )),
+            Fields::Unnamed(u) => Ok(u.unnamed.iter().collect()),
         },
         _ => Err(Error::new_spanned(input, "expected a struct")),
     }
@@ -444,11 +443,18 @@ fn gf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
 
 fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
     let mut out = Vec::new();
-    for field in struct_fields(input)? {
+    for (i, field) in struct_fields(input)?.into_iter().enumerate() {
         let Some(attr) = find_bevy_attr(field) else {
             continue;
         };
-        let name = field.ident.clone().unwrap();
+        let (godot_prop, bevy_field) = match &field.ident {
+            Some(ident) => (ident.clone(), Some(ident.clone())),
+            None => {
+                // Map tuples to value0, value1, value2, ..., value{n}
+                let synthetic_ident = format_ident!("{TUPLE_FIELD_PREFIX}{i}");
+                (synthetic_ident.clone(), Some(synthetic_ident))
+            }
+        };
         let d = parse_field_directives(attr)?;
         if d.component.is_some() {
             return Err(Error::new_spanned(
@@ -463,8 +469,8 @@ fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
             ));
         }
         out.push(Mapping {
-            godot_prop: name.clone(),
-            bevy_field: Some(name),
+            godot_prop,
+            bevy_field,
             as_type: d.as_type,
             default: d.default,
             with: d.with,
@@ -475,11 +481,14 @@ fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
 
 fn collect_field_bindings(input: &DeriveInput) -> syn::Result<Vec<ComponentPlan>> {
     let mut out = Vec::new();
-    for field in struct_fields(input)? {
+    for (i, field) in struct_fields(input)?.into_iter().enumerate() {
         let Some(attr) = find_bevy_attr(field) else {
             continue;
         };
-        let name = field.ident.clone().unwrap();
+        let name = match &field.ident {
+            Some(ident) => ident.clone(),
+            None => format_ident!("{TUPLE_FIELD_PREFIX}{i}"),
+        };
         let d = parse_field_directives(attr)?;
         if d.as_type.is_some() {
             return Err(Error::new_spanned(
