@@ -38,7 +38,7 @@ func _ready():
 
 	# Run all benchmarks
 	print("Running benchmarks...")
-	rust_runner.run_all_benchmarks(self)
+	var exit_code = rust_runner.run_all_benchmarks(self)
 
 	# Benchmarks are synchronous, so we can quit immediately after
-	get_tree().quit()
+	get_tree().quit(exit_code)

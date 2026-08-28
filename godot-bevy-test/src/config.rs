@@ -10,6 +10,28 @@ pub(crate) struct Filter {
     pub(crate) patterns: Vec<String>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum BenchmarkSelector {
+    All,
+    Exact(String),
+    Filter(Filter),
+}
+
+impl BenchmarkSelector {
+    pub(crate) fn matches(&self, name: &str) -> bool {
+        match self {
+            Self::All => true,
+            Self::Exact(exact) => name == exact,
+            Self::Filter(filter) => filter.patterns.iter().any(|pattern| name.contains(pattern)),
+        }
+    }
+
+    #[cfg(feature = "profile-tracy")]
+    pub(crate) fn is_all(&self) -> bool {
+        matches!(self, Self::All)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct TestConfig {
     pub(crate) filter: Option<Filter>,
@@ -47,6 +69,33 @@ impl TestConfig {
 pub(crate) fn filter_from_env(name: &str) -> Result<Option<Filter>, String> {
     match std::env::var(name) {
         Ok(value) => parse_filter(name, &value).map(Some),
+        Err(VarError::NotPresent) => Ok(None),
+        Err(VarError::NotUnicode(_)) => Err(format!("{name} must be valid Unicode")),
+    }
+}
+
+pub(crate) fn benchmark_selector_from_env() -> Result<BenchmarkSelector, String> {
+    let exact = optional_nonempty_from_env("BENCHMARK_EXACT")?;
+    let filter = filter_from_env("BENCHMARK_FILTER")?;
+    match (exact, filter) {
+        (Some(_), Some(_)) => {
+            Err("BENCHMARK_EXACT and BENCHMARK_FILTER are mutually exclusive".to_string())
+        }
+        (Some(exact), None) => Ok(BenchmarkSelector::Exact(exact)),
+        (None, Some(filter)) => Ok(BenchmarkSelector::Filter(filter)),
+        (None, None) => Ok(BenchmarkSelector::All),
+    }
+}
+
+#[cfg(feature = "profile-tracy")]
+pub(crate) fn required_nonempty_from_env(name: &str) -> Result<String, String> {
+    optional_nonempty_from_env(name)?.ok_or_else(|| format!("{name} is required"))
+}
+
+fn optional_nonempty_from_env(name: &str) -> Result<Option<String>, String> {
+    match std::env::var(name) {
+        Ok(value) if value.trim().is_empty() => Err(format!("{name} must not be empty")),
+        Ok(value) => Ok(Some(value.trim().to_string())),
         Err(VarError::NotPresent) => Ok(None),
         Err(VarError::NotUnicode(_)) => Err(format!("{name} must be valid Unicode")),
     }
@@ -172,5 +221,17 @@ mod tests {
         assert!(parse_boolean("BOOLEAN", "1").unwrap());
         assert!(!parse_boolean("BOOLEAN", "false").unwrap());
         assert!(parse_boolean("BOOLEAN", "yes").is_err());
+    }
+
+    #[test]
+    fn benchmark_selectors_match_exactly_or_by_substring() {
+        let exact = BenchmarkSelector::Exact("alpha".to_string());
+        assert!(exact.matches("alpha"));
+        assert!(!exact.matches("alpha_2"));
+
+        let filter = BenchmarkSelector::Filter(parse_filter("FILTER", "alpha,beta").unwrap());
+        assert!(filter.matches("prefix_alpha_suffix"));
+        assert!(filter.matches("beta_2"));
+        assert!(!filter.matches("gamma"));
     }
 }

@@ -17,6 +17,11 @@ test-frame-signal = ["godot-bevy/test-frame-signal", "godot-bevy-test/test-frame
 autosync-tests = []
 harness-probes = []
 harness-focus-probe = ["harness-probes"]
+profile-tracy = [
+    "godot-bevy/trace_bevy",
+    "godot-bevy/trace_tracy",
+    "godot-bevy-test/profile-tracy",
+]
 
 [dependencies]
 godot = { workspace = true, features = ["__trace"] }

@@ -57,6 +57,9 @@
 pub mod bencher;
 mod config;
 pub mod exit_code;
+#[cfg(feature = "profile-tracy")]
+#[doc(hidden)]
+pub mod profiling;
 mod report;
 pub mod runner;
 pub mod test_app;
@@ -130,8 +133,11 @@ macro_rules! declare_test_runner {
             }
 
             #[func]
-            fn run_all_benchmarks(&mut self, scene_tree: ::godot::obj::Gd<::godot::classes::Node>) {
-                self.runner.run_all_benchmarks(scene_tree);
+            fn run_all_benchmarks(
+                &mut self,
+                scene_tree: ::godot::obj::Gd<::godot::classes::Node>,
+            ) -> i32 {
+                self.runner.run_all_benchmarks(scene_tree)
             }
         }
     };

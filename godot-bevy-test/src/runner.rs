@@ -15,7 +15,9 @@ use std::time::{Duration, Instant};
 
 use crate::TestContext;
 use crate::bencher;
-use crate::config::{Filter, TestConfig, filter_from_env, report_path_from_env};
+use crate::config::{
+    BenchmarkSelector, Filter, TestConfig, benchmark_selector_from_env, report_path_from_env,
+};
 use crate::exit_code::write_exit_code;
 use crate::report::{
     Attempt, AttemptOutcome, Failure, LogicalTest, ReportWriter, RunOutcome, Selection,
@@ -53,6 +55,13 @@ pub struct RustBenchmark {
     pub line: u32,
     pub function: fn(),
     pub repetitions: usize,
+}
+
+struct BenchmarkSelection {
+    selector: BenchmarkSelector,
+    registered: usize,
+    file_count: usize,
+    benchmarks: Vec<RustBenchmark>,
 }
 
 #[derive(Copy, Clone)]
@@ -167,7 +176,7 @@ impl TestRunnerImpl {
         run_next_attempt(state);
     }
 
-    pub fn run_all_benchmarks(&mut self, scene_tree: Gd<Node>) {
+    pub fn run_all_benchmarks(&mut self, _scene_tree: Gd<Node>) -> i32 {
         println!("\n\n{FMT_CYAN_BOLD}Run{FMT_END} godot-bevy benchmarks...");
 
         let rust_debug = cfg!(debug_assertions);
@@ -193,18 +202,40 @@ impl TestRunnerImpl {
             println!("  For accurate benchmarks, use release builds{FMT_END}");
         }
 
-        let (benchmarks, file_count) = match self.collect_benchmarks() {
+        #[cfg(feature = "profile-tracy")]
+        if let Err(error) = crate::profiling::subscriber_status() {
+            godot::global::godot_error!("Profile configuration error: {error}");
+            return 2;
+        }
+
+        let selection = match self.collect_benchmarks() {
             Ok(collected) => collected,
             Err(error) => {
                 godot::global::godot_error!("{error}");
-                scene_tree.get_tree().quit_ex().exit_code(2).done();
-                return;
+                return 2;
             }
         };
+        #[cfg(feature = "profile-tracy")]
+        if selection.selector.is_all() {
+            godot::global::godot_error!(
+                "Profile configuration error: BENCHMARK_EXACT or BENCHMARK_FILTER is required"
+            );
+            return 2;
+        }
+        if selection.benchmarks.is_empty() {
+            godot::global::godot_error!("benchmark selection matched zero benchmarks");
+            return 2;
+        }
+        if matches!(&selection.selector, BenchmarkSelector::Exact(_))
+            && selection.benchmarks.len() != 1
+        {
+            godot::global::godot_error!("exact benchmark selection must match one benchmark");
+            return 2;
+        }
         println!(
             "  Rust: found {} benchmarks in {} files.",
-            benchmarks.len(),
-            file_count
+            selection.benchmarks.len(),
+            selection.file_count
         );
 
         if let Ok(filter) = std::env::var("BENCHMARK_FILTER") {
@@ -218,11 +249,60 @@ impl TestRunnerImpl {
         }
         println!("{FMT_END}");
 
+        #[cfg(feature = "profile-tracy")]
+        let profile_run_id = match crate::config::required_nonempty_from_env("GBPROF_RUN_ID") {
+            Ok(run_id) => Some(run_id),
+            Err(error) => {
+                godot::global::godot_error!("Profile configuration error: {error}");
+                return 2;
+            }
+        };
+        #[cfg(not(feature = "profile-tracy"))]
+        let profile_run_id: Option<String> = None;
+
+        #[cfg(feature = "profile-tracy")]
+        if std::env::var_os("BENCHMARK_JSON").is_none()
+            || crate::config::required_nonempty_from_env("BENCHMARK_JSON_PATH").is_err()
+        {
+            godot::global::godot_error!(
+                "Profile configuration error: BENCHMARK_JSON and BENCHMARK_JSON_PATH are required"
+            );
+            return 2;
+        }
+
+        #[cfg(feature = "profile-tracy")]
+        if let Err(error) = crate::profiling::wait_for_connection() {
+            godot::global::godot_error!("Profile configuration error: {error}");
+            return 2;
+        }
+
+        #[cfg(feature = "profile-tracy")]
+        crate::profiling::mark_run_begin(profile_run_id.as_deref().unwrap_or_default());
         let clock = Instant::now();
-        self.run_rust_benchmarks(benchmarks);
+        let run_result = self.run_rust_benchmarks(&selection, profile_run_id.as_deref());
         let elapsed = clock.elapsed();
+        #[cfg(feature = "profile-tracy")]
+        crate::profiling::mark_run_end(profile_run_id.as_deref().unwrap_or_default());
+
+        if let Err(error) = run_result {
+            godot::global::godot_error!("Benchmark output error: {error}");
+            return 2;
+        }
+
+        #[cfg(feature = "profile-tracy")]
+        {
+            let errors = crate::profiling::layer_errors();
+            if !errors.is_empty() {
+                godot::global::godot_error!(
+                    "Profile tracing layer reported errors: {}",
+                    errors.join("; ")
+                );
+                return 2;
+            }
+        }
 
         println!("\nBenchmarks completed in {:.2}s.", elapsed.as_secs_f32());
+        0
     }
 
     fn collect_registered_tests(&self) -> Vec<RegisteredTest> {
@@ -252,35 +332,40 @@ impl TestRunnerImpl {
         tests
     }
 
-    fn collect_benchmarks(&self) -> Result<(Vec<RustBenchmark>, usize), String> {
-        let filter = filter_from_env("BENCHMARK_FILTER")?;
+    fn collect_benchmarks(&self) -> Result<BenchmarkSelection, String> {
+        let selector = benchmark_selector_from_env()?;
         let mut all_files = HashSet::new();
         let mut benchmarks = Vec::new();
+        let mut registered = 0;
 
         godot::sys::shard_foreach!(__GODOT_BENCH; |bench: &RustBenchmark| {
-            let matches = filter.as_ref().is_none_or(|filter| {
-                filter
-                    .patterns
-                    .iter()
-                    .any(|pattern| bench.name.contains(pattern))
-            });
-            if matches {
+            registered += 1;
+            if selector.matches(bench.name) {
                 benchmarks.push(*bench);
                 all_files.insert(bench.file);
             }
         });
 
         benchmarks.sort_by_key(|bench| (bench.file, bench.line));
-        Ok((benchmarks, all_files.len()))
+        Ok(BenchmarkSelection {
+            selector,
+            registered,
+            file_count: all_files.len(),
+            benchmarks,
+        })
     }
 
-    fn run_rust_benchmarks(&self, benchmarks: Vec<RustBenchmark>) {
+    fn run_rust_benchmarks(
+        &self,
+        selection: &BenchmarkSelection,
+        profile_run_id: Option<&str>,
+    ) -> Result<(), String> {
         let output_json = std::env::var("BENCHMARK_JSON").is_ok();
 
         let mut results = Vec::new();
         let mut last_file = None;
 
-        for bench in benchmarks {
+        for bench in &selection.benchmarks {
             if !output_json && last_file.as_deref() != Some(bench.file) {
                 if last_file.is_some() {
                     println!();
@@ -294,7 +379,8 @@ impl TestRunnerImpl {
                 std::io::Write::flush(&mut std::io::stdout()).ok();
             }
 
-            let result = bencher::run_benchmark(bench.function, bench.repetitions);
+            let result =
+                bencher::run_benchmark_named(bench.name, bench.function, bench.repetitions);
             results.push((bench.name, result.stats[0], result.stats[1]));
 
             if !output_json {
@@ -306,8 +392,9 @@ impl TestRunnerImpl {
         }
 
         if output_json {
-            output_json_results(results);
+            output_json_results(results, selection, profile_run_id)?;
         }
+        Ok(())
     }
 }
 
@@ -810,7 +897,11 @@ fn drain_frame_failures() -> Vec<Failure> {
     Vec::new()
 }
 
-fn output_json_results(results: Vec<(&str, Duration, Duration)>) {
+fn output_json_results(
+    results: Vec<(&str, Duration, Duration)>,
+    selection: &BenchmarkSelection,
+    profile_run_id: Option<&str>,
+) -> Result<(), String> {
     use std::collections::HashMap;
 
     let mut benchmarks = HashMap::new();
@@ -825,7 +916,7 @@ fn output_json_results(results: Vec<(&str, Duration, Duration)>) {
         benchmarks.insert(name.to_string(), entry);
     }
 
-    let output = serde_json::json!({
+    let mut output = serde_json::json!({
         "benchmarks": benchmarks,
         "timestamp": chrono::Utc::now().to_rfc3339(),
         "environment": {
@@ -834,10 +925,65 @@ fn output_json_results(results: Vec<(&str, Duration, Duration)>) {
         }
     });
 
-    if let Ok(path) = std::env::var("BENCHMARK_JSON_PATH")
-        && let Ok(file) = std::fs::File::create(path)
-    {
-        let _ = serde_json::to_writer_pretty(file, &output);
+    if let Some(run_id) = profile_run_id {
+        let (mode, requested, patterns) = match &selection.selector {
+            BenchmarkSelector::Exact(exact) => ("exact", exact.clone(), Vec::new()),
+            BenchmarkSelector::Filter(filter) => {
+                ("filter", filter.normalized.clone(), filter.patterns.clone())
+            }
+            BenchmarkSelector::All => {
+                return Err("profile benchmark selection is missing".to_string());
+            }
+        };
+        let selected: Vec<&str> = selection
+            .benchmarks
+            .iter()
+            .map(|benchmark| benchmark.name)
+            .collect();
+        let repetitions: serde_json::Map<String, serde_json::Value> = selection
+            .benchmarks
+            .iter()
+            .map(|benchmark| {
+                (
+                    benchmark.name.to_string(),
+                    serde_json::Value::from(benchmark.repetitions),
+                )
+            })
+            .collect();
+
+        output["evidence_kind"] = serde_json::json!("profiled-benchmark-workload");
+        output["benchmark_compatible"] = serde_json::json!(false);
+        output["disclosure"] = serde_json::json!("INSTRUMENTED PROFILE — NOT BENCHMARK RESULTS");
+        output["profile_run_id"] = serde_json::json!(run_id);
+        output["selection"] = serde_json::json!({
+            "mode": mode,
+            "requested": requested,
+            "patterns": patterns,
+            "registered": selection.registered,
+            "selected": selected.len(),
+            "benchmarks": selected,
+        });
+        output["profiling"] = serde_json::json!({
+            "warmup_iterations": bencher::WARMUP_RUNS,
+            "sample_iterations": bencher::TEST_RUNS,
+            "inner_repetitions": repetitions,
+        });
+    }
+
+    if let Ok(path) = std::env::var("BENCHMARK_JSON_PATH") {
+        match std::fs::File::create(&path) {
+            Ok(file) => {
+                if let Err(error) = serde_json::to_writer_pretty(file, &output)
+                    && profile_run_id.is_some()
+                {
+                    return Err(format!("failed to write {path}: {error}"));
+                }
+            }
+            Err(error) if profile_run_id.is_some() => {
+                return Err(format!("failed to create {path}: {error}"));
+            }
+            Err(_) => {}
+        }
     }
 
     println!("===BENCHMARK_JSON_START===");
@@ -846,6 +992,7 @@ fn output_json_results(results: Vec<(&str, Duration, Duration)>) {
         serde_json::to_string_pretty(&output).unwrap_or_default()
     );
     println!("===BENCHMARK_JSON_END===");
+    Ok(())
 }
 
 const FMT_CYAN_BOLD: &str = "\x1b[36;1m";

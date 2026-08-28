@@ -15,7 +15,6 @@ let
     extensions = [ "rust-src" ];
   };
   godot-bin = pkgs.callPackage ./nix/godot-bin.nix { };
-  tracy = inputs.tracy.packages.${system}.default;
 in
 {
   packages =
@@ -27,6 +26,11 @@ in
       rust-toolchain
       rust-nightly # web builds
       act # run GitHub Actions locally
+      inferno
+      samply
+      # tracy's wire protocol must match tracy-client-sys in Cargo.lock
+      # (0.28.0 bundles Tracy 0.13.1); nixpkgs tracy is 0.13.1
+      tracy
 
       # emscripten 4.x breaks the godot-rust linker, so pin 3.1.73 (+ matching binaryen)
       emscriptenPkgs.emscripten
@@ -35,8 +39,6 @@ in
       godot-bin
     ]
     ++ lib.optionals pkgs.stdenv.isLinux [
-      tracy
-
       alsa-lib
       libGL
       libxkbcommon

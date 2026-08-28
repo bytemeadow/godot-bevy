@@ -49,6 +49,11 @@ impl Default for GodotBevyLogPlugin {
 
 impl Plugin for GodotBevyLogPlugin {
     fn build(&self, _app: &mut App) {
+        // The profile harness installs the sole global subscriber before benchmark startup.
+        if std::env::var_os("GBPROF_RUN_ID").is_some() {
+            return;
+        }
+
         // Copied behavior from https://docs.rs/bevy_log/0.16.1/src/bevy_log/lib.rs.html#279
         let default_filter = { format!("{},{}", self.level, self.filter) };
         let filter_layer = EnvFilter::try_from_default_env()

@@ -24,4 +24,11 @@ mod time_scale_tests;
 mod transform_sync_tests;
 
 #[gdextension(entry_symbol = godot_bevy_itest)]
-unsafe impl ExtensionLibrary for IntegrationTests {}
+unsafe impl ExtensionLibrary for IntegrationTests {
+    #[cfg(feature = "profile-tracy")]
+    fn on_stage_init(stage: godot::init::InitStage) {
+        if stage == godot::init::InitStage::Scene {
+            godot_bevy_test::profiling::install_profile_subscriber();
+        }
+    }
+}

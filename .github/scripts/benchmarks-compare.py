@@ -14,6 +14,13 @@ from pathlib import Path
 SIGNIFICANCE_SIGMA = 2.0
 
 
+def reject_profiled_input(data: dict, path: str | Path) -> None:
+    if data.get("benchmark_compatible") is False:
+        raise SystemExit(
+            f"Refusing instrumented profile workload as benchmark input: {path}"
+        )
+
+
 def create_argument_parser() -> argparse.ArgumentParser:
     """Create and configure the argument parser for benchmark comparison."""
     parser = argparse.ArgumentParser(
@@ -48,6 +55,7 @@ def load_round_medians(paths: list[str]) -> dict[str, list[float]]:
                 data = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             continue
+        reject_profiled_input(data, path)
         for name, d in data.get("benchmarks", {}).items():
             try:
                 runs.setdefault(name, []).append(float(d["median_ns"]))
@@ -99,11 +107,13 @@ def main(args: list[str]) -> None:
             f"Error: benchmark results file {bench_results_path} not found, can't continue."
         )
         exit(1)
+    reject_profiled_input(current_results, bench_results_path)
 
     baseline = {"benchmarks": {}}
     try:
         with open(baseline_path) as f:
             baseline = json.load(f)
+        reject_profiled_input(baseline, baseline_path)
     except FileNotFoundError:
         print(
             f"Warning: baseline file {baseline_path} not found, showing only current results."

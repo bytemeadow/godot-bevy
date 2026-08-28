@@ -53,6 +53,7 @@ default = ["bevy_gamepad", "godot_bevy_log", "experimental-threads"]
 bevy_gamepad = ["dep:bevy_gilrs"]
 godot_bevy_log = ["dep:chrono", "dep:bevy_log"]
 trace_tracy = ["dep:tracing-tracy", "dep:tracing-subscriber"]
+trace_bevy = ["bevy_app/trace", "bevy_ecs/trace"]
 # Enable godot's experimental threading support (default for native builds)
 # Note: This is incompatible with experimental-wasm's lazy-function-tables
 experimental-threads = ["godot/experimental-threads"]

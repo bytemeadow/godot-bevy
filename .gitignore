@@ -50,3 +50,4 @@ extension_api.json
 # Ignore Godot generated gdextension api json files
 **/extension_api.json
 godot_extension_api
+__pycache__/
