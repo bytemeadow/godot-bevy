@@ -87,6 +87,17 @@ pub(crate) fn benchmark_selector_from_env() -> Result<BenchmarkSelector, String>
     }
 }
 
+pub(crate) fn native_profile_seconds_from_env() -> Result<Option<u32>, String> {
+    let Some(value) = optional_nonempty_from_env("GBPROF_NATIVE_SECONDS")? else {
+        return Ok(None);
+    };
+    let seconds = parse_positive_u32("GBPROF_NATIVE_SECONDS", &value)?;
+    if seconds < 5 {
+        return Err("GBPROF_NATIVE_SECONDS must be at least 5".to_string());
+    }
+    Ok(Some(seconds))
+}
+
 #[cfg(feature = "profile-tracy")]
 pub(crate) fn required_nonempty_from_env(name: &str) -> Result<String, String> {
     optional_nonempty_from_env(name)?.ok_or_else(|| format!("{name} is required"))

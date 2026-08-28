@@ -16,7 +16,8 @@ use std::time::{Duration, Instant};
 use crate::TestContext;
 use crate::bencher;
 use crate::config::{
-    BenchmarkSelector, Filter, TestConfig, benchmark_selector_from_env, report_path_from_env,
+    BenchmarkSelector, Filter, TestConfig, benchmark_selector_from_env,
+    native_profile_seconds_from_env, report_path_from_env,
 };
 use crate::exit_code::write_exit_code;
 use crate::report::{
@@ -232,6 +233,21 @@ impl TestRunnerImpl {
             godot::global::godot_error!("exact benchmark selection must match one benchmark");
             return 2;
         }
+        let native_profile_seconds = match native_profile_seconds_from_env() {
+            Ok(seconds) => seconds,
+            Err(error) => {
+                godot::global::godot_error!("Native profile configuration error: {error}");
+                return 2;
+            }
+        };
+        if native_profile_seconds.is_some()
+            && !matches!(&selection.selector, BenchmarkSelector::Exact(_))
+        {
+            godot::global::godot_error!(
+                "Native profile configuration error: BENCHMARK_EXACT is required"
+            );
+            return 2;
+        }
         println!(
             "  Rust: found {} benchmarks in {} files.",
             selection.benchmarks.len(),
@@ -279,10 +295,20 @@ impl TestRunnerImpl {
         #[cfg(feature = "profile-tracy")]
         crate::profiling::mark_run_begin(profile_run_id.as_deref().unwrap_or_default());
         let clock = Instant::now();
-        let run_result = self.run_rust_benchmarks(&selection, profile_run_id.as_deref());
+        let run_result = self.run_rust_benchmarks(
+            &selection,
+            profile_run_id.as_deref(),
+            native_profile_seconds,
+        );
         let elapsed = clock.elapsed();
         #[cfg(feature = "profile-tracy")]
-        crate::profiling::mark_run_end(profile_run_id.as_deref().unwrap_or_default());
+        {
+            crate::profiling::mark_run_end(profile_run_id.as_deref().unwrap_or_default());
+            // Godot may unload the gdextension before tracy's flush-on-exit atexit
+            // handler runs, losing the final zones. Give the tracy worker thread
+            // time to ship the run_end marker before we request quit.
+            std::thread::sleep(std::time::Duration::from_millis(750));
+        }
 
         if let Err(error) = run_result {
             godot::global::godot_error!("Benchmark output error: {error}");
@@ -359,8 +385,11 @@ impl TestRunnerImpl {
         &self,
         selection: &BenchmarkSelection,
         profile_run_id: Option<&str>,
+        native_profile_seconds: Option<u32>,
     ) -> Result<(), String> {
         let output_json = std::env::var("BENCHMARK_JSON").is_ok();
+        let native_profile_duration =
+            native_profile_seconds.map(|seconds| Duration::from_secs(seconds.into()));
 
         let mut results = Vec::new();
         let mut last_file = None;
@@ -379,8 +408,22 @@ impl TestRunnerImpl {
                 std::io::Write::flush(&mut std::io::stdout()).ok();
             }
 
-            let result =
-                bencher::run_benchmark_named(bench.name, bench.function, bench.repetitions);
+            let started = Instant::now();
+            let mut loops = 0;
+            let result = loop {
+                let result =
+                    bencher::run_benchmark_named(bench.name, bench.function, bench.repetitions);
+                loops += 1;
+                if native_profile_duration.is_none_or(|duration| started.elapsed() >= duration) {
+                    break result;
+                }
+            };
+            if native_profile_duration.is_some() {
+                println!(
+                    "  Native profiling workload: {loops} benchmark loops in {:.2}s",
+                    started.elapsed().as_secs_f32()
+                );
+            }
             results.push((bench.name, result.stats[0], result.stats[1]));
 
             if !output_json {

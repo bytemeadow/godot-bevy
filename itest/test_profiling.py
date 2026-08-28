@@ -2,16 +2,25 @@
 from __future__ import annotations
 
 import copy
+import gzip
 import json
 import shutil
 import subprocess
 import sys
 import tempfile
+import xml.etree.ElementTree as ElementTree
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 import profile_orchestrator
+import profile_native
+from gecko_to_folded import GeckoProfileError, convert_profile, load_json, write_folded
+from profile_compare import (
+    ComparisonError,
+    create_comparison,
+    load_profile,
+)
 from profile_orchestrator import (
     ARTIFACTS,
     ProfileFailure,
@@ -22,9 +31,14 @@ from profile_orchestrator import (
     selection_request,
 )
 from profile_schema import (
+    COMPARISON_SCHEMA_NAME,
     DISCLOSURE,
+    NATIVE_ARTIFACTS,
+    NATIVE_SCHEMA_NAME,
     SCHEMA_NAME,
     SchemaValidationError,
+    validate_native_summary,
+    validate_profile_comparison,
     validate_profile_spans,
 )
 from profile_tracy import (
@@ -37,9 +51,16 @@ from profile_tracy import (
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 SCHEMA = REPOSITORY / "godot-bevy-test" / "schema" / SCHEMA_NAME
+COMPARISON_SCHEMA = (
+    REPOSITORY / "godot-bevy-test" / "schema" / COMPARISON_SCHEMA_NAME
+)
+NATIVE_SCHEMA = REPOSITORY / "godot-bevy-test" / "schema" / NATIVE_SCHEMA_NAME
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "profiling"
 INCLUSIVE = FIXTURES / "zones-inclusive.tsv"
 SELF = FIXTURES / "zones-self.tsv"
+GECKO_PROFILE = FIXTURES / "gecko-profile.json"
+GECKO_SYMBOLS = FIXTURES / "gecko-profile.json.syms.json"
+GECKO_FOLDED = FIXTURES / "gecko-profile.folded"
 
 
 def require(condition: bool, message: str) -> None:
@@ -118,51 +139,155 @@ def valid_documents(output: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     return incomplete, complete
 
 
+def write_json(path: Path, document: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+
+
+def write_profile_fixture(
+    output: Path,
+    run_id: str,
+    scale: float = 1.0,
+) -> tuple[Path, dict[str, Any]]:
+    output.mkdir(parents=True, exist_ok=True)
+    _, document = valid_documents(output)
+    document["run_id"] = run_id
+    for span in document["spans"]:
+        for timing_name in ("inclusive", "self"):
+            for sample in span[timing_name]["per_sample"]:
+                sample["normalized_total_ns"] *= scale
+                sample["normalized_count"] *= scale
+    path = output / "spans.json"
+    write_json(path, document)
+    return path, document
+
+
+def native_fixture(output: Path) -> dict[str, Any]:
+    for filename in NATIVE_ARTIFACTS.values():
+        content = (
+            "<svg>INSTRUMENTED PROFILE — NOT BENCHMARK RESULTS</svg>\n"
+            if filename.endswith(".svg")
+            else "fixture\n"
+        )
+        (output / filename).write_text(content, encoding="utf-8")
+    environment = {
+        "cargo_profile": "profiling",
+        "git_commit": "0123456789abcdef",
+        "git_short": "0123456",
+        "git_dirty": False,
+        "os": "fixture-os",
+        "arch": "fixture-arch",
+        "cpu": "fixture-cpu",
+        "rustc_version": "rustc fixture",
+        "godot_version": "Godot fixture",
+        "samply_version": "0.13.1",
+        "features": [],
+    }
+    document = profile_native.initial_document(
+        "native-fixture", environment, "fixture_bench", 5, output
+    )
+    document["sampling"]["observed_wall_seconds"] = 5.5
+    document["samples"] = {
+        "count": 600,
+        "unknown_leaf_count": 120,
+        "unknown_leaf_ratio": 0.2,
+    }
+    document["symbols"] = {"rust": True, "godot": True}
+    document["hotspots"] = [
+        {"name": "godot_bevy::fixture", "samples": 480, "percent": 80.0}
+    ]
+    document["artifacts"] = profile_native.artifact_records(output)
+    document["complete"] = True
+    document["outcome"] = "pass"
+    return document
+
+
+def rejected(validation: Any, document: Any, schema: Path) -> None:
+    try:
+        validation(document, schema)
+    except SchemaValidationError:
+        return
+    raise AssertionError("invalid schema document was accepted")
+
+
 def verify_schemas() -> None:
     with tempfile.TemporaryDirectory() as temporary:
-        incomplete, complete = valid_documents(Path(temporary))
+        root = Path(temporary)
+        profile_output = root / "profile"
+        profile_output.mkdir()
+        incomplete, complete = valid_documents(profile_output)
         validate_profile_spans(incomplete, SCHEMA, require_complete=False)
         validate_profile_spans(complete, SCHEMA, require_complete=True)
         print("PASS profile-spans-v1: complete-and-incomplete")
 
-        invalid_disclosure = copy.deepcopy(complete)
-        invalid_disclosure["benchmark_compatible"] = True
-        try:
-            validate_profile_spans(invalid_disclosure, SCHEMA)
-        except SchemaValidationError:
-            pass
-        else:
-            raise AssertionError("benchmark disclosure fields were not enforced")
+        baseline_path, _ = write_profile_fixture(
+            root / "baseline", "schema-baseline"
+        )
+        current_path, _ = write_profile_fixture(root / "current", "schema-current")
+        comparison = create_comparison(
+            [
+                load_profile(baseline_path, SCHEMA, "baseline", 1),
+                load_profile(current_path, SCHEMA, "current", 1),
+            ],
+            "descriptive",
+            "comparison-fixture",
+        )
+        validate_profile_comparison(
+            comparison, COMPARISON_SCHEMA, require_complete=True
+        )
+        print("PASS profile-comparison-v1: valid")
+
+        native_output = root / "native"
+        native_output.mkdir()
+        native = native_fixture(native_output)
+        incomplete_native = copy.deepcopy(native)
+        incomplete_native["complete"] = False
+        incomplete_native["outcome"] = "incomplete"
+        incomplete_native["sampling"]["observed_wall_seconds"] = None
+        incomplete_native["samples"] = {
+            "count": 0,
+            "unknown_leaf_count": 0,
+            "unknown_leaf_ratio": None,
+        }
+        incomplete_native["symbols"] = {"rust": False, "godot": False}
+        incomplete_native["hotspots"] = []
+        validate_native_summary(
+            incomplete_native, NATIVE_SCHEMA, require_complete=False
+        )
+        validate_native_summary(native, NATIVE_SCHEMA, require_complete=True)
+        print("PASS native-summary-v1: valid")
+
+        for validation, document, schema in (
+            (validate_profile_spans, complete, SCHEMA),
+            (validate_profile_comparison, comparison, COMPARISON_SCHEMA),
+            (validate_native_summary, native, NATIVE_SCHEMA),
+        ):
+            invalid_disclosure = copy.deepcopy(document)
+            invalid_disclosure["benchmark_compatible"] = True
+            rejected(validation, invalid_disclosure, schema)
         print("PASS disclosure fields: required")
 
-        extension = copy.deepcopy(complete)
-        extension["metadata"]["fixture-extension"] = {"allowed": True}
-        validate_profile_spans(extension, SCHEMA, require_complete=True)
-        extension["unexpected"] = True
-        try:
-            validate_profile_spans(extension, SCHEMA)
-        except SchemaValidationError:
-            pass
-        else:
-            raise AssertionError("unexpected top-level property was accepted")
+        for validation, document, schema in (
+            (validate_profile_spans, complete, SCHEMA),
+            (validate_profile_comparison, comparison, COMPARISON_SCHEMA),
+            (validate_native_summary, native, NATIVE_SCHEMA),
+        ):
+            extension = copy.deepcopy(document)
+            extension["metadata"]["fixture-extension"] = {"allowed": True}
+            validation(extension, schema, require_complete=True)
+            extension["unexpected"] = True
+            rejected(validation, extension, schema)
 
         duplicate_artifact = copy.deepcopy(complete)
         duplicate_artifact["artifacts"][0]["kind"] = "workload"
-        try:
-            validate_profile_spans(duplicate_artifact, SCHEMA)
-        except SchemaValidationError:
-            pass
-        else:
-            raise AssertionError("duplicate typed artifact was accepted")
-
-        try:
-            validate_profile_spans([], SCHEMA)
-        except SchemaValidationError:
-            pass
-        else:
-            raise AssertionError("non-object profile document was accepted")
+        rejected(validate_profile_spans, duplicate_artifact, SCHEMA)
+        rejected(validate_profile_spans, [], SCHEMA)
         print("PASS extension points: constrained")
 
+    verify_fixtures()
+
+
+def verify_fixtures() -> None:
     aggregation = fixture_aggregation()
     require(
         normalize_source_file(
@@ -270,6 +395,86 @@ def verify_schemas() -> None:
             ),
             "high emitted-name cardinality warning",
         )
+
+        gecko_profile = load_json(GECKO_PROFILE)
+        gecko_symbols = load_json(GECKO_SYMBOLS)
+        conversion = convert_profile(gecko_profile, gecko_symbols)
+        require(conversion.sample_count == 6, "Gecko weighted sample count")
+        require(conversion.unknown_leaf_count == 0, "Gecko unknown leaf count")
+        require(conversion.rust_symbols, "Gecko Rust symbol detection")
+        require(conversion.godot_symbols, "Gecko Godot symbol detection")
+        folded = Path(temporary) / "fixture.folded"
+        write_folded(conversion, folded)
+        require(
+            folded.read_text(encoding="utf-8")
+            == GECKO_FOLDED.read_text(encoding="utf-8"),
+            "Gecko folded-stack golden",
+        )
+
+        compressed = Path(temporary) / "profile.json.gz"
+        with gzip.open(compressed, "wt", encoding="utf-8") as handle:
+            json.dump(gecko_profile, handle)
+        require(load_json(compressed) == gecko_profile, "gzip Gecko profile parser")
+
+        row_oriented = copy.deepcopy(gecko_profile)
+        thread = row_oriented["threads"][0]
+        for name, columns in (
+            ("samples", ["stack", "time", "weight"]),
+            ("stackTable", ["prefix", "frame"]),
+            ("frameTable", ["func", "address", "nativeSymbol"]),
+            ("funcTable", ["name", "resource"]),
+        ):
+            table = thread[name]
+            thread[name] = {
+                "length": table["length"],
+                "schema": {column: index for index, column in enumerate(columns)},
+                "data": [
+                    [table[column][index] for column in columns]
+                    for index in range(table["length"])
+                ],
+            }
+        require(
+            convert_profile(row_oriented, gecko_symbols).folded == conversion.folded,
+            "row-oriented Gecko table parser",
+        )
+
+        stackless = copy.deepcopy(gecko_profile)
+        stackless["threads"][0]["samples"]["stack"][0] = None
+        stackless_conversion = convert_profile(stackless, gecko_symbols)
+        require(
+            stackless_conversion.sample_count == 6
+            and stackless_conversion.unknown_leaf_count == 1,
+            "stackless Gecko sample accounting",
+        )
+
+        cyclic = copy.deepcopy(gecko_profile)
+        cyclic["threads"][0]["stackTable"]["prefix"][0] = 2
+        try:
+            convert_profile(cyclic, gecko_symbols)
+        except GeckoProfileError:
+            pass
+        else:
+            raise AssertionError("cyclic Gecko stack table was accepted")
+
+        require(
+            profile_native._looks_like_profiler_failure(
+                "perf_event_open failed: Operation not permitted"
+            ),
+            "Samply permission failure classification",
+        )
+        failure_message = profile_native._profiler_failure_message()
+        if sys.platform.startswith("linux"):
+            require(
+                "perf_event_paranoid" in failure_message
+                and "never changes" in failure_message,
+                "Linux Samply permission guidance",
+            )
+        elif sys.platform == "darwin":
+            require(
+                "signed Godot" in failure_message
+                and "will not" in failure_message,
+                "macOS Samply signing guidance",
+            )
     print("PASS profiling fixtures: all")
 
 
@@ -484,6 +689,204 @@ def verify_contract() -> None:
     print("PASS benchmark pipeline guard: profiled-input-rejected")
 
 
+def verify_comparison() -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        baseline_path, _ = write_profile_fixture(
+            root / "baseline", "baseline-1"
+        )
+        current_path, _ = write_profile_fixture(
+            root / "current", "current-1", 1.1
+        )
+        descriptive_inputs = [
+            load_profile(baseline_path, SCHEMA, "baseline", 1),
+            load_profile(current_path, SCHEMA, "current", 1),
+        ]
+        descriptive = create_comparison(
+            descriptive_inputs, "descriptive", "descriptive-fixture"
+        )
+        validate_profile_comparison(
+            descriptive, COMPARISON_SCHEMA, require_complete=True
+        )
+        require(
+            descriptive["quality"] == "descriptive"
+            and descriptive["noise_analysis"] is False
+            and all(
+                metric["noise_pct"] is None
+                for span in descriptive["spans"]
+                for metric in span["metrics"]
+            ),
+            "descriptive comparison noise contract",
+        )
+        print("PASS one-pair comparison: quality=descriptive noise=false")
+
+        exploratory = copy.deepcopy(descriptive_inputs)
+        for profile in exploratory:
+            profile.document["selection"].update(
+                {"mode": "filter", "requested": "fixture", "patterns": ["fixture"]}
+            )
+        try:
+            create_comparison(exploratory, "descriptive", "filter-fixture")
+        except ComparisonError:
+            pass
+        else:
+            raise AssertionError("exploratory filter profiles were compared")
+
+        interleaved_inputs = []
+        for round_number, (baseline_scale, current_scale) in enumerate(
+            ((0.9, 1.0), (1.0, 1.15), (1.1, 1.2)), start=1
+        ):
+            round_baseline, _ = write_profile_fixture(
+                root / f"baseline-{round_number}",
+                f"baseline-{round_number}",
+                baseline_scale,
+            )
+            round_current, _ = write_profile_fixture(
+                root / f"current-{round_number}",
+                f"current-{round_number}",
+                current_scale,
+            )
+            interleaved_inputs.extend(
+                [
+                    load_profile(
+                        round_baseline, SCHEMA, "baseline", round_number
+                    ),
+                    load_profile(round_current, SCHEMA, "current", round_number),
+                ]
+            )
+        interleaved = create_comparison(
+            interleaved_inputs, "interleaved", "interleaved-fixture"
+        )
+        validate_profile_comparison(
+            interleaved, COMPARISON_SCHEMA, require_complete=True
+        )
+        hot = next(span for span in interleaved["spans"] if span["name"] == "hot_zone")
+        require(
+            interleaved["noise_analysis"] is True
+            and all(metric["noise_pct"] is not None for metric in hot["metrics"]),
+            "interleaved comparison noise contract",
+        )
+        print("PASS three-pair comparison: quality=interleaved noise=true")
+
+        compatibility_mutations = (
+            ("platform-os", lambda doc: doc["environment"].__setitem__("os", "other-os")),
+            ("platform-arch", lambda doc: doc["environment"].__setitem__("arch", "other-arch")),
+            ("cpu", lambda doc: doc["environment"].__setitem__("cpu", "other-cpu")),
+            ("godot", lambda doc: doc["environment"].__setitem__("godot_version", "other-godot")),
+            ("rustc", lambda doc: doc["environment"].__setitem__("rustc_version", "other-rustc")),
+            ("tracy", lambda doc: doc["environment"].__setitem__("tracy_version", "other-tracy")),
+            ("profile", lambda doc: doc["environment"].__setitem__("cargo_profile", "release")),
+            ("features", lambda doc: doc["environment"]["features"].append("other-feature")),
+            ("selector", lambda doc: doc["selection"].__setitem__("requested", "other-bench")),
+            ("schema", lambda doc: doc.__setitem__("$schema", "profile-spans-v2.schema.json")),
+        )
+        for label, mutate in compatibility_mutations:
+            incompatible_path, incompatible_document = write_profile_fixture(
+                root / f"incompatible-{label}", f"incompatible-{label}", 1.1
+            )
+            mutate(incompatible_document)
+            write_json(incompatible_path, incompatible_document)
+            try:
+                incompatible_input = load_profile(
+                    incompatible_path, SCHEMA, "current", 1
+                )
+                create_comparison(
+                    [descriptive_inputs[0], incompatible_input],
+                    "descriptive",
+                    "incompatible-fixture",
+                )
+            except ComparisonError:
+                pass
+            else:
+                raise AssertionError(f"{label} incompatibility was accepted")
+
+        incompatible_cli, incompatible_document = write_profile_fixture(
+            root / "incompatible-cli", "incompatible-cli", 1.1
+        )
+        incompatible_document["environment"]["cpu"] = "other-cpu"
+        write_json(incompatible_cli, incompatible_document)
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(REPOSITORY / "itest" / "compare-profiles.py"),
+                str(baseline_path),
+                str(incompatible_cli),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        )
+        require(result.returncode == 2, "incompatible profile exit code")
+        print("PASS incompatible profiles: exit=2")
+
+        incomplete_path, incomplete_document = write_profile_fixture(
+            root / "incomplete", "incomplete"
+        )
+        incomplete_document["complete"] = False
+        incomplete_document["outcome"] = "incomplete"
+        incomplete_document["spans"] = []
+        write_json(incomplete_path, incomplete_document)
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(REPOSITORY / "itest" / "compare-profiles.py"),
+                str(baseline_path),
+                str(incomplete_path),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        )
+        require(result.returncode == 2, "incomplete profile exit code")
+
+        missing_artifact_path, _ = write_profile_fixture(
+            root / "missing-artifact", "missing-artifact"
+        )
+        (missing_artifact_path.parent / "capture.tracy").unlink()
+        missing_artifact = subprocess.run(
+            [
+                sys.executable,
+                str(REPOSITORY / "itest" / "compare-profiles.py"),
+                str(baseline_path),
+                str(missing_artifact_path),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        )
+        require(missing_artifact.returncode == 2, "missing profile artifact exit code")
+        print("PASS incomplete profiles: exit=2")
+
+        unmatched_path, unmatched_document = write_profile_fixture(
+            root / "unmatched", "unmatched", 1.1
+        )
+        unmatched_document["spans"][0]["name"] = "renamed_hot_zone"
+        write_json(unmatched_path, unmatched_document)
+        unmatched = create_comparison(
+            [
+                descriptive_inputs[0],
+                load_profile(unmatched_path, SCHEMA, "current", 1),
+            ],
+            "descriptive",
+            "unmatched-fixture",
+        )
+        require(
+            unmatched["summary"]["added"] == 1
+            and unmatched["summary"]["removed"] == 1,
+            "unmatched span identity contract",
+        )
+        print("PASS unmatched spans: added-and-removed")
+        require(
+            descriptive["benchmark_compatible"] is False
+            and descriptive["disclosure"] == DISCLOSURE,
+            "comparison disclosure",
+        )
+        print("PASS comparison disclosure: diagnostic-only")
+
+
 def verify_fail_closed() -> None:
     request = SelectionRequest("exact", "fixture_bench", [])
 
@@ -635,25 +1038,171 @@ def verify_live(path: Path) -> None:
     print("PASS disclosure: benchmark_compatible=false")
 
 
+def verify_compare_live(path: Path) -> None:
+    document = json.loads(path.read_text(encoding="utf-8"))
+    validate_profile_comparison(
+        document, COMPARISON_SCHEMA, require_complete=True
+    )
+    expected_inputs = [
+        (side, round_number)
+        for round_number in range(1, 4)
+        for side in ("baseline", "current")
+    ]
+    actual_inputs = [
+        (profile["side"], profile["round"]) for profile in document["inputs"]
+    ]
+    require(
+        document["quality"] == "interleaved"
+        and document["rounds"]
+        == {"baseline": 3, "current": 3, "interleaved": True}
+        and actual_inputs == expected_inputs,
+        "live interleaving order",
+    )
+    print("PASS interleaving: baseline,current x3")
+    require(document["$schema"] == COMPARISON_SCHEMA_NAME, "comparison schema")
+    print("PASS comparison schema: profile-comparison-v1")
+    require(
+        document["noise_analysis"] is True
+        and all(
+            [metric["kind"] for metric in span["metrics"]]
+            == ["self", "inclusive", "count"]
+            for span in document["spans"]
+        )
+        and any(
+            metric["noise_pct"] is not None
+            for span in document["spans"]
+            if span["status"] == "matched"
+            for metric in span["metrics"]
+        ),
+        "comparison metric and noise output",
+    )
+    print("PASS comparison metrics: self,inclusive,count,noise")
+
+
+def verify_native_live(path: Path) -> None:
+    document = json.loads(path.read_text(encoding="utf-8"))
+    validate_native_summary(document, NATIVE_SCHEMA, require_complete=True)
+    samples = document["samples"]
+    require(samples["count"] >= 500, "native sample count")
+    print("PASS samply child capture: samples>=500")
+    sampling = document["sampling"]
+    require(
+        sampling["rate_hz"] == 1000 and sampling["reuse_threads"] is False,
+        "Samply settings",
+    )
+    print("PASS samply settings: rate=1000 reuse-threads=false")
+    require(
+        document["symbols"] == {"rust": True, "godot": True},
+        "native symbol coverage",
+    )
+    print("PASS native symbols: rust=true godot=true")
+    require(samples["unknown_leaf_ratio"] <= 0.5, "unknown leaf ratio")
+    print("PASS unknown leaf ratio: <=50%")
+
+    folded = path.parent / NATIVE_ARTIFACTS["folded-stacks"]
+    require(folded.read_text(encoding="utf-8").strip() != "", "folded stacks")
+    print("PASS folded stacks: nonempty")
+    flamegraph = path.parent / NATIVE_ARTIFACTS["flamegraph"]
+    root = ElementTree.parse(flamegraph).getroot()
+    require(root.tag.endswith("svg"), "flamegraph SVG root")
+    require(DISCLOSURE in flamegraph.read_text(encoding="utf-8"), "flamegraph disclosure")
+    print("PASS flamegraph svg: valid")
+    print("PASS native-summary-v1: complete=true")
+    require(
+        document["benchmark_compatible"] is False
+        and document["scope"]["kind"] == "whole-process",
+        "native profiling disclosure",
+    )
+    print("PASS disclosure: benchmark_compatible=false")
+
+
+def verify_workflow() -> None:
+    workflow = REPOSITORY / ".github" / "workflows" / "profiling.yml"
+    text = workflow.read_text(encoding="utf-8")
+    event_block = text.split("on:", 1)[1].split("permissions:", 1)[0]
+    require(
+        "workflow_dispatch:" in event_block
+        and all(
+            event not in event_block
+            for event in ("pull_request:", "push:", "schedule:")
+        ),
+        "profiling workflow triggers",
+    )
+    print("PASS profiling workflow: workflow_dispatch-only")
+    require(
+        "tracy:" in text
+        and "runs-on: ubuntu-latest" in text
+        and "./itest/run-profile.sh --bench" in text,
+        "Linux Tracy job",
+    )
+    print("PASS tracy job: linux=true")
+    native_job = text.split("  native:", 1)[1]
+    require(
+        "kernel.perf_event_paranoid=1" in native_job
+        and "./itest/run-profile.sh --native --bench" in native_job,
+        "native perf permission",
+    )
+    print("PASS native job: perf-permission-configured")
+    require(
+        text.count("if: always()") >= 2
+        and text.count("uses: actions/upload-artifact@v4") >= 2,
+        "always-uploaded profile artifacts",
+    )
+    print("PASS artifact upload: if=always")
+    require("pull_request" not in event_block, "per-PR profiling capture")
+    print("PASS per-PR capture: absent")
+    changed = subprocess.run(
+        [
+            "git",
+            "diff",
+            "--name-only",
+            "HEAD",
+            "--",
+            "godot-bevy-test/schema/itest-report-v1.schema.json",
+            "godot-bevy-test/src/report.rs",
+            ".github/scripts/benchmarks-compare.py",
+            ".github/scripts/benchmarks-merge.py",
+            ".github/workflows/benchmarks.yml",
+        ],
+        cwd=REPOSITORY,
+        text=True,
+        stdout=subprocess.PIPE,
+        check=False,
+    )
+    require(changed.returncode == 0 and not changed.stdout.strip(), "Tier-1 mutation")
+    print("PASS Tier-1 report mutation: absent")
+
+
 def main() -> int:
     if len(sys.argv) not in {2, 3}:
         print(
             "usage: test_profiling.py "
-            "schemas|tools|contract|fail-closed|live [spans.json]",
+            "schemas|fixtures|tools|contract|compare|fail-closed|"
+            "live|compare-live|native-live|workflow [artifact.json]",
             file=sys.stderr,
         )
         return 2
     mode = sys.argv[1]
     if mode == "schemas" and len(sys.argv) == 2:
         verify_schemas()
+    elif mode == "fixtures" and len(sys.argv) == 2:
+        verify_fixtures()
     elif mode == "tools" and len(sys.argv) == 2:
         verify_tools()
     elif mode == "contract" and len(sys.argv) == 2:
         verify_contract()
+    elif mode == "compare" and len(sys.argv) == 2:
+        verify_comparison()
     elif mode == "fail-closed" and len(sys.argv) == 2:
         verify_fail_closed()
     elif mode == "live" and len(sys.argv) == 3:
         verify_live(Path(sys.argv[2]))
+    elif mode == "compare-live" and len(sys.argv) == 3:
+        verify_compare_live(Path(sys.argv[2]))
+    elif mode == "native-live" and len(sys.argv) == 3:
+        verify_native_live(Path(sys.argv[2]))
+    elif mode == "workflow" and len(sys.argv) == 2:
+        verify_workflow()
     else:
         print("invalid profiling test mode", file=sys.stderr)
         return 2

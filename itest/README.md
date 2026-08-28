@@ -116,6 +116,25 @@ The harness contracts can be exercised independently:
 ./itest/verify-harness.sh focus
 ```
 
+## Profiling
+
+Tier-2 profiles are optimized, symbolized diagnostics and are not benchmark
+results. Tracy profiles exact benchmark spans; native profiles use Samply over
+the whole Godot process, including startup and teardown. Samply records CPU
+samples, not allocation counts or bytes.
+
+```bash
+./itest/run-profile.sh --bench transform_sync_bevy_to_godot_3d
+./itest/run-profile.sh --native --bench transform_sync_bevy_to_godot_3d --seconds 5
+./itest/compare-profiles.py path/to/a/spans.json path/to/b/spans.json
+PROFILE_ROUNDS=3 ./itest/compare-profiles.sh main --bench transform_sync_bevy_to_godot_3d
+PROFILE_ROUNDS=3 ./itest/compare-profiles.sh --self --bench transform_sync_bevy_to_godot_3d
+```
+
+The Python comparison is descriptive. The shell comparison alternates at least
+three process captures per side and reports standard-error-based noise. Artifacts
+are written under `target/profiles/`.
+
 ## How It Works
 
 1. Sync and async tests are collected into one globally ordered run

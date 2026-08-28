@@ -107,6 +107,10 @@ def create_parser() -> argparse.ArgumentParser:
         type=Path,
         help="artifact directory; an existing nonempty directory is rejected",
     )
+    parser.add_argument("--repository", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--target-dir", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--library-dir", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--skip-build", action="store_true", help=argparse.SUPPRESS)
     return parser
 
 
@@ -335,46 +339,52 @@ def prepare_output(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
-def build_itest(repository: Path, cargo: str) -> None:
-    result = subprocess.run(
-        [
-            cargo,
-            "build",
-            "--profile",
-            "profiling",
-            "--manifest-path",
-            str(repository / "itest" / "rust" / "Cargo.toml"),
-            "--target-dir",
-            str(repository / "target"),
-            "--features",
-            "profile-tracy",
-        ],
-        cwd=repository,
-        check=False,
-    )
+def build_itest(
+    repository: Path,
+    cargo: str,
+    target_dir: Path,
+    features: str | None = "profile-tracy",
+) -> None:
+    command = [
+        cargo,
+        "build",
+        "--profile",
+        "profiling",
+        "--manifest-path",
+        str(repository / "itest" / "rust" / "Cargo.toml"),
+        "--target-dir",
+        str(target_dir),
+    ]
+    if features is not None:
+        command.extend(["--features", features])
+    result = subprocess.run(command, cwd=repository, check=False)
     if result.returncode != 0:
         raise ProfileFailure(
             "configuration", f"profiling build failed with exit {result.returncode}"
         )
 
 
-def write_gdextension(repository: Path) -> None:
+def write_gdextension(repository: Path, library_directory: Path | None = None) -> None:
     godot_project = repository / "itest" / "godot"
     gdextension = godot_project / "itest.gdextension"
+    if library_directory is None:
+        library_directory_text = "res://../../target/profiling"
+    else:
+        library_directory_text = str(library_directory.resolve()).replace("\\", "/")
     gdextension.write_text(
-        """[configuration]
+        f"""[configuration]
 entry_symbol = "godot_bevy_itest"
 compatibility_minimum = 4.2
 
 [libraries]
-linux.debug.x86_64 = "res://../../target/profiling/libgodot_bevy_itest.so"
-linux.release.x86_64 = "res://../../target/profiling/libgodot_bevy_itest.so"
-windows.debug.x86_64 = "res://../../target/profiling/godot_bevy_itest.dll"
-windows.release.x86_64 = "res://../../target/profiling/godot_bevy_itest.dll"
-macos.debug = "res://../../target/profiling/libgodot_bevy_itest.dylib"
-macos.release = "res://../../target/profiling/libgodot_bevy_itest.dylib"
-macos.debug.arm64 = "res://../../target/profiling/libgodot_bevy_itest.dylib"
-macos.release.arm64 = "res://../../target/profiling/libgodot_bevy_itest.dylib"
+linux.debug.x86_64 = "{library_directory_text}/libgodot_bevy_itest.so"
+linux.release.x86_64 = "{library_directory_text}/libgodot_bevy_itest.so"
+windows.debug.x86_64 = "{library_directory_text}/godot_bevy_itest.dll"
+windows.release.x86_64 = "{library_directory_text}/godot_bevy_itest.dll"
+macos.debug = "{library_directory_text}/libgodot_bevy_itest.dylib"
+macos.release = "{library_directory_text}/libgodot_bevy_itest.dylib"
+macos.debug.arm64 = "{library_directory_text}/libgodot_bevy_itest.dylib"
+macos.release.arm64 = "{library_directory_text}/libgodot_bevy_itest.dylib"
 """,
         encoding="utf-8",
     )
@@ -669,8 +679,16 @@ def display_path(path: Path, repository: Path) -> str:
 
 
 def run(args: argparse.Namespace) -> int:
-    repository = Path(__file__).resolve().parents[1]
-    schema_path = repository / "godot-bevy-test" / "schema" / SCHEMA_NAME
+    tool_repository = Path(__file__).resolve().parents[1]
+    repository = (
+        args.repository.resolve() if args.repository is not None else tool_repository
+    )
+    target_dir = (
+        args.target_dir.resolve()
+        if args.target_dir is not None
+        else repository / "target"
+    )
+    schema_path = tool_repository / "godot-bevy-test" / "schema" / SCHEMA_NAME
     request = selection_request(args.bench, args.filter)
     run_id, git_short = make_run_id(repository)
     output = (
@@ -700,13 +718,32 @@ def run(args: argparse.Namespace) -> int:
     )
     environment = collect_environment(repository, godot, rustc, git_short)
 
-    build_itest(repository, cargo)
+    if not args.skip_build:
+        build_itest(repository, cargo, target_dir)
+    elif args.library_dir is None:
+        raise ProfileFailure("configuration", "--skip-build requires --library-dir")
+    else:
+        library_name = (
+            "libgodot_bevy_itest.dylib"
+            if sys.platform == "darwin"
+            else "godot_bevy_itest.dll"
+            if sys.platform == "win32"
+            else "libgodot_bevy_itest.so"
+        )
+        if not (args.library_dir / library_name).is_file():
+            raise ProfileFailure(
+                "configuration",
+                f"prebuilt profiling library not found: {args.library_dir / library_name}",
+            )
     prepare_output(output)
     document = initial_document(run_id, environment, request, output)
     write_document(document, output, schema_path, require_complete=False)
 
     try:
-        write_gdextension(repository)
+        library_directory = args.library_dir
+        if library_directory is None and target_dir != repository / "target":
+            library_directory = target_dir / "profiling"
+        write_gdextension(repository, library_directory)
         capture_workload(
             repository, output, request, run_id, tracy_capture, godot
         )
