@@ -208,7 +208,8 @@ jobs:
         run: ./run-tests.sh ${{ matrix.profile == 'release' && '--release' || '' }} --json ../target/itest-${{ matrix.profile }}.json
 
       - name: Upload integration test report
-        if: always()
+        # skipped under act: no artifact service locally (ACTIONS_RUNTIME_TOKEN)
+        if: ${{ always() && !env.ACT }}
         uses: actions/upload-artifact@v4
         with:
           name: itest-report-${{ matrix.profile }}
