@@ -21,4 +21,5 @@ bevy = { version = "0.19", default-features = false, features = [
     "multi_threaded",
 ] }
 serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 chrono = "0.4"

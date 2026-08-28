@@ -16,8 +16,8 @@ fn main() {
 
     if let Err(e) = runner.execute() {
         eprintln!("{e:?}");
-        std::process::exit(1);
+        std::process::exit(2);
     }
 
-    std::process::exit(godot_bevy_test::exit_code::read_and_cleanup_exit_code().unwrap_or(1));
+    std::process::exit(godot_bevy_test::exit_code::read_and_cleanup_exit_code().unwrap_or(2));
 }

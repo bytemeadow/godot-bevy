@@ -71,7 +71,9 @@ Where things live:
 - Unit tests: `cargo test`.
 - Integration tests run in a real Godot: `devenv shell -- itest` (or `cd itest && ./run-tests.sh`). They build with `--features test-frame-signal,autosync-tests`, need Godot (`GODOT4_BIN` or on PATH), and run headless with `--fixed-fps 60` so physics steps exactly once per render frame.
 - Tests live in `itest/rust/src/*_tests.rs` using `TestApp` + `#[itest]`/`#[itest(async)]`; add new files as `mod` in `itest/rust/src/lib.rs`. Read `itest/README.md` before writing one.
-- There is no name filter -- to run a single test, tag it `#[itest(focus)]` and rerun; `#[itest(skip)]` skips one.
+- Select tests without editing source: `devenv shell -- itest --filter test_name`. Filters are comma-separated, case-sensitive substrings. A filter matching no tests is an error.
+- Repeat and retain evidence: `devenv shell -- itest --filter test_name --repeat 3 --timeout-frames 600 --json ../target/itest.json`. Exit 0 means pass, 1 means a failed/flaky/timeout result, and 2 means a configuration or harness error.
+- `#[itest(focus)]` intersects with filters. CI sets `ITEST_DENY_FOCUS=1`, so committed focus markers fail before any test executes. `#[itest(skip)]` reports a selected test as skipped.
 - In async tests, `app.physics_update().await` guarantees a physics tick. Don't write exact single-frame assertions -- frame boundaries have ±1-frame slop.
 
 ## Benchmarks

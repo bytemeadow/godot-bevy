@@ -9,6 +9,8 @@ This crate provides a testing framework for writing integration tests that run i
 - **Real Godot Integration**: Tests run in Godot's headless mode with actual frame progression
 - **Async Test Support**: Wait for frames, test across multiple update cycles
 - **Bevy-style API**: Familiar `TestApp` pattern with world access
+- **Structured Reports**: Versioned JSON with per-attempt timing and failures
+- **Filtering & Repeats**: Select by name, repeat tests, and detect flakes
 - **Benchmark Support**: Performance benchmarking with statistical analysis
 - **Focus & Skip**: Easily focus on specific tests or skip work-in-progress
 - **Cross-platform**: Works on Linux, macOS, and Windows
@@ -140,6 +142,33 @@ godot4 --headless --path godot --quit-after 5000
 #[itest(focus)]             // Only run focused tests
 #[itest(async, skip)]       // Combine attributes
 ```
+
+Macro options are exact tokens. Unknown or misspelled options are compile errors.
+Focus selects only focused registrations and still intersects with `ITEST_FILTER`.
+Set `ITEST_DENY_FOCUS=1` in CI to reject focus mode before tests execute.
+
+### Runner Configuration
+
+The runner reads these environment variables:
+
+| Variable | Meaning |
+| --- | --- |
+| `ITEST_FILTER` | Comma-separated, case-sensitive name substrings |
+| `ITEST_REPEAT` | Positive attempt count per selected test; default `1` |
+| `ITEST_TIMEOUT_FRAMES` | Positive frame limit per attempt; default `600` |
+| `ITEST_JSON_PATH` | Optional path for the v1 JSON report |
+| `ITEST_DENY_FOCUS` | `1`/`true` rejects focused runs; default false |
+| `ITEST_BUILD_PROFILE` | `debug` or `release` report metadata |
+
+Filters are trimmed and empty terms are discarded; a fully empty filter or a
+zero-test selection is a configuration error. Skip affects execution after
+selection, so selected skipped tests remain visible in the report.
+
+The report schema is published at
+`schema/itest-report-v1.schema.json`. Requested reports are checkpointed with
+`complete: false` after every logical test and atomically finalized. Exit codes
+are 0 for pass, 1 for failed/flaky/timeout results, and 2 for configuration or
+harness errors.
 
 ### TestApp
 

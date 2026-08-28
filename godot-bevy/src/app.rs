@@ -8,6 +8,8 @@ use bevy_app::{App, PluginsState};
 use bevy_ecs::message::Messages;
 use crossbeam_channel::unbounded;
 use godot::prelude::*;
+#[cfg(feature = "test-frame-signal")]
+use std::sync::Mutex;
 use std::sync::OnceLock;
 
 // Stores the client's entrypoint (the function they decorated with the `#[bevy_app]` macro) at runtime
@@ -15,6 +17,34 @@ pub static BEVY_INIT_FUNC: OnceLock<Box<dyn Fn(&mut App) + Send + Sync>> = OnceL
 
 // Configuration for BevyApp, set by the #[bevy_app] macro attributes
 pub static BEVY_APP_CONFIG: OnceLock<BevyAppConfig> = OnceLock::new();
+
+#[cfg(feature = "test-frame-signal")]
+static TEST_FRAME_PANICS: Mutex<Vec<(&'static str, String)>> = Mutex::new(Vec::new());
+
+#[cfg(feature = "test-frame-signal")]
+fn record_test_frame_panic(callback: &'static str, payload: &(dyn std::any::Any + Send)) {
+    let message = if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else if let Some(message) = payload.downcast_ref::<&str>() {
+        message.to_string()
+    } else {
+        "unknown panic payload".to_string()
+    };
+    TEST_FRAME_PANICS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .push((callback, message));
+}
+
+#[cfg(feature = "test-frame-signal")]
+#[doc(hidden)]
+pub fn drain_test_frame_panics() -> Vec<(&'static str, String)> {
+    std::mem::take(
+        &mut *TEST_FRAME_PANICS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()),
+    )
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct BevyAppConfig {
@@ -513,6 +543,8 @@ impl INode for BevyApp {
         }
 
         if let Some(Err(e)) = result {
+            #[cfg(feature = "test-frame-signal")]
+            record_test_frame_panic("_process", e.as_ref());
             self.app = None;
             godot::global::godot_error!(
                 "godot-bevy: Bevy app panicked during _process and was permanently torn down; \
@@ -553,6 +585,8 @@ impl INode for BevyApp {
                 crate::profiling::secondary_frame_mark("physics");
             }))
         {
+            #[cfg(feature = "test-frame-signal")]
+            record_test_frame_panic("_physics_process", e.as_ref());
             self.app = None;
             godot::global::godot_error!(
                 "godot-bevy: Bevy app panicked during _physics_process and was permanently torn down; \

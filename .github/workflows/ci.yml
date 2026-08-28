@@ -134,6 +134,8 @@ jobs:
             library:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
+              - 'godot-bevy-test/**'
+              - 'godot-bevy-test-macros/**'
               - '.github/workflows/ci.yml'
               - 'Cargo.toml'
               - 'Cargo.lock'
@@ -147,6 +149,8 @@ jobs:
     name: integration tests (${{ matrix.profile }})
     runs-on: ubuntu-latest
     needs: [lint, changes]
+    env:
+      ITEST_DENY_FOCUS: "1"
     if: |
       always() &&
       (github.event_name == 'workflow_dispatch' ||
@@ -201,4 +205,12 @@ jobs:
         working-directory: itest
         env:
           GODOT4_BIN: godot
-        run: ./run-tests.sh ${{ matrix.profile == 'release' && '--release' || '' }}
+        run: ./run-tests.sh ${{ matrix.profile == 'release' && '--release' || '' }} --json ../target/itest-${{ matrix.profile }}.json
+
+      - name: Upload integration test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: itest-report-${{ matrix.profile }}
+          path: target/itest-${{ matrix.profile }}.json
+          if-no-files-found: warn

@@ -1,6 +1,49 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{ItemFn, Lit, Meta, MetaNameValue, ReturnType, parse_macro_input};
+use syn::ext::IdentExt;
+use syn::parse::{Parse, ParseStream};
+use syn::{Ident, ItemFn, Lit, Meta, MetaNameValue, ReturnType, Token, parse_macro_input};
+
+#[derive(Default)]
+struct ITestOptions {
+    is_async: bool,
+    is_skipped: bool,
+    is_focused: bool,
+}
+
+impl Parse for ITestOptions {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut options = Self::default();
+
+        while !input.is_empty() {
+            let option = input.call(Ident::parse_any)?;
+            let (name, selected) = match option.to_string().as_str() {
+                "async" => ("async", &mut options.is_async),
+                "skip" => ("skip", &mut options.is_skipped),
+                "focus" => ("focus", &mut options.is_focused),
+                _ => {
+                    return Err(syn::Error::new(
+                        option.span(),
+                        "unknown #[itest] option; expected async, skip, or focus",
+                    ));
+                }
+            };
+            if *selected {
+                return Err(syn::Error::new(
+                    option.span(),
+                    format!("duplicate #[itest] option `{name}`"),
+                ));
+            }
+            *selected = true;
+
+            if !input.is_empty() {
+                input.parse::<Token![,]>()?;
+            }
+        }
+
+        Ok(options)
+    }
+}
 
 /// Attribute macro for integration tests
 ///
@@ -28,13 +71,21 @@ use syn::{ItemFn, Lit, Meta, MetaNameValue, ReturnType, parse_macro_input};
 ///     // only focused tests will run when any test has focus
 /// }
 /// ```
+///
+/// Unknown options are rejected at compile time:
+/// ```compile_fail
+/// use godot_bevy_test_macros::itest;
+///
+/// #[itest(foucs)]
+/// fn misspelled_option() {}
+/// ```
 #[proc_macro_attribute]
 pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);
-    let attr_str = attr.to_string();
-    let is_async = attr_str.contains("async");
-    let is_skipped = attr_str.contains("skip");
-    let is_focused = attr_str.contains("focus");
+    let options = parse_macro_input!(attr as ITestOptions);
+    let is_async = options.is_async;
+    let is_skipped = options.is_skipped;
+    let is_focused = options.is_focused;
 
     let test_name = &input.sig.ident;
     let test_name_str = test_name.to_string();
@@ -160,4 +211,23 @@ pub fn bench(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         );
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_exact_itest_options() {
+        let options = syn::parse_str::<ITestOptions>("async, skip, focus").unwrap();
+        assert!(options.is_async);
+        assert!(options.is_skipped);
+        assert!(options.is_focused);
+    }
+
+    #[test]
+    fn rejects_unknown_and_duplicate_itest_options() {
+        assert!(syn::parse_str::<ITestOptions>("asyncish").is_err());
+        assert!(syn::parse_str::<ITestOptions>("focus, focus").is_err());
+    }
 }

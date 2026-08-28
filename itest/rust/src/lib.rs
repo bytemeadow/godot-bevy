@@ -1,8 +1,3 @@
-/*
- * Integration tests for godot-bevy
- * All tests are async and wait for real Godot frame progression
- */
-
 use godot::init::{ExtensionLibrary, gdextension};
 
 // Declare the test runner class
@@ -14,6 +9,8 @@ mod autosync_match_tests;
 mod benchmarks;
 mod collision_tests;
 mod event_bridge_tests;
+#[cfg(feature = "harness-probes")]
+mod harness_probe_tests;
 mod input_ecosystem_tests;
 mod input_tests;
 #[cfg(feature = "autosync-tests")]

@@ -2356,6 +2356,7 @@ dependencies = [
  "godot",
  "godot-bevy",
  "godot-bevy-test-macros",
+ "serde",
  "serde_json",
 ]
 

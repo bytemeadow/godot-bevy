@@ -55,7 +55,9 @@
 //! 4. Set up a Godot project with `TestRunner.gd` and run tests headlessly.
 
 pub mod bencher;
+mod config;
 pub mod exit_code;
+mod report;
 pub mod runner;
 pub mod test_app;
 pub mod test_helpers;
