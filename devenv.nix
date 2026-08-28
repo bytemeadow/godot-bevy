@@ -105,6 +105,16 @@ in
       cd itest && ./run-benches.sh "$@"
     '';
 
+    # native, needs local godot; tracy span table (default) or samply flamegraph (--native)
+    profile.exec = ''
+      cd itest && ./run-profile.sh "$@"
+    '';
+
+    # native, needs local godot; interleaved span comparison vs a base ref (or --self)
+    profile-compare.exec = ''
+      cd itest && ./compare-profiles.sh "$@"
+    '';
+
     book.exec = ''
       cd book && mdbook build "$@"
     '';

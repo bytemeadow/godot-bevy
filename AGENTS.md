@@ -20,6 +20,8 @@ Everything runs inside `devenv shell -- <cmd>` (direnv usually activates the env
 | `ci-lint` | what CI enforces: `cargo fmt --check` + `clippy -D warnings` |
 | `itest` | integration tests, natively (needs local Godot) |
 | `bench` | benchmarks, natively (needs local Godot) |
+| `profile` | tracy span table for one benchmark, or samply flamegraph with `--native` |
+| `profile-compare` | interleaved span comparison vs a base ref (diagnostic-only) |
 | `ci-test` / `ci-itest` / `ci-benches` | replay the CI workflows via act -- needs Docker, slow |
 | `book` / `book-serve` | build / live-serve the mdbook in `book/` |
 
@@ -93,10 +95,10 @@ Tier-2 profiling is diagnostic-only and uses the optimized, symbolized `profilin
 Cargo profile:
 
 ```bash
-devenv shell -- ./itest/run-profile.sh --bench transform_sync_bevy_to_godot_3d
-devenv shell -- ./itest/run-profile.sh --native --bench transform_sync_bevy_to_godot_3d
+devenv shell -- profile --bench transform_sync_bevy_to_godot_3d
+devenv shell -- profile --native --bench transform_sync_bevy_to_godot_3d
 devenv shell -- ./itest/compare-profiles.py a/spans.json b/spans.json
-PROFILE_ROUNDS=3 devenv shell -- ./itest/compare-profiles.sh main --bench transform_sync_bevy_to_godot_3d
+PROFILE_ROUNDS=3 devenv shell -- profile-compare main --bench transform_sync_bevy_to_godot_3d
 ```
 
 Native profiles cover the whole Godot process, including startup and teardown.
