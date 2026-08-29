@@ -18,6 +18,9 @@ on:
 
 env:
   ITEST_DENY_FOCUS: "1"
+  # hosted runners: one ~10G mutants scratch fits, two don't; full sweep needs >30min
+  QUALIFICATION_JOBS: "1"
+  QUALIFICATION_WALL_CLOCK: "7200"
 
 permissions:
   contents: read
