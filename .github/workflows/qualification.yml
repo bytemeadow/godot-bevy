@@ -1,6 +1,9 @@
 name: qualification
 
 on:
+  # TEMPORARY pre-merge validation trigger; remove before merge
+  push:
+    branches: [godot-bevy-verification]
   workflow_dispatch:
     inputs:
       suite:
@@ -33,15 +36,15 @@ jobs:
       - name: Install devenv
         run: nix profile add nixpkgs#devenv
       - name: Run mutation qualification
-        if: inputs.suite == 'mutants' || inputs.suite == 'both'
+        if: github.event_name == 'push' || inputs.suite == 'mutants' || inputs.suite == 'both'
         run: devenv shell -- mutants full
       - name: Run fault qualification
-        if: always() && (inputs.suite == 'faults' || inputs.suite == 'both')
+        if: always() && (github.event_name == 'push' || inputs.suite == 'faults' || inputs.suite == 'both')
         run: devenv shell -- qualification faults --profiles debug,release
       - name: Upload qualification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: qualification-${{ inputs.suite }}
+          name: qualification-${{ inputs.suite || 'push' }}
           path: target/qualification/
           if-no-files-found: warn
