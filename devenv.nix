@@ -21,6 +21,7 @@ in
     with pkgs;
     [
       sccache # rust build artifact cache
+      cargo-mutants
       python3 # godot type generation script
       mdbook # builds book/
       rust-toolchain
@@ -97,6 +98,14 @@ in
     itest.exec = ''
       echo "Running integration tests..."
       cd itest && ./run-tests.sh "$@"
+    '';
+
+    mutants.exec = ''
+      python3 itest/qualification_mutants.py "$@"
+    '';
+
+    qualification.exec = ''
+      python3 itest/qualification.py "$@"
     '';
 
     # native, needs local godot

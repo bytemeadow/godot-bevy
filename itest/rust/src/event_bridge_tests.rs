@@ -67,6 +67,36 @@ fn test_send_event_rust_node_scoped(ctx: &TestContext) -> godot::task::TaskHandl
     })
 }
 
+#[itest(async)]
+fn test_send_event_delivers_exactly_once(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        #[derive(Resource, Default)]
+        struct Received(u32);
+
+        let mut app = TestApp::new(&ctx_clone, |app| {
+            app.init_resource::<Received>();
+            app.add_observer(|_: On<Damage>, mut received: ResMut<Received>| {
+                received.0 += 1;
+            });
+        })
+        .await;
+
+        let node = singleton_node(&ctx_clone);
+        godot_bevy::send_event(&node, Damage { amount: 1 });
+        app.update().await;
+        app.update().await;
+
+        let received = app.with_world(|world| world.resource::<Received>().0);
+        assert_eq!(
+            received, 1,
+            "event bridge should deliver exactly once across two frames"
+        );
+
+        app.cleanup().await;
+    })
+}
+
 /// `try_singleton` resolves the autoload and delivers identically.
 #[itest(async)]
 fn test_send_event_via_try_singleton(ctx: &TestContext) -> godot::task::TaskHandle {

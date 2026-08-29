@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bytemeadow/godot-bevy/qualification-v1.schema.json",
+  "title": "godot-bevy Tier-3 qualification evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "run_id",
+    "evidence_kind",
+    "mode",
+    "complete",
+    "outcome",
+    "generated_at",
+    "environment",
+    "summary",
+    "mutants",
+    "faults",
+    "checks",
+    "errors",
+    "artifacts",
+    "metadata"
+  ],
+  "properties": {
+    "$schema": { "const": "qualification-v1.schema.json" },
+    "schema_version": { "const": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "evidence_kind": {
+      "enum": [
+        "mutation-run",
+        "mutation-baseline",
+        "fault-pack",
+        "doctest-audit",
+        "assertion-audit",
+        "aggregate"
+      ]
+    },
+    "mode": { "type": "string", "minLength": 1 },
+    "complete": { "type": "boolean" },
+    "outcome": { "enum": ["incomplete", "pass", "fail", "error", "skip"] },
+    "generated_at": { "type": "string", "minLength": 1 },
+    "environment": { "$ref": "#/$defs/environment" },
+    "summary": { "$ref": "#/$defs/summary" },
+    "mutants": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/mutant" }
+    },
+    "faults": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/fault" }
+    },
+    "checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/error" }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "metadata": { "$ref": "#/$defs/metadata" }
+  },
+  "$defs": {
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "git_commit",
+        "git_dirty",
+        "os",
+        "arch",
+        "cargo_profile",
+        "tools",
+        "metadata"
+      ],
+      "properties": {
+        "git_commit": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{7,64}$"
+        },
+        "git_dirty": { "type": "boolean" },
+        "os": { "type": "string", "minLength": 1 },
+        "arch": { "type": "string", "minLength": 1 },
+        "cargo_profile": { "type": ["string", "null"] },
+        "tools": { "$ref": "#/$defs/metadata" },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "passed", "failed", "invalid", "skipped", "counts"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "invalid": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "counts": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "mutant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "package",
+        "path",
+        "function",
+        "genre",
+        "replacement",
+        "source_slice_sha256",
+        "outcome",
+        "name",
+        "location",
+        "log_path",
+        "diff_path",
+        "metadata"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "package": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "function": { "type": ["string", "null"] },
+        "genre": { "type": "string", "minLength": 1 },
+        "replacement": { "type": "string" },
+        "source_slice_sha256": { "$ref": "#/$defs/sha256" },
+        "outcome": { "enum": ["caught", "missed", "timeout", "unviable"] },
+        "name": { "type": "string", "minLength": 1 },
+        "location": { "$ref": "#/$defs/location" },
+        "log_path": { "type": ["string", "null"] },
+        "diff_path": { "type": ["string", "null"] },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "fault": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "profile",
+        "outcome",
+        "killer_tests",
+        "failed_tests",
+        "matched_signatures",
+        "report_path",
+        "metadata"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "profile": { "enum": ["debug", "release"] },
+        "outcome": { "enum": ["killed", "survived", "invalid"] },
+        "killer_tests": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "failed_tests": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "matched_signatures": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "report_path": { "type": ["string", "null"] },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "outcome", "exit_code", "artifact", "metadata"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "outcome": { "enum": ["pass", "fail", "error", "skip"] },
+        "exit_code": { "enum": [0, 1, 2] },
+        "artifact": { "type": ["string", "null"] },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "message", "check"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "check": { "type": ["string", "null"] }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "present", "size_bytes", "metadata"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "present": { "type": "boolean" },
+        "size_bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["line", "column"],
+      "properties": {
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

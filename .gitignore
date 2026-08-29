@@ -39,7 +39,8 @@ devenv.local.nix
 # tracy profiler captures
 *.tracy
 
-.cargo/
+.cargo/*
+!.cargo/mutants.toml
 /inspo
 
 extension_api.json
