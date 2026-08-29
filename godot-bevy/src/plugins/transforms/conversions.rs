@@ -106,7 +106,9 @@ impl IntoGodotTransform2D for BevyTransform {
             (w * w - z * z, 2.0 * w * z)
         } else {
             let (_, _, angle) = self.rotation.to_euler(bevy_math::EulerRot::XYZ);
-            angle.sin_cos()
+            // sin_cos() returns (sin, cos); this tuple is (cos, sin)
+            let (sin, cos) = angle.sin_cos();
+            (cos, sin)
         };
 
         // Apply scale to rotation matrix
