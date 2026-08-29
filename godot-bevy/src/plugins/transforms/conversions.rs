@@ -468,6 +468,24 @@ mod tests {
     }
 
     #[test]
+    fn transform_2d_y_component_alone_takes_the_euler_path() {
+        let rotation = Quat::from_xyzw(0.0, 0.5, 0.5, std::f32::consts::FRAC_1_SQRT_2);
+        let transform = BevyTransform {
+            translation: Vec3::new(7.0, 11.0, 13.0),
+            rotation,
+            scale: Vec3::new(2.0, 3.0, 1.0),
+        }
+        .to_godot_transform_2d();
+
+        // euler z is exactly PI/2 for this quat; the pure-z fast path would
+        // instead produce a.x = (w*w - z*z) * 2.0 = 0.5
+        assert!(transform.a.x.abs() < 1e-6);
+        assert!((transform.a.y - 2.0).abs() < 1e-6);
+        assert!((transform.b.x + 3.0).abs() < 1e-6);
+        assert!(transform.b.y.abs() < 1e-6);
+    }
+
+    #[test]
     fn transform_2d_fast_path_thresholds_fall_back_to_euler() {
         for rotation in [
             Quat::from_xyzw(1e-6, 0.5e-6, 1.0, -0.5e-12),
