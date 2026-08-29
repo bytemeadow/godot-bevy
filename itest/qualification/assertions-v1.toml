@@ -419,3 +419,13 @@ units = "position units"
 tolerance = "0.1"
 rationale = "The same-frame runtime observation can differ only by f32 transport noise."
 sensitivity_witness = "A delayed or no-op read leaves the observed value at zero instead of 99."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions.rs"
+test = "transform_2d_y_component_alone_takes_the_euler_path"
+expression_fingerprint = "sha256:f46704a7d68657ac1275ff9336d3938bdebb5541b9c5cf5b29a126c8e500a35f"
+configuration_fingerprint = "sha256:f7f1b45a4b3b28693aff35674dba9d79acd3f562b67be8524e9bbfe2413493f4"
+units = "2D basis component magnitude"
+tolerance = "1e-6 absolute"
+rationale = "cos(PI/2) in f32 is ~-4.4e-8, not exactly zero, so the euler-path expectations need an absolute band."
+sensitivity_witness = "The pure-z fast path yields a.x = 0.5 and b.y = 1.0 for this quat, three orders of magnitude outside the band."
