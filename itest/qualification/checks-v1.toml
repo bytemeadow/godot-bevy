@@ -11,3 +11,15 @@ id = "fault-pack"
 command = ["python3", "itest/qualification_faults.py", "--profiles", "debug,release"]
 artifact = "target/qualification/latest-faults/qualification-v1.json"
 evidence_kind = "fault-pack"
+
+[[checks]]
+id = "doctests"
+command = ["./itest/verify-qualification.sh", "doctests"]
+artifact = "target/qualification/latest-doctests/qualification-v1.json"
+evidence_kind = "doctest-audit"
+
+[[checks]]
+id = "assertions"
+command = ["./itest/verify-qualification.sh", "assertions"]
+artifact = "target/qualification/latest-assertions/qualification-v1.json"
+evidence_kind = "assertion-audit"

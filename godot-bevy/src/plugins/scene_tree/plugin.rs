@@ -48,14 +48,16 @@ use tracing::{debug, trace, warn};
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use bevy_ecs::prelude::Res;
+/// # use godot::obj::InstanceId;
+/// # use godot_bevy::prelude::NodeEntityIndex;
 /// fn handle_collision(
 ///     index: Res<NodeEntityIndex>,
-///     // ... other params
+///     colliding_instance_id: InstanceId,
 /// ) {
-///     let colliding_instance_id = /* from collision event */;
 ///     if let Some(entity) = index.get(colliding_instance_id) {
-///         // Do something with the entity
+///         println!("colliding with {entity:?}");
 ///     }
 /// }
 /// ```

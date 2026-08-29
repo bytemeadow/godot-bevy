@@ -26,10 +26,15 @@ def generate_signal_names(
         //! These provide convenient, discoverable signal names for connecting to Godot signals.
         //!
         //! Example usage:
-        //! ```ignore
-        //! use godot_bevy::interop::signal_names::ButtonSignals;
-        //! // Connect to the "pressed" signal
-        //! button.connect(ButtonSignals::PRESSED.into(), callable);
+        //! ```no_run
+        //! use godot::classes::Button;
+        //! use godot::obj::Gd;
+        //! use godot::prelude::Callable;
+        //! use godot_bevy::interop::signal_names::BaseButtonSignals;
+        //!
+        //! fn connect_pressed(button: &mut Gd<Button>, callable: &Callable) {
+        //!     button.connect(BaseButtonSignals::PRESSED, callable);
+        //! }
         //! ```
         
         """)

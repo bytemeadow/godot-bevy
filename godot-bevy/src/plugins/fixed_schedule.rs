@@ -465,6 +465,22 @@ mod tests {
     }
 
     #[test]
+    fn suffix_starts_after_the_split_marker() {
+        #[derive(Resource, Default)]
+        struct MarkerRuns(u32);
+
+        let mut app = hosted_app();
+        app.init_resource::<MarkerRuns>();
+        app.add_systems(GodotFixedMainLoopSplit, |mut runs: ResMut<MarkerRuns>| {
+            runs.0 += 1;
+        });
+
+        run_main_suffix(app.world_mut());
+
+        assert_eq!(app.world().resource::<MarkerRuns>().0, 0);
+    }
+
+    #[test]
     fn state_transition_runs_in_prefix() {
         // Concrete consumer: bevy_state's StatesPlugin inserts StateTransition after
         // PreUpdate, which lands it in the prefix (before the fixed loop).

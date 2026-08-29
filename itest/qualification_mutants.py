@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -36,6 +36,7 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 SCHEMA = REPOSITORY / "godot-bevy-test" / "schema" / "qualification-v1.schema.json"
 CONFIG = REPOSITORY / ".cargo" / "mutants.toml"
 BASELINE = REPOSITORY / "itest" / "qualification" / "mutants-baseline-v1.json"
+WAIVERS = REPOSITORY / "itest" / "qualification" / "mutants-waivers-v1.toml"
 OUTPUT_ROOT = REPOSITORY / "target" / "qualification" / "mutants"
 LATEST = REPOSITORY / "target" / "qualification" / "latest" / "qualification-v1.json"
 OUTCOME_NAMES = {
@@ -68,6 +69,20 @@ class MutationEvidenceError(ValueError):
 
 
 @dataclass(frozen=True)
+class MutationWaiver:
+    stable_id: str
+    package: str
+    path: str
+    function: str | None
+    genre: str
+    replacement: str
+    source_slice_sha256: str
+    ordinal: int
+    rationale: str
+    reference: str
+
+
+@dataclass(frozen=True)
 class MutationRecord:
     stable_id: str
     package: str
@@ -76,6 +91,7 @@ class MutationRecord:
     genre: str
     replacement: str
     source_slice_sha256: str
+    ordinal: int
     source_slice: bytes
     outcome: str
     name: str
@@ -83,6 +99,7 @@ class MutationRecord:
     column: int
     log_path: str | None
     diff_path: str | None
+    metadata: dict[str, Any]
 
     def as_report_record(self) -> dict[str, Any]:
         return {
@@ -93,12 +110,13 @@ class MutationRecord:
             "genre": self.genre,
             "replacement": self.replacement,
             "source_slice_sha256": self.source_slice_sha256,
+            "ordinal": self.ordinal,
             "outcome": self.outcome,
             "name": self.name,
             "location": {"line": self.line, "column": self.column},
             "log_path": self.log_path,
             "diff_path": self.diff_path,
-            "metadata": {},
+            "metadata": self.metadata,
         }
 
 
@@ -319,10 +337,15 @@ def _stable_id(
     genre: str,
     replacement: str,
     source_slice_sha256: str,
+    ordinal: int,
 ) -> str:
+    # ordinal disambiguates repeated identical mutations within one function
+    # (e.g. two `>` operators); it is the span-order index within the group,
+    # so it shifts only when that function's own mutation set changes.
     identity = {
         "function": function,
         "genre": genre,
+        "ordinal": ordinal,
         "package": package,
         "path": path,
         "replacement": replacement,
@@ -335,6 +358,143 @@ def _stable_id(
         separators=(",", ":"),
     ).encode("utf-8")
     return f"sha256:{hashlib.sha256(canonical).hexdigest()}"
+
+
+def load_waivers(path: Path = WAIVERS) -> dict[str, MutationWaiver]:
+    document = load_toml(path)
+    if set(document) != {"version", "waivers"} or document.get("version") != 1:
+        raise MutationEvidenceError("mutant waiver manifest must be version 1")
+    entries = document.get("waivers")
+    if not isinstance(entries, list):
+        raise MutationEvidenceError("mutant waiver manifest must contain waiver tables")
+    required = {
+        "id",
+        "package",
+        "path",
+        "function",
+        "genre",
+        "replacement",
+        "source_slice_sha256",
+        "ordinal",
+        "rationale",
+        "reference",
+    }
+    waivers: dict[str, MutationWaiver] = {}
+    for index, raw in enumerate(entries):
+        entry = _object(raw, f"waivers[{index}]")
+        if set(entry) != required:
+            raise MutationEvidenceError(f"waivers[{index}] has unexpected fields")
+        stable_id = _string(entry["id"], f"waivers[{index}].id")
+        package = _string(entry["package"], f"waivers[{index}].package")
+        source_path = _normalized_relative_path(
+            entry["path"], f"waivers[{index}].path"
+        )
+        function_value = entry["function"]
+        function = _string(
+            function_value, f"waivers[{index}].function", empty=True
+        )
+        function = function or None
+        genre = _string(entry["genre"], f"waivers[{index}].genre")
+        replacement = _string(
+            entry["replacement"], f"waivers[{index}].replacement", empty=True
+        )
+        source_hash = _string(
+            entry["source_slice_sha256"],
+            f"waivers[{index}].source_slice_sha256",
+        )
+        if re.fullmatch(r"[0-9a-f]{64}", source_hash) is None:
+            raise MutationEvidenceError(f"waivers[{index}] has an invalid source hash")
+        ordinal = _nonnegative_integer(entry["ordinal"], f"waivers[{index}].ordinal")
+        rationale = _string(entry["rationale"], f"waivers[{index}].rationale")
+        reference = _string(entry["reference"], f"waivers[{index}].reference")
+        expected_id = _stable_id(
+            package,
+            source_path,
+            function,
+            genre,
+            replacement,
+            source_hash,
+            ordinal,
+        )
+        if stable_id != expected_id:
+            raise MutationEvidenceError(f"waivers[{index}] identity fingerprint is invalid")
+        if stable_id in waivers:
+            raise MutationEvidenceError(f"duplicate mutant waiver {stable_id}")
+        waivers[stable_id] = MutationWaiver(
+            stable_id=stable_id,
+            package=package,
+            path=source_path,
+            function=function,
+            genre=genre,
+            replacement=replacement,
+            source_slice_sha256=source_hash,
+            ordinal=ordinal,
+            rationale=rationale,
+            reference=reference,
+        )
+    return waivers
+
+
+def apply_waivers(
+    run: MutationRun,
+    waivers: dict[str, MutationWaiver],
+    *,
+    require_all: bool,
+) -> MutationRun:
+    matched: set[str] = set()
+    mutants: list[MutationRecord] = []
+    for mutant in run.mutants:
+        waiver = waivers.get(mutant.stable_id)
+        if waiver is None:
+            mutants.append(mutant)
+            continue
+        identity = (
+            mutant.package,
+            mutant.path,
+            mutant.function,
+            mutant.genre,
+            mutant.replacement,
+            mutant.source_slice_sha256,
+            mutant.ordinal,
+        )
+        waiver_identity = (
+            waiver.package,
+            waiver.path,
+            waiver.function,
+            waiver.genre,
+            waiver.replacement,
+            waiver.source_slice_sha256,
+            waiver.ordinal,
+        )
+        if identity != waiver_identity:
+            raise MutationEvidenceError(f"mutant waiver identity mismatch: {waiver.stable_id}")
+        if mutant.outcome != "missed":
+            if require_all:
+                raise MutationEvidenceError(
+                    f"mutant waiver no longer describes a miss: {waiver.stable_id}"
+                )
+            mutants.append(mutant)
+            continue
+        matched.add(waiver.stable_id)
+        mutants.append(
+            replace(
+                mutant,
+                outcome="waived",
+                metadata={
+                    "waiver": {
+                        "rationale": waiver.rationale,
+                        "reference": waiver.reference,
+                    }
+                },
+            )
+        )
+    if require_all:
+        stale = sorted(set(waivers) - matched)
+        if stale:
+            raise MutationEvidenceError(
+                "stale mutant waivers: " + ", ".join(stale)
+            )
+    return replace(run, mutants=mutants)
 
 
 def _normalize_mutant(
@@ -382,20 +542,14 @@ def _normalize_mutant(
         raise MutationEvidenceError("mutant outcome has no diff_path")
     diff_relative, _ = _evidence_path(output_dir, diff_value, "outcome.diff_path")
     return MutationRecord(
-        stable_id=_stable_id(
-            package,
-            source_relative,
-            function,
-            genre,
-            replacement,
-            source_slice_sha256,
-        ),
+        stable_id="",
         package=package,
         path=source_relative,
         function=function,
         genre=genre,
         replacement=replacement,
         source_slice_sha256=source_slice_sha256,
+        ordinal=-1,
         source_slice=source_slice,
         outcome=normalized_outcome,
         name=_string(mutant.get("name"), "mutant.name"),
@@ -403,7 +557,41 @@ def _normalize_mutant(
         column=column,
         log_path=log_relative,
         diff_path=diff_relative,
+        metadata={},
     )
+
+
+def _assign_identities(mutants: list[MutationRecord]) -> list[MutationRecord]:
+    groups: dict[tuple[Any, ...], list[int]] = {}
+    for index, mutant in enumerate(mutants):
+        key = (
+            mutant.package,
+            mutant.path,
+            mutant.function,
+            mutant.genre,
+            mutant.replacement,
+            mutant.source_slice_sha256,
+        )
+        groups.setdefault(key, []).append(index)
+    assigned = list(mutants)
+    for indices in groups.values():
+        ordered = sorted(indices, key=lambda i: (mutants[i].line, mutants[i].column))
+        for ordinal, index in enumerate(ordered):
+            mutant = mutants[index]
+            assigned[index] = replace(
+                mutant,
+                ordinal=ordinal,
+                stable_id=_stable_id(
+                    mutant.package,
+                    mutant.path,
+                    mutant.function,
+                    mutant.genre,
+                    mutant.replacement,
+                    mutant.source_slice_sha256,
+                    ordinal,
+                ),
+            )
+    return assigned
 
 
 def normalize_outcomes(output_dir: Path, source_root: Path) -> MutationRun:
@@ -471,6 +659,7 @@ def normalize_outcomes(output_dir: Path, source_root: Path) -> MutationRun:
         _normalize_mutant(_object(outcome, "mutant outcome"), output_dir, source_root)
         for outcome in mutant_outcomes
     ]
+    mutants = _assign_identities(mutants)
     total = _nonnegative_integer(document.get("total_mutants"), "total_mutants")
     if total != len(mutants):
         raise MutationEvidenceError(
@@ -616,8 +805,11 @@ def _complete_report(
     driver_log: Path,
     elapsed: float,
     native_exit: int,
+    raw_counts: dict[str, int],
 ) -> tuple[int, int]:
-    counts = {name: 0 for name in ("caught", "missed", "timeout", "unviable")}
+    counts = {
+        name: 0 for name in ("caught", "missed", "timeout", "unviable", "waived")
+    }
     for mutant in run.mutants:
         counts[mutant.outcome] += 1
     if not run.mutants:
@@ -633,7 +825,9 @@ def _complete_report(
     baseline_status, baseline_outcomes = _load_baseline()
     current = {mutant.stable_id: mutant.outcome for mutant in run.mutants}
     regressions, new_ids = compare_mutant_outcomes(baseline_outcomes, current)
-    expected_native_exit = 3 if counts["timeout"] else 2 if counts["missed"] else 0
+    expected_native_exit = (
+        3 if raw_counts["timeout"] else 2 if raw_counts["missed"] else 0
+    )
     if native_exit != expected_native_exit:
         raise MutationEvidenceError(
             f"cargo-mutants exit {native_exit} conflicts with normalized outcome "
@@ -645,7 +839,7 @@ def _complete_report(
     document["mutants"] = [mutant.as_report_record() for mutant in run.mutants]
     document["summary"] = {
         "total": len(run.mutants),
-        "passed": counts["caught"],
+        "passed": counts["caught"] + counts["waived"],
         "failed": counts["missed"],
         "invalid": counts["timeout"],
         "skipped": counts["unviable"],
@@ -821,8 +1015,22 @@ def _execute_mutants(
         run_dir, driver_log, extra_arguments, started
     )
     run = normalize_outcomes(output_dir, REPOSITORY)
+    raw_counts = {name: 0 for name in ("caught", "missed", "timeout", "unviable")}
+    for mutant in run.mutants:
+        raw_counts[mutant.outcome] += 1
+    run = apply_waivers(
+        run,
+        load_waivers(),
+        require_all=terminal_mode == "full",
+    )
     exit_code, regressions = _complete_report(
-        document, run, output_dir, driver_log, elapsed, native_exit
+        document,
+        run,
+        output_dir,
+        driver_log,
+        elapsed,
+        native_exit,
+        raw_counts,
     )
     _write_run(run_dir, document)
     _print_survivors(run, output_dir)

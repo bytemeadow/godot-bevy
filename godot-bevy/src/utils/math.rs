@@ -52,6 +52,7 @@ mod tests {
     fn test_normalize_angle() {
         assert!((normalize_angle(3.0 * PI) - PI).abs() < 1e-6);
         assert!((normalize_angle(-PI / 2.0) - (3.0 * PI / 2.0)).abs() < 1e-6);
+        assert!((normalize_angle(-5.0 * PI) - PI).abs() < 1e-6);
         assert!((normalize_angle(PI / 4.0) - PI / 4.0).abs() < 1e-6);
     }
 

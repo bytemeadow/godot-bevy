@@ -1345,7 +1345,9 @@ name = "book-tests"
 version = "0.0.0"
 dependencies = [
  "bevy",
+ "godot",
  "godot-bevy",
+ "godot-bevy-test",
 ]
 
 [[package]]
@@ -2369,6 +2371,7 @@ dependencies = [
 name = "godot-bevy-test-macros"
 version = "0.11.0"
 dependencies = [
+ "inventory",
  "proc-macro2",
  "quote",
  "syn",

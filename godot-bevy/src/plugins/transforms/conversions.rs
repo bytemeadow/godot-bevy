@@ -420,4 +420,90 @@ mod tests {
         assert_eq!(vec3.y, 2.0);
         assert_eq!(vec3.z, 0.0);
     }
+
+    #[test]
+    fn transform_2d_scale_threshold_and_pi_sign_are_deterministic() {
+        let threshold = GodotTransform2D {
+            a: Vector2::new(0.0, 1e-6),
+            b: Vector2::new(-1e-6, 0.0),
+            origin: Vector2::ZERO,
+        }
+        .to_bevy_transform();
+        assert_eq!(threshold.rotation, Quat::IDENTITY);
+
+        let positive_pi = GodotTransform2D {
+            a: Vector2::new(-1.0, 0.0),
+            b: Vector2::new(0.0, -1.0),
+            origin: Vector2::ZERO,
+        }
+        .to_bevy_transform();
+        assert_eq!(positive_pi.rotation.z, 1.0);
+        assert_eq!(positive_pi.rotation.w, 0.0);
+
+        let negative_pi = GodotTransform2D {
+            a: Vector2::new(-1.0, -1e-20),
+            b: Vector2::new(1e-20, -1.0),
+            origin: Vector2::ZERO,
+        }
+        .to_bevy_transform();
+        assert_eq!(negative_pi.rotation.z, -1.0);
+        assert_eq!(negative_pi.rotation.w, 0.0);
+    }
+
+    #[test]
+    fn transform_2d_general_quaternion_uses_full_euler_rotation() {
+        let rotation = Quat::from_xyzw(0.5, 0.0, 0.5, std::f32::consts::FRAC_1_SQRT_2);
+        let transform = BevyTransform {
+            translation: Vec3::new(7.0, 11.0, 13.0),
+            rotation,
+            scale: Vec3::new(2.0, 3.0, 1.0),
+        }
+        .to_godot_transform_2d();
+
+        assert!((transform.a.x - 1.154_700_5).abs() < 1e-6);
+        assert!((transform.a.y - 1.632_993_2).abs() < 1e-6);
+        assert!((transform.b.x + 2.449_489_8).abs() < 1e-6);
+        assert!((transform.b.y - 1.732_050_8).abs() < 1e-6);
+        assert_eq!(transform.origin, Vector2::new(7.0, 11.0));
+    }
+
+    #[test]
+    fn transform_2d_fast_path_thresholds_fall_back_to_euler() {
+        for rotation in [
+            Quat::from_xyzw(1e-6, 0.5e-6, 1.0, -0.5e-12),
+            Quat::from_xyzw(0.5e-6, 1e-6, 1.0, -0.5e-12),
+        ] {
+            let transform = BevyTransform::from_rotation(rotation).to_godot_transform_2d();
+            assert!(transform.a.y.abs() > 1e-8);
+        }
+    }
+
+    #[test]
+    fn quaternion_difference_checks_sign_boundary_and_each_component() {
+        let canonical = Quat::from_xyzw(0.5, 0.5, 0.5, 0.5);
+        assert!(!quats_differ(canonical, -canonical, 0.01));
+
+        let dot_zero_a = Quat::from_xyzw(0.75, 0.5, 0.5, 0.5);
+        let dot_zero_b = Quat::from_xyzw(0.75, -0.5, -0.3125, -0.3125);
+        assert_eq!(dot_zero_a.dot(dot_zero_b), 0.0);
+        assert!(!quats_differ(dot_zero_a, dot_zero_b, 1.0));
+
+        let zero = Quat::from_xyzw(0.0, 0.0, 0.0, 0.0);
+        for boundary in [
+            Quat::from_xyzw(0.25, 0.0, 0.0, 0.0),
+            Quat::from_xyzw(0.0, 0.25, 0.0, 0.0),
+            Quat::from_xyzw(0.0, 0.0, 0.25, 0.0),
+            Quat::from_xyzw(0.0, 0.0, 0.0, 0.25),
+        ] {
+            assert!(!quats_differ(zero, boundary, 0.25));
+        }
+        for different in [
+            Quat::from_xyzw(0.5, 0.0, 0.0, 0.0),
+            Quat::from_xyzw(0.0, 0.5, 0.0, 0.0),
+            Quat::from_xyzw(0.0, 0.0, 0.5, 0.0),
+            Quat::from_xyzw(0.0, 0.0, 0.0, 0.5),
+        ] {
+            assert!(quats_differ(zero, different, 0.25));
+        }
+    }
 }

@@ -48,6 +48,8 @@ pub struct GodotActions {
     pub(crate) action_keys: Vec<String>,
     /// Actions already warned about in debug so each unknown name warns only once.
     warned: Mutex<HashSet<String>>,
+    #[cfg(test)]
+    poll_override: Option<fn(&mut GodotActions, Clock)>,
 }
 
 // ── typed handle ────────────────────────────────────────────────────────────
@@ -184,6 +186,11 @@ impl GodotActions {
     /// any actions; zero-alloc once seeded -- `action_keys` holds the
     /// pre-stringified keys.
     pub(crate) fn poll(&mut self, clock: Clock) {
+        #[cfg(test)]
+        if let Some(poll_override) = self.poll_override {
+            poll_override(self, clock);
+            return;
+        }
         if self.action_set.is_empty() {
             let acts: Vec<StringName> = InputMap::singleton().get_actions().iter_shared().collect();
             let keys: Vec<String> = acts.iter().map(|n| n.to_string()).collect();
@@ -283,6 +290,17 @@ impl Plugin for GodotActionsPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn fake_poll(ga: &mut GodotActions, clock: Clock) {
+        let snapshot = match clock {
+            Clock::Process => &mut ga.process,
+            Clock::Physics => &mut ga.physics,
+        };
+        snapshot.actions.insert(
+            "polled".to_string(),
+            make_state_full(true, true, false, 0.625, 0.375),
+        );
+    }
 
     fn make_state_full(
         pressed: bool,
@@ -401,7 +419,7 @@ mod tests {
 
         ga.process.actions.insert(
             "left".to_owned(),
-            make_state_full(true, false, false, 0.8, 1.0),
+            make_state_full(true, false, false, 0.8, 0.375),
         );
         ga.process.actions.insert(
             "right".to_owned(),
@@ -417,22 +435,17 @@ mod tests {
         );
 
         // strength != raw_strength
-        assert_ne!(ga.strength("left"), ga.raw_strength("left"));
-        assert!((ga.strength("left") - 0.8).abs() < f32::EPSILON);
-        assert!((ga.raw_strength("left") - 1.0).abs() < f32::EPSILON);
+        assert_eq!(ga.strength("left"), 0.8);
+        assert_eq!(ga.raw_strength("left"), 0.375);
 
         // axis == pos - neg
         let ax = ga.axis("left", "right");
-        assert!(
-            (ax - (0.6 - 0.8)).abs() < f32::EPSILON,
-            "axis={ax}, expected {}",
-            0.6 - 0.8
-        );
+        assert_eq!(ax, 0.6_f32 - 0.8_f32);
 
         // vector componentwise
         let v = ga.vector("left", "right", "up", "down");
-        assert!((v.x - (0.6 - 0.8)).abs() < f32::EPSILON, "v.x={}", v.x);
-        assert!((v.y - (0.3 - 0.4)).abs() < f32::EPSILON, "v.y={}", v.y);
+        assert_eq!(v.x, 0.6_f32 - 0.8_f32);
+        assert_eq!(v.y, 0.3_f32 - 0.4_f32);
     }
 
     // ── 5. poll_physics_actions without resource is a noop ───────────────────
@@ -449,6 +462,56 @@ mod tests {
         );
     }
 
+    #[test]
+    fn driver_helpers_poll_the_selected_clock_and_restore_process() {
+        let mut world = World::new();
+        let actions = GodotActions {
+            active: Clock::Process,
+            poll_override: Some(fake_poll),
+            ..Default::default()
+        };
+        world.insert_resource(actions);
+
+        poll_physics_actions(&mut world);
+        let actions = world.resource::<GodotActions>();
+        assert_eq!(actions.active, Clock::Physics);
+        assert_eq!(actions.raw_strength("polled"), 0.375);
+
+        restore_process_clock(&mut world);
+        assert_eq!(world.resource::<GodotActions>().active, Clock::Process);
+    }
+
+    #[test]
+    fn plugin_registers_and_polls_process_actions() {
+        let mut app = App::new();
+        app.add_plugins(GodotActionsPlugin);
+        {
+            let mut actions = app.world_mut().resource_mut::<GodotActions>();
+            actions.active = Clock::Physics;
+            actions.poll_override = Some(fake_poll);
+        }
+
+        app.world_mut().run_schedule(Update);
+
+        let actions = app.world().resource::<GodotActions>();
+        assert_eq!(actions.active, Clock::Process);
+        assert_eq!(actions.strength("polled"), 0.625);
+        assert_eq!(actions.raw_strength("polled"), 0.375);
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn typed_unknown_action_does_not_enter_the_warning_gate() {
+        let actions = GodotActions::default();
+        let state = actions.lookup(ActionRef {
+            key: "typed_missing",
+            warn_if_unknown: false,
+        });
+
+        assert!(!state.pressed);
+        assert!(actions.warned.lock().is_empty());
+    }
+
     // ── 6. Unknown &str -- no panic, defaults returned, warn-once ────────────
 
     #[test]
@@ -456,10 +519,10 @@ mod tests {
         let ga = GodotActions::default();
 
         assert!(!ga.pressed("does_not_exist"));
-        assert!((ga.strength("does_not_exist") - 0.0).abs() < f32::EPSILON);
+        assert_eq!(ga.strength("does_not_exist"), 0.0);
 
         // Second call -- warn-once must not panic even if already warned.
         assert!(!ga.pressed("does_not_exist"));
-        assert!((ga.strength("does_not_exist") - 0.0).abs() < f32::EPSILON);
+        assert_eq!(ga.strength("does_not_exist"), 0.0);
     }
 }

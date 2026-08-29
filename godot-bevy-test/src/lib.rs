@@ -21,28 +21,29 @@
 //! ```
 //!
 //! 2. Set up your test entry point in `src/lib.rs`:
-//! ```ignore
+//! ```no_run
 //! use godot::init::{ExtensionLibrary, gdextension};
 //! use godot_bevy_test::prelude::*;
 //!
 //! // Declare the test runner class for Godot
 //! godot_bevy_test::declare_test_runner!();
 //!
-//! // Include your test modules
-//! mod my_tests;
+//! mod my_tests {}
 //!
 //! #[gdextension(entry_symbol = my_game_tests)]
 //! unsafe impl ExtensionLibrary for IntegrationTests {}
+//! # fn main() {}
 //! ```
 //!
 //! 3. Write tests using the `#[itest]` macro:
-//! ```ignore
+//! ```no_run
 //! use godot_bevy_test::prelude::*;
 //!
 //! #[itest(async)]
 //! fn test_player_spawns(ctx: &TestContext) -> godot::task::TaskHandle {
+//!     let ctx = ctx.clone();
 //!     godot::task::spawn(async move {
-//!         let mut app = TestApp::new(&ctx, |app| {
+//!         let mut app = TestApp::new(&ctx, |_app| {
 //!             // Add your plugins
 //!         }).await;
 //!
@@ -50,6 +51,7 @@
 //!         // assertions...
 //!     })
 //! }
+//! # fn main() {}
 //! ```
 //!
 //! 4. Set up a Godot project with `TestRunner.gd` and run tests headlessly.
@@ -107,12 +109,17 @@ pub mod prelude {
 /// Must be called once in your test crate's lib.rs.
 ///
 /// # Example
-/// ```ignore
+/// ```no_run
+/// # mod default_name {
 /// // Default name (IntegrationTests)
 /// godot_bevy_test::declare_test_runner!();
 ///
+/// # }
+/// # mod custom_name {
 /// // Custom name
 /// godot_bevy_test::declare_test_runner!(MyTestRunner);
+/// # }
+/// # fn main() {}
 /// ```
 #[macro_export]
 macro_rules! declare_test_runner {

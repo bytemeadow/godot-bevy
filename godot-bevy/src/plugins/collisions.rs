@@ -8,8 +8,10 @@
 //! godot-bevy provides a [`Collisions`] system parameter for querying collision state.
 //! This is the primary way to check what entities are currently colliding.
 //!
-//! ```ignore
-//! fn my_system(collisions: Collisions) {
+//! ```no_run
+//! # use godot_bevy::bevy_ecs::prelude::Entity;
+//! # use godot_bevy::prelude::Collisions;
+//! fn my_system(collisions: Collisions, player: Entity, enemy: Entity) {
 //!     // Iterate all currently touching pairs
 //!     for (entity_a, entity_b) in collisions.iter() {
 //!         // Handle collision
@@ -34,21 +36,34 @@
 //!
 //! ## Reading as Messages
 //!
-//! ```ignore
+//! ```no_run
+//! # use godot_bevy::bevy_ecs::prelude::MessageReader;
+//! # use godot_bevy::prelude::CollisionStarted;
 //! fn handle_hits(mut started: MessageReader<CollisionStarted>) {
 //!     for event in started.read() {
-//!         println!("{:?} started colliding with {:?}", event.0, event.1);
+//!         println!(
+//!             "{:?} started colliding with {:?}",
+//!             event.entity1, event.entity2
+//!         );
 //!     }
 //! }
 //! ```
 //!
 //! ## Using Observers
 //!
-//! ```ignore
-//! app.add_observer(|trigger: Trigger<CollisionStarted>| {
-//!     let (a, b) = (trigger.event().0, trigger.event().1);
-//!     println!("{a:?} started colliding with {b:?}");
+//! ```no_run
+//! # use godot_bevy::bevy_app::App;
+//! # use godot_bevy::bevy_ecs::prelude::On;
+//! # use godot_bevy::prelude::CollisionStarted;
+//! # fn add_collision_observer(app: &mut App) {
+//! app.add_observer(|event: On<CollisionStarted>| {
+//!     println!(
+//!         "{:?} started colliding with {:?}",
+//!         event.event().entity1,
+//!         event.event().entity2
+//!     );
 //! });
+//! # }
 //! ```
 
 use crate::interop::GodotNodeHandle;
@@ -96,7 +111,10 @@ const COLLISION_NEIGHBOR_REBUILD_THRESHOLD: usize = 512;
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use godot_bevy::bevy_app::App;
+/// # use godot_bevy::bevy_ecs::prelude::{MessageReader, On};
+/// # use godot_bevy::prelude::CollisionStarted;
 /// // As a message
 /// fn handle_collision_start(mut events: MessageReader<CollisionStarted>) {
 ///     for event in events.read() {
@@ -105,10 +123,12 @@ const COLLISION_NEIGHBOR_REBUILD_THRESHOLD: usize = 512;
 /// }
 ///
 /// // As an observer
-/// app.add_observer(|trigger: Trigger<CollisionStarted>| {
-///     let event = trigger.event();
+/// # fn add_collision_observer(app: &mut App) {
+/// app.add_observer(|event: On<CollisionStarted>| {
+///     let event = event.event();
 ///     println!("{:?} hit {:?}", event.entity1, event.entity2);
 /// });
+/// # }
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Message, Event)]
 pub struct CollisionStarted {
@@ -125,7 +145,10 @@ pub struct CollisionStarted {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use godot_bevy::bevy_app::App;
+/// # use godot_bevy::bevy_ecs::prelude::{MessageReader, On};
+/// # use godot_bevy::prelude::CollisionEnded;
 /// // As a message
 /// fn handle_collision_end(mut events: MessageReader<CollisionEnded>) {
 ///     for event in events.read() {
@@ -134,10 +157,12 @@ pub struct CollisionStarted {
 /// }
 ///
 /// // As an observer
-/// app.add_observer(|trigger: Trigger<CollisionEnded>| {
-///     let event = trigger.event();
+/// # fn add_collision_observer(app: &mut App) {
+/// app.add_observer(|event: On<CollisionEnded>| {
+///     let event = event.event();
 ///     println!("{:?} separated from {:?}", event.entity1, event.entity2);
 /// });
+/// # }
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Message, Event)]
 pub struct CollisionEnded {
@@ -333,8 +358,10 @@ fn normalize_pair(a: Entity, b: Entity) -> (Entity, Entity) {
 ///
 /// # Example
 ///
-/// ```ignore
-/// fn my_system(collisions: Collisions) {
+/// ```no_run
+/// # use godot_bevy::bevy_ecs::prelude::Entity;
+/// # use godot_bevy::prelude::Collisions;
+/// fn my_system(collisions: Collisions, player: Entity, enemy: Entity) {
 ///     // Check all active collisions
 ///     for (a, b) in collisions.iter() {
 ///         println!("{a:?} is colliding with {b:?}");
@@ -434,16 +461,23 @@ pub enum CollisionMessageType {
 ///
 /// Add the plugin to your app:
 ///
-/// ```ignore
+/// ```no_run
+/// # use godot_bevy::bevy_app::App;
+/// # use godot_bevy::prelude::GodotCollisionsPlugin;
+/// # let mut app = App::new();
 /// app.add_plugins(GodotCollisionsPlugin);
 /// ```
 ///
 /// Then use the [`Collisions`] system parameter or collision events:
 ///
-/// ```ignore
+/// ```no_run
+/// # use godot_bevy::bevy_ecs::prelude::{Entity, MessageReader};
+/// # use godot_bevy::prelude::{CollisionStarted, Collisions};
 /// fn detect_hits(
 ///     collisions: Collisions,
 ///     mut started: MessageReader<CollisionStarted>,
+///     player: Entity,
+///     enemy: Entity,
 /// ) {
 ///     // Query current state
 ///     if collisions.contains(player, enemy) {

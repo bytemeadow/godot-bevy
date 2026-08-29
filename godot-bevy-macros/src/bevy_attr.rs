@@ -618,6 +618,8 @@ pub fn parse_godot_first(input: &DeriveInput) -> syn::Result<ClassPlan> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use quote::quote;
+    use syn::parse::Parser;
     use syn::parse_quote;
 
     #[test]
@@ -652,6 +654,55 @@ mod tests {
             _ => panic!("expected newtype companion"),
         }
         assert_eq!(plan.primary.path.get_ident().unwrap().to_string(), "Player");
+        assert_eq!(
+            format!("{plan:?}"),
+            "ClassPlan(Player2D, emit_node_class=true, 2 companions)"
+        );
+    }
+
+    #[test]
+    fn require_parser_consumes_marker_struct_and_binding_entries() {
+        let marker = Parser::parse2(parse_one_require, quote!(Stunned)).unwrap();
+        assert!(
+            matches!(marker, RawRequire::Marker { component } if component.is_ident("Stunned"))
+        );
+
+        let structured = Parser::parse2(
+            parse_one_require,
+            quote!(stats: Stats { current(as = i32), maximum(as = i32, default = 100) }),
+        )
+        .unwrap();
+        match structured {
+            RawRequire::Struct { component, fields } => {
+                assert!(component.is_ident("Stats"));
+                assert_eq!(fields.len(), 2);
+                assert_eq!(fields[0].0.to_string(), "current");
+                assert_eq!(fields[1].0.to_string(), "maximum");
+                assert!(fields[0].1.as_type.is_some());
+                assert!(fields[1].1.default.is_some());
+            }
+            _ => panic!("expected structured require"),
+        }
+
+        let binding = Parser::parse2(
+            parse_one_require,
+            quote!(Stats {
+                current: max_health,
+                maximum: max_health
+            }),
+        )
+        .unwrap();
+        match binding {
+            RawRequire::Binding { component, pairs } => {
+                assert!(component.is_ident("Stats"));
+                assert_eq!(pairs.len(), 2);
+                assert_eq!(pairs[0].0.to_string(), "current");
+                assert_eq!(pairs[0].1.to_string(), "max_health");
+                assert_eq!(pairs[1].0.to_string(), "maximum");
+                assert_eq!(pairs[1].1.to_string(), "max_health");
+            }
+            _ => panic!("expected binding require"),
+        }
     }
 
     #[test]

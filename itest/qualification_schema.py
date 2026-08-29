@@ -224,7 +224,10 @@ def _semantic_errors(document: dict[str, Any]) -> list[str]:
         if kind in {"mutation-run", "mutation-baseline"}:
             expected_summary = (
                 len(mutants),
-                sum(record.get("outcome") == "caught" for record in mutants),
+                sum(
+                    record.get("outcome") in {"caught", "waived"}
+                    for record in mutants
+                ),
                 sum(record.get("outcome") == "missed" for record in mutants),
                 sum(record.get("outcome") == "timeout" for record in mutants),
                 sum(record.get("outcome") == "unviable" for record in mutants),

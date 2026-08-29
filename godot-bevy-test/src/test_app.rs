@@ -25,9 +25,13 @@ use crate::{TestContext, await_frame};
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use bevy::prelude::Transform;
+/// # use godot_bevy::prelude::GodotTransformSyncPlugin;
+/// # use godot_bevy_test::{TestApp, TestContext};
+/// # async fn example(ctx: &TestContext) {
 /// let mut app = TestApp::new(ctx, |app| {
-///     app.add_plugins(GodotTransformSyncPlugin);
+///     app.add_plugins(GodotTransformSyncPlugin::default());
 /// }).await;
 ///
 /// let entity = app.with_world_mut(|world| {
@@ -42,6 +46,7 @@ use crate::{TestContext, await_frame};
 /// assert_eq!(translation_x, 0.0);
 ///
 /// app.cleanup().await;
+/// # }
 /// ```
 pub struct TestApp {
     ctx: TestContext,

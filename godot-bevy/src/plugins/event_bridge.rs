@@ -158,6 +158,28 @@ impl AddGodotEventAppExt for App {
     }
 }
 
+#[doc(hidden)]
+pub struct EventBridgeReceipt(());
+
+#[doc(hidden)]
+pub trait EventBridgeTarget {
+    fn enqueue_event<T>(&self, event: T) -> EventBridgeReceipt
+    where
+        T: Event + Clone + Send + 'static,
+        for<'a> T::Trigger<'a>: Default;
+}
+
+impl EventBridgeTarget for Gd<BevyApp> {
+    fn enqueue_event<T>(&self, event: T) -> EventBridgeReceipt
+    where
+        T: Event + Clone + Send + 'static,
+        for<'a> T::Trigger<'a>: Default,
+    {
+        self.bind().send_event(event);
+        EventBridgeReceipt(())
+    }
+}
+
 /// Send a typed event into a specific `BevyApp`'s ECS from Godot Rust code that
 /// holds a `Gd<BevyApp>`. It reaches `On<T>` observers on the next `First` drain
 /// — it enqueues, it doesn't `trigger` synchronously, so code already inside a
@@ -170,18 +192,19 @@ impl AddGodotEventAppExt for App {
 /// is running (from a system, or a signal a system emitted synchronously): the
 /// `bind()` panics inside gdext and the frame's `catch_unwind` tears the app
 /// down. Off-thread, hold a cloned `GodotEventSender` and send through that.
-pub fn send_event<T>(app: &Gd<BevyApp>, event: T)
+pub fn send_event<T>(app: &impl EventBridgeTarget, event: T)
 where
     T: Event + Clone + Send + 'static,
     for<'a> T::Trigger<'a>: Default,
 {
-    app.bind().send_event(event);
+    let _receipt = app.enqueue_event(event);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use bevy_ecs::prelude::*;
+    use std::any::Any;
 
     #[derive(Event, Clone)]
     struct Damage {
@@ -205,6 +228,30 @@ mod tests {
         app.world()
             .resource::<GodotEventSender>()
             .send(Damage { amount });
+    }
+
+    #[derive(Default)]
+    struct RecordingTarget(Mutex<Vec<i32>>);
+
+    impl EventBridgeTarget for RecordingTarget {
+        fn enqueue_event<T>(&self, event: T) -> EventBridgeReceipt
+        where
+            T: Event + Clone + Send + 'static,
+            for<'a> T::Trigger<'a>: Default,
+        {
+            let damage = (&event as &dyn Any)
+                .downcast_ref::<Damage>()
+                .expect("Damage event");
+            self.0.lock().push(damage.amount);
+            EventBridgeReceipt(())
+        }
+    }
+
+    #[test]
+    fn public_send_event_delegates_the_exact_event() {
+        let target = RecordingTarget::default();
+        send_event(&target, Damage { amount: 37 });
+        assert_eq!(*target.0.lock(), vec![37]);
     }
 
     #[test]

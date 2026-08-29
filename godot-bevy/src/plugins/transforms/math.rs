@@ -75,20 +75,18 @@ mod tests {
 
     #[test]
     fn test_extract_scale_from_2d_matrix() {
-        // Test identity matrix with scale (2, 3)
-        let (scale_x, scale_y) = extract_scale_from_2d_matrix(2.0, 0.0, 0.0, 3.0);
-        assert!((scale_x - 2.0).abs() < 1e-6);
-        assert!((scale_y - 3.0).abs() < 1e-6);
+        let (scale_x, scale_y) = extract_scale_from_2d_matrix(3.0, 4.0, 5.0, 12.0);
+        assert_eq!(scale_x, 5.0);
+        assert_eq!(scale_y, 13.0);
     }
 
     #[test]
     fn test_create_2d_rotation_matrix() {
-        // Test identity rotation with scale
-        let ((a_x, a_y), (b_x, b_y)) = create_2d_rotation_matrix(0.0, 2.0, 3.0);
-        assert!((a_x - 2.0).abs() < 1e-6);
-        assert!(a_y.abs() < 1e-6);
-        assert!(b_x.abs() < 1e-6);
-        assert!((b_y - 3.0).abs() < 1e-6);
+        let ((a_x, a_y), (b_x, b_y)) = create_2d_rotation_matrix(PI / 6.0, 2.0, 3.0);
+        assert!((a_x - 1.732_050_8).abs() < 1e-6);
+        assert!((a_y - 1.0).abs() < 1e-6);
+        assert!((b_x + 1.5).abs() < 1e-6);
+        assert!((b_y - 2.598_076).abs() < 1e-6);
     }
 
     #[test]
@@ -108,6 +106,20 @@ mod tests {
             scale: Vec3::new(1.0, 1.0, 1.0),
         };
         assert!(!validate_transform_for_conversion(&invalid_transform));
+
+        let non_normalized_rotation = Transform {
+            translation: Vec3::ZERO,
+            rotation: Quat::from_xyzw(0.0, 0.0, 0.0, 2.0),
+            scale: Vec3::ONE,
+        };
+        assert!(!validate_transform_for_conversion(&non_normalized_rotation));
+
+        let zero_scale = Transform {
+            translation: Vec3::ZERO,
+            rotation: Quat::IDENTITY,
+            scale: Vec3::new(1.0, 0.0, 1.0),
+        };
+        assert!(!validate_transform_for_conversion(&zero_scale));
     }
 
     #[test]

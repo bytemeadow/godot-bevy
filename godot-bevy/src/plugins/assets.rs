@@ -34,17 +34,17 @@ use crate::interop::GodotResourceHandle;
 /// and uses Godot's `ResourceLoader` directly for maximum compatibility.
 ///
 /// ## Unified Asset Loading
-/// ```ignore
-/// use bevy::prelude::*;
+/// ```no_run
 /// use bevy_asset::{AssetServer, Assets, Handle};
+/// use bevy_ecs::prelude::{Res, ResMut, Resource};
 /// use godot::classes::PackedScene;
 /// use godot_bevy::prelude::*;
 ///
 /// fn load_assets(asset_server: Res<AssetServer>) {
 ///     // Load any Godot resource through Bevy's asset system (async, non-blocking)
 ///     let scene: Handle<GodotResource> = asset_server.load("scenes/player.tscn");
-///     let audio: Handle<GodotResource> = asset_server.load("audio/music.ogg");
-///     let texture: Handle<GodotResource> = asset_server.load("art/player.png");
+///     let _audio: Handle<GodotResource> = asset_server.load("audio/music.ogg");
+///     let _texture: Handle<GodotResource> = asset_server.load("art/player.png");
 /// }
 ///
 /// #[derive(Resource)]
@@ -56,7 +56,7 @@ use crate::interop::GodotResourceHandle;
 ///     mut assets: ResMut<Assets<GodotResource>>,
 ///     my_assets: Res<MyAssets>, // Your loaded handles
 /// ) {
-///     if let Some(asset) = assets.get_mut(&my_assets.scene) {
+///     if let Some(mut asset) = assets.get_mut(&my_assets.scene) {
 ///         if let Some(scene) = asset.try_cast::<PackedScene>() {
 ///             // Use the scene...
 ///         }

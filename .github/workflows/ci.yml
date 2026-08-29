@@ -104,7 +104,9 @@ jobs:
           version: 1.0
 
       - name: Run unit tests
-        run: cargo test --lib --bins --examples
+        run: |
+          cargo test --lib --bins --examples
+          cargo test --doc -p godot-bevy -p godot-bevy-macros -p godot-bevy-test -p godot-bevy-test-macros
 
   # Detect which paths changed to conditionally run downstream jobs
   changes:
@@ -134,6 +136,7 @@ jobs:
         with:
           filters: |
             library:
+              - 'book-tests/**'
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
               - 'godot-bevy-test/**'
@@ -171,6 +174,8 @@ jobs:
         run: ./itest/verify-qualification.sh contract
       - name: Verify fault patch applicability
         run: ./itest/verify-qualification.sh faults
+      - name: Verify tolerance and no-op audit
+        run: ./itest/verify-qualification.sh assertions
 
   # Integration tests with Godot runtime
   # For local testing with act: act workflow_dispatch -j integration-tests --container-architecture linux/amd64

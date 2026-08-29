@@ -130,8 +130,9 @@ fn connect_signal<T>(
 ///
 /// # Example
 ///
-/// ```ignore
-/// use bevy::prelude::*;
+/// ```no_run
+/// use godot_bevy::bevy_app::App;
+/// use godot_bevy::bevy_ecs::prelude::{Event, On};
 /// use godot_bevy::prelude::*;
 ///
 /// #[derive(Event, Clone)]
@@ -141,7 +142,7 @@ fn connect_signal<T>(
 ///     app.add_plugins(GodotSignalsPlugin::<ButtonPressed>::default());
 ///
 ///     // React to button presses with a global observer
-///     app.add_observer(|_trigger: Trigger<ButtonPressed>| {
+///     app.add_observer(|_event: On<ButtonPressed>| {
 ///         println!("A button was pressed!");
 ///     });
 /// }
@@ -220,7 +221,13 @@ fn drain_and_trigger_signals(world: &mut bevy_ecs::world::World) {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use godot_bevy::bevy_ecs::prelude::{Component, Event, Query, With};
+/// # use godot_bevy::prelude::{GodotNodeHandle, GodotSignals};
+/// # #[derive(Component)]
+/// # struct MyButton;
+/// # #[derive(Event, Clone)]
+/// # struct ButtonPressed;
 /// fn connect_signals(
 ///     button: Query<&GodotNodeHandle, With<MyButton>>,
 ///     signals: GodotSignals<ButtonPressed>,
@@ -295,8 +302,8 @@ where
     ///
     /// # Example
     ///
-    /// ```ignore
-    /// use bevy::prelude::*;
+    /// ```no_run
+    /// use godot_bevy::bevy_ecs::prelude::Event;
     /// use godot_bevy::prelude::*;
     /// use godot_bevy::interop::signal_names::SceneTreeSignals;
     ///

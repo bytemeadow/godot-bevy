@@ -48,6 +48,7 @@ impl Parse for ITestOptions {
 /// Attribute macro for integration tests
 ///
 /// Usage:
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#itest -->
 /// ```ignore
 /// #[itest]
 /// fn my_sync_test(ctx: &TestContext) {
@@ -148,6 +149,7 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Attribute macro for benchmarks
 ///
 /// Usage:
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#bench -->
 /// ```ignore
 /// #[bench]
 /// fn my_benchmark() -> ReturnType {

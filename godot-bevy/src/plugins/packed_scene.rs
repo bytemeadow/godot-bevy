@@ -106,15 +106,21 @@ impl GodotScene {
     ///   * The closure returns an optional event, or None to skip triggering.
     ///
     /// # Example
-    /// ```ignore
-    /// let scene: Handle<GodotResource> = ...;
-    /// let entity = world.spawn_empty();
+    /// ```no_run
+    /// # use bevy_asset::Handle;
+    /// # use bevy_ecs::prelude::{Event, World};
+    /// # use godot_bevy::prelude::*;
+    /// # #[derive(Event, Clone, Debug)]
+    /// # struct MyEvent;
+    /// # let scene: Handle<GodotResource> = Handle::default();
+    /// # let mut world = World::new();
+    /// let mut entity = world.spawn_empty();
     /// entity.insert(
-    ///     GodotScene::from_handle(scene).with_signal_connection::<MyEvent>(
+    ///     GodotScene::from_handle(scene).with_signal_connection::<MyEvent, _>(
     ///         "VBox/MyButton",
     ///         "pressed",
-    ///         |args, _node_id, _entity| {
-    ///             Some(MyEvent::from_args(args))
+    ///         |_args, _node_id, _entity| {
+    ///             Some(MyEvent)
     ///         }
     ///     )
     /// );
