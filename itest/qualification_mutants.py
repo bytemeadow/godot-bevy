@@ -31,7 +31,7 @@ from qualification_schema import (
 from qualification_toml import load_toml
 
 CARGO_MUTANTS_VERSION = "27.1.0"
-WALL_CLOCK_SECONDS = 1800
+WALL_CLOCK_SECONDS = int(os.environ.get("QUALIFICATION_WALL_CLOCK", "1800"))
 REPOSITORY = Path(__file__).resolve().parents[1]
 SCHEMA = REPOSITORY / "godot-bevy-test" / "schema" / "qualification-v1.schema.json"
 CONFIG = REPOSITORY / ".cargo" / "mutants.toml"
@@ -749,7 +749,7 @@ def _cargo_mutants(
         "cargo",
         "mutants",
         "--jobs",
-        "3",
+        os.environ.get("QUALIFICATION_JOBS", "3"),
         "--no-shuffle",
         "--output",
         str(output_dir),
@@ -816,8 +816,9 @@ def _execute_mutants(
     driver_log = run_dir / "cargo-mutants.log"
     if started is None:
         started = time.monotonic()
+    # cargo-mutants creates a mutants.out/ directory inside --output
     native_exit, elapsed = _cargo_mutants(
-        output_dir, driver_log, extra_arguments, started
+        run_dir, driver_log, extra_arguments, started
     )
     run = normalize_outcomes(output_dir, REPOSITORY)
     exit_code, regressions = _complete_report(
