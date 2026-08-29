@@ -1,9 +1,6 @@
 name: profiling
 
 on:
-  # TEMPORARY pre-merge validation trigger; remove before merge
-  push:
-    branches: [godot-bevy-verification]
   workflow_dispatch:
     inputs:
       backend:
@@ -21,7 +18,7 @@ permissions:
 
 jobs:
   tracy:
-    if: github.event_name == 'push' || inputs.backend == 'tracy' || inputs.backend == 'both'
+    if: inputs.backend == 'tracy' || inputs.backend == 'both'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +39,7 @@ jobs:
           if-no-files-found: warn
 
   native:
-    if: github.event_name == 'push' || inputs.backend == 'native' || inputs.backend == 'both'
+    if: inputs.backend == 'native' || inputs.backend == 'both'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
