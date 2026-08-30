@@ -33,7 +33,7 @@ from qualification_toml import load_toml
 CARGO_MUTANTS_VERSION = "27.1.0"
 WALL_CLOCK_SECONDS = int(os.environ.get("QUALIFICATION_WALL_CLOCK", "1800"))
 REPOSITORY = Path(__file__).resolve().parents[1]
-SCHEMA = REPOSITORY / "godot-bevy-test" / "schema" / "qualification-v1.schema.json"
+SCHEMA = REPOSITORY / "itest" / "schema" / "qualification-v1.schema.json"
 CONFIG = REPOSITORY / ".cargo" / "mutants.toml"
 BASELINE = REPOSITORY / "itest" / "qualification" / "mutants-baseline-v1.json"
 WAIVERS = REPOSITORY / "itest" / "qualification" / "mutants-waivers-v1.toml"

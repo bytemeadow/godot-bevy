@@ -527,7 +527,7 @@ def main() -> int:
         "--schema",
         type=Path,
         default=Path(__file__).resolve().parents[1]
-        / "godot-bevy-test"
+        / "itest"
         / "schema"
         / SCHEMA_NAME,
     )

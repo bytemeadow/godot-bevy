@@ -50,11 +50,11 @@ from profile_tracy import (
 )
 
 REPOSITORY = Path(__file__).resolve().parents[1]
-SCHEMA = REPOSITORY / "godot-bevy-test" / "schema" / SCHEMA_NAME
+SCHEMA = REPOSITORY / "itest" / "schema" / SCHEMA_NAME
 COMPARISON_SCHEMA = (
-    REPOSITORY / "godot-bevy-test" / "schema" / COMPARISON_SCHEMA_NAME
+    REPOSITORY / "itest" / "schema" / COMPARISON_SCHEMA_NAME
 )
-NATIVE_SCHEMA = REPOSITORY / "godot-bevy-test" / "schema" / NATIVE_SCHEMA_NAME
+NATIVE_SCHEMA = REPOSITORY / "itest" / "schema" / NATIVE_SCHEMA_NAME
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "profiling"
 INCLUSIVE = FIXTURES / "zones-inclusive.tsv"
 SELF = FIXTURES / "zones-self.tsv"

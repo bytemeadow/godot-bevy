@@ -232,9 +232,9 @@ def run(args: argparse.Namespace) -> int:
         stage_library(target, current_library)
 
         orchestrator = repository / "itest" / "profile_orchestrator.py"
-        profile_schema = repository / "godot-bevy-test" / "schema" / SCHEMA_NAME
+        profile_schema = repository / "itest" / "schema" / SCHEMA_NAME
         comparison_schema = (
-            repository / "godot-bevy-test" / "schema" / COMPARISON_SCHEMA_NAME
+            repository / "itest" / "schema" / COMPARISON_SCHEMA_NAME
         )
         inputs: list[ProfileInput] = []
         for round_number in range(1, rounds + 1):

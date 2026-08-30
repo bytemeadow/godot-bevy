@@ -43,7 +43,7 @@ from coverage_model import (
 REPOSITORY = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "coverage"
 REPORT_FIXTURES = FIXTURES / "reports"
-SCHEMA = REPOSITORY / "godot-bevy-test" / "schema" / "coverage-v1.schema.json"
+SCHEMA = REPOSITORY / "itest" / "schema" / "coverage-v1.schema.json"
 SCOPE = REPOSITORY / "itest" / "coverage" / "scope-v1.toml"
 WITNESSES = REPOSITORY / "itest" / "coverage" / "witnesses-v1.toml"
 CARGO_FIXTURE_MANIFESTS = {

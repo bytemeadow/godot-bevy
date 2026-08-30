@@ -351,7 +351,7 @@ def render_flamegraph(
 
 def run(args: argparse.Namespace) -> int:
     repository = Path(__file__).resolve().parents[1]
-    schema = repository / "godot-bevy-test" / "schema" / NATIVE_SCHEMA_NAME
+    schema = repository / "itest" / "schema" / NATIVE_SCHEMA_NAME
     benchmark = args.bench.strip()
     if not benchmark:
         raise ProfileFailure("configuration", "--bench must not be empty")

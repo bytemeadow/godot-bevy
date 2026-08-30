@@ -21,7 +21,7 @@ from qualification_schema import (
 from qualification_toml import TomlError, load_toml, loads_toml
 
 REPOSITORY = Path(__file__).resolve().parents[1]
-SCHEMA = REPOSITORY / "godot-bevy-test" / "schema" / "qualification-v1.schema.json"
+SCHEMA = REPOSITORY / "itest" / "schema" / "qualification-v1.schema.json"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "qualification"
 TERMINAL_FIXTURES = FIXTURES / "terminal"
 DOCTEST_LEDGER = REPOSITORY / "itest" / "qualification" / "doctests-v1.toml"

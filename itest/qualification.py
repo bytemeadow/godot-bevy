@@ -22,7 +22,7 @@ from qualification_toml import TomlError, load_toml
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 REGISTRY = REPOSITORY / "itest" / "qualification" / "checks-v1.toml"
-SCHEMA = REPOSITORY / "godot-bevy-test" / "schema" / "qualification-v1.schema.json"
+SCHEMA = REPOSITORY / "itest" / "schema" / "qualification-v1.schema.json"
 OUTPUT_ROOT = REPOSITORY / "target" / "qualification" / "aggregate"
 
 

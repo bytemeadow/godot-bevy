@@ -30,7 +30,7 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 FAULTS_ROOT = REPOSITORY / "itest" / "faults"
 MANIFEST = FAULTS_ROOT / "manifest.toml"
 QUALIFICATION_SCHEMA = (
-    REPOSITORY / "godot-bevy-test" / "schema" / "qualification-v1.schema.json"
+    REPOSITORY / "itest" / "schema" / "qualification-v1.schema.json"
 )
 ITEST_SCHEMA = REPOSITORY / "godot-bevy-test" / "schema" / "itest-report-v1.schema.json"
 OUTPUT_ROOT = REPOSITORY / "target" / "qualification" / "faults"

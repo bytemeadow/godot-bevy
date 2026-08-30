@@ -24,11 +24,9 @@ class GodotSignal:
 class GodotClass:
     name: str
     api_type: str
-    name: str
     is_refcounted: bool
     is_instantiable: bool
     inherits: Optional[str]
-    api_type: str
     enums: Optional[List]
     methods: Optional[List]
     signals: Optional[List[GodotSignal]]

@@ -688,7 +688,7 @@ def run(args: argparse.Namespace) -> int:
         if args.target_dir is not None
         else repository / "target"
     )
-    schema_path = tool_repository / "godot-bevy-test" / "schema" / SCHEMA_NAME
+    schema_path = tool_repository / "itest" / "schema" / SCHEMA_NAME
     request = selection_request(args.bench, args.filter)
     run_id, git_short = make_run_id(repository)
     output = (

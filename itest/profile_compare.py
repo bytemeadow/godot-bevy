@@ -442,9 +442,9 @@ def create_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = create_parser().parse_args()
     repository = Path(__file__).resolve().parents[1]
-    profile_schema = repository / "godot-bevy-test" / "schema" / SCHEMA_NAME
+    profile_schema = repository / "itest" / "schema" / SCHEMA_NAME
     comparison_schema = (
-        repository / "godot-bevy-test" / "schema" / COMPARISON_SCHEMA_NAME
+        repository / "itest" / "schema" / COMPARISON_SCHEMA_NAME
     )
     print(DISCLOSURE)
     try:

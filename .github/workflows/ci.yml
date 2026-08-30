@@ -143,7 +143,7 @@ jobs:
             qualification:
               - '.cargo/mutants.toml'
               - 'devenv.nix'
-              - 'godot-bevy-test/schema/qualification-v1.schema.json'
+              - 'itest/schema/**'
               - 'itest/faults/**'
               - 'itest/fixtures/qualification/**'
               - 'itest/qualification*.py'
