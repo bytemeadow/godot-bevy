@@ -14,7 +14,6 @@ pub fn bevy_app(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as syn::ItemFn);
     let name = &input_fn.sig.ident;
 
-    // Parse attribute for configuration options
     let config = if !attr.is_empty() {
         match parse_bevy_app_config(attr) {
             Ok(cfg) => cfg,
@@ -124,7 +123,6 @@ fn parse_bevy_app_config(attr: TokenStream) -> Result<BevyAppConfig, Error> {
 ///     #[node("Node2D/*/VisibleOnScreenNotifier2D")]
 ///     visibility_notifier: GodotNodeHandle,
 /// }
-/// /// Generated companion string constants:
 /// impl MobNodes {
 ///     pub const ANIMATED_SPRITE_PATH: &'static str = "AnimatedSprite2D";
 ///     pub const VISIBILITY_NOTIFIER_PATH: &'static str = "Node2D/*/VisibleOnScreenNotifier2D";

@@ -1,12 +1,3 @@
-/*
- * Event-bridge itests: defer-only delivery.
- *
- * Every fire — Rust `send_event(&app, ..)`, the `&self` method, or GDScript
- * `send_event(name, payload)` — enqueues onto the per-app event channel; the
- * `First`-schedule drain triggers `On<T>` observers on the next frame. These pin
- * delivery, node-scoping, the registry decode paths, and the no-panic FFI edges.
- */
-
 use bevy::prelude::*;
 use godot::obj::NewAlloc;
 use godot::prelude::*;
@@ -23,7 +14,6 @@ struct Damage {
     amount: i32,
 }
 
-/// Resolve the autoload BevyApp node the harness wraps.
 fn singleton_node(ctx: &TestContext) -> Gd<BevyApp> {
     ctx.scene_tree
         .get_tree()
@@ -33,7 +23,6 @@ fn singleton_node(ctx: &TestContext) -> Gd<BevyApp> {
         .expect("BevyAppSingleton autoload should exist")
 }
 
-/// The autoload BevyApp as a generic `Gd<Node>`, for `.call("send_event", ..)`.
 fn bridge_node(ctx: &TestContext) -> Gd<godot::classes::Node> {
     singleton_node(ctx).upcast::<godot::classes::Node>()
 }
@@ -142,7 +131,6 @@ fn test_send_event_after_teardown_noop(ctx: &TestContext) -> godot::task::TaskHa
 
         let node = singleton_node(&ctx_clone);
 
-        // Sanity-check the observer fires before we tear down.
         godot_bevy::send_event(&node, Damage { amount: 1 });
         app.update().await;
         assert_ne!(witness.load(SeqCst), 0, "observer must fire on a live app");
@@ -194,7 +182,6 @@ fn test_send_event_multi_live_app(ctx: &TestContext) -> godot::task::TaskHandle 
         #[derive(Resource, Default)]
         struct Received(i32);
 
-        // App A: the autoload, via the harness.
         let mut app_a = TestApp::new(&ctx_clone, |app| {
             app.init_resource::<Received>();
             app.add_observer(|t: On<Damage>, mut r: ResMut<Received>| {
@@ -204,7 +191,6 @@ fn test_send_event_multi_live_app(ctx: &TestContext) -> godot::task::TaskHandle 
         .await;
         let node_a = singleton_node(&ctx_clone);
 
-        // App B: a second live BevyApp built by hand (mirrors TestApp::new).
         let mut node_b = BevyApp::new_alloc();
         node_b.set_name("BevyAppSecondInstance");
         node_b

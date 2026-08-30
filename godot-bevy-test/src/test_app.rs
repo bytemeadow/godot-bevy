@@ -83,7 +83,7 @@ impl TestApp {
     {
         use std::sync::Mutex;
 
-        await_frame().await; // Wait for any previous test cleanup
+        await_frame().await; // A previous test's cleanup may still be pending.
 
         let scene_tree = ctx.scene_tree.get_tree();
         let root = scene_tree.get_root().expect("Root should exist");
@@ -128,8 +128,6 @@ impl TestApp {
     }
 
     /// Advance multiple Godot frames.
-    ///
-    /// Convenience for calling `update()` N times.
     pub async fn updates(&self, count: u32) {
         for _ in 0..count {
             self.update().await;
@@ -146,8 +144,6 @@ impl TestApp {
     }
 
     /// Get immutable access to the Bevy World
-    ///
-    /// Use this to query component state, just like in Bevy tests.
     /// Note: This uses a closure to avoid lifetime issues with the Gd borrow.
     pub fn with_world<F, R>(&self, f: F) -> R
     where
@@ -159,8 +155,6 @@ impl TestApp {
     }
 
     /// Get mutable access to the Bevy World
-    ///
-    /// Use this to spawn entities, modify components, etc.
     pub fn with_world_mut<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&mut World) -> R,

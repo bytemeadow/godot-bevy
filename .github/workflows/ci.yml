@@ -17,7 +17,7 @@ on:
       - ".github/workflows/book.yml"
       - ".github/workflows/benchmark*.yml"
       - ".github/workflows/examples.yml"
-  workflow_dispatch: # Allows manual runs and local testing with act
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -34,7 +34,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Fast-fail lint job - runs once on Linux, catches formatting/clippy errors quickly
   lint:
     name: lint
     runs-on: ubuntu-latest
@@ -64,8 +63,6 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets -- -D warnings
 
-  # Test job - runs on all platforms after lint passes
-  # For workflow_dispatch (local act testing), runs only on ubuntu-latest
   test:
     name: test (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
@@ -108,7 +105,6 @@ jobs:
           cargo test --lib --bins --examples
           cargo test --doc -p godot-bevy -p godot-bevy-macros -p godot-bevy-test -p godot-bevy-test-macros
 
-  # Detect which paths changed to conditionally run downstream jobs
   changes:
     name: detect changes
     runs-on: ubuntu-latest
@@ -119,8 +115,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # For manual triggers (workflow_dispatch), always run all jobs
-      # This enables local testing with act and explicit manual runs
       - name: Manual trigger - run all
         id: manual
         if: github.event_name == 'workflow_dispatch'
@@ -129,7 +123,6 @@ jobs:
           echo "itest=true" >> $GITHUB_OUTPUT
           echo "qualification=true" >> $GITHUB_OUTPUT
 
-      # For push/PR events, use paths-filter to detect changes
       - uses: dorny/paths-filter@v3
         id: filter
         if: github.event_name != 'workflow_dispatch'
@@ -180,7 +173,6 @@ jobs:
       - name: Verify coverage evidence contract
         run: ./itest/verify-coverage.sh contract
 
-  # Integration tests with Godot runtime
   # For local testing with act: act workflow_dispatch -j integration-tests --container-architecture linux/amd64
   integration-tests:
     name: integration tests (${{ matrix.profile }})

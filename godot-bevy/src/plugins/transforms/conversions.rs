@@ -12,10 +12,8 @@ impl IntoBevyTransform for GodotTransform3D {
     fn to_bevy_transform(self) -> BevyTransform {
         let translation = self.origin.to_vec3();
 
-        // Extract scale first
         let scale = self.basis.get_scale().to_vec3();
 
-        // Get rotation from the basis
         // Note: get_quaternion() internally calls orthonormalized() to handle scaled bases
         let rotation = self.basis.get_quaternion().to_quat();
 
@@ -77,7 +75,6 @@ impl IntoGodotTransform for BevyTransform {
     fn to_godot_transform(self) -> GodotTransform3D {
         let quat = self.rotation.to_quaternion();
 
-        // Create rotation basis from quaternion
         let rotation_basis = Basis::from_quaternion(quat);
 
         // Scale each basis vector (column) by the corresponding scale component
@@ -111,7 +108,6 @@ impl IntoGodotTransform2D for BevyTransform {
             (cos, sin)
         };
 
-        // Apply scale to rotation matrix
         let a = Vector2::new(cos_rot * self.scale.x, sin_rot * self.scale.x);
         let b = Vector2::new(-sin_rot * self.scale.y, cos_rot * self.scale.y);
         let origin = Vector2::new(self.translation.x, self.translation.y);

@@ -31,7 +31,6 @@ impl Plugin for GameplayPlugin {
         app.add_plugins(hud::HudPlugin);
         app.add_plugins(door::DoorPlugin);
 
-        // Add observers for reset and return to menu
         app.add_observer(on_reset_level)
             .add_observer(on_return_to_menu);
 
@@ -44,7 +43,6 @@ impl Plugin for GameplayPlugin {
     }
 }
 
-/// System that detects reset level input and triggers observer
 fn detect_reset_level_input(mut commands: Commands, actions: Res<GodotActions>) {
     if actions.just_pressed("reset_level") {
         info!("Reset level input detected");
@@ -52,7 +50,6 @@ fn detect_reset_level_input(mut commands: Commands, actions: Res<GodotActions>) 
     }
 }
 
-/// System that detects return to menu input and triggers observer
 fn detect_return_to_menu_input(mut commands: Commands, actions: Res<GodotActions>) {
     if actions.just_pressed("return_to_main_menu") {
         info!("Return to main menu input detected");
@@ -60,7 +57,6 @@ fn detect_return_to_menu_input(mut commands: Commands, actions: Res<GodotActions
     }
 }
 
-/// Observer that handles reset level events
 fn on_reset_level(
     _trigger: On<ResetLevelMessage>,
     mut gems_collected: ResMut<GemsCollected>,
@@ -71,25 +67,20 @@ fn on_reset_level(
 ) {
     info!("Processing level reset");
 
-    // Reset gems collected
     gems_collected.0 = 0;
 
     // Clear HUD handles since they'll be invalid after scene reload
     hud_handles.clear();
 
-    // Send HUD update with reset gem count
     commands.trigger(HudUpdateMessage::GemsChanged(0));
 
-    // Request scene reload through centralized scene management
     scene_events.write(SceneOperationMessage::reload());
 
-    // Emit level loaded event with current level ID
     if let Some(level_id) = current_level.level_id {
         commands.trigger(LevelLoadedMessage { level_id });
     }
 }
 
-/// Observer that handles return to main menu events
 fn on_return_to_menu(
     _trigger: On<ReturnToMainMenuMessage>,
     mut gems_collected: ResMut<GemsCollected>,
@@ -100,19 +91,15 @@ fn on_return_to_menu(
 ) {
     info!("Processing return to main menu");
 
-    // Reset gems collected
     gems_collected.0 = 0;
 
     // Clear HUD handles since they'll be invalid after scene changes
     hud_handles.clear();
 
-    // Clear current level state
     current_level.clear();
 
-    // Change to main menu state
     next_state.set(GameState::MainMenu);
 
-    // Request scene change through centralized scene management
     scene_events.write(SceneOperationMessage::change_to_file(
         "res://scenes/levels/main_menu.tscn",
     ));

@@ -5,8 +5,6 @@ from typing import List, Optional, Set, Dict
 
 @dataclass(frozen=True)
 class VersionHeader:
-    """Raw gdextension_api.json version header format"""
-
     version_major: int
     version_minor: int
     version_patch: int
@@ -18,16 +16,12 @@ class VersionHeader:
 
 @dataclass(frozen=True)
 class GodotSignal:
-    """Raw gdextension_api.json signal format"""
-
     name: str
     description: str
 
 
 @dataclass(frozen=True)
 class GodotClass:
-    """Raw gdextension_api.json class format"""
-
     name: str
     api_type: str
     name: str
@@ -44,13 +38,11 @@ class GodotClass:
 
 @dataclass
 class ExtensionApi:
-    """Class representation of the gdextension_api.json data format"""
-
     header: VersionHeader
     classes: List[GodotClass]
 
     def classes_descended_from(self, root_class_name: str) -> List[str]:
-        """Return an alphabetically sorted list of all classes descended from the given root class name"""
+        """Results include the root and are alphabetically sorted."""
         inheritance_map = defaultdict(list)
 
         for class_info in self.classes:
@@ -59,7 +51,6 @@ class ExtensionApi:
                 parent = class_info.inherits
                 inheritance_map[parent].append(name)
 
-        # Collect all Node-derived types
         classes: Set[str] = set()
 
         def collect_descendants(class_name: str):

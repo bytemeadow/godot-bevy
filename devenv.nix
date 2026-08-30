@@ -65,14 +65,12 @@ in
 
   env.RUSTC_WRAPPER = "${pkgs.sccache}/bin/sccache";
 
-  # nightly for web builds
   env.CARGO_NIGHTLY = "${rust-nightly}/bin/cargo";
   env.RUSTC_NIGHTLY = "${rust-nightly}/bin/rustc";
 
   # rustfmt runs on commit; clippy stays in CI
   git-hooks.hooks.rustfmt.enable = true;
 
-  # enable claude code
   claude.code.enable = true;
 
   scripts = {

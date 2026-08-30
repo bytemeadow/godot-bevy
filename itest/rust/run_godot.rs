@@ -5,7 +5,6 @@ fn main() {
     )
     .gdextension_config(|config| config.entry_symbol("godot_bevy_itest"));
 
-    // Run with `cargo run --features itest` to run integration tests
     let runner = runner.godot_cli_arguments(vec![
         "--headless",
         "--scene",

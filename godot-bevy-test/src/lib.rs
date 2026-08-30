@@ -25,7 +25,6 @@
 //! use godot::init::{ExtensionLibrary, gdextension};
 //! use godot_bevy_test::prelude::*;
 //!
-//! // Declare the test runner class for Godot
 //! godot_bevy_test::declare_test_runner!();
 //!
 //! mod my_tests {}
@@ -43,12 +42,9 @@
 //! fn test_player_spawns(ctx: &TestContext) -> godot::task::TaskHandle {
 //!     let ctx = ctx.clone();
 //!     godot::task::spawn(async move {
-//!         let mut app = TestApp::new(&ctx, |_app| {
-//!             // Add your plugins
-//!         }).await;
+//!         let mut app = TestApp::new(&ctx, |_app| {}).await;
 //!
 //!         app.update().await;
-//!         // assertions...
 //!     })
 //! }
 //! # fn main() {}
@@ -68,7 +64,6 @@ mod selection;
 pub mod test_app;
 pub mod test_helpers;
 
-// Re-export plugin registries from runner module for macro access
 #[doc(hidden)]
 pub use runner::__GODOT_ASYNC_ITEST;
 #[doc(hidden)]
@@ -76,7 +71,6 @@ pub use runner::__GODOT_BENCH;
 #[doc(hidden)]
 pub use runner::__GODOT_ITEST;
 
-// Re-export core types
 #[cfg(feature = "test-frame-signal")]
 pub use runner::await_bevy_frame;
 pub use runner::{AsyncRustTestCase, RustBenchmark, RustTestCase, TestRunnerImpl};
@@ -84,10 +78,8 @@ pub use runner::{await_frame, await_frames, await_physics_frame};
 pub use test_app::TestApp;
 pub use test_helpers::Counter;
 
-// Re-export bencher types
 pub use bencher::{BenchResult, measured, metrics, run_benchmark};
 
-// Re-export the macros
 pub use godot_bevy_test_macros::{bench, itest};
 
 /// Context passed to each test function
@@ -111,12 +103,10 @@ pub mod prelude {
 /// # Example
 /// ```no_run
 /// # mod default_name {
-/// // Default name (IntegrationTests)
 /// godot_bevy_test::declare_test_runner!();
 ///
 /// # }
 /// # mod custom_name {
-/// // Custom name
 /// godot_bevy_test::declare_test_runner!(MyTestRunner);
 /// # }
 /// # fn main() {}

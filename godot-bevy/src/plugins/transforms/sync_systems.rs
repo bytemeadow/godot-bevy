@@ -153,7 +153,6 @@ pub fn post_update_godot_transforms<F: QueryFilter>(
     }
 }
 
-/// Whether Godot's project-wide physics interpolation is enabled.
 fn physics_interpolation_enabled() -> bool {
     Engine::singleton()
         .get_main_loop()

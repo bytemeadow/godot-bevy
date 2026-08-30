@@ -6,10 +6,8 @@ mod tests {
 
     #[test]
     fn test_extract_rotation_from_2d_matrix() {
-        // Test identity matrix (no rotation)
         assert!((extract_rotation_from_2d_matrix(1.0, 0.0) - 0.0).abs() < 1e-6);
 
-        // Test 90-degree rotation
         assert!((extract_rotation_from_2d_matrix(0.0, 1.0) - PI / 2.0).abs() < 1e-6);
     }
 
@@ -31,7 +29,6 @@ mod tests {
 
     #[test]
     fn test_validate_transform_for_conversion() {
-        // Valid transform
         let valid_transform = Transform {
             translation: Vec3::new(1.0, 2.0, 3.0),
             rotation: Quat::IDENTITY,
@@ -39,7 +36,6 @@ mod tests {
         };
         assert!(validate_transform_for_conversion(&valid_transform));
 
-        // Invalid translation (NaN)
         let invalid_transform = Transform {
             translation: Vec3::new(f32::NAN, 2.0, 3.0),
             rotation: Quat::IDENTITY,
@@ -64,10 +60,8 @@ mod tests {
 
     #[test]
     fn test_extract_z_rotation_from_quat() {
-        // Test identity quaternion
         assert!(extract_z_rotation_from_quat(Quat::IDENTITY).abs() < 1e-6);
 
-        // Test Z rotation
         let z_rot_quat = Quat::from_rotation_z(PI / 4.0);
         assert!((extract_z_rotation_from_quat(z_rot_quat) - PI / 4.0).abs() < 1e-6);
     }

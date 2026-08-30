@@ -39,7 +39,6 @@ impl Plugin for AvianPhysicsDemo {
             .add_plugins(GodotBevyLogPlugin::default())
             .add_plugins(GodotTransformSyncPlugin::default())
             .add_plugins((
-                // Plugins required by Avian
                 ScenePlugin,
                 // Avian's default physics step runs in FixedPostUpdate, which godot-bevy
                 // ticks from Godot's _physics_process. Disable Avian's own transform
@@ -74,14 +73,12 @@ pub struct GameAssets {
 }
 
 fn spawn_entities(mut commands: Commands, assets: Res<GameAssets>) {
-    // Static physics object with a collision shape (cylinder floor)
     commands.spawn(GodotPhysicsStatic::cylinder(
         assets.floor_scene.clone(),
         4.0, // radius
         0.1, // height
     ));
 
-    // Dynamic physics object with a collision shape and initial angular velocity
     commands.spawn(GodotPhysicsBox::dynamic_with_spin(
         assets.simple_box_scene.clone(),
         Vec3::new(0.0, 4.0, 0.0),

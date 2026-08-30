@@ -1,8 +1,3 @@
-/*
- * Real frame-driven integration tests
- * These tests verify actual Godot frame progression
- */
-
 use bevy::prelude::*;
 use godot_bevy_test::prelude::*;
 
@@ -302,7 +297,6 @@ fn test_reinit_runs_startup(ctx: &TestContext) -> godot::task::TaskHandle {
     })
 }
 
-/// Test that Update systems run on real Godot frames
 #[itest(async)]
 fn test_update_runs_on_real_frames(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -333,7 +327,6 @@ fn test_update_runs_on_real_frames(ctx: &TestContext) -> godot::task::TaskHandle
     })
 }
 
-/// Test FixedUpdate runs on physics frames
 #[itest(async)]
 fn test_fixed_update_runs_each_frame(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -363,7 +356,6 @@ fn test_fixed_update_runs_each_frame(ctx: &TestContext) -> godot::task::TaskHand
     })
 }
 
-/// Test frame pacing is controlled by Godot
 #[itest(async)]
 fn test_frame_pacing_controlled_by_godot(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -396,8 +388,7 @@ fn test_frame_pacing_controlled_by_godot(ctx: &TestContext) -> godot::task::Task
     })
 }
 
-/// FixedUpdate now ticks on Godot's physics clock: each physics tick runs
-/// FixedMain exactly once, and Res<Time> inside it is positive.
+/// Each Godot physics tick runs FixedMain exactly once with positive `Res<Time>`.
 #[itest(async)]
 fn test_fixed_update_runs_on_physics_tick(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();

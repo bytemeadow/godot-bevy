@@ -52,13 +52,11 @@ impl Parse for ITestOptions {
 /// ```ignore
 /// #[itest]
 /// fn my_sync_test(ctx: &TestContext) {
-///     // test code
 /// }
 ///
 /// #[itest(async)]
 /// fn my_async_test(ctx: &TestContext) -> godot::task::TaskHandle {
 ///     godot::task::spawn(async move {
-///         // async test code
 ///     })
 /// }
 ///
@@ -93,7 +91,7 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
     let visibility = &input.vis;
     let body = &input.block;
 
-    // Extract parameter or use default - use absolute path to godot_bevy_test
+    // Absolute paths keep the expansion independent of caller imports.
     let param = if let Some(param) = input.sig.inputs.first() {
         quote! { #param }
     } else {
@@ -101,7 +99,6 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     if is_async {
-        // Async test - returns TaskHandle
         let return_ty = match &input.sig.output {
             ReturnType::Type(_, ty) => quote! { -> #ty },
             ReturnType::Default => quote! { -> ::godot::task::TaskHandle },
@@ -125,7 +122,6 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
             );
         })
     } else {
-        // Sync test
         TokenStream::from(quote! {
             #visibility fn #test_name(#param) {
                 #body
@@ -153,12 +149,10 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```ignore
 /// #[bench]
 /// fn my_benchmark() -> ReturnType {
-///     // benchmark code - must return a value
 /// }
 ///
 /// #[bench(repeat = 25)]
 /// fn expensive_benchmark() -> ReturnType {
-///     // custom repetition count
 /// }
 /// ```
 #[proc_macro_attribute]

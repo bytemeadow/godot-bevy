@@ -17,7 +17,6 @@ pub mod scene_tree;
 pub mod signals;
 pub mod transforms;
 
-// Re-export all plugins for convenience
 pub use assets::GodotAssetsPlugin;
 pub use audio::GodotAudioPlugin;
 pub use collisions::GodotCollisionsPlugin;
@@ -31,7 +30,6 @@ pub use packed_scene::GodotPackedScenePlugin;
 pub use scene_tree::GodotSceneTreePlugin;
 pub use transforms::GodotTransformSyncPlugin;
 
-// Re-export for backwards compatibility
 #[deprecated(note = "Use GodotInputEventPlugin instead")]
 pub use input::GodotInputEventPlugin as GodotInputPlugin;
 

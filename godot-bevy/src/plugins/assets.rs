@@ -41,7 +41,6 @@ use crate::interop::GodotResourceHandle;
 /// use godot_bevy::prelude::*;
 ///
 /// fn load_assets(asset_server: Res<AssetServer>) {
-///     // Load any Godot resource through Bevy's asset system (async, non-blocking)
 ///     let scene: Handle<GodotResource> = asset_server.load("scenes/player.tscn");
 ///     let _audio: Handle<GodotResource> = asset_server.load("audio/music.ogg");
 ///     let _texture: Handle<GodotResource> = asset_server.load("art/player.png");
@@ -54,11 +53,10 @@ use crate::interop::GodotResourceHandle;
 ///
 /// fn use_loaded_assets(
 ///     mut assets: ResMut<Assets<GodotResource>>,
-///     my_assets: Res<MyAssets>, // Your loaded handles
+///     my_assets: Res<MyAssets>,
 /// ) {
 ///     if let Some(mut asset) = assets.get_mut(&my_assets.scene) {
 ///         if let Some(scene) = asset.try_cast::<PackedScene>() {
-///             // Use the scene...
 ///         }
 ///     }
 /// }

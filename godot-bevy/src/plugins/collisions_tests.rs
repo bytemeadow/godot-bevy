@@ -9,26 +9,21 @@ mod tests {
         let e2 = Entity::from_bits(2);
         let e3 = Entity::from_bits(3);
 
-        // Add collision
         state.add_collision(e1, e2);
         assert!(state.contains(e1, e2));
         assert!(state.contains(e2, e1)); // Symmetric
         assert!(!state.contains(e1, e3));
 
-        // Check colliding_with
         assert_eq!(state.colliding_with(e1), &[e2]);
         assert_eq!(state.colliding_with(e2), &[e1]);
         assert!(state.colliding_with(e3).is_empty());
 
-        // Check started
         assert_eq!(state.started_this_frame.len(), 1);
 
-        // Remove collision
         state.remove_collision(e1, e2);
         assert!(!state.contains(e1, e2));
         assert!(state.colliding_with(e1).is_empty());
 
-        // Check ended
         assert_eq!(state.ended_this_frame.len(), 1);
     }
 
@@ -41,7 +36,6 @@ mod tests {
         state.add_collision(e1, e2);
         assert_eq!(state.started_this_frame.len(), 1);
 
-        // Begin new frame
         state.begin_frame();
         assert!(state.started_this_frame.is_empty());
         assert!(state.ended_this_frame.is_empty());
@@ -55,7 +49,6 @@ mod tests {
         let e1 = Entity::from_bits(1);
         let e2 = Entity::from_bits(2);
 
-        // Should always return same order regardless of input order
         assert_eq!(normalize_pair(e1, e2), normalize_pair(e2, e1));
     }
 
@@ -125,7 +118,6 @@ mod tests {
         state.add_collision(e1, e2); // Duplicate
         state.add_collision(e2, e1); // Same pair, different order
 
-        // Should only have one collision
         assert_eq!(state.len(), 1);
         assert_eq!(state.started_this_frame.len(), 1);
     }

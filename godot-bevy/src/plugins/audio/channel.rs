@@ -65,7 +65,6 @@ impl<T: AudioChannelMarker> AudioChannel<T> {
         &self.channel_id
     }
 
-    /// Queue a command for this channel (internal method)
     fn queue_command(&self, command: AudioCommand) {
         self.commands.write().push_back(command);
     }

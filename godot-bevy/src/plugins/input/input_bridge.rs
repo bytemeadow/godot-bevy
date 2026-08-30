@@ -182,7 +182,6 @@ fn bridge_pan_gesture(
     }
 }
 
-// Conversion functions
 fn godot_key_to_bevy_key(godot_key: godot::global::Key) -> Key {
     use godot::global::Key as GK;
 
@@ -296,7 +295,6 @@ fn godot_key_to_bevy_keycode(godot_key: godot::global::Key) -> Option<KeyCode> {
         GK::F11 => Some(BK::F11),
         GK::F12 => Some(BK::F12),
 
-        // Numpad keys
         GK::KP_0 => Some(BK::Numpad0),
         GK::KP_1 => Some(BK::Numpad1),
         GK::KP_2 => Some(BK::Numpad2),
@@ -314,7 +312,6 @@ fn godot_key_to_bevy_keycode(godot_key: godot::global::Key) -> Option<KeyCode> {
         GK::KP_PERIOD => Some(BK::NumpadDecimal),
         GK::KP_ENTER => Some(BK::NumpadEnter),
 
-        // Additional common keys
         GK::DELETE => Some(BK::Delete),
         GK::INSERT => Some(BK::Insert),
         GK::HOME => Some(BK::Home),
@@ -327,7 +324,6 @@ fn godot_key_to_bevy_keycode(godot_key: godot::global::Key) -> Option<KeyCode> {
         GK::PAUSE => Some(BK::Pause),
         GK::PRINT => Some(BK::PrintScreen),
 
-        // Punctuation and symbols
         GK::COMMA => Some(BK::Comma),
         GK::PERIOD => Some(BK::Period),
         GK::SLASH => Some(BK::Slash),

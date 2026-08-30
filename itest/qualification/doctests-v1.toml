@@ -13,7 +13,7 @@ scaffold = "book-tests/src/doctest_scaffolds.rs#node_tree_view"
 source = "godot-bevy-macros/src/lib.rs"
 ordinal = 2
 category = "compiled_scaffold"
-fingerprint = "sha256:3e88fadd45c1f66f459edee50de1f0d950e2a24acc604a806a30b2b5c4ab2fe1"
+fingerprint = "sha256:bc869540004b9e33c88b269bf419468d382cbc203fd758723212e854f59d511b"
 scaffold = "book-tests/src/doctest_scaffolds.rs#node_tree_paths"
 
 [[fences]]
@@ -69,35 +69,35 @@ scaffold = "book-tests/src/doctest_scaffolds.rs#godot_node_fields"
 source = "godot-bevy-test-macros/src/lib.rs"
 ordinal = 1
 category = "compiled_scaffold"
-fingerprint = "sha256:fd806a10df87675b2bd95f53867b8a4411e269a52a62243d2d63674430bf3674"
+fingerprint = "sha256:ef26aae70578cfc76d53cc83e46157bff02515b3b359c16a84b493919b112d05"
 scaffold = "book-tests/src/doctest_scaffolds.rs#itest"
 
 [[fences]]
 source = "godot-bevy-test-macros/src/lib.rs"
 ordinal = 2
 category = "compiled_scaffold"
-fingerprint = "sha256:408adfb4f563c1ee6c40363840475eae8afa2d982d5c330aabd6698077572633"
+fingerprint = "sha256:ed47351cfe88f87b414137fbc6755bc744cb576736689d9adb6d6cfe2996db18"
 scaffold = "book-tests/src/doctest_scaffolds.rs#bench"
 
 [[fences]]
 source = "godot-bevy-test/src/lib.rs"
 ordinal = 1
 category = "compiled_no_run"
-fingerprint = "sha256:823500d09ad25bca0e1a6d9995f7c5ded4eaca29a3afeda4b577bc4ac028bd82"
+fingerprint = "sha256:c8722d53eb716e72ef415a00ae73ec70042268828e5357f0797e01ac06d6b279"
 scaffold = ""
 
 [[fences]]
 source = "godot-bevy-test/src/lib.rs"
 ordinal = 2
 category = "compiled_no_run"
-fingerprint = "sha256:cc32ce450cb9948eb315aa64096a520094f20c2dc61dad76c96950325d4f3be6"
+fingerprint = "sha256:41267677e233df039e68ef4155ddfe895b5c717ce6215a0bde5349e0526aaf65"
 scaffold = ""
 
 [[fences]]
 source = "godot-bevy-test/src/lib.rs"
 ordinal = 3
 category = "compiled_no_run"
-fingerprint = "sha256:0e432ae538ac2d3830cfb34d2d3bb2efe23d08bc4fed4ffc3cb7f0c881c224ce"
+fingerprint = "sha256:b1929999ad2c9fa181df66f970c3d61bc15d6b7b0d6b64310389d1d6b78bf54e"
 scaffold = ""
 
 [[fences]]
@@ -160,21 +160,21 @@ scaffold = ""
 source = "godot-bevy/src/plugins/assets.rs"
 ordinal = 1
 category = "compiled_no_run"
-fingerprint = "sha256:6d2a436bad2834664a4cdbb3e43b75ecb68d41b25a6d3b09324e14a81e53cfdf"
+fingerprint = "sha256:4ca566096f114ca3afe91dbbc6fdaf900177fec443f9ee96d128f8da89fd4e0f"
 scaffold = ""
 
 [[fences]]
 source = "godot-bevy/src/plugins/audio/mod.rs"
 ordinal = 1
 category = "compiled_no_run"
-fingerprint = "sha256:9e740383e924e8ba2c5505b4b26250d7d443703cba83c76c97dd33d5e375e7cc"
+fingerprint = "sha256:bd49fa1971516b3ea74f7d470ba1195a0a546910aa321da54a52bd22892aec24"
 scaffold = ""
 
 [[fences]]
 source = "godot-bevy/src/plugins/collisions.rs"
 ordinal = 1
 category = "compiled_no_run"
-fingerprint = "sha256:378e013a243a4a6bd8dc203abdcbc0839e271cbdc548dc5856cc68c7c3429475"
+fingerprint = "sha256:2c0c2071e78af107ac7a29598f007cf0797e388e582b814d7632423b4393496e"
 scaffold = ""
 
 [[fences]]
@@ -195,21 +195,21 @@ scaffold = ""
 source = "godot-bevy/src/plugins/collisions.rs"
 ordinal = 4
 category = "compiled_no_run"
-fingerprint = "sha256:9627718361152299fb1e2db7afc27ab8ca9468880baebe20a79290bccdbd5dea"
+fingerprint = "sha256:ee1b59e7ff2e8976006b915b60cfc4f388c8f3241fa0905e0cbe3e5d27273c6d"
 scaffold = ""
 
 [[fences]]
 source = "godot-bevy/src/plugins/collisions.rs"
 ordinal = 5
 category = "compiled_no_run"
-fingerprint = "sha256:4fde5497018835889281d7e4de9bd054a6550ddc3ea6445c11b553477880c306"
+fingerprint = "sha256:419ca94ee3ee1386906ba4df654ab6a85c81d2050ae11e9ac1b64483b2f47c7d"
 scaffold = ""
 
 [[fences]]
 source = "godot-bevy/src/plugins/collisions.rs"
 ordinal = 6
 category = "compiled_no_run"
-fingerprint = "sha256:24a8f3d6d4fec7f26b9588d725bdc650d89b4316a3a3e735b70dd6ef5dc6ec96"
+fingerprint = "sha256:739b6a8a70e39ffcdcd4613aadf7e174646c37590706fdccd65f7a7457b5f721"
 scaffold = ""
 
 [[fences]]
@@ -223,7 +223,7 @@ scaffold = ""
 source = "godot-bevy/src/plugins/collisions.rs"
 ordinal = 8
 category = "compiled_no_run"
-fingerprint = "sha256:148789c7a60e780d4562c2c6e31c4f603aa0ba564ce9b9be7fa523668daded20"
+fingerprint = "sha256:1ad087d05ac0f048fa27931a4b85c29058f8ac71f7de0ab4f77dacea323c283e"
 scaffold = ""
 
 [[fences]]
@@ -258,14 +258,14 @@ scaffold = ""
 source = "godot-bevy/src/plugins/signals.rs"
 ordinal = 1
 category = "compiled_no_run"
-fingerprint = "sha256:a6c6bdeae0dda23eea880d232f64dde6070291ec8461edb8fa60c6cac941cbd4"
+fingerprint = "sha256:0892a3e578cb8b24c535775b0118941e43d438420f18638547ce87883167d2ca"
 scaffold = ""
 
 [[fences]]
 source = "godot-bevy/src/plugins/signals.rs"
 ordinal = 2
 category = "compiled_no_run"
-fingerprint = "sha256:26b497898716359302e31887a93e5b71026592937a0eec4287d44bf90b1ba71d"
+fingerprint = "sha256:52248fd0182387ba1d6d942c2cd0103b4487e4d31ab5507b7daff1caededdea7"
 scaffold = ""
 
 [[fences]]

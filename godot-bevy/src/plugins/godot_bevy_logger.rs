@@ -41,7 +41,6 @@ impl Default for GodotBevyLogPlugin {
             filter: bevy_log::DEFAULT_FILTER.to_string(),
             level: Level::INFO,
             color: true,
-            // Timestamp formatting reference https://docs.rs/chrono/0.4.41/chrono/format/strftime/index.html
             timestamp_format: Some("%T%.3f".to_owned()),
         }
     }
@@ -125,7 +124,6 @@ where
         let mut msg_vistor = GodotProxyLayerVisitor(None);
         event.record(&mut msg_vistor);
 
-        // Timestamp formatting reference https://docs.rs/chrono/0.4.41/chrono/format/strftime/index.html
         let timestamp = if let Some(format) = &self.timestamp_format {
             format!("{} ", Local::now().format(format))
         } else {

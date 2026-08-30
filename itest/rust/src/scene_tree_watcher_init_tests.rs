@@ -1,16 +1,6 @@
-/*
- * Scene tree watcher initialization tests
- *
- * Tests that verify correct initialization of OptimizedSceneTreeWatcher
- * and SceneTreeWatcher during BevyApp::ready():
- * - Only one OptimizedSceneTreeWatcher should exist (no duplicates)
- * - OptimizedSceneTreeWatcher.rust_watcher should be connected (not null)
- */
-
 use godot::prelude::*;
 use godot_bevy_test::prelude::*;
 
-/// Find the BevyAppSingleton autoload node.
 fn find_bevy_app_node(
     scene_tree_node: &Gd<godot::classes::Node>,
 ) -> Option<Gd<godot::classes::Node>> {
@@ -19,7 +9,6 @@ fn find_bevy_app_node(
     root.try_get_node_as::<godot::classes::Node>("BevyAppSingleton")
 }
 
-/// Count children whose name starts with the given prefix.
 fn count_children_with_prefix(parent: &Gd<godot::classes::Node>, prefix: &str) -> usize {
     let mut count = 0;
     for i in 0..parent.get_child_count() {
@@ -32,7 +21,6 @@ fn count_children_with_prefix(parent: &Gd<godot::classes::Node>, prefix: &str) -
     count
 }
 
-/// Test that only one OptimizedSceneTreeWatcher exists after initialization.
 #[itest(async)]
 fn test_single_optimized_scene_tree_watcher(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -57,8 +45,6 @@ fn test_single_optimized_scene_tree_watcher(ctx: &TestContext) -> godot::task::T
     })
 }
 
-/// Test that OptimizedSceneTreeWatcher's rust_watcher variable is connected
-/// to the SceneTreeWatcher after initialization.
 #[itest(async)]
 fn test_optimized_watcher_rust_watcher_connected(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();

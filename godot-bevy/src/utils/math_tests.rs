@@ -29,9 +29,9 @@ mod tests {
     #[test]
     fn test_move_toward() {
         assert_eq!(move_toward(0.0, 10.0, 5.0), 5.0);
-        assert_eq!(move_toward(8.0, 10.0, 5.0), 10.0); // Should reach target
-        assert_eq!(move_toward(10.0, 0.0, 3.0), 7.0); // Moving backward
-        assert_eq!(move_toward(5.0, 5.0, 1.0), 5.0); // Already at target
+        assert_eq!(move_toward(8.0, 10.0, 5.0), 10.0);
+        assert_eq!(move_toward(10.0, 0.0, 3.0), 7.0);
+        assert_eq!(move_toward(5.0, 5.0, 1.0), 5.0);
     }
 
     #[test]

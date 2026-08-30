@@ -6,10 +6,8 @@ compile_error!("coverage-flush requires cfg(coverage)");
 #[cfg(feature = "coverage-flush")]
 mod coverage_flush;
 
-// Declare the test runner class
 godot_bevy_test::declare_test_runner!();
 
-// Test modules
 mod asset_reader_tests;
 mod autosync_match_tests;
 mod benchmarks;

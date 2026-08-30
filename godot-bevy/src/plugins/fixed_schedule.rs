@@ -126,7 +126,6 @@ pub(crate) fn run_godot_fixed_main(world: &mut World, delta: Duration) {
     world.try_run_schedule(RunFixedMainLoop).ok();
 }
 
-// ── split-Main helpers ────────────────────────────────────────────────────────
 // Mirror `Main::run_main` (bevy_app main_schedule.rs): resource_scope over the
 // live MainScheduleOrder, try_run_schedule for each label, ignoring missing ones.
 // The split point is the GodotFixedMainLoopSplit marker inserted by
@@ -143,7 +142,6 @@ fn split_idx(order: &MainScheduleOrder) -> usize {
         .expect("split marker installed by host_fixed_main_loop")
 }
 
-/// Run the startup schedules (PreStartup/Startup/PostStartup and any extras).
 /// Idempotency is the caller's responsibility (`started` flag in `app.rs`).
 pub(crate) fn run_startup(world: &mut World) {
     world.resource_scope(|world, order: bevy_ecs::world::Mut<MainScheduleOrder>| {
@@ -153,7 +151,6 @@ pub(crate) fn run_startup(world: &mut World) {
     });
 }
 
-/// Run all schedules before the split marker (First, PreUpdate, StateTransition, …).
 /// Never calls `clear_trackers`.
 pub(crate) fn run_main_prefix(world: &mut World) {
     world.resource_scope(|world, order: bevy_ecs::world::Mut<MainScheduleOrder>| {
@@ -164,7 +161,6 @@ pub(crate) fn run_main_prefix(world: &mut World) {
     });
 }
 
-/// Run all schedules after the split marker (Update, PostUpdate, Last, …).
 /// Never calls `clear_trackers` -- the caller does that after this returns.
 pub(crate) fn run_main_suffix(world: &mut World) {
     world.resource_scope(|world, order: bevy_ecs::world::Mut<MainScheduleOrder>| {

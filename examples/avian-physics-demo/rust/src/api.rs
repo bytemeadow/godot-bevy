@@ -18,8 +18,6 @@ use godot_bevy::prelude::{GodotAccess, GodotNodeHandle, GodotResource, GodotScen
 /// Currently supports:
 /// - BoxMesh → Collider::cuboid
 /// - CylinderMesh → Collider::cylinder
-///
-/// Future extensions could support SphereMesh, CapsuleMesh, etc.
 #[derive(Component)]
 pub struct ColliderFromGodotMesh;
 
@@ -37,7 +35,6 @@ pub fn process_collider_from_godot_mesh(
         if let Some(mesh_instance) = godot.try_get::<MeshInstance3D>(*node_handle)
             && let Some(mesh) = mesh_instance.get_mesh()
         {
-            // Try BoxMesh
             if let Ok(box_mesh) = mesh.clone().try_cast::<BoxMesh>() {
                 let size = box_mesh.get_size();
                 commands
@@ -49,7 +46,6 @@ pub fn process_collider_from_godot_mesh(
                     size
                 );
             }
-            // Try CylinderMesh
             else if let Ok(cylinder_mesh) = mesh.try_cast::<CylinderMesh>() {
                 let radius = cylinder_mesh.get_top_radius();
                 let height = cylinder_mesh.get_height();
@@ -62,8 +58,6 @@ pub fn process_collider_from_godot_mesh(
                     radius, height
                 );
             }
-
-            // You can extend this with support for other Godot mesh types (SphereMesh, CapsuleMesh, etc.)
         }
     }
 }

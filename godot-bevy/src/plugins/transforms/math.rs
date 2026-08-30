@@ -34,17 +34,14 @@ pub fn create_2d_rotation_matrix(
 
 /// Validate that transform components are reasonable for conversion
 pub fn validate_transform_for_conversion(transform: &Transform) -> bool {
-    // Check translation is finite
     if !transform.translation.is_finite() {
         return false;
     }
 
-    // Check rotation quaternion is normalized and finite
     if !transform.rotation.is_finite() || !transform.rotation.is_normalized() {
         return false;
     }
 
-    // Check scale is finite and positive
     if !transform.scale.is_finite() || transform.scale.min_element() <= 0.0 {
         return false;
     }

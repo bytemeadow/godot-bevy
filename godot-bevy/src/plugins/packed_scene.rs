@@ -154,7 +154,6 @@ fn spawn_scene(
     signal_sender: Option<Res<SignalSender>>,
     mut godot: GodotAccess,
 ) {
-    // Build a per-frame cache for path-based scene loading.
     // This avoids repeated ResourceLoader.load() calls when spawning multiple
     // instances of the same scene in a single frame (~22x faster).
     let mut local_cache: HashMap<String, Gd<PackedScene>> = HashMap::new();
@@ -176,7 +175,6 @@ fn spawn_scene(
                 }
             }
             GodotSceneResource::Path(path) => {
-                // Use cached resource if available, otherwise load and cache
                 if let Some(cached) = local_cache.get(path) {
                     cached.clone()
                 } else {
@@ -221,7 +219,6 @@ fn spawn_scene(
             }
         }
 
-        // Connect signals (only if typed signals plugin is available)
         if !scene.deferred_signal_connections.is_empty() {
             if let Some(ref sender) = signal_sender {
                 for deferred_connection in scene.deferred_signal_connections.drain(..) {

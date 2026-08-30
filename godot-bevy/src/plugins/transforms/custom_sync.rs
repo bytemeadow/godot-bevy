@@ -34,12 +34,10 @@
 /// ```
 #[macro_export]
 macro_rules! add_transform_sync_systems {
-    // Main entry point - handles mixed directional sync
     ($app:expr, $($tokens:tt)*) => {
         $crate::add_transform_sync_systems!(@parse_all $app, $($tokens)*);
     };
 
-    // Parse all items recursively
     (@parse_all $app:expr, $name:ident = bevy_to_godot: $query:ty, $($rest:tt)*) => {
         $crate::add_transform_sync_systems!(@generate_post_system $app, $query);
         $crate::add_transform_sync_systems!(@parse_all $app, $($rest)*);
@@ -55,7 +53,6 @@ macro_rules! add_transform_sync_systems {
         $crate::add_transform_sync_systems!(@parse_all $app, $($rest)*);
     };
 
-    // Handle last item (without trailing comma)
     (@parse_all $app:expr, $name:ident = bevy_to_godot: $query:ty) => {
         $crate::add_transform_sync_systems!(@generate_post_system $app, $query);
     };
@@ -68,7 +65,6 @@ macro_rules! add_transform_sync_systems {
         $crate::add_transform_sync_systems!(@generate_systems $app, $query, $query);
     };
 
-    // Handle empty case
     (@parse_all $app:expr,) => {};
     (@parse_all $app:expr) => {};
 
@@ -131,7 +127,6 @@ impl GodotTransformSyncPluginExt for crate::plugins::transforms::GodotTransformS
     }
 }
 
-// Re-export the macro at the crate level
 pub use add_transform_sync_systems;
 
 #[cfg(test)]

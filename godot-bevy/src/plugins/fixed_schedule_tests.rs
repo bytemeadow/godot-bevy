@@ -190,8 +190,6 @@ mod tests {
         );
     }
 
-    // ── split-Main helper tests ───────────────────────────────────────────────
-
     #[test]
     fn run_startup_runs_startup_labels_once() {
         #[derive(Resource, Default)]

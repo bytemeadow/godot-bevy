@@ -1,13 +1,3 @@
-/*
- * Input system integration tests
- *
- * Tests the full input pipeline through real Godot frames:
- * - Input.parse_input_event() feeds Godot's input system
- * - GodotInputWatcher receives _input/_unhandled_input callbacks → channel
- * - write_input_messages (First) drains the channel into typed Bevy messages
- * - BevyInputBridgePlugin further bridges into Bevy's ButtonInput resources
- */
-
 use bevy::input::{ButtonInput, keyboard::KeyCode};
 use bevy::prelude::*;
 use godot::classes::{Input, InputEventKey, InputEventMouseMotion, InputMap};
@@ -61,7 +51,6 @@ fn parse_key_event(key: Key, pressed: bool) {
     Input::singleton().parse_input_event(&event);
 }
 
-/// Test that a Godot keyboard event arrives as a KeyboardInput message.
 #[itest(async)]
 fn test_keyboard_input_reaches_bevy(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -87,7 +76,6 @@ fn test_keyboard_input_reaches_bevy(ctx: &TestContext) -> godot::task::TaskHandl
     })
 }
 
-/// Test that a key bound to an InputMap action produces an ActionInput message.
 #[itest(async)]
 fn test_action_input_via_input_map(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -120,7 +108,6 @@ fn test_action_input_via_input_map(ctx: &TestContext) -> godot::task::TaskHandle
     })
 }
 
-/// Test that mouse motion arrives as a MouseMotion message with the right delta.
 #[itest(async)]
 fn test_mouse_motion_reaches_bevy(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -147,7 +134,6 @@ fn test_mouse_motion_reaches_bevy(ctx: &TestContext) -> godot::task::TaskHandle 
     })
 }
 
-/// Test that BevyInputBridgePlugin maintains Bevy's ButtonInput<KeyCode> state.
 #[itest(async)]
 fn test_input_bridge_button_input(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -422,7 +408,6 @@ fn test_godot_actions_edges_in_both_clocks(ctx: &TestContext) -> godot::task::Ta
             phys_press.len()
         );
 
-        // Process clock
         assert_eq!(
             proc_jp, 1,
             "process just_pressed must fire exactly once; frames: {proc_press:?}"

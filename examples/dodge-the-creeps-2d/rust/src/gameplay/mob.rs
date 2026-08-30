@@ -48,14 +48,11 @@ pub struct MobPlugin;
 
 impl Plugin for MobPlugin {
     fn build(&self, app: &mut App) {
-        app
-            // enable signal routing for mob screen exit
-            .add_plugins(GodotSignalsPlugin::<MobScreenExited>::default())
+        app.add_plugins(GodotSignalsPlugin::<MobScreenExited>::default())
             .add_systems(
                 Update,
                 (spawn_mob, new_mob).run_if(in_state(GameState::InGame)),
             )
-            // Use observer for mob screen exit
             .add_observer(on_mob_screen_exited)
             .insert_resource(MobSpawnTimer(Timer::from_seconds(
                 0.5,
@@ -85,7 +82,7 @@ fn spawn_mob(
         return;
     }
 
-    // Choose a random location on Path2D - still needs main thread access
+    // PathFollow2D sampling requires main-thread access.
     let mob_spawn_handle = entities
         .iter()
         .find_entity_by_name("MobSpawnLocation")
@@ -94,10 +91,8 @@ fn spawn_mob(
     let mut mob_spawn_location = godot.get::<PathFollow2D>(*mob_spawn_handle);
     mob_spawn_location.set_progress_ratio(fastrand::f32());
 
-    // Set the mob's direction perpendicular to the path direction.
     let mut direction = mob_spawn_location.get_rotation() + PI / 2.0;
 
-    // Add some randomness to the direction.
     direction += fastrand::f32() * PI / 2.0 - PI / 4.0;
 
     let position = mob_spawn_location.get_position();
@@ -155,10 +150,8 @@ fn new_mob(
         let mob_type_index = fastrand::usize(0..mob_types.len());
         let animation_name = &mob_types[mob_type_index].clone();
 
-        // Use animation state instead of direct API calls
         anim_state.play(Some(animation_name.into()));
 
-        // Play 2D positional spawn sound at mob's position with fade-in
         let position = transform.translation.xy();
 
         sfx_channel

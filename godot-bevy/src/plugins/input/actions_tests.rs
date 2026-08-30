@@ -29,8 +29,6 @@ mod tests {
         }
     }
 
-    // ── 1. Active-clock flip with divergent snapshots ────────────────────────
-
     #[test]
     fn active_clock_flip_divergent_snapshots() {
         let mut ga = GodotActions::default();
@@ -63,8 +61,6 @@ mod tests {
         assert!(!ga.pressed("b"), "reverted: b should not be pressed again");
     }
 
-    // ── 2. Shared helper returns the executing clock's data ──────────────────
-
     fn read_a(ga: &GodotActions) -> bool {
         ga.pressed("a")
     }
@@ -89,8 +85,6 @@ mod tests {
             "helper under Physics should see pressed=false"
         );
     }
-
-    // ── 3. Edge independence -- no aliasing between fields ───────────────────
 
     #[test]
     fn edge_independence_no_aliasing() {
@@ -121,8 +115,6 @@ mod tests {
         assert!(!ga.just_pressed("falling"));
         assert!(ga.just_released("falling"));
     }
-
-    // ── 4. strength / raw_strength / axis / vector ───────────────────────────
 
     #[test]
     fn strength_raw_strength_axis_vector() {
@@ -158,8 +150,6 @@ mod tests {
         assert_eq!(v.x, 0.6_f32 - 0.8_f32);
         assert_eq!(v.y, 0.3_f32 - 0.4_f32);
     }
-
-    // ── 5. poll_physics_actions without resource is a noop ───────────────────
 
     #[test]
     fn poll_physics_actions_without_resource_is_noop() {
@@ -222,8 +212,6 @@ mod tests {
         assert!(!state.pressed);
         assert!(actions.warned.lock().is_empty());
     }
-
-    // ── 6. Unknown &str -- no panic, defaults returned, warn-once ────────────
 
     #[test]
     fn unknown_action_returns_defaults_no_panic() {

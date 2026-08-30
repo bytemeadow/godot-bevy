@@ -36,21 +36,18 @@ mod tests {
 
     #[test]
     fn test_vector3_conversions() {
-        // Test Vec3 to Vector3
         let bevy_vec = Vec3::new(1.0, 2.0, 3.0);
         let godot_vec = bevy_vec.to_vector3();
         assert_eq!(godot_vec.x, bevy_vec.x);
         assert_eq!(godot_vec.y, bevy_vec.y);
         assert_eq!(godot_vec.z, bevy_vec.z);
 
-        // Test Vector3 to Vec3
         let godot_vec = Vector3::new(4.0, 5.0, 6.0);
         let bevy_vec = godot_vec.to_vec3();
         assert_eq!(bevy_vec.x, godot_vec.x);
         assert_eq!(bevy_vec.y, godot_vec.y);
         assert_eq!(bevy_vec.z, godot_vec.z);
 
-        // Round trip
         let original = Vec3::new(1.5, -2.7, f32::consts::PI);
         let round_trip = original.to_vector3().to_vec3();
         assert_vec3_near(original, round_trip, EPSILON);
@@ -58,7 +55,6 @@ mod tests {
 
     #[test]
     fn test_quaternion_conversions() {
-        // Test Quat to Quaternion
         let bevy_quat = Quat::from_rotation_y(std::f32::consts::PI / 4.0);
         let godot_quat = bevy_quat.to_quaternion();
         assert!((godot_quat.x - bevy_quat.x).abs() < EPSILON);
@@ -66,7 +62,6 @@ mod tests {
         assert!((godot_quat.z - bevy_quat.z).abs() < EPSILON);
         assert!((godot_quat.w - bevy_quat.w).abs() < EPSILON);
 
-        // Test Quaternion to Quat
         let godot_quat = Quaternion::new(0.0, 0.707, 0.0, 0.707);
         let bevy_quat = godot_quat.to_quat();
         assert!((bevy_quat.x - godot_quat.x).abs() < EPSILON);
@@ -74,7 +69,6 @@ mod tests {
         assert!((bevy_quat.z - godot_quat.z).abs() < EPSILON);
         assert!((bevy_quat.w - godot_quat.w).abs() < EPSILON);
 
-        // Round trip
         let original = Quat::from_euler(bevy_math::EulerRot::XYZ, 0.1, 0.2, 0.3);
         let round_trip = original.to_quaternion().to_quat();
         assert_quat_near(original, round_trip, EPSILON);
@@ -82,7 +76,6 @@ mod tests {
 
     #[test]
     fn test_transform_3d_identity() {
-        // Test identity transform
         let bevy_transform = BevyTransform::IDENTITY;
         let godot_transform = bevy_transform.to_godot_transform();
         let back_to_bevy = godot_transform.to_bevy_transform();
@@ -182,7 +175,6 @@ mod tests {
 
         assert_vec3_near(back_to_bevy.translation, Vec3::ZERO, EPSILON);
 
-        // Check that the Z rotation is preserved
         let (_, _, z_rot) = back_to_bevy.rotation.to_euler(bevy_math::EulerRot::XYZ);
         assert!(
             (z_rot - angle).abs() < EPSILON,
@@ -217,7 +209,6 @@ mod tests {
         assert!((back_to_bevy.translation.x - bevy_transform.translation.x).abs() < EPSILON);
         assert!((back_to_bevy.translation.y - bevy_transform.translation.y).abs() < EPSILON);
 
-        // Check Z rotation is preserved
         let (_, _, original_z) = bevy_transform.rotation.to_euler(bevy_math::EulerRot::XYZ);
         let (_, _, back_z) = back_to_bevy.rotation.to_euler(bevy_math::EulerRot::XYZ);
         assert!(

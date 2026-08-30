@@ -4,12 +4,10 @@ use std::path::PathBuf;
 
 /// Get the cross-platform path for exit code file
 pub fn exit_code_path() -> PathBuf {
-    // Use environment variable if set (for CI customization)
     if let Ok(path) = std::env::var("GODOT_TEST_EXIT_CODE_PATH") {
         return PathBuf::from(path);
     }
 
-    // Cross-platform temp directory
     let mut path = std::env::temp_dir();
     path.push("godot_test_exit_code");
     path

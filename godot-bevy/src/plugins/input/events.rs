@@ -138,7 +138,7 @@ impl From<godot::global::MouseButton> for GodotMouseButton {
             godot::global::MouseButton::WHEEL_RIGHT => GodotMouseButton::WheelRight,
             godot::global::MouseButton::XBUTTON1 => GodotMouseButton::Extra1,
             godot::global::MouseButton::XBUTTON2 => GodotMouseButton::Extra2,
-            _ => GodotMouseButton::Left, // fallback
+            _ => GodotMouseButton::Left,
         }
     }
 }
@@ -206,7 +206,6 @@ fn extract_basic_input_events(
     gamepad_axis_events: &mut MessageWriter<GamepadAxisInput>,
     pan_gesture_events: &mut MessageWriter<PanGestureInput>,
 ) {
-    // Keyboard input
     let input_event = match input_event.try_cast::<InputEventKey>() {
         Ok(key_event) => {
             keyboard_events.write(GodotKeyboardInput {
@@ -221,7 +220,6 @@ fn extract_basic_input_events(
         Err(original) => original,
     };
 
-    // Mouse button input
     let input_event = match input_event.try_cast::<InputEventMouseButton>() {
         Ok(mouse_button_event) => {
             let position = mouse_button_event.get_position();
@@ -238,7 +236,6 @@ fn extract_basic_input_events(
         Err(original) => original,
     };
 
-    // Touch input
     let input_event = match input_event.try_cast::<InputEventScreenTouch>() {
         Ok(touch_event) => {
             let position = touch_event.get_position();
@@ -252,7 +249,6 @@ fn extract_basic_input_events(
         Err(original) => original,
     };
 
-    // Gamepad button input
     let input_event = match input_event.try_cast::<InputEventJoypadButton>() {
         Ok(gamepad_button_event) => {
             gamepad_button_events.write(GamepadButtonInput {
@@ -266,7 +262,6 @@ fn extract_basic_input_events(
         Err(original) => original,
     };
 
-    // Gamepad axis input
     let input_event = match input_event.try_cast::<InputEventJoypadMotion>() {
         Ok(gamepad_motion_event) => {
             gamepad_axis_events.write(GamepadAxisInput {
@@ -279,7 +274,6 @@ fn extract_basic_input_events(
         Err(original) => original,
     };
 
-    // Two-finger pan gesture
     if let Ok(pan_gesture_event) = input_event.try_cast::<InputEventPanGesture>() {
         let delta = pan_gesture_event.get_delta();
         pan_gesture_events.write(PanGestureInput {

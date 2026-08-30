@@ -991,8 +991,6 @@ const FMT_YELLOW: &str = "\x1b[33m";
 const FMT_RED: &str = "\x1b[31m";
 const FMT_END: &str = "\x1b[0m";
 
-/// Helper function to wait for the next Godot process frame.
-///
 /// The `process_frame` signal fires after all `_physics_process()` calls but
 /// before `_process()` for that frame, so the suffix (Update/PostUpdate/Last)
 /// has not yet run when this resolves. The Main prefix
@@ -1010,8 +1008,6 @@ pub async fn await_frame() {
     let _: () = signal.to_future().await;
 }
 
-/// Helper function to wait for the next Godot physics frame.
-///
 /// Waits for the `physics_frame` signal, which fires immediately before
 /// `_physics_process()` runs. Use this when you need to guarantee that
 /// a physics tick has occurred (e.g., collision processing).
@@ -1025,7 +1021,7 @@ pub async fn await_physics_frame() {
     let _: () = signal.to_future().await;
 }
 
-/// Helper function to wait for multiple frames
+/// Wait for multiple frames.
 pub async fn await_frames(count: u32) {
     for _ in 0..count {
         await_frame().await;

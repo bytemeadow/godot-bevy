@@ -52,8 +52,6 @@ pub struct GodotActions {
     poll_override: Option<fn(&mut GodotActions, Clock)>,
 }
 
-// ── typed handle ────────────────────────────────────────────────────────────
-
 /// A typed action handle. Construct once; reuse across systems.
 ///
 /// The key is pre-computed from the `StringName` so lookups never allocate.
@@ -71,8 +69,6 @@ impl Action {
         Self { name, key }
     }
 }
-
-// ── borrow helper ────────────────────────────────────────────────────────────
 
 /// Short-lived borrow used by every accessor. Never allocates.
 pub struct ActionRef<'a> {
@@ -107,8 +103,6 @@ impl<'a> From<&'a Action> for ActionRef<'a> {
         }
     }
 }
-
-// ── accessors ────────────────────────────────────────────────────────────────
 
 impl GodotActions {
     fn snapshot(&self) -> &Snapshot {
@@ -230,8 +224,6 @@ impl GodotActions {
     }
 }
 
-// ── driver helpers ───────────────────────────────────────────────────────────
-
 /// Called by `godot_fixed_driver` before `FixedMain` runs. Sets the active
 /// clock to `Physics` and refreshes the physics snapshot via FFI. No-op if
 /// `GodotActions` hasn't been added (allows apps that don't use action input
@@ -256,8 +248,6 @@ fn poll_process_actions(mut ga: ResMut<GodotActions>) {
     ga.set_active(Clock::Process);
     ga.poll(Clock::Process);
 }
-
-// ── plugin ────────────────────────────────────────────────────────────────────
 
 /// Marker set for the `Update`-schedule process-clock poll.
 ///
@@ -284,8 +274,6 @@ impl Plugin for GodotActionsPlugin {
         app.add_systems(Update, poll_process_actions.in_set(GodotInputSet));
     }
 }
-
-// ── tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 include!("actions_tests.rs");
