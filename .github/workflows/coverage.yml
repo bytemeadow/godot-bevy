@@ -1,6 +1,9 @@
 name: coverage
 
 on:
+  # TEMPORARY pre-merge validation trigger; remove before merge
+  push:
+    branches: [godot-bevy-verification]
   workflow_dispatch:
 
 env:
