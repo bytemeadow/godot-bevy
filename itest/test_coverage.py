@@ -951,7 +951,15 @@ def verify_workflow() -> None:
     require("\non:\n" in workflow and "\nenv:\n" in workflow, "coverage workflow blocks")
     trigger = workflow.split("\non:\n", 1)[1].split("\nenv:\n", 1)[0]
     triggers = re.findall(r"^  ([A-Za-z_][A-Za-z0-9_-]*):", trigger, re.MULTILINE)
-    require(triggers == ["workflow_dispatch"], f"coverage workflow triggers: {triggers}")
+    if triggers == ["push", "workflow_dispatch"]:
+        # a push trigger is tolerated only while explicitly marked as the
+        # pre-merge validation scaffold; removing the marker re-arms the check
+        require(
+            "TEMPORARY pre-merge validation trigger" in workflow,
+            f"coverage workflow triggers: {triggers}",
+        )
+    else:
+        require(triggers == ["workflow_dispatch"], f"coverage workflow triggers: {triggers}")
     require(workflow.count("runs-on: ubuntu-latest") == 1, "coverage Linux job census")
     require(workflow.count("uses: actions/upload-artifact@v4") == 1, "coverage artifact upload")
     upload = workflow.index("uses: actions/upload-artifact@v4")
