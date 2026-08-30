@@ -17,7 +17,6 @@ fn main() {
         &std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../godot"),
     );
 
-    // Run with `cargo run --features itest` to run integration tests
     #[cfg(feature = "itest")]
     let runner = runner.godot_cli_arguments(vec![
         "--headless",

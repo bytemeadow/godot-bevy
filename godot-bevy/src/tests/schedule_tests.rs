@@ -161,7 +161,6 @@ fn update_message_survives_idle_until_next_physics_tick() {
     app.add_message::<Ping>();
     app.init_resource::<Recv>();
     app.init_resource::<Wrote>();
-    // Write exactly one Ping, in Update (suffix), on the first frame only.
     app.add_systems(
         Update,
         |mut w: MessageWriter<Ping>, mut wrote: ResMut<Wrote>| {

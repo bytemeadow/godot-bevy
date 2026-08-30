@@ -27,7 +27,6 @@ fn build_app(app: &mut App) {
             level_manager::LevelManagerPlugin,
             gameplay::GameplayPlugin,
         ))
-        // Register types for inspector reflection
         .register_type::<components::Speed>()
         .register_type::<components::JumpVelocity>()
         .register_type::<components::Gravity>()

@@ -15,6 +15,14 @@ name = "godot_bevy_itest"
 default = []
 test-frame-signal = ["godot-bevy/test-frame-signal", "godot-bevy-test/test-frame-signal"]
 autosync-tests = []
+harness-probes = []
+harness-focus-probe = ["harness-probes"]
+coverage-flush = []
+profile-tracy = [
+    "godot-bevy/trace_bevy",
+    "godot-bevy/trace_tracy",
+    "godot-bevy-test/profile-tracy",
+]
 
 [dependencies]
 godot = { workspace = true, features = ["__trace"] }
@@ -32,3 +40,6 @@ cargo-godot-lib.workspace = true
 # the lib target.
 leafwing-input-manager = "0.21"
 bevy_enhanced_input = "0.26"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(coverage)"] }

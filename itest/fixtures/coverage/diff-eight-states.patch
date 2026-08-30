@@ -1,0 +1,29 @@
+diff --git a/godot-bevy/src/fixture.rs b/godot-bevy/src/fixture.rs
+index 1111111..2222222 100644
+--- a/godot-bevy/src/fixture.rs
++++ b/godot-bevy/src/fixture.rs
+@@ -1,0 +2,5 @@
++covered
++partial
++uncovered
++unstable
++no region
+diff --git a/godot-bevy/src/unmapped.rs b/godot-bevy/src/unmapped.rs
+index 1111111..2222222 100644
+--- a/godot-bevy/src/unmapped.rs
++++ b/godot-bevy/src/unmapped.rs
+@@ -1,0 +2 @@
++not mapped
+diff --git a/godot-bevy/src/fixture_tests.rs b/godot-bevy/src/fixture_tests.rs
+index 1111111..2222222 100644
+--- a/godot-bevy/src/fixture_tests.rs
++++ b/godot-bevy/src/fixture_tests.rs
+@@ -1,0 +2 @@
++out of scope
+diff --git a/godot-bevy/src/deleted.rs b/godot-bevy/src/deleted.rs
+deleted file mode 100644
+index 1111111..0000000
+--- a/godot-bevy/src/deleted.rs
++++ /dev/null
+@@ -8 +7,0 @@
+-deleted

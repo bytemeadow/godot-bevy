@@ -48,14 +48,16 @@ use tracing::{debug, trace, warn};
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use bevy_ecs::prelude::Res;
+/// # use godot::obj::InstanceId;
+/// # use godot_bevy::prelude::NodeEntityIndex;
 /// fn handle_collision(
 ///     index: Res<NodeEntityIndex>,
-///     // ... other params
+///     colliding_instance_id: InstanceId,
 /// ) {
-///     let colliding_instance_id = /* from collision event */;
 ///     if let Some(entity) = index.get(colliding_instance_id) {
-///         // Do something with the entity
+///         println!("colliding with {entity:?}");
 ///     }
 /// }
 /// ```
@@ -165,7 +167,6 @@ pub struct SceneTreeConfig {
 
 impl Plugin for GodotSceneTreePlugin {
     fn build(&self, app: &mut App) {
-        // Auto-register all discovered AutoSyncBundle plugins
         super::autosync::register_all_autosync_bundles(app);
         super::autosync::register_all_required_components(app);
 
@@ -194,8 +195,6 @@ impl Plugin for GodotSceneTreePlugin {
         app.world_mut()
             .register_component_hooks::<GodotNodeHandle>()
             .on_insert(on_godot_node_handle_insert)
-            // 0.19 renamed the replace hook to `on_discard` (fires when the component
-            // is about to be dropped via replace/remove); same semantics as before.
             .on_discard(on_godot_node_handle_replace);
     }
 }
@@ -231,7 +230,6 @@ impl Default for SceneTreeRefImpl {
     }
 }
 
-/// Edge state for `mirror_tree_pause_to_virtual`.
 #[derive(Resource, Default)]
 struct PauseBridge {
     last_tree_paused: bool,
@@ -284,11 +282,9 @@ fn initialize_scene_tree(
 ) {
     let root = scene_tree.get().get_root().unwrap();
 
-    // Check if we have the optimized GDScript watcher for type pre-analysis
     let optimized_watcher = get_bevy_app_child("OptimizedSceneTreeWatcher");
 
     let messages = if let Some(mut watcher) = optimized_watcher {
-        // Use optimized GDScript watcher to analyze the initial tree with type information
         tracing::info!("Using optimized initial tree analysis with type pre-analysis");
 
         let analysis_result = watcher.call("analyze_initial_tree", &[]);
@@ -339,7 +335,6 @@ fn initialize_scene_tree(
                     .as_ref()
                     .and_then(|masks| masks.get(i))
                     .and_then(|mask| u8::try_from(mask).ok());
-                // Parse groups if available (v2+ addon)
                 let groups = groups_array.as_ref().and_then(|arr| {
                     arr.get(i).map(|variant| {
                         let packed = variant.to::<godot::builtin::PackedStringArray>();
@@ -365,7 +360,6 @@ fn initialize_scene_tree(
 
         messages
     } else {
-        // Use fallback traversal without type optimization
         tracing::info!("Using fallback initial tree analysis (no type optimization)");
         traverse_fallback(root.upcast())
     };
@@ -397,11 +391,11 @@ fn traverse_fallback(node: Gd<Node>) -> Vec<SceneTreeMessage> {
         messages.push(SceneTreeMessage {
             node_id: GodotNodeHandle::from(node.instance_id()),
             message_type: SceneTreeMessageType::NodeAdded,
-            node_type: None, // No type optimization available
+            node_type: None,
             node_name: None,
             parent_id: None,
             collision_mask: None,
-            groups: None, // No groups optimization available
+            groups: None,
         });
 
         for child in node.get_children().iter_shared() {
@@ -459,14 +453,12 @@ fn collision_mask_has(mask: u8, flag: u8) -> bool {
     mask & flag != 0
 }
 
-/// Helper function to recursively search for a node by name
 fn find_node_by_name(parent: &Gd<Node>, name: &StringName) -> Option<Gd<Node>> {
-    // Check if this node matches - compare StringName directly to avoid allocation
+    // Comparing StringName directly avoids allocation.
     if &parent.get_name() == name {
         return Some(parent.clone());
     }
 
-    // Search children recursively
     for i in 0..parent.get_child_count() {
         if let Some(child) = parent.get_child(i) {
             let child_node = child.cast::<Node>();
@@ -481,10 +473,8 @@ fn find_node_by_name(parent: &Gd<Node>, name: &StringName) -> Option<Gd<Node>> {
 
 const BEVY_APP_AUTOLOAD_NAME: &str = "BevyAppSingleton";
 
-/// Gets a child node of the BevyAppSingleton autoload by name.
 /// Falls back to tree search if the autoload isn't registered.
 fn get_bevy_app_child(child_name: &str) -> Option<Gd<Node>> {
-    // Autoload lookup is cached after first call
     if let Ok(bevy_app) = try_get_autoload_by_name::<Node>(BEVY_APP_AUTOLOAD_NAME) {
         return bevy_app.try_get_node_as::<Node>(child_name);
     }
@@ -504,16 +494,12 @@ fn connect_scene_tree(mut scene_tree: SceneTreeRef) {
             panic!("SceneTreeWatcher not found as child of BevyAppSingleton autoload or anywhere in the scene tree.");
         });
 
-    // Check if we have the optimized GDScript watcher
     let optimized_watcher = get_bevy_app_child("OptimizedSceneTreeWatcher");
 
     if optimized_watcher.is_some() {
-        // The optimized GDScript watcher handles scene tree connections and forwards
-        // pre-analyzed messages to the Rust watcher (which has the MPSC sender)
-        // No need to connect here - it connects automatically in its _ready()
+        // The optimized watcher self-connects in _ready and forwards pre-analyzed messages.
         tracing::info!("Using optimized GDScript scene tree watcher with type pre-analysis");
     } else {
-        // Fallback to direct connection without type optimization
         tracing::info!("Using fallback scene tree connection (no type optimization)");
 
         scene_tree_gd.connect(
@@ -649,7 +635,6 @@ fn create_scene_tree_entity(
     // CollisionWatcher is optional - only required if GodotCollisionsPlugin is added
     let collision_watcher = get_bevy_app_child("CollisionWatcher");
 
-    // Collect collision bodies for batched signal connection.
     let mut pending_collision_bodies: Vec<(Gd<Node>, u8, ColliderKind)> = Vec::new();
 
     for message in messages.into_iter() {
@@ -697,10 +682,8 @@ fn create_scene_tree_entity(
                     new_entity_commands.insert((node_id, Name::from(node_name)));
                     new_entity_commands.id()
                 } else {
-                    // Compute the class hierarchy once; reused for markers and autosync.
                     let class_hierarchy = get_inheritance_hierarchy(
                         node_type
-                            // Fall back to getting node-type from node if not provided by message
                             .unwrap_or_else(|| node.get_class().to_string())
                             .as_str(),
                     );
@@ -717,16 +700,12 @@ fn create_scene_tree_entity(
                         }
                     }
 
-                    // Check if the node is a collision body (Area2D, Area3D, RigidBody2D, RigidBody3D, etc.)
-                    // These nodes typically have collision detection capabilities
-                    // Only connect if CollisionWatcher exists (i.e., GodotCollisionsPlugin was added)
                     let collision_mask = collision_mask.or_else(|| {
                         collision_watcher
                             .as_ref()
                             .map(|_| collision_mask_from_node(&mut node))
                     });
 
-                    // Check if the node is a collision body and collect for batched signal connection
                     if collision_watcher.is_some()
                         && let Some(mask) = collision_mask
                     {
@@ -761,13 +740,11 @@ fn create_scene_tree_entity(
                         SceneTreeDecorated,
                     ));
 
-                    // Add all components registered by plugins
                     component_registry.add_to_entity(&mut new_entity_commands, &mut node_accessor);
 
                     let new_entity = new_entity_commands.id();
                     node_index.insert(instance_id, new_entity);
 
-                    // Try to add any registered bundles for this node type
                     super::autosync::try_add_bundles_for_node(
                         commands,
                         new_entity,
@@ -804,7 +781,6 @@ fn create_scene_tree_entity(
             }
             SceneTreeMessageType::NodeRemoved => {
                 if let Some(ent) = existing_entity {
-                    // Check if node is being reparented vs truly removed
                     // During reparenting, the node is temporarily removed from old parent
                     // but still exists in the scene tree (has a parent)
                     // We need to try_get because the node handle might be invalid if freed
@@ -860,7 +836,6 @@ fn create_scene_tree_entity(
         }
     }
 
-    // Batch connect collision signals if there are any pending
     if !pending_collision_bodies.is_empty()
         && let Some(ref collision_watcher) = collision_watcher
     {
@@ -919,7 +894,6 @@ fn batch_connect_collision_signals(
         .filter(|node| node.has_method("bulk_connect_collision_signals"));
 
     if let Some(mut bulk_ops) = bulk_ops {
-        // Use batched GDScript call
         let instance_ids: Vec<i64> = pending_bodies
             .iter()
             .map(|(node, _, _)| node.instance_id().to_i64())
@@ -941,7 +915,6 @@ fn batch_connect_collision_signals(
             ],
         );
     } else {
-        // Fallback: connect signals individually
         for (node, mask, _) in pending_bodies {
             if !node.is_instance_valid() {
                 continue;

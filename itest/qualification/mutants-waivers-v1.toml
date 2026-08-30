@@ -1,0 +1,25 @@
+version = 1
+
+[[waivers]]
+id = "sha256:7c89f86aad819d7cd691f8fe7dc0283e9716e5d517e12ee25dada888cce9d58f"
+package = "godot-bevy"
+path = "godot-bevy/src/plugins/transforms/conversions.rs"
+function = "<impl IntoBevyTransform for GodotTransform2D>::to_bevy_transform"
+genre = "BinaryOperator"
+replacement = ">="
+source_slice_sha256 = "62b67e1f685b7fef51102005dddd27774be3fee38c42965c53aab035d0b6b221"
+ordinal = 1
+rationale = "cos_half is sqrt((1 + cos_theta) / 2) for f32 cos_theta in [-1, 1]; the smallest positive rounded 1 + cos_theta is 2^-24, making the smallest positive cos_half about 1.7e-4 rather than 1e-6"
+reference = "https://doc.rust-lang.org/reference/types/numeric.html#floating-point-types"
+
+[[waivers]]
+id = "sha256:821c48be90b0561e6b20b23d794c8140f65896b119d68df90cb05eb4538bfc04"
+package = "godot-bevy-test"
+path = "godot-bevy-test/src/config.rs"
+function = "parse_positive_u32"
+genre = "BinaryOperator"
+replacement = "&&"
+source_slice_sha256 = "565d240f5343e625ae579a4d45a770f1f02c6368b5ed4d06da4fbe6f47c28866"
+ordinal = 0
+rationale = "every empty or non-ASCII-digit string rejected by the guard is also rejected by the immediately following u32 parse, with the same public error"
+reference = "https://doc.rust-lang.org/std/primitive.str.html#method.parse"

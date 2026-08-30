@@ -1,0 +1,33 @@
+{
+  "$schema": "qualification-v1.schema.json",
+  "schema_version": 1,
+  "run_id": "fixture-skip",
+  "evidence_kind": "mutation-run",
+  "mode": "diff",
+  "complete": true,
+  "outcome": "skip",
+  "generated_at": "2026-08-29T00:00:00Z",
+  "environment": {
+    "git_commit": "0123456789abcdef",
+    "git_dirty": true,
+    "os": "fixture-os",
+    "arch": "fixture-arch",
+    "cargo_profile": "test",
+    "tools": {"cargo-mutants": "27.1.0"},
+    "metadata": {}
+  },
+  "summary": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "invalid": 0,
+    "skipped": 1,
+    "counts": {"candidate": 0}
+  },
+  "mutants": [],
+  "faults": [],
+  "checks": [],
+  "errors": [],
+  "artifacts": [],
+  "metadata": {}
+}

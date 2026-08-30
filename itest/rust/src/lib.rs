@@ -1,19 +1,20 @@
-/*
- * Integration tests for godot-bevy
- * All tests are async and wait for real Godot frame progression
- */
-
 use godot::init::{ExtensionLibrary, gdextension};
 
-// Declare the test runner class
+#[cfg(all(feature = "coverage-flush", not(coverage)))]
+compile_error!("coverage-flush requires cfg(coverage)");
+
+#[cfg(feature = "coverage-flush")]
+mod coverage_flush;
+
 godot_bevy_test::declare_test_runner!();
 
-// Test modules
 mod asset_reader_tests;
 mod autosync_match_tests;
 mod benchmarks;
 mod collision_tests;
 mod event_bridge_tests;
+#[cfg(feature = "harness-probes")]
+mod harness_probe_tests;
 mod input_ecosystem_tests;
 mod input_tests;
 #[cfg(feature = "autosync-tests")]
@@ -27,4 +28,16 @@ mod time_scale_tests;
 mod transform_sync_tests;
 
 #[gdextension(entry_symbol = godot_bevy_itest)]
-unsafe impl ExtensionLibrary for IntegrationTests {}
+unsafe impl ExtensionLibrary for IntegrationTests {
+    #[cfg(feature = "profile-tracy")]
+    fn on_stage_init(stage: godot::init::InitStage) {
+        if stage == godot::init::InitStage::Scene {
+            godot_bevy_test::profiling::install_profile_subscriber();
+        }
+    }
+
+    #[cfg(feature = "coverage-flush")]
+    fn on_stage_deinit(stage: godot::init::InitStage) {
+        coverage_flush::dump(stage);
+    }
+}

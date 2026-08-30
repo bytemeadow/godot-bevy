@@ -10,11 +10,11 @@
 ///
 /// # Usage
 ///
-/// ```ignore
+/// ```no_run
 /// use godot_bevy::add_transform_sync_systems;
+/// use godot_bevy::bevy_app::App;
 /// use bevy_ecs::query::With;
 /// use bevy_ecs::component::Component;
-/// use bevy::prelude::*;
 ///
 /// #[derive(Component)]
 /// struct Player;
@@ -34,12 +34,10 @@
 /// ```
 #[macro_export]
 macro_rules! add_transform_sync_systems {
-    // Main entry point - handles mixed directional sync
     ($app:expr, $($tokens:tt)*) => {
         $crate::add_transform_sync_systems!(@parse_all $app, $($tokens)*);
     };
 
-    // Parse all items recursively
     (@parse_all $app:expr, $name:ident = bevy_to_godot: $query:ty, $($rest:tt)*) => {
         $crate::add_transform_sync_systems!(@generate_post_system $app, $query);
         $crate::add_transform_sync_systems!(@parse_all $app, $($rest)*);
@@ -55,7 +53,6 @@ macro_rules! add_transform_sync_systems {
         $crate::add_transform_sync_systems!(@parse_all $app, $($rest)*);
     };
 
-    // Handle last item (without trailing comma)
     (@parse_all $app:expr, $name:ident = bevy_to_godot: $query:ty) => {
         $crate::add_transform_sync_systems!(@generate_post_system $app, $query);
     };
@@ -68,7 +65,6 @@ macro_rules! add_transform_sync_systems {
         $crate::add_transform_sync_systems!(@generate_systems $app, $query, $query);
     };
 
-    // Handle empty case
     (@parse_all $app:expr,) => {};
     (@parse_all $app:expr) => {};
 
@@ -131,27 +127,7 @@ impl GodotTransformSyncPluginExt for crate::plugins::transforms::GodotTransformS
     }
 }
 
-// Re-export the macro at the crate level
 pub use add_transform_sync_systems;
 
 #[cfg(test)]
-mod tests {
-    // Regression guard for the `godot_to_bevy:`/bidirectional arm: its `.run_if(...)`
-    // resolves via `IntoScheduleConfigs`, so the macro must pull the trait into scope
-    // itself. We import only what a minimal external caller needs -- deliberately NOT
-    // `IntoScheduleConfigs` -- so a missing in-macro import fails this compile.
-    use crate::bevy_app::App;
-    use crate::bevy_ecs::prelude::{Component, With};
-
-    #[derive(Component)]
-    struct PhysicsActor;
-
-    #[test]
-    fn godot_to_bevy_arm_resolves_run_if_without_trait_import() {
-        let mut app = App::new();
-        crate::add_transform_sync_systems! {
-            app,
-            PhysicsResults = godot_to_bevy: With<PhysicsActor>,
-        }
-    }
-}
+include!("custom_sync_tests.rs");

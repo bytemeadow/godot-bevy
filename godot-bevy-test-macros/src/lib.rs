@@ -1,20 +1,62 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{ItemFn, Lit, Meta, MetaNameValue, ReturnType, parse_macro_input};
+use syn::ext::IdentExt;
+use syn::parse::{Parse, ParseStream};
+use syn::{Ident, ItemFn, Lit, Meta, MetaNameValue, ReturnType, Token, parse_macro_input};
+
+#[derive(Default)]
+struct ITestOptions {
+    is_async: bool,
+    is_skipped: bool,
+    is_focused: bool,
+}
+
+impl Parse for ITestOptions {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut options = Self::default();
+
+        while !input.is_empty() {
+            let option = input.call(Ident::parse_any)?;
+            let (name, selected) = match option.to_string().as_str() {
+                "async" => ("async", &mut options.is_async),
+                "skip" => ("skip", &mut options.is_skipped),
+                "focus" => ("focus", &mut options.is_focused),
+                _ => {
+                    return Err(syn::Error::new(
+                        option.span(),
+                        "unknown #[itest] option; expected async, skip, or focus",
+                    ));
+                }
+            };
+            if *selected {
+                return Err(syn::Error::new(
+                    option.span(),
+                    format!("duplicate #[itest] option `{name}`"),
+                ));
+            }
+            *selected = true;
+
+            if !input.is_empty() {
+                input.parse::<Token![,]>()?;
+            }
+        }
+
+        Ok(options)
+    }
+}
 
 /// Attribute macro for integration tests
 ///
 /// Usage:
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#itest -->
 /// ```ignore
 /// #[itest]
 /// fn my_sync_test(ctx: &TestContext) {
-///     // test code
 /// }
 ///
 /// #[itest(async)]
 /// fn my_async_test(ctx: &TestContext) -> godot::task::TaskHandle {
 ///     godot::task::spawn(async move {
-///         // async test code
 ///     })
 /// }
 ///
@@ -28,20 +70,28 @@ use syn::{ItemFn, Lit, Meta, MetaNameValue, ReturnType, parse_macro_input};
 ///     // only focused tests will run when any test has focus
 /// }
 /// ```
+///
+/// Unknown options are rejected at compile time:
+/// ```compile_fail
+/// use godot_bevy_test_macros::itest;
+///
+/// #[itest(foucs)]
+/// fn misspelled_option() {}
+/// ```
 #[proc_macro_attribute]
 pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);
-    let attr_str = attr.to_string();
-    let is_async = attr_str.contains("async");
-    let is_skipped = attr_str.contains("skip");
-    let is_focused = attr_str.contains("focus");
+    let options = parse_macro_input!(attr as ITestOptions);
+    let is_async = options.is_async;
+    let is_skipped = options.is_skipped;
+    let is_focused = options.is_focused;
 
     let test_name = &input.sig.ident;
     let test_name_str = test_name.to_string();
     let visibility = &input.vis;
     let body = &input.block;
 
-    // Extract parameter or use default - use absolute path to godot_bevy_test
+    // Absolute paths keep the expansion independent of caller imports.
     let param = if let Some(param) = input.sig.inputs.first() {
         quote! { #param }
     } else {
@@ -49,7 +99,6 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     if is_async {
-        // Async test - returns TaskHandle
         let return_ty = match &input.sig.output {
             ReturnType::Type(_, ty) => quote! { -> #ty },
             ReturnType::Default => quote! { -> ::godot::task::TaskHandle },
@@ -73,7 +122,6 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
             );
         })
     } else {
-        // Sync test
         TokenStream::from(quote! {
             #visibility fn #test_name(#param) {
                 #body
@@ -97,15 +145,14 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Attribute macro for benchmarks
 ///
 /// Usage:
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#bench -->
 /// ```ignore
 /// #[bench]
 /// fn my_benchmark() -> ReturnType {
-///     // benchmark code - must return a value
 /// }
 ///
 /// #[bench(repeat = 25)]
 /// fn expensive_benchmark() -> ReturnType {
-///     // custom repetition count
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -161,3 +208,6 @@ pub fn bench(attr: TokenStream, item: TokenStream) -> TokenStream {
         );
     })
 }
+
+#[cfg(test)]
+include!("lib_tests.rs");

@@ -1,0 +1,12 @@
+diff --git a/godot-bevy/src/plugins/input/actions.rs b/godot-bevy/src/plugins/input/actions.rs
+--- a/godot-bevy/src/plugins/input/actions.rs
++++ b/godot-bevy/src/plugins/input/actions.rs
+@@ -215,7 +215,7 @@ impl GodotActions {
+         for (name, key) in action_set.iter().zip(action_keys.iter()) {
+             let st = snap.actions.get_mut(key).unwrap();
+             st.pressed = input.is_action_pressed(name);
+-            st.just_pressed = input.is_action_just_pressed(name);
++            st.just_pressed |= input.is_action_just_pressed(name);
+             st.just_released = input.is_action_just_released(name);
+             st.strength = input.get_action_strength(name);
+             st.raw_strength = input.get_action_raw_strength(name);

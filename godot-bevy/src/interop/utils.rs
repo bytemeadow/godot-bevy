@@ -3,7 +3,6 @@ use godot::{
     prelude::*,
 };
 
-/// used to access raw (RawGd) object
 struct Gd_<T: GodotClass> {
     raw: RawGd<T>,
 }

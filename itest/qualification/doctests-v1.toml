@@ -1,0 +1,283 @@
+version = 1
+scaffold_path = "book-tests/src/doctest_scaffolds.rs"
+scaffold_sha256 = "sha256:bfd638c61e3d3b5bbc7439ef5b826dcc7eae413f890e10804f96820e3a2abab0"
+
+[[fences]]
+source = "godot-bevy-macros/src/lib.rs"
+ordinal = 1
+category = "compiled_scaffold"
+fingerprint = "sha256:7c9e98f401e11c86376a9d2355346e5568d25a6da67baef510a9cd870d2b8f65"
+scaffold = "book-tests/src/doctest_scaffolds.rs#node_tree_view"
+
+[[fences]]
+source = "godot-bevy-macros/src/lib.rs"
+ordinal = 2
+category = "compiled_scaffold"
+fingerprint = "sha256:bc869540004b9e33c88b269bf419468d382cbc203fd758723212e854f59d511b"
+scaffold = "book-tests/src/doctest_scaffolds.rs#node_tree_paths"
+
+[[fences]]
+source = "godot-bevy-macros/src/lib.rs"
+ordinal = 3
+category = "compiled_scaffold"
+fingerprint = "sha256:7beff112595027a4c4efdf2624028be928c55f0d610e33fa004238b1356e0d97"
+scaffold = "book-tests/src/doctest_scaffolds.rs#bevy_components_fields"
+
+[[fences]]
+source = "godot-bevy-macros/src/lib.rs"
+ordinal = 4
+category = "compiled_scaffold"
+fingerprint = "sha256:24ed67efd4bf82c235c772423fadc32a15585d99d98295be7cfb347a5ec060e4"
+scaffold = "book-tests/src/doctest_scaffolds.rs#bevy_components_require"
+
+[[fences]]
+source = "godot-bevy-macros/src/lib.rs"
+ordinal = 5
+category = "compiled_scaffold"
+fingerprint = "sha256:362792514c5e484f7fa8e921a1e976f0d364430264e39eb70e5c8fcdcbdfb380"
+scaffold = "book-tests/src/doctest_scaffolds.rs#godot_node"
+
+[[fences]]
+source = "godot-bevy-macros/src/lib.rs"
+ordinal = 6
+category = "compiled_scaffold"
+fingerprint = "sha256:dd7e63e2aad1b77e850177259f155992a5a9fa2c8900d79b3f64c9f0c8049fe1"
+scaffold = "book-tests/src/doctest_scaffolds.rs#godot_node_marker"
+
+[[fences]]
+source = "godot-bevy-macros/src/lib.rs"
+ordinal = 7
+category = "compiled_scaffold"
+fingerprint = "sha256:e7ade02a9bde8c1e4db16d9d92d766ad56a3c28f57897de789c9bc52296624c1"
+scaffold = "book-tests/src/doctest_scaffolds.rs#godot_node_newtype"
+
+[[fences]]
+source = "godot-bevy-macros/src/lib.rs"
+ordinal = 8
+category = "compiled_scaffold"
+fingerprint = "sha256:6c3a1aa9d49d4a58802f39eb8f6079a159b7f3ba35d3bdcb110a7bcf9935bb27"
+scaffold = "book-tests/src/doctest_scaffolds.rs#godot_node_struct"
+
+[[fences]]
+source = "godot-bevy-macros/src/lib.rs"
+ordinal = 9
+category = "compiled_scaffold"
+fingerprint = "sha256:76ad66085e5389e4ad1a7bf99d15e6982ff6485cecda3e81c55d1992eb5ff51c"
+scaffold = "book-tests/src/doctest_scaffolds.rs#godot_node_fields"
+
+[[fences]]
+source = "godot-bevy-test-macros/src/lib.rs"
+ordinal = 1
+category = "compiled_scaffold"
+fingerprint = "sha256:ef26aae70578cfc76d53cc83e46157bff02515b3b359c16a84b493919b112d05"
+scaffold = "book-tests/src/doctest_scaffolds.rs#itest"
+
+[[fences]]
+source = "godot-bevy-test-macros/src/lib.rs"
+ordinal = 2
+category = "compiled_scaffold"
+fingerprint = "sha256:ed47351cfe88f87b414137fbc6755bc744cb576736689d9adb6d6cfe2996db18"
+scaffold = "book-tests/src/doctest_scaffolds.rs#bench"
+
+[[fences]]
+source = "godot-bevy-test/src/lib.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:c8722d53eb716e72ef415a00ae73ec70042268828e5357f0797e01ac06d6b279"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy-test/src/lib.rs"
+ordinal = 2
+category = "compiled_no_run"
+fingerprint = "sha256:41267677e233df039e68ef4155ddfe895b5c717ce6215a0bde5349e0526aaf65"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy-test/src/lib.rs"
+ordinal = 3
+category = "compiled_no_run"
+fingerprint = "sha256:b1929999ad2c9fa181df66f970c3d61bc15d6b7b0d6b64310389d1d6b78bf54e"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy-test/src/test_app.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:480efaabb5b65833b645081a824b43b71f7de83e168d650e83e3d9713d82c2e7"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/interop/signal_names/signal_names4_2.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:e578d922ec0ab874e3b2d5dcc3f0020e5904bfdf0e934ffd804b23040e77cff4"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/interop/signal_names/signal_names4_2_1.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:e578d922ec0ab874e3b2d5dcc3f0020e5904bfdf0e934ffd804b23040e77cff4"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/interop/signal_names/signal_names4_2_2.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:e578d922ec0ab874e3b2d5dcc3f0020e5904bfdf0e934ffd804b23040e77cff4"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/interop/signal_names/signal_names4_3.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:e578d922ec0ab874e3b2d5dcc3f0020e5904bfdf0e934ffd804b23040e77cff4"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/interop/signal_names/signal_names4_4.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:e578d922ec0ab874e3b2d5dcc3f0020e5904bfdf0e934ffd804b23040e77cff4"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/interop/signal_names/signal_names4_5.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:e578d922ec0ab874e3b2d5dcc3f0020e5904bfdf0e934ffd804b23040e77cff4"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/interop/signal_names/signal_names4_6.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:e578d922ec0ab874e3b2d5dcc3f0020e5904bfdf0e934ffd804b23040e77cff4"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/assets.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:4ca566096f114ca3afe91dbbc6fdaf900177fec443f9ee96d128f8da89fd4e0f"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/audio/mod.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:bd49fa1971516b3ea74f7d470ba1195a0a546910aa321da54a52bd22892aec24"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/collisions.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:2c0c2071e78af107ac7a29598f007cf0797e388e582b814d7632423b4393496e"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/collisions.rs"
+ordinal = 2
+category = "compiled_no_run"
+fingerprint = "sha256:bf10b6fc4986e1953601cf30f5c7ef82400c82e88d53cdc78c1fbf70feddac8b"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/collisions.rs"
+ordinal = 3
+category = "compiled_no_run"
+fingerprint = "sha256:e21a6296ec5aedda2c567aaa8caf7239a4018d115ddfcf3f5bcc9c07f0929283"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/collisions.rs"
+ordinal = 4
+category = "compiled_no_run"
+fingerprint = "sha256:ee1b59e7ff2e8976006b915b60cfc4f388c8f3241fa0905e0cbe3e5d27273c6d"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/collisions.rs"
+ordinal = 5
+category = "compiled_no_run"
+fingerprint = "sha256:419ca94ee3ee1386906ba4df654ab6a85c81d2050ae11e9ac1b64483b2f47c7d"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/collisions.rs"
+ordinal = 6
+category = "compiled_no_run"
+fingerprint = "sha256:739b6a8a70e39ffcdcd4613aadf7e174646c37590706fdccd65f7a7457b5f721"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/collisions.rs"
+ordinal = 7
+category = "compiled_no_run"
+fingerprint = "sha256:a8341436bb0c5a801b0dd07c14626fb76a3b8110e0371b8c564f5189302a34a3"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/collisions.rs"
+ordinal = 8
+category = "compiled_no_run"
+fingerprint = "sha256:1ad087d05ac0f048fa27931a4b85c29058f8ac71f7de0ab4f77dacea323c283e"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/packed_scene.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:e0e46fd6f286a43e0d5dd768d8c1c1e64c50f1b914f4f0228b1e3d5e2ddd7a32"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/scene_tree/plugin.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:9b05c1b39fcbf7a3b1cfb69c9110571ac02587f6689b4c96b7e2bd9739d5dbe3"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/scene_tree/relationship.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:5ecfd7333c1bb6b009552b7e5e2a0967e9e6dba64114a734839c737bf797d321"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/scene_tree/relationship.rs"
+ordinal = 2
+category = "compiled_no_run"
+fingerprint = "sha256:082b87724bbbc867e3a9e7e8993ae1d01c76c1ecba9eac8d878445904253f905"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/signals.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:0892a3e578cb8b24c535775b0118941e43d438420f18638547ce87883167d2ca"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/signals.rs"
+ordinal = 2
+category = "compiled_no_run"
+fingerprint = "sha256:52248fd0182387ba1d6d942c2cd0103b4487e4d31ab5507b7daff1caededdea7"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/signals.rs"
+ordinal = 3
+category = "compiled_no_run"
+fingerprint = "sha256:ef03c6602cd30e64b1620de8408f284f4db9776a28131cb09d20682de508d439"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/transforms/custom_sync.rs"
+ordinal = 1
+category = "compiled_no_run"
+fingerprint = "sha256:63365b3a16e40e2315eeba3d59c60f1d48e63aa8493c8910d1c2502f3acf7562"
+scaffold = ""

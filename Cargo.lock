@@ -349,6 +349,7 @@ dependencies = [
  "downcast-rs",
  "log",
  "thiserror 2.0.18",
+ "tracing",
  "variadics_please 1.1.0",
  "wasm-bindgen",
  "web-sys",
@@ -549,6 +550,7 @@ dependencies = [
  "slotmap",
  "smallvec",
  "thiserror 2.0.18",
+ "tracing",
  "variadics_please 1.1.0",
 ]
 
@@ -1343,7 +1345,9 @@ name = "book-tests"
 version = "0.0.0"
 dependencies = [
  "bevy",
+ "godot",
  "godot-bevy",
+ "godot-bevy-test",
 ]
 
 [[package]]
@@ -2356,13 +2360,18 @@ dependencies = [
  "godot",
  "godot-bevy",
  "godot-bevy-test-macros",
+ "serde",
  "serde_json",
+ "tracing",
+ "tracing-subscriber",
+ "tracing-tracy",
 ]
 
 [[package]]
 name = "godot-bevy-test-macros"
 version = "0.11.0"
 dependencies = [
+ "inventory",
  "proc-macro2",
  "quote",
  "syn",

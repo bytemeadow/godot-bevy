@@ -65,7 +65,6 @@ impl AudioApp for App {
     fn add_audio_channel<T: AudioChannelMarker>(&mut self) -> &mut Self {
         let channel_id = ChannelId(T::CHANNEL_NAME);
 
-        // Auto-register a dedicated system for this channel type
         self.add_systems(
             Update,
             process_channel_commands::<T>.in_set(AudioSystemSet::CollectCommands),
@@ -73,7 +72,6 @@ impl AudioApp for App {
 
         self.insert_resource(AudioChannel::<T>::new(channel_id));
 
-        // Initialize channel state in the global manager
         self.world_mut()
             .resource_mut::<GodotAudioChannels>()
             .channels
@@ -83,7 +81,6 @@ impl AudioApp for App {
     }
 }
 
-/// Dedicated system for processing commands from a specific channel type
 fn process_channel_commands<T: AudioChannelMarker>(
     channel: Res<AudioChannel<T>>,
     mut audio_channels: ResMut<GodotAudioChannels>,
@@ -102,7 +99,6 @@ struct PendingSoundOps {
     paused: Option<bool>,
 }
 
-/// System that applies queued audio commands using Godot APIs.
 fn audio_main_thread(
     mut audio_channels: ResMut<GodotAudioChannels>,
     mut audio_output: ResMut<AudioOutput>,
@@ -126,7 +122,6 @@ fn audio_main_thread(
                 )
                 .is_none()
                 {
-                    // Asset not ready, re-queue for next frame
                     audio_channels
                         .command_queue
                         .push_front(AudioCommand::Play(play_cmd));
@@ -138,9 +133,8 @@ fn audio_main_thread(
                 let sound_ids = collect_channel_sound_ids(&audio_output, channel_id);
 
                 if let Some(tween) = tween {
-                    // Implement fade-out tweening with real current volumes
                     for sound_id in sound_ids {
-                        // Get the actual current volume instead of assuming 1.0
+                        // A fade-out must start from the player's current volume.
                         let current_volume = audio_output
                             .current_volumes
                             .get(&sound_id)
@@ -155,7 +149,6 @@ fn audio_main_thread(
                         );
                     }
                 } else {
-                    // Immediate stop
                     for sound_id in sound_ids {
                         schedule_stop_sound(
                             &mut audio_output,
@@ -218,7 +211,6 @@ fn audio_main_thread(
     let mut volume_updates = Vec::new();
     let mut pitch_updates = Vec::new();
 
-    // First pass: update tweens and collect parameter changes
     for (&sound_id, tween) in audio_output.active_tweens.iter_mut() {
         let current_value = tween.update(delta);
 
@@ -234,7 +226,6 @@ fn audio_main_thread(
         if tween.is_complete() {
             completed_tweens.push(sound_id);
 
-            // If this was a fade-out, mark sound for removal
             if matches!(tween.tween_type, TweenType::FadeOut) {
                 sounds_to_stop.push(sound_id);
             }
@@ -346,7 +337,6 @@ fn apply_pending_ops(player: &mut AudioPlayer, ops: &PendingSoundOps) {
     }
 }
 
-/// Process a play command and return the sound ID if successful
 fn process_play_command(
     play_cmd: &PlayCommand,
     assets: &mut Assets<GodotResource>,
@@ -357,7 +347,6 @@ fn process_play_command(
     let audio_stream = if let Some(mut asset) = assets.get_mut(&play_cmd.handle) {
         asset.try_cast::<AudioStream>()
     } else {
-        // Asset not ready yet, re-queue for next frame
         warn!("Audio asset not ready: {:?}", play_cmd.handle);
         return None;
     };
@@ -367,21 +356,17 @@ fn process_play_command(
         return None;
     };
 
-    // Configure looping if requested
     let audio_stream = configure_looping(audio_stream, play_cmd.settings.looping);
 
-    // Check if fade-in is needed
     let (initial_volume, fade_in_tween) = if let Some(fade_in) = &play_cmd.settings.fade_in {
         (0.0, Some((play_cmd.settings.volume, fade_in.clone())))
     } else {
         (play_cmd.settings.volume, None)
     };
 
-    // Create settings with initial volume for fade-in
     let mut initial_settings = play_cmd.settings.clone();
     initial_settings.volume = initial_volume;
 
-    // Create appropriate player based on type
     let player_handle = match &play_cmd.player_type {
         AudioPlayerType::NonPositional => create_audio_player(audio_stream, &initial_settings),
         AudioPlayerType::Spatial2D { position } => {
@@ -394,12 +379,10 @@ fn process_play_command(
 
     if let Some(handle) = player_handle {
         if let Some(mut root) = scene_tree.get().get_root() {
-            // Get the node from the handle and add it to the scene tree
             let node = godot.get::<godot::classes::Node>(handle);
             root.add_child(&node);
         }
 
-        // Now that the node is in the scene tree, start playback
         start_audio_playback(godot, handle);
 
         output.playing_sounds.insert(play_cmd.sound_id, handle);
@@ -407,7 +390,6 @@ fn process_play_command(
             .sound_to_channel
             .insert(play_cmd.sound_id, play_cmd.channel_id);
 
-        // Track initial volume (either fade-in start volume or target volume)
         let initial_volume = if fade_in_tween.is_some() {
             0.0
         } else {
@@ -417,7 +399,6 @@ fn process_play_command(
             .current_volumes
             .insert(play_cmd.sound_id, initial_volume);
 
-        // Set up fade-in tween if needed
         if let Some((target_volume, fade_in)) = fade_in_tween {
             let tween = ActiveTween::new_fade_in(target_volume, fade_in);
             output.active_tweens.insert(play_cmd.sound_id, tween);
@@ -500,7 +481,6 @@ fn configure_looping(
         return audio_stream;
     }
 
-    // Try to enable looping on different stream types
     if let Ok(mut ogg_stream) = audio_stream
         .clone()
         .try_cast::<godot::classes::AudioStreamOggVorbis>()
@@ -520,7 +500,6 @@ fn configure_looping(
 }
 
 fn start_audio_playback(godot: &mut GodotAccess, handle: GodotNodeHandle) {
-    // Try each player type and start playback
     if let Some(mut player) = godot.try_get::<AudioStreamPlayer>(handle) {
         player.play();
     } else if let Some(mut player) = godot.try_get::<AudioStreamPlayer2D>(handle) {
@@ -530,7 +509,6 @@ fn start_audio_playback(godot: &mut GodotAccess, handle: GodotNodeHandle) {
     }
 }
 
-/// Convert linear volume (0.0-1.0) to decibels for Godot
 fn volume_to_db(volume: f32) -> f32 {
     if volume <= 0.0 {
         -80.0 // Silence
@@ -539,7 +517,6 @@ fn volume_to_db(volume: f32) -> f32 {
     }
 }
 
-/// Simplified GodotAudioChannels - most functionality moved to per-channel systems
 impl GodotAudioChannels {
     /// Get stats about the audio system
     pub fn stats(&self) -> (usize, usize) {

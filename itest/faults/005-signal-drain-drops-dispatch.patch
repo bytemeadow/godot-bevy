@@ -1,0 +1,14 @@
+diff --git a/godot-bevy/src/plugins/signals.rs b/godot-bevy/src/plugins/signals.rs
+--- a/godot-bevy/src/plugins/signals.rs
++++ b/godot-bevy/src/plugins/signals.rs
+@@ -207,9 +207,7 @@ fn drain_and_trigger_signals(world: &mut bevy_ecs::world::World) {
+         let guard = receiver.0.lock();
+         pending.extend(guard.try_iter());
+     }
+-    for dispatch in pending.drain(..) {
+-        dispatch.trigger_in_world(world);
+-    }
++    pending.clear();
+ }
+ 
+ /// SystemParam for connecting Godot signals to Bevy observers.

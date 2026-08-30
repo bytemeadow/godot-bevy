@@ -1,0 +1,51 @@
+[
+  {
+    "debug_name": "libgodot_bevy_itest.dylib",
+    "debug_id": "RUSTFIXTURE",
+    "code_id": null,
+    "symbol_table": {
+      "string_table": [
+        "godot_bevy::runner",
+        "bevy_ecs::schedule::run"
+      ],
+      "symbols": [
+        {
+          "rva": 16,
+          "size": 16,
+          "symbol": 0,
+          "frames": [
+            { "function": 0, "file": null, "line": null }
+          ]
+        },
+        {
+          "rva": 48,
+          "size": 16,
+          "symbol": 1,
+          "frames": [
+            { "function": 1, "file": null, "line": null }
+          ]
+        }
+      ]
+    },
+    "known_addresses": [18, 50]
+  },
+  {
+    "debug_name": "Godot",
+    "debug_id": "GODOTFIXTURE",
+    "code_id": null,
+    "symbol_table": {
+      "string_table": ["SceneTree::process"],
+      "symbols": [
+        {
+          "rva": 32,
+          "size": 16,
+          "symbol": 0,
+          "frames": [
+            { "function": 0, "file": null, "line": null }
+          ]
+        }
+      ]
+    },
+    "known_addresses": [34]
+  }
+]

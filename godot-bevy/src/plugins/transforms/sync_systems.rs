@@ -72,7 +72,7 @@ pub(crate) fn write_needed(bevy: &BevyTransform, shadow: &BevyTransform) -> bool
         || rotation_differs(bevy.rotation, shadow.rotation)
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub fn pre_update_godot_transforms<F: QueryFilter>(
     mut entities: Query<
         (
@@ -105,7 +105,7 @@ pub fn pre_update_godot_transforms<F: QueryFilter>(
     }
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub fn post_update_godot_transforms<F: QueryFilter>(
     mut entities: Query<
         (
@@ -153,7 +153,6 @@ pub fn post_update_godot_transforms<F: QueryFilter>(
     }
 }
 
-/// Whether Godot's project-wide physics interpolation is enabled.
 fn physics_interpolation_enabled() -> bool {
     Engine::singleton()
         .get_main_loop()

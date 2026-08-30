@@ -1,6 +1,4 @@
 /*
- * Autosync class-keyed lookup correctness.
- *
  * Reuses the registered fixtures from the benchmarks module so no additional
  * autosync types are registered (which would skew the benchmark comparison).
  */
@@ -8,7 +6,6 @@
 use crate::benchmarks::{BenchAutosyncNode0, BenchMarker0};
 use godot_bevy_test::prelude::*;
 
-/// A scene-spawned node of a registered type gets its bundle component.
 #[itest(async)]
 fn test_autosync_matches_registered_type(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -30,7 +27,6 @@ fn test_autosync_matches_registered_type(ctx: &TestContext) -> godot::task::Task
     })
 }
 
-/// A scene-spawned node of an unregistered type gets no autosync component.
 #[itest(async)]
 fn test_autosync_skips_unregistered_type(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();

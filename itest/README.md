@@ -88,11 +88,93 @@ node.queue_free();
 
 ```bash
 ./itest/run-tests.sh
+./itest/run-tests.sh --filter test_exactly_one_clear
+./itest/run-tests.sh --filter transform_,scene_tree_ --repeat 3
+./itest/run-tests.sh --timeout-frames 600 --json target/itest.json
 ```
+
+Filters are comma-separated, case-sensitive substrings. Empty filters and filters
+that select no tests exit 2 instead of producing a false-green run. Focused tests
+intersect with the filter; set `ITEST_DENY_FOCUS=1` to reject any focused registry
+before execution.
+
+`--repeat` runs every selected test in test-major order and reports a mix of passing and
+failing attempts as `flaky`. `--timeout-frames` defaults to 600 per attempt. Failed,
+flaky, and timed-out tests exit 1; configuration and harness failures exit 2.
+
+`--json` writes the versioned report atomically and checkpoints it after each
+logical test. The same final JSON appears between `===ITEST_JSON_START===` and
+`===ITEST_JSON_END===` in stdout. A checkpoint left by a watchdog has
+`"complete": false`.
+
+The harness contracts can be exercised independently:
+
+```bash
+./itest/verify-harness.sh repeat|panic|config|focus
+```
+
+Each verification tier ships the same kind of self-check, proving the tooling
+itself fails closed rather than reporting false green:
+
+| Script | Modes |
+|--------|-------|
+| `verify-harness.sh` | `repeat`, `panic`, `config`, `focus` |
+| `verify-profiling.sh` | `schemas`, `tools`, `contract`, `tracy-live`, `fail-closed`, `compare`, `compare-live`, `native-live`, `workflow` |
+| `verify-qualification.sh` | `contract`, `mutants`, `doctests`, `assertions`, `faults`, `workflow` |
+| `verify-coverage.sh` | `contract`, `tools`, `flush`, `pipeline`, `reports`, `diff`, `godot-live`, `fail-closed-live`, `workflow`, `all-offline` |
+
+Modes ending in `-live` need Godot and a full build; the rest are offline and
+run in ordinary CI.
+
+## Profiling
+
+Tier-2 profiles are optimized, symbolized diagnostics and are not benchmark
+results. Tracy profiles exact benchmark spans; native profiles use Samply over
+the whole Godot process, including startup and teardown. Samply records CPU
+samples, not allocation counts or bytes.
+
+```bash
+./itest/run-profile.sh --bench transform_sync_bevy_to_godot_3d
+./itest/run-profile.sh --native --bench transform_sync_bevy_to_godot_3d --seconds 5
+./itest/compare-profiles.py path/to/a/spans.json path/to/b/spans.json
+PROFILE_ROUNDS=3 ./itest/compare-profiles.sh main --bench transform_sync_bevy_to_godot_3d
+PROFILE_ROUNDS=3 ./itest/compare-profiles.sh --self --bench transform_sync_bevy_to_godot_3d
+```
+
+The Python comparison is descriptive. The shell comparison alternates at least
+three process captures per side and reports standard-error-based noise. Artifacts
+are written under `target/profiles/`.
+
+## Coverage
+
+Tier-4 merges unit-test, proc-macro construction, and real-Godot Rust coverage.
+It is reach evidence, not assertion quality, branch proof, GDScript coverage, or
+benchmark evidence.
+
+```bash
+devenv shell -- coverage
+devenv shell -- coverage diff --base main
+devenv shell -- coverage clean
+```
+
+The scope and exclusions live in `coverage/scope-v1.toml`. Diff mode runs three
+separate Godot processes and requires every compiler region touching a changed
+line to be reached by unit/build evidence or by all three runs. There are no
+percentage gates. Reports live under `target/coverage/runs/`; successful runs
+prune raw profiles and merged profdata unless `--keep-raw` is supplied, while
+failed runs retain them. `coverage clean` removes only the coverage build and run
+trees. Coverage forces sccache recache so proc-macro construction cannot be
+replaced by a compiler-cache hit.
+
+The manual Linux workflow has a 90-minute cold-run budget; actual phase timings
+and disk use are recorded in `coverage-v1.json`. Use the rustc-sysroot LLVM tools,
+the Cargo JSON object paths, and the test-process sentinel. Import profiles are
+diagnostic only, absent source mappings are not zero coverage, and instrumented
+timings must never be compared with Tier-2 or benchmark results.
 
 ## How It Works
 
-1. Tests are async Godot tasks (`godot::task::spawn`)
+1. Sync and async tests are collected into one globally ordered run
 2. `app.update().await` waits for a Godot frame signal
 3. During await, Godot's main loop progresses
 4. Godot calls `BevyApp::process()`, which runs the Main suffix (`Update`/`PostUpdate`/`Last`) + `clear_trackers`
