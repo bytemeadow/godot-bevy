@@ -28,7 +28,8 @@ in
       (assert lib.assertMsg (cargoLlvmCovPkgs.cargo-llvm-cov.version == "0.9.0")
         "cargo-llvm-cov must stay at 0.9.0";
         cargoLlvmCovPkgs.cargo-llvm-cov)
-      python3 # godot type generation script
+      python3 # itest verification drivers
+      uv # resolves the codegen's dacite/jinja2 from uv.lock
       mdbook # builds book/
       rust-toolchain
       rust-nightly # web builds
@@ -64,6 +65,9 @@ in
     ];
 
   env.RUSTC_WRAPPER = "${pkgs.sccache}/bin/sccache";
+
+  # keep uv on the devenv interpreter instead of fetching its own CPython
+  env.UV_PYTHON_DOWNLOADS = "never";
 
   env.CARGO_NIGHTLY = "${rust-nightly}/bin/cargo";
   env.RUSTC_NIGHTLY = "${rust-nightly}/bin/rustc";
