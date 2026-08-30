@@ -110,11 +110,21 @@ logical test. The same final JSON appears between `===ITEST_JSON_START===` and
 The harness contracts can be exercised independently:
 
 ```bash
-./itest/verify-harness.sh repeat
-./itest/verify-harness.sh panic
-./itest/verify-harness.sh config
-./itest/verify-harness.sh focus
+./itest/verify-harness.sh repeat|panic|config|focus
 ```
+
+Each verification tier ships the same kind of self-check, proving the tooling
+itself fails closed rather than reporting false green:
+
+| Script | Modes |
+|--------|-------|
+| `verify-harness.sh` | `repeat`, `panic`, `config`, `focus` |
+| `verify-profiling.sh` | `schemas`, `tools`, `contract`, `tracy-live`, `fail-closed`, `compare`, `compare-live`, `native-live`, `workflow` |
+| `verify-qualification.sh` | `contract`, `mutants`, `doctests`, `assertions`, `faults`, `workflow` |
+| `verify-coverage.sh` | `contract`, `tools`, `flush`, `pipeline`, `reports`, `diff`, `godot-live`, `fail-closed-live`, `workflow`, `all-offline` |
+
+Modes ending in `-live` need Godot and a full build; the rest are offline and
+run in ordinary CI.
 
 ## Profiling
 
