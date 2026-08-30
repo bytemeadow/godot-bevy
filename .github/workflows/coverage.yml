@@ -1,0 +1,45 @@
+name: coverage
+
+on:
+  workflow_dispatch:
+
+env:
+  GODOT4_BIN: godot
+  ITEST_DENY_FOCUS: "1"
+  COVERAGE_BUILD_TIMEOUT_SECONDS: "3600"
+  COVERAGE_GODOT_TIMEOUT_SECONDS: "1800"
+  COVERAGE_GODOT_QUIT_AFTER: "5000"
+  COVERAGE_RUNS_TO_KEEP: "3"
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: cachix/install-nix-action@v31
+      - uses: cachix/cachix-action@v16
+        with:
+          name: devenv
+      - name: Install devenv
+        run: nix profile add nixpkgs#devenv
+      - name: Verify offline coverage contracts
+        run: devenv shell -- ./itest/verify-coverage.sh all-offline
+      - name: Capture merged Rust coverage
+        run: |
+          echo "PASS coverage runner: platform=linux-x86_64"
+          devenv shell -- coverage
+      - name: Upload coverage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-linux-x86_64
+          path: |
+            target/coverage/runs/
+            target/coverage/latest-run.txt
+          if-no-files-found: warn

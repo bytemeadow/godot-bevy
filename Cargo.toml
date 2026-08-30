@@ -46,3 +46,13 @@ opt-level = 3
 inherits = "release"
 debug = 1
 strip = "none"
+
+[profile.coverage]
+inherits = "dev"
+opt-level = 0
+debug = 2
+strip = "none"
+incremental = false
+
+[profile.coverage.package."*"]
+opt-level = 0

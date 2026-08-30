@@ -158,6 +158,7 @@ jobs:
               - 'itest/test_qualification.py'
               - 'itest/verify-qualification.sh'
               - '.github/workflows/qualification.yml'
+              - '.github/workflows/coverage.yml'
               - '.github/workflows/ci.yml'
 
   qualification-static:
@@ -176,6 +177,8 @@ jobs:
         run: ./itest/verify-qualification.sh faults
       - name: Verify tolerance and no-op audit
         run: ./itest/verify-qualification.sh assertions
+      - name: Verify coverage evidence contract
+        run: ./itest/verify-coverage.sh contract
 
   # Integration tests with Godot runtime
   # For local testing with act: act workflow_dispatch -j integration-tests --container-architecture linux/amd64

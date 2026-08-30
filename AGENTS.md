@@ -22,6 +22,7 @@ Everything runs inside `devenv shell -- <cmd>` (direnv usually activates the env
 | `bench` | benchmarks, natively (needs local Godot) |
 | `profile` | tracy span table for one benchmark, or samply flamegraph with `--native` |
 | `profile-compare` | interleaved span comparison vs a base ref (diagnostic-only) |
+| `coverage` | merged Rust coverage through Godot; `diff` and `clean` subcommands |
 | `ci-test` / `ci-itest` / `ci-benches` | replay the CI workflows via act -- needs Docker, slow |
 | `book` / `book-serve` | build / live-serve the mdbook in `book/` |
 

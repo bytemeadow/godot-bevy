@@ -1,5 +1,11 @@
 use godot::init::{ExtensionLibrary, gdextension};
 
+#[cfg(all(feature = "coverage-flush", not(coverage)))]
+compile_error!("coverage-flush requires cfg(coverage)");
+
+#[cfg(feature = "coverage-flush")]
+mod coverage_flush;
+
 // Declare the test runner class
 godot_bevy_test::declare_test_runner!();
 
@@ -30,5 +36,10 @@ unsafe impl ExtensionLibrary for IntegrationTests {
         if stage == godot::init::InitStage::Scene {
             godot_bevy_test::profiling::install_profile_subscriber();
         }
+    }
+
+    #[cfg(feature = "coverage-flush")]
+    fn on_stage_deinit(stage: godot::init::InitStage) {
+        coverage_flush::dump(stage);
     }
 }

@@ -135,6 +135,33 @@ The Python comparison is descriptive. The shell comparison alternates at least
 three process captures per side and reports standard-error-based noise. Artifacts
 are written under `target/profiles/`.
 
+## Coverage
+
+Tier-4 merges unit-test, proc-macro construction, and real-Godot Rust coverage.
+It is reach evidence, not assertion quality, branch proof, GDScript coverage, or
+benchmark evidence.
+
+```bash
+devenv shell -- coverage
+devenv shell -- coverage diff --base main
+devenv shell -- coverage clean
+```
+
+The scope and exclusions live in `coverage/scope-v1.toml`. Diff mode runs three
+separate Godot processes and requires every compiler region touching a changed
+line to be reached by unit/build evidence or by all three runs. There are no
+percentage gates. Reports live under `target/coverage/runs/`; successful runs
+prune raw profiles and merged profdata unless `--keep-raw` is supplied, while
+failed runs retain them. `coverage clean` removes only the coverage build and run
+trees. Coverage forces sccache recache so proc-macro construction cannot be
+replaced by a compiler-cache hit.
+
+The manual Linux workflow has a 90-minute cold-run budget; actual phase timings
+and disk use are recorded in `coverage-v1.json`. Use the rustc-sysroot LLVM tools,
+the Cargo JSON object paths, and the test-process sentinel. Import profiles are
+diagnostic only, absent source mappings are not zero coverage, and instrumented
+timings must never be compared with Tier-2 or benchmark results.
+
 ## How It Works
 
 1. Sync and async tests are collected into one globally ordered run

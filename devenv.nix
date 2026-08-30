@@ -9,7 +9,10 @@ let
   system = pkgs.stdenv.system;
   rustPkgs = import inputs.nixpkgs { inherit system overlays; };
   emscriptenPkgs = import inputs.nixpkgs-emscripten { inherit system; };
-  rust-toolchain = rustPkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+  cargoLlvmCovPkgs = import inputs.nixpkgs-cargo-llvm-cov { inherit system; };
+  rust-toolchain = (rustPkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml).override {
+    extensions = [ "rust-src" "rust-analyzer" "llvm-tools" ];
+  };
   # -Zbuild-std (web builds) requires nightly
   rust-nightly = rustPkgs.rust-bin.nightly.latest.default.override {
     extensions = [ "rust-src" ];
@@ -22,6 +25,9 @@ in
     [
       sccache # rust build artifact cache
       cargo-mutants
+      (assert lib.assertMsg (cargoLlvmCovPkgs.cargo-llvm-cov.version == "0.9.0")
+        "cargo-llvm-cov must stay at 0.9.0";
+        cargoLlvmCovPkgs.cargo-llvm-cov)
       python3 # godot type generation script
       mdbook # builds book/
       rust-toolchain
@@ -106,6 +112,10 @@ in
 
     qualification.exec = ''
       python3 itest/qualification.py "$@"
+    '';
+
+    coverage.exec = ''
+      python3 itest/coverage.py "$@"
     '';
 
     # native, needs local godot

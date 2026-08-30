@@ -4,6 +4,9 @@ inputs:
   # pinned for emscripten 3.1.73 (godot-rust web exports; 4.x breaks the linker)
   nixpkgs-emscripten:
     url: github:nixos/nixpkgs/e255a9090e25aed2486f9fb00e5d645fb342d654
+  # pinned for cargo-llvm-cov 0.9.0 (the coverage driver's show-env contract)
+  nixpkgs-cargo-llvm-cov:
+    url: github:nixos/nixpkgs/e8be7818e19ada32105a8af937a6a473b38167ca
   rust-overlay:
     url: github:oxalica/rust-overlay
     inputs:
