@@ -237,18 +237,16 @@ jobs:
           GODOT4_BIN: godot
         run: ./run-tests.sh ${{ matrix.profile == 'release' && '--release' || '' }} --json ../target/itest-${{ matrix.profile }}.json
 
-      - name: Import platformer Godot project
-        # Headless import can segfault on exit once a GDExtension is loaded
-        # (godotengine/godot#111645). The .godot folder is written before that, so
-        # tolerate the exit status like run-tests.sh does; cargo-godot-lib then skips
-        # its own import.
-        run: godot --headless --path examples/platformer-2d/godot --import --quit || true
-
       - name: Run platformer integration tests
         env:
           GODOT4_BIN: godot
           GODOT: godot
-        run: cargo run ${{ matrix.profile == 'release' && '--release' || '' }} --features itest --manifest-path examples/platformer-2d/rust/Cargo.toml
+        # The first run also does the headless import, which can segfault on exit once a
+        # GDExtension is loaded (godotengine/godot#111645) after .godot is already written.
+        # Retrying once then skips the import and just runs the tests.
+        run: |
+          CMD="cargo run ${{ matrix.profile == 'release' && '--release' || '' }} --features itest --manifest-path examples/platformer-2d/rust/Cargo.toml"
+          $CMD || { test -d examples/platformer-2d/godot/.godot && $CMD; }
 
       - name: Upload integration test report
         # skipped under act: no artifact service locally (ACTIONS_RUNTIME_TOKEN)
