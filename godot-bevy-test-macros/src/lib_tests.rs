@@ -31,6 +31,14 @@ mod tests {
     }
 
     #[test]
+    fn async_function_keeps_the_declared_parameter_type() {
+        let input = syn::parse2(quote! { async fn test_name(ctx: TestContext) {} }).unwrap();
+        let expanded = expand_itest(input, ITestOptions::default()).to_string();
+
+        assert!(expanded.contains("let ctx : TestContext = ctx . clone ()"));
+    }
+
+    #[test]
     fn async_function_rejects_borrowed_context() {
         let input = syn::parse2(quote! { async fn test_name(ctx: &TestContext) {} }).unwrap();
         let expanded = expand_itest(input, ITestOptions::default());

@@ -144,9 +144,10 @@ fn expand_itest(input: ItemFn, options: ITestOptions) -> proc_macro2::TokenStrea
                     .into_compile_error();
                 }
                 let pattern = &param.pat;
+                let ty = &param.ty;
                 (
                     quote! { ctx: &::godot_bevy_test::TestContext },
-                    quote! { let #pattern = ctx.clone(); },
+                    quote! { let #pattern: #ty = ctx.clone(); },
                 )
             }
             Some(FnArg::Receiver(receiver)) => {

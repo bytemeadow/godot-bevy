@@ -460,8 +460,6 @@ impl INode for BevyApp {
         #[cfg(debug_assertions)]
         self.register_optimized_bulk_operations();
 
-        // Integration-test runs set this so the autoload stays inert until TestApp initializes it;
-        // the runner scene loads after the autoload and cannot stop it otherwise.
         if std::env::var_os("GODOT_BEVY_ITEST").is_some() {
             return;
         }
