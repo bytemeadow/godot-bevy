@@ -286,6 +286,18 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
+/// Tuple structs are supported for component-first nodes. Exported fields use `value0`,
+/// `value1`, and so on as their Godot property names.
+///
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#godot_node_tuple -->
+/// ```ignore
+/// #[derive(Component, GodotNode, Default)]
+/// struct Velocity(
+///     #[gdbevy(export)] f32,
+///     #[gdbevy(export)] f32,
+/// );
+/// ```
+///
 /// | Key | Meaning |
 /// |-----|---------|
 /// | `export` (**required**) | Marks the field as a generated Godot export. |

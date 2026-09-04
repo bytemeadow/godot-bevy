@@ -8,8 +8,6 @@ use syn::{
     braced, parenthesized, parse_quote,
 };
 
-pub const TUPLE_FIELD_PREFIX: &str = "value";
-
 /// The Godot class + Bevy components a single derive expands to.
 ///
 /// Two front-ends share this IR: component-first (`GodotNode`, which generates the
@@ -45,6 +43,7 @@ pub enum ComponentInit {
 pub struct Mapping {
     pub godot_prop: syn::Ident,
     pub bevy_field: Option<syn::Ident>,
+    pub tuple_index: Option<usize>,
     pub as_type: Option<syn::Type>,
     pub default: Option<syn::Expr>,
     pub with: Option<syn::Path>,
@@ -364,6 +363,7 @@ fn cf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
                 init: ComponentInit::Newtype(Mapping {
                     godot_prop: prop,
                     bevy_field: None,
+                    tuple_index: None,
                     as_type: Some(as_type),
                     default: cfg.default,
                     with: cfg.with,
@@ -388,6 +388,7 @@ fn cf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
                 mappings.push(Mapping {
                     godot_prop: fname.clone(),
                     bevy_field: Some(fname),
+                    tuple_index: None,
                     as_type: Some(as_type),
                     default: cfg.default,
                     with: cfg.with,
@@ -427,6 +428,7 @@ fn gf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
                 .map(|(bevy_field, godot_field)| Mapping {
                     godot_prop: godot_field,
                     bevy_field: Some(bevy_field),
+                    tuple_index: None,
                     as_type: None,
                     default: None,
                     with: None,
@@ -447,13 +449,9 @@ fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
         let Some(attr) = find_bevy_attr(field) else {
             continue;
         };
-        let (godot_prop, bevy_field) = match &field.ident {
-            Some(ident) => (ident.clone(), Some(ident.clone())),
-            None => {
-                // Map tuples to value0, value1, value2, ..., value{n}
-                let synthetic_ident = format_ident!("{TUPLE_FIELD_PREFIX}{i}");
-                (synthetic_ident.clone(), Some(synthetic_ident))
-            }
+        let (godot_prop, bevy_field, tuple_index) = match &field.ident {
+            Some(ident) => (ident.clone(), Some(ident.clone()), None),
+            None => (format_ident!("value{i}"), None, Some(i)),
         };
         let d = parse_field_directives(attr)?;
         if d.component.is_some() {
@@ -471,6 +469,7 @@ fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
         out.push(Mapping {
             godot_prop,
             bevy_field,
+            tuple_index,
             as_type: d.as_type,
             default: d.default,
             with: d.with,
@@ -480,15 +479,22 @@ fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
 }
 
 fn collect_field_bindings(input: &DeriveInput) -> syn::Result<Vec<ComponentPlan>> {
+    if matches!(&input.data, Data::Struct(s) if matches!(s.fields, Fields::Unnamed(_))) {
+        return Err(Error::new_spanned(
+            input,
+            "tuple structs are only supported for component-first `GodotNode`",
+        ));
+    }
+
     let mut out = Vec::new();
-    for (i, field) in struct_fields(input)?.into_iter().enumerate() {
+    for field in struct_fields(input)? {
         let Some(attr) = find_bevy_attr(field) else {
             continue;
         };
-        let name = match &field.ident {
-            Some(ident) => ident.clone(),
-            None => format_ident!("{TUPLE_FIELD_PREFIX}{i}"),
-        };
+        let name = field
+            .ident
+            .clone()
+            .expect("tuple structs are rejected above");
         let d = parse_field_directives(attr)?;
         if d.as_type.is_some() {
             return Err(Error::new_spanned(
@@ -520,6 +526,7 @@ fn collect_field_bindings(input: &DeriveInput) -> syn::Result<Vec<ComponentPlan>
             init: ComponentInit::Newtype(Mapping {
                 godot_prop: name,
                 bevy_field: None,
+                tuple_index: None,
                 as_type: None,
                 default: None,
                 with: d.with,

@@ -1,12 +1,10 @@
-use crate::bevy_attr::{
-    ClassPlan, ComponentInit, ComponentPlan, Mapping, PrimaryPlan, TUPLE_FIELD_PREFIX,
-};
+use crate::bevy_attr::{ClassPlan, ComponentInit, ComponentPlan, Mapping, PrimaryPlan};
 use proc_macro2::{TokenStream as TokenStream2, TokenTree};
 use quote::{ToTokens, format_ident, quote};
 use std::collections::HashSet;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::{Attribute, Data, DeriveInput, Expr, Ident, Path, Token, Type};
+use syn::{Attribute, Data, DeriveInput, Expr, Path, Token, Type};
 
 /// Lower a `ClassPlan` to the Godot class, autosync registration, and required-components
 /// registrar. `input` is threaded through for two things the IR doesn't carry: the primary
@@ -16,7 +14,7 @@ pub fn emit(plan: &ClassPlan, input: &DeriveInput) -> TokenStream2 {
     if plan.emit_node_class {
         out.extend(emit_node_class(plan, input));
     }
-    out.extend(emit_autosync(plan, input));
+    out.extend(emit_autosync(plan));
     if let Some(trigger) = &plan.trigger {
         let sibling = collect_require_idents(&input.attrs);
         out.extend(emit_required_registration(plan, trigger, &sibling));
@@ -30,10 +28,7 @@ fn emit_node_class(plan: &ClassPlan, input: &DeriveInput) -> TokenStream2 {
 
     let mut exports: Vec<TokenStream2> = Vec::new();
     for m in &plan.primary.fields {
-        let ty = m
-            .as_type
-            .clone()
-            .or_else(|| primary_field_type(input, &m.godot_prop));
+        let ty = m.as_type.clone().or_else(|| primary_field_type(input, m));
         exports.push(export_field(m, ty));
     }
     for c in &plan.companions {
@@ -74,12 +69,12 @@ fn export_field(m: &Mapping, ty: Option<Type>) -> TokenStream2 {
     }
 }
 
-fn emit_autosync(plan: &ClassPlan, input: &DeriveInput) -> TokenStream2 {
+fn emit_autosync(plan: &ClassPlan) -> TokenStream2 {
     let class = &plan.godot_class;
     let fn_name = format_ident!("__create_{}_bundle", class.to_string().to_lowercase());
 
     let mut values: Vec<TokenStream2> = Vec::new();
-    if let Some(pv) = primary_value(&plan.primary, input) {
+    if let Some(pv) = primary_value(&plan.primary) {
         values.push(pv);
     }
     for c in &plan.companions {
@@ -111,7 +106,7 @@ fn emit_autosync(plan: &ClassPlan, input: &DeriveInput) -> TokenStream2 {
     }
 }
 
-fn primary_value(primary: &PrimaryPlan, input: &DeriveInput) -> Option<TokenStream2> {
+fn primary_value(primary: &PrimaryPlan) -> Option<TokenStream2> {
     if primary.path.segments.is_empty() {
         return None;
     }
@@ -120,14 +115,17 @@ fn primary_value(primary: &PrimaryPlan, input: &DeriveInput) -> Option<TokenStre
         return Some(quote!(#path::default()));
     }
 
-    let is_tuple = match &input.data {
-        Data::Struct(s) => matches!(s.fields, syn::Fields::Unnamed(_)),
-        _ => false,
-    };
-
-    if is_tuple {
-        let inits = primary.fields.iter().map(read_prop);
-        Some(quote!(#path( #(#inits),* )))
+    if primary.fields.iter().any(|m| m.tuple_index.is_some()) {
+        let assignments = primary.fields.iter().map(|m| {
+            let index = syn::Index::from(m.tuple_index.expect("tuple mapping has an index"));
+            let read = read_prop(m);
+            quote!(c.#index = #read;)
+        });
+        Some(quote!({
+            let mut c = #path::default();
+            #(#assignments)*
+            c
+        }))
     } else {
         let inits = primary.fields.iter().map(field_init);
         Some(quote!(#path { #(#inits,)* ..Default::default() }))
@@ -261,7 +259,7 @@ fn companion_default_value(m: &Mapping) -> TokenStream2 {
     }
 }
 
-fn primary_field_type(input: &DeriveInput, ident: &Ident) -> Option<Type> {
+fn primary_field_type(input: &DeriveInput, mapping: &Mapping) -> Option<Type> {
     let Data::Struct(s) = &input.data else {
         return None;
     };
@@ -269,17 +267,12 @@ fn primary_field_type(input: &DeriveInput, ident: &Ident) -> Option<Type> {
         syn::Fields::Named(n) => n
             .named
             .iter()
-            .find(|f| f.ident.as_ref() == Some(ident))
+            .find(|f| f.ident.as_ref() == mapping.bevy_field.as_ref())
             .map(|f| f.ty.clone()),
-        syn::Fields::Unnamed(u) => {
-            let name = ident.to_string();
-            if let Some(idx_str) = name.strip_prefix(TUPLE_FIELD_PREFIX) {
-                if let Ok(idx) = idx_str.parse::<usize>() {
-                    return u.unnamed.iter().nth(idx).map(|f| f.ty.clone());
-                }
-            }
-            None
-        }
+        syn::Fields::Unnamed(u) => mapping
+            .tuple_index
+            .and_then(|index| u.unnamed.iter().nth(index))
+            .map(|f| f.ty.clone()),
         syn::Fields::Unit => None,
     }
 }

@@ -63,6 +63,18 @@ fn percentage_to_fraction(v: f32) -> f32 { v / 100.0 }
 
 `as = T` is optional when the field type is already Godot-compatible; add it only when the export type differs from the Rust field type.
 
+### Tuple fields
+
+Tuple structs are supported for component-first nodes. Exported fields are named `value0`, `value1`, and so on in the generated Godot class.
+
+```rust
+#[derive(Component, GodotNode, Default)]
+pub struct Velocity(
+    #[gdbevy(export)] f32,
+    #[gdbevy(export)] f32,
+);
+```
+
 ### All component-first keys
 
 | Placement | Key | Required? | Meaning |

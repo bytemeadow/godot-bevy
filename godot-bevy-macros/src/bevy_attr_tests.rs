@@ -141,6 +141,31 @@ mod tests {
     }
 
     #[test]
+    fn cf_tuple_newtype_export() {
+        let di: syn::DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode, Default)]
+            struct Level(#[gdbevy(export, default = 1)] i32);
+        };
+        let plan = parse_component_first(&di).unwrap();
+        let field = &plan.primary.fields[0];
+        assert_eq!(field.godot_prop.to_string(), "value0");
+        assert_eq!(field.tuple_index, Some(0));
+        assert!(field.default.is_some());
+    }
+
+    #[test]
+    fn cf_tuple_export_uses_field_position() {
+        let di: syn::DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode, Default)]
+            struct Velocity(f64, #[gdbevy(export)] f64, f64);
+        };
+        let plan = parse_component_first(&di).unwrap();
+        assert_eq!(plan.primary.fields.len(), 1);
+        assert_eq!(plan.primary.fields[0].godot_prop.to_string(), "value1");
+        assert_eq!(plan.primary.fields[0].tuple_index, Some(1));
+    }
+
+    #[test]
     fn gf_field_binding() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(GodotClass, BevyComponents)]
@@ -176,6 +201,20 @@ mod tests {
             }
             _ => panic!("expected newtype field binding"),
         }
+    }
+
+    #[test]
+    fn gf_tuple_struct_is_rejected() {
+        let di: syn::DeriveInput = parse_quote! {
+            #[derive(GodotClass, BevyComponents)]
+            struct PlayerNode(#[gdbevy(component = Speed)] f32);
+        };
+        assert!(
+            parse_godot_first(&di)
+                .unwrap_err()
+                .to_string()
+                .contains("tuple structs are only supported")
+        );
     }
 
     #[test]
