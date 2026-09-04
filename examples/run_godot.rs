@@ -41,9 +41,13 @@ fn main() {
         "10000",
     ]);
 
+    // Discard a leftover result from an earlier crashed run.
+    godot_bevy_test::exit_code::read_and_cleanup_exit_code();
+
+    // Godot can die on a signal at shutdown with a GDExtension loaded, after the tests
+    // have already written their result, so the exit file is authoritative.
     if let Err(e) = runner.execute() {
         eprintln!("{e}");
-        std::process::exit(1);
     }
 
     std::process::exit(godot_bevy_test::exit_code::read_and_cleanup_exit_code().unwrap_or(1));
