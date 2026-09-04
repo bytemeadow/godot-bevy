@@ -1,0 +1,19 @@
+diff --git a/godot-bevy/src/plugins/transforms/sync_systems.rs b/godot-bevy/src/plugins/transforms/sync_systems.rs
+--- a/godot-bevy/src/plugins/transforms/sync_systems.rs
++++ b/godot-bevy/src/plugins/transforms/sync_systems.rs
+@@ -134,13 +134,13 @@ pub fn post_update_godot_transforms<F: QueryFilter>(
+             let Some(mut obj) = godot.try_get::<Node2D>(*reference) else {
+                 continue;
+             };
+-            obj.set_transform(transform_ref.to_godot_transform_2d());
++            obj.set_transform(metadata.shadow.to_godot_transform_2d());
+         } else if node3d.is_some() {
+             let _span = tracing::info_span!("ffi_call_3d").entered();
+             let Some(mut obj) = godot.try_get::<Node3D>(*reference) else {
+                 continue;
+             };
+-            obj.set_transform(transform_ref.to_godot_transform());
++            obj.set_transform(metadata.shadow.to_godot_transform());
+         }
+ 
+         metadata.shadow = *transform_ref;

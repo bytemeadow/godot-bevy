@@ -39,8 +39,7 @@ fn sample_ratio(virt: Res<Time<Virtual>>, real: Res<Time<Real>>, mut probe: ResM
     }
 }
 
-/// Drive `frames` render frames at `scale` and return (sum Virtual.delta,
-/// sum Real.delta, clean-frame count). Resets time_scale to 1.0 before returning.
+/// Resets the process-global time scale before returning.
 async fn measure_ratio(ctx: &TestContext, scale: f64, frames: u32) -> (f64, f64, u32) {
     let mut app = TestApp::new(ctx, |app| {
         app.init_resource::<RatioProbe>();

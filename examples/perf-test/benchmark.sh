@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
 
-# Boids Performance Benchmark Runner
-# This script runs automated benchmarks comparing Godot and Bevy implementations
-
 # bash strict mode, http://redsymbol.net/articles/unofficial-bash-strict-mode/
 set -euo pipefail
 IFS=$'\n\t'
 
-# Default values
 GODOT_EXECUTABLE="godot"
 IMPLEMENTATION="godot"
 BOID_COUNT=1000
@@ -15,7 +11,6 @@ DURATION=10
 OUTPUT_DIR="$(readlink -f .)/benchmark_results"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
-# Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         --godot)
@@ -70,10 +65,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
 
-# Construct output filename
 OUTPUT_FILE="$OUTPUT_DIR/benchmark_${IMPLEMENTATION}_${BOID_COUNT}boids_${TIMESTAMP}.json"
 
 echo "🎮 Boids Performance Benchmark"
@@ -84,7 +77,6 @@ echo "Duration: $DURATION seconds"
 echo "Output: $OUTPUT_FILE"
 echo ""
 
-# First ensure the Rust library is built
 echo "🔨 Building Rust library..."
 cd rust
 # for unknown reasons, both the debug and release dynamic libraries must be present;
@@ -114,7 +106,6 @@ cd ..
 # If we're using a nix development environment, wrap executable in a file hierarchy standard (FHS) env
 [[ $(type -P "steam-run") ]] && FHS_BINARY="steam-run" || FHS_BINARY=""
 
-# Run the benchmark
 echo "🚀 Starting benchmark..."
 $FHS_BINARY "$BENCHMARK_BINARY" --headless \
     --implementation="$IMPLEMENTATION" \
@@ -126,7 +117,6 @@ echo ""
 echo "✅ Benchmark complete!"
 echo "Results saved to: $OUTPUT_FILE"
 
-# Display the results
 if [ -f "$OUTPUT_FILE" ]; then
     echo ""
     echo "📊 Results:"

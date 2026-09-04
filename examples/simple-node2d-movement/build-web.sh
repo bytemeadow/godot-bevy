@@ -1,7 +1,4 @@
 #!/bin/bash
-#
-# Build script for web (WASM) exports
-#
 # Prerequisites (choose one):
 #   A) Using devenv (recommended):
 #      - Just run `devenv shell` - everything is set up automatically
@@ -23,7 +20,6 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUST_DIR="$SCRIPT_DIR/rust"
 
-# Parse arguments
 BUILD_MODE="release"
 SERVE=false
 THREADED=false
@@ -49,7 +45,6 @@ if [[ "$BUILD_MODE" == "release" ]]; then
     RELEASE_FLAG="--release"
 fi
 
-# Determine which cargo to use
 if [[ -n "$CARGO_NIGHTLY" ]]; then
     CARGO_CMD="$CARGO_NIGHTLY"
     echo "Using nightly cargo from devenv: $CARGO_CMD"
@@ -69,7 +64,6 @@ echo ""
 
 cd "$RUST_DIR"
 
-# Check for Emscripten
 if ! command -v emcc &> /dev/null; then
     echo "ERROR: Emscripten (emcc) not found in PATH"
     echo ""
@@ -81,7 +75,6 @@ EMCC_VERSION=$(emcc --version | head -n1)
 echo "Using Emscripten: $EMCC_VERSION"
 echo ""
 
-# Set writable Emscripten cache directory
 if [[ -z "$EM_CACHE" ]]; then
     export EM_CACHE="$SCRIPT_DIR/.em_cache"
     mkdir -p "$EM_CACHE"
@@ -89,7 +82,6 @@ if [[ -z "$EM_CACHE" ]]; then
     echo ""
 fi
 
-# Set up bindgen to use Emscripten's sysroot
 if [[ -n "$EMSDK" ]]; then
     EMSCRIPTEN_SYSROOT="$EMSDK/upstream/emscripten/cache/sysroot"
     if [[ -d "$EMSCRIPTEN_SYSROOT" ]]; then
@@ -99,7 +91,6 @@ if [[ -n "$EMSDK" ]]; then
     fi
 fi
 
-# Generate extension_api.json if it doesn't exist
 API_JSON="$SCRIPT_DIR/../../extension_api.json"
 if [[ ! -f "$API_JSON" ]]; then
     echo "Generating extension_api.json from Godot..."
@@ -114,12 +105,10 @@ else
 fi
 echo ""
 
-# Workspace target directory (use absolute path since we cd later)
 # SCRIPT_DIR is examples/simple-node2d-movement, so go up 2 levels to workspace root
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WASM_DIR="$WORKSPACE_ROOT/target/wasm32-unknown-emscripten/$BUILD_MODE"
 
-# Build non-threaded version (default, broader compatibility)
 echo "=== Building NON-THREADED version ==="
 RUSTFLAGS="-C link-args=-sSIDE_MODULE=2 -C link-args=-O0 -Zlink-native-libraries=no -Cllvm-args=-enable-emscripten-cxx-exceptions=0 -Zemscripten-wasm-eh=false" \
     $CARGO_CMD build --no-default-features --features web-nothreads -Zbuild-std --target wasm32-unknown-emscripten $RELEASE_FLAG
@@ -131,7 +120,6 @@ else
     exit 1
 fi
 
-# Only build threaded version if requested or doing a full build
 if [[ "$THREADED" == true ]] || [[ "$SERVE" == false ]]; then
     echo ""
     echo "=== Building THREADED version ==="
@@ -145,7 +133,6 @@ if [[ "$THREADED" == true ]] || [[ "$SERVE" == false ]]; then
     RUSTFLAGS="-C link-args=-pthread -C target-feature=+atomics -C link-args=-sSIDE_MODULE=2 -C link-args=-O0 -Zlink-native-libraries=no -Cllvm-args=-enable-emscripten-cxx-exceptions=0 -Zemscripten-wasm-eh=false" \
         $CARGO_CMD build --no-default-features --features web -Zbuild-std --target wasm32-unknown-emscripten $RELEASE_FLAG
 
-    # Copy to main target dir with .threads.wasm suffix
     if [[ -f "$THREADED_WASM_DIR/simple_node2d_movement_example.wasm" ]]; then
         cp "$THREADED_WASM_DIR/simple_node2d_movement_example.wasm" "$WASM_DIR/simple_node2d_movement_example.threads.wasm"
         echo "Created: $WASM_DIR/simple_node2d_movement_example.threads.wasm"
@@ -175,7 +162,6 @@ if [[ "$SERVE" == true ]]; then
         EXPORT_FLAG="--export-debug"
     fi
 
-    # Select preset based on threading mode
     if [[ "$THREADED" == true ]]; then
         PRESET="Web Threaded"
     else

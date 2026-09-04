@@ -1,0 +1,53 @@
+version = 1
+
+[[packages]]
+name = "godot-bevy"
+root = "godot-bevy/src"
+
+[[packages]]
+name = "godot-bevy-macros"
+root = "godot-bevy-macros/src"
+
+[[packages]]
+name = "godot-bevy-test"
+root = "godot-bevy-test/src"
+
+[[packages]]
+name = "godot-bevy-test-macros"
+root = "godot-bevy-test-macros/src"
+
+[[exclusions]]
+pattern = "godot-bevy/src/interop/node_markers/**"
+category = "generated"
+
+[[exclusions]]
+pattern = "godot-bevy/src/interop/node_markers.rs"
+category = "generated-dispatcher"
+
+[[exclusions]]
+pattern = "godot-bevy/src/interop/signal_names/**"
+category = "generated"
+
+[[exclusions]]
+pattern = "godot-bevy/src/interop/signal_names.rs"
+category = "generated-dispatcher"
+
+[[exclusions]]
+pattern = "godot-bevy/src/plugins/scene_tree/node_type_checking/**"
+category = "generated"
+
+[[exclusions]]
+pattern = "godot-bevy/src/plugins/scene_tree/node_type_checking.rs"
+category = "generated-dispatcher"
+
+[[exclusions]]
+pattern = "godot-bevy/src/tests/**"
+category = "test-code"
+
+[[exclusions]]
+pattern = "**/tests.rs"
+category = "test-code"
+
+[[exclusions]]
+pattern = "**/*_tests.rs"
+category = "test-code"

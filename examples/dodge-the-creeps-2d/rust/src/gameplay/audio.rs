@@ -45,7 +45,6 @@ pub struct GameAudio {
     pub game_over_sound: Handle<GodotResource>,
 }
 
-/// System that starts background music
 fn start_background_music(
     music_channel: Res<AudioChannel<GameMusicChannel>>,
     game_audio: Res<GameAudio>,
@@ -59,13 +58,11 @@ fn start_background_music(
     info!("Started background music with 3-second fade-in!");
 }
 
-/// System that stops background music
 fn stop_background_music(music_channel: Res<AudioChannel<GameMusicChannel>>) {
     music_channel.stop();
     info!("Stopped background music");
 }
 
-/// System that plays game over sound
 fn play_game_over_sound(
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
     game_audio: Res<GameAudio>,

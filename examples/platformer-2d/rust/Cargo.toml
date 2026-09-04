@@ -16,7 +16,8 @@ bevy_asset_loader = "0.27"
 fastrand = { version = "2.3.0" }
 godot = "0.5"
 godot-bevy = { path = "../../../godot-bevy" }
+godot-bevy-test = { path = "../../../godot-bevy-test", optional = true }
 cargo-godot-lib.workspace = true
 
 [features]
-itest = []
+itest = ["dep:godot-bevy-test", "godot-bevy-test/test-frame-signal"]

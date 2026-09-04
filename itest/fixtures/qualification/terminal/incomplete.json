@@ -1,0 +1,33 @@
+{
+  "$schema": "qualification-v1.schema.json",
+  "schema_version": 1,
+  "run_id": "fixture-incomplete",
+  "evidence_kind": "mutation-run",
+  "mode": "full",
+  "complete": false,
+  "outcome": "incomplete",
+  "generated_at": "2026-08-29T00:00:00Z",
+  "environment": {
+    "git_commit": "0123456789abcdef",
+    "git_dirty": false,
+    "os": "fixture-os",
+    "arch": "fixture-arch",
+    "cargo_profile": "test",
+    "tools": {"cargo-mutants": "27.1.0"},
+    "metadata": {}
+  },
+  "summary": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "invalid": 0,
+    "skipped": 0,
+    "counts": {}
+  },
+  "mutants": [],
+  "faults": [],
+  "checks": [],
+  "errors": [],
+  "artifacts": [],
+  "metadata": {}
+}

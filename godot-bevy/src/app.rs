@@ -8,13 +8,41 @@ use bevy_app::{App, PluginsState};
 use bevy_ecs::message::Messages;
 use crossbeam_channel::unbounded;
 use godot::prelude::*;
+#[cfg(feature = "test-frame-signal")]
+use std::sync::Mutex;
 use std::sync::OnceLock;
 
-// Stores the client's entrypoint (the function they decorated with the `#[bevy_app]` macro) at runtime
 pub static BEVY_INIT_FUNC: OnceLock<Box<dyn Fn(&mut App) + Send + Sync>> = OnceLock::new();
 
-// Configuration for BevyApp, set by the #[bevy_app] macro attributes
 pub static BEVY_APP_CONFIG: OnceLock<BevyAppConfig> = OnceLock::new();
+
+#[cfg(feature = "test-frame-signal")]
+static TEST_FRAME_PANICS: Mutex<Vec<(&'static str, String)>> = Mutex::new(Vec::new());
+
+#[cfg(feature = "test-frame-signal")]
+fn record_test_frame_panic(callback: &'static str, payload: &(dyn std::any::Any + Send)) {
+    let message = if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else if let Some(message) = payload.downcast_ref::<&str>() {
+        message.to_string()
+    } else {
+        "unknown panic payload".to_string()
+    };
+    TEST_FRAME_PANICS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .push((callback, message));
+}
+
+#[cfg(feature = "test-frame-signal")]
+#[doc(hidden)]
+pub fn drain_test_frame_panics() -> Vec<(&'static str, String)> {
+    std::mem::take(
+        &mut *TEST_FRAME_PANICS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()),
+    )
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct BevyAppConfig {
@@ -75,24 +103,24 @@ fn log_plugin_diagnostics(app: &App) {
     );
 }
 
+/// Godot node hosting the Bevy `App`; the `BevyAppSingleton` autoload is one of these.
+///
+/// Integration-test runs set `GODOT_BEVY_ITEST` so the autoload does not boot the
+/// `#[bevy_app]` function; `TestApp` initializes it per test instead.
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct BevyApp {
     base: Base<Node>,
     app: Option<App>,
-    // Optional per-instance init function (for tests)
     // If set, this takes precedence over the global BEVY_INIT_FUNC
     #[allow(clippy::type_complexity)]
     instance_init_func: Option<Box<dyn Fn(&mut App) + Send + Sync>>,
-    // True after the startup schedules have run (lifetime flag, set once).
     started: bool,
-    // True from the first physics callback of a frame until the end of process().
     // Guards the prefix from running twice in frames with >= 1 physics steps.
     prefix_done_this_frame: bool,
     // Physics steps run in the current render frame; reported via bevy_frame_complete.
     #[cfg(feature = "test-frame-signal")]
     physics_steps_this_frame: u32,
-    /// Tracks the Godot RenderingServer draw time.
     render_server_span: Option<tracing::span::EnteredSpan>,
 }
 
@@ -256,8 +284,6 @@ impl BevyApp {
     }
 
     fn register_scene_tree_watcher(&mut self, app: &mut App) {
-        // Check if SceneTreeWatcher already exists (e.g., created by test framework)
-        // If so, don't create a new one or replace the event reader
         if self.base().has_node("SceneTreeWatcher") {
             return;
         }
@@ -280,7 +306,6 @@ impl BevyApp {
     }
 
     fn register_collision_watcher(&mut self, app: &mut App) {
-        // Check if CollisionWatcher already exists (e.g., created by test framework)
         if self.base().has_node("CollisionWatcher") {
             return;
         }
@@ -298,15 +323,12 @@ impl BevyApp {
             return;
         }
 
-        // Check if the optimized watcher file exists before trying to load it
-        // This prevents error logs when the file is not present (e.g., in examples)
+        // FileAccess avoids absent-addon ResourceLoader logs and a cache-backed existence check.
         let path = "res://addons/godot-bevy/optimized_scene_tree_watcher.gd";
 
-        // Use FileAccess to check if file actually exists (ResourceLoader.exists() may cache)
         if godot::classes::FileAccess::file_exists(path) {
             let mut resource_loader = godot::classes::ResourceLoader::singleton();
 
-            // Try to load and instantiate the OptimizedSceneTreeWatcher GDScript class
             if let Some(resource) = resource_loader.load(path)
                 && let Ok(mut script) = resource.try_cast::<godot::classes::GDScript>()
                 && let Ok(instance) = script.try_instantiate(&[])
@@ -329,19 +351,15 @@ impl BevyApp {
     /// scene already provides one). Backs collision-signal batching.
     #[cfg(debug_assertions)]
     fn register_optimized_bulk_operations(&mut self) {
-        // Check if OptimizedBulkOperations already exists (e.g., loaded from tscn)
         if self.base().has_node("OptimizedBulkOperations") {
             return;
         }
 
-        // Check if the bulk operations file exists before trying to load it
         let path = "res://addons/godot-bevy/optimized_bulk_operations.gd";
 
-        // Use FileAccess to check if file actually exists
         if godot::classes::FileAccess::file_exists(path) {
             let mut resource_loader = godot::classes::ResourceLoader::singleton();
 
-            // Try to load and instantiate the OptimizedBulkOperations GDScript class
             if let Some(resource) = resource_loader.load(path)
                 && let Ok(mut script) = resource.try_cast::<godot::classes::GDScript>()
                 && let Ok(instance) = script.try_instantiate(&[])
@@ -438,10 +456,13 @@ impl INode for BevyApp {
             return;
         }
 
-        // The OptimizedBulkOperations helper node backs collision-signal batching.
         // Registered before the init check so it exists without a full Bevy app.
         #[cfg(debug_assertions)]
         self.register_optimized_bulk_operations();
+
+        if std::env::var_os("GODOT_BEVY_ITEST").is_some() {
+            return;
+        }
 
         let has_init = self.instance_init_func.is_some() || BEVY_INIT_FUNC.get().is_some();
         if !has_init {
@@ -461,7 +482,7 @@ impl INode for BevyApp {
         }
         #[cfg(not(feature = "trace_tracy"))]
         {
-            let _ = self.render_server_span; // Avoid unused variable warning
+            let _ = self.render_server_span;
         }
 
         self.do_initialize();
@@ -481,8 +502,7 @@ impl INode for BevyApp {
         let need_startup = !self.started;
         let need_prefix = !self.prefix_done_this_frame;
 
-        // Run the frame's suffix (and startup/prefix fallback). Capture any panic
-        // so the end-of-frame signal still fires before we propagate it.
+        // Preserve end-of-frame signal delivery before rethrowing a schedule panic.
         let result = self.app.as_mut().map(|app| {
             catch_unwind(AssertUnwindSafe(|| {
                 let world = app.world_mut();
@@ -513,6 +533,8 @@ impl INode for BevyApp {
         }
 
         if let Some(Err(e)) = result {
+            #[cfg(feature = "test-frame-signal")]
+            record_test_frame_panic("_process", e.as_ref());
             self.app = None;
             godot::global::godot_error!(
                 "godot-bevy: Bevy app panicked during _process and was permanently torn down; \
@@ -553,6 +575,8 @@ impl INode for BevyApp {
                 crate::profiling::secondary_frame_mark("physics");
             }))
         {
+            #[cfg(feature = "test-frame-signal")]
+            record_test_frame_panic("_physics_process", e.as_ref());
             self.app = None;
             godot::global::godot_error!(
                 "godot-bevy: Bevy app panicked during _physics_process and was permanently torn down; \

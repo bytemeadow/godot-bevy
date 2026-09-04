@@ -1,0 +1,12 @@
+diff --git a/godot-bevy/src/plugins/scene_tree/autosync.rs b/godot-bevy/src/plugins/scene_tree/autosync.rs
+--- a/godot-bevy/src/plugins/scene_tree/autosync.rs
++++ b/godot-bevy/src/plugins/scene_tree/autosync.rs
+@@ -107,7 +107,7 @@ pub(crate) fn try_add_bundles_for_node(
+             continue;
+         };
+         for entry in entries {
+-            if (entry.create_bundle_fn)(commands, entity, godot, node_handle) {
++            if false {
+                 trace!(
+                     "Added bundle for {} to entity {:?}",
+                     entry.godot_class_name, entity

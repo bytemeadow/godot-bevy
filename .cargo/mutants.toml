@@ -1,0 +1,22 @@
+additional_cargo_args = ["--locked"]
+test_workspace = false
+timeout_multiplier = 3.0
+minimum_test_timeout = 20.0
+
+examine_globs = [
+  "godot-bevy/src/plugins/audio/channel.rs",
+  "godot-bevy/src/plugins/event_bridge.rs",
+  "godot-bevy/src/plugins/fixed_schedule.rs",
+  "godot-bevy/src/plugins/input/actions.rs",
+  "godot-bevy/src/plugins/scene_tree/relationship.rs",
+  "godot-bevy/src/plugins/transforms/conversions.rs",
+  "godot-bevy/src/plugins/transforms/custom_sync.rs",
+  "godot-bevy/src/plugins/transforms/math.rs",
+  "godot-bevy/src/utils/math.rs",
+  "godot-bevy-macros/src/bevy_attr.rs",
+  "godot-bevy-macros/src/emit.rs",
+  "godot-bevy-test-macros/src/lib.rs",
+  "godot-bevy-test/src/config.rs",
+  "godot-bevy-test/src/report.rs",
+  "godot-bevy-test/src/selection.rs",
+]

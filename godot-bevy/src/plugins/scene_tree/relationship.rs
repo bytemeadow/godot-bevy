@@ -20,7 +20,9 @@ use bevy_reflect::Reflect;
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use bevy_ecs::prelude::{Entity, Query};
+/// # use godot_bevy::plugins::scene_tree::GodotChildOf;
 /// fn find_parent_entity(
 ///     query: Query<&GodotChildOf>,
 ///     entity: Entity,
@@ -54,7 +56,9 @@ impl GodotChildOf {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use bevy_ecs::prelude::{Entity, Query};
+/// # use godot_bevy::plugins::scene_tree::GodotChildren;
 /// fn iterate_children(
 ///     query: Query<&GodotChildren>,
 ///     parent_entity: Entity,
@@ -129,3 +133,6 @@ fn godot_children_on_despawn(mut world: DeferredWorld, context: HookContext) {
         commands.entity(entity).try_despawn();
     }
 }
+
+#[cfg(test)]
+include!("relationship_tests.rs");

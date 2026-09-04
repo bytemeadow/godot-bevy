@@ -34,7 +34,6 @@ pub struct MainMenuPlugin;
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuAssets>()
-            // Enable signal routing for our menu events
             .add_plugins(GodotSignalsPlugin::<StartGameRequested>::default())
             .add_plugins(GodotSignalsPlugin::<ToggleFullscreenRequested>::default())
             .add_plugins(GodotSignalsPlugin::<QuitRequested>::default())
@@ -47,7 +46,6 @@ impl Plugin for MainMenuPlugin {
                 )
                     .run_if(in_state(GameState::MainMenu)),
             )
-            // Use observers for button press handling
             .add_observer(on_start_game)
             .add_observer(on_toggle_fullscreen)
             .add_observer(on_quit);
@@ -75,9 +73,7 @@ fn reset_menu_assets(mut menu_assets: ResMut<MenuAssets>) {
 }
 
 fn init_menu_assets(mut menu_assets: ResMut<MenuAssets>, mut scene_tree: SceneTreeRef) {
-    // Try to find menu nodes, but handle failure gracefully
     if let Some(root) = scene_tree.get().get_root() {
-        // Try to create MenuUi - this might fail if nodes aren't ready yet
         match MenuUi::from_node(root) {
             Ok(menu_ui) => {
                 info!("MainMenu: Successfully found menu nodes");
@@ -103,7 +99,6 @@ fn menu_initialized_but_signals_not_connected(menu_assets: Res<MenuAssets>) -> b
     menu_assets.initialized && !menu_assets.signals_connected
 }
 
-// Typed events for menu actions
 #[derive(Event, Debug, Clone)]
 struct StartGameRequested;
 
@@ -117,12 +112,10 @@ struct QuitRequested {
 
 fn connect_buttons(
     mut menu_assets: ResMut<MenuAssets>,
-    // Typed bridges for precise events
     signals_start: GodotSignals<StartGameRequested>,
     signals_fullscreen: GodotSignals<ToggleFullscreenRequested>,
     signals_quit: GodotSignals<QuitRequested>,
 ) {
-    // Check if all buttons are available first
     if menu_assets.start_button.is_some()
         && menu_assets.fullscreen_button.is_some()
         && menu_assets.quit_button.is_some()
@@ -170,7 +163,6 @@ fn on_start_game(
     mut app_state: ResMut<NextState<GameState>>,
     mut commands: Commands,
 ) {
-    // Only respond when in MainMenu state
     if *state.get() != GameState::MainMenu {
         return;
     }
@@ -186,7 +178,6 @@ fn on_toggle_fullscreen(
     state: Res<bevy::state::state::State<GameState>>,
     mut godot: GodotAccess,
 ) {
-    // Only respond when in MainMenu state
     if *state.get() != GameState::MainMenu {
         return;
     }
@@ -205,7 +196,6 @@ fn on_quit(
     state: Res<bevy::state::state::State<GameState>>,
     mut godot: GodotAccess,
 ) {
-    // Only respond when in MainMenu state
     if *state.get() != GameState::MainMenu {
         return;
     }

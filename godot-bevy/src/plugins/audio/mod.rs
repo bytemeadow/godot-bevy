@@ -4,8 +4,10 @@
 //! with Bevy's ECS, offering channels, spatial audio, and smooth transitions.
 //!
 //! # Example
-//! ```ignore
-//! use bevy::prelude::*;
+//! ```no_run
+//! use bevy_asset::AssetServer;
+//! use bevy_ecs::prelude::{Res, Resource};
+//! use bevy_math::Vec2;
 //! use godot_bevy::prelude::*;
 //!
 //! fn setup_audio(
@@ -13,13 +15,11 @@
 //!     sound_effects: Res<AudioChannel<SoundEffects>>,
 //!     asset_server: Res<AssetServer>,
 //! ) {
-//!     // Play background music
 //!     background_music
 //!         .play(asset_server.load("music/background.ogg"))
 //!         .volume(0.8)
 //!         .looped();
 //!
-//!     // Play a sound effect at a specific 2D position
 //!     sound_effects
 //!         .play_2d(
 //!             asset_server.load("sounds/jump.wav"),
@@ -29,7 +29,6 @@
 //!         .pitch(1.2);
 //! }
 //!
-//! // Define custom audio channels
 //! #[derive(Resource)]
 //! struct BackgroundMusic;
 //! impl AudioChannelMarker for BackgroundMusic {
@@ -51,7 +50,6 @@ pub mod plugin;
 pub mod settings;
 pub mod tween;
 
-// Re-export main types for convenience
 pub use channel::{AudioChannel, AudioChannelMarker, ChannelId, MainAudioTrack, PlayAudioCommand};
 pub use command::{AudioCommand, PlayCommand};
 pub use output::{ActiveTween, AudioOutput, SoundId, TweenType};
@@ -60,7 +58,6 @@ pub use plugin::{AudioApp, AudioError, GodotAudioChannels, GodotAudioPlugin};
 pub use settings::AudioSettings;
 pub use tween::{AudioEasing, AudioTween};
 
-// Internal types that need to be accessible within the audio module
 pub(crate) use channel::ChannelState;
 
 /// Main audio channel type alias for convenience

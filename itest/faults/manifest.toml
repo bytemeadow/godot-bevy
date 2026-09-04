@@ -1,0 +1,74 @@
+version = 1
+profiles = ["debug", "release"]
+
+[[faults]]
+id = "transform_bevy_write_uses_shadow"
+patch = "001-transform-bevy-write-uses-shadow.patch"
+killer_test = "test_bevy_to_godot_transform_sync"
+assertion_signature = "Position should sync"
+
+[[faults]]
+id = "transform_godot_read_is_discarded"
+patch = "002-transform-godot-read-is-discarded.patch"
+killer_test = "test_godot_to_bevy_transform_sync"
+assertion_signature = "Bevy should detect Godot transform changes"
+
+[[faults]]
+id = "scene_remove_keeps_entity"
+patch = "003-scene-remove-keeps-entity.patch"
+killer_test = "test_remove_child_despawns_entity"
+assertion_signature = "Entity should be despawned after remove_child()"
+
+[[faults]]
+id = "scene_reparent_is_removal"
+patch = "004-scene-reparent-is-removal.patch"
+killer_test = "test_node_reparenting_preserves_entity"
+assertion_signature = "Entity should still exist after reparenting"
+
+[[faults]]
+id = "signal_drain_drops_dispatch"
+patch = "005-signal-drain-drops-dispatch.patch"
+killer_test = "test_signal_connection_same_frame"
+assertion_signature = "Signal should be received after connect"
+
+[[faults]]
+id = "collision_end_drops_observer"
+patch = "006-collision-end-drops-observer.patch"
+killer_test = "test_collision_ended_observer_from_system"
+assertion_signature = "CollisionEnded observer should fire once from system pipeline"
+
+[[faults]]
+id = "event_bridge_drains_twice"
+patch = "007-event-bridge-drains-twice.patch"
+killer_test = "test_send_event_delivers_exactly_once"
+assertion_signature = "event bridge should deliver exactly once across two frames"
+
+[[faults]]
+id = "input_edge_sticks"
+patch = "008-input-edge-sticks.patch"
+killer_test = "test_godot_actions_edges_in_both_clocks"
+assertion_signature = "process just_pressed must fire exactly once"
+
+[[faults]]
+id = "autosync_registered_match_bypassed"
+patch = "009-autosync-registered-match-bypassed.patch"
+killer_test = "test_autosync_matches_registered_type"
+assertion_signature = "registered type should receive its bundle component"
+
+[[faults]]
+id = "packed_scene_reconciliation_duplicates_entity"
+patch = "010-packed-scene-reconciliation-duplicates-entity.patch"
+killer_test = "test_packed_scene_spawn_reconciles_to_single_entity"
+assertion_signature = "expected exactly one entity for the spawned node"
+
+[[faults]]
+id = "asset_reader_returns_empty_bytes"
+patch = "011-asset-reader-returns-empty-bytes.patch"
+killer_test = "test_read_delivers_real_bytes"
+assertion_signature = "reader must deliver the real file bytes, not an empty stream"
+
+[[faults]]
+id = "fixed_driver_ignores_pause"
+patch = "012-fixed-driver-ignores-pause.patch"
+killer_test = "test_tree_pause_freezes_fixed_runs_update"
+assertion_signature = "FixedUpdate must be frozen under SceneTree.paused"

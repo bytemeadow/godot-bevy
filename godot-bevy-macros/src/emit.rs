@@ -24,8 +24,6 @@ pub fn emit(plan: &ClassPlan, input: &DeriveInput) -> TokenStream2 {
     out
 }
 
-/// The generated `#[derive(GodotClass)]` struct, one `#[export]` per primary field and per
-/// generated companion export.
 fn emit_node_class(plan: &ClassPlan, input: &DeriveInput) -> TokenStream2 {
     let class = &plan.godot_class;
     let base = &plan.base;
@@ -76,8 +74,6 @@ fn export_field(m: &Mapping, ty: Option<Type>) -> TokenStream2 {
     }
 }
 
-/// The autosync `create_bundle_fn` + its `inventory::submit!`. Reads the editor-authored
-/// `#[export]` values off the node and inserts them as a direct component tuple.
 fn emit_autosync(plan: &ClassPlan, input: &DeriveInput) -> TokenStream2 {
     let class = &plan.godot_class;
     let fn_name = format_ident!("__create_{}_bundle", class.to_string().to_lowercase());
@@ -159,7 +155,6 @@ fn field_init(m: &Mapping) -> TokenStream2 {
     quote!(#field: #read)
 }
 
-/// `node.bind().prop.clone()`, run through `with(...)` when present.
 fn read_prop(m: &Mapping) -> TokenStream2 {
     let prop = &m.godot_prop;
     let read = quote!(node.bind().#prop.clone());
@@ -169,8 +164,7 @@ fn read_prop(m: &Mapping) -> TokenStream2 {
     }
 }
 
-/// Register companions as Bevy required components so pure-Bevy spawns get the declared
-/// defaults. Uses the non-panicking `try_*` forms and logs on failure; skips any companion
+/// Uses the non-panicking `try_*` forms and logs on failure; skips any companion
 /// already named in a sibling `#[require(...)]` to avoid Bevy's double-registration panic.
 fn emit_required_registration(
     plan: &ClassPlan,
@@ -254,8 +248,6 @@ fn registration_warn(comp: &Path, trigger: &Path) -> TokenStream2 {
     }
 }
 
-/// The Bevy-side default for a generated-export companion: its export default (or the export
-/// type's `Default`), run through `with(...)` when set.
 fn companion_default_value(m: &Mapping) -> TokenStream2 {
     let ty = m.as_type.as_ref().expect("generated export has `as`");
     let default = m
@@ -320,7 +312,6 @@ fn has_top_level_comma(ts: TokenStream2) -> bool {
     false
 }
 
-/// Collect the component idents named in sibling `#[require(...)]` attributes.
 fn collect_require_idents(attrs: &[Attribute]) -> HashSet<String> {
     let mut set = HashSet::new();
     for attr in attrs {
@@ -340,7 +331,6 @@ fn collect_require_idents(attrs: &[Attribute]) -> HashSet<String> {
     set
 }
 
-/// One `#[require(...)]` entry: a component path, ignoring any trailing `= expr` / `(args)`.
 struct RequireEntry(Path);
 
 impl Parse for RequireEntry {
@@ -354,72 +344,4 @@ impl Parse for RequireEntry {
 }
 
 #[cfg(test)]
-mod tests {
-    use syn::parse_quote;
-
-    #[test]
-    fn cf_generates_class_companions_and_required_registration() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode, Default)]
-            #[gdbevy(base = CharacterBody2D, class_name = Player2D)]
-            #[gdbevy(require(speed: Speed, as = f32, default = 250.0), require(Stunned))]
-            struct Player;
-        };
-        let out = crate::godot_node::derive_godot_node_component(di)
-            .unwrap()
-            .to_string();
-        assert!(out.contains("# [class (base = CharacterBody2D"));
-        assert!(out.contains("pub struct Player2D"));
-        assert!(out.contains("# [export]") && out.contains("speed : f32"));
-        assert!(out.contains("# [init (val = 250.0"));
-        assert!(out.contains("try_register_required_components_with"));
-        assert!(
-            out.contains("try_register_required_components ::")
-                || out.contains("try_register_required_components <")
-        );
-        assert!(out.contains("GodotRequiredComponents"));
-        assert!(out.contains("AutoSyncBundleRegistry"));
-        assert!(out.contains("Stunned :: default ()"));
-        assert!(!out.contains("bevy_bundle"));
-    }
-
-    #[test]
-    fn gf_emits_insert_and_no_class() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(GodotClass, BevyComponents)]
-            #[gdbevy(require(Player))]
-            struct PlayerNode {
-                base: Base<Node2D>,
-                #[gdbevy(component = Speed, with = to_speed)]
-                #[export] speed: f32,
-            }
-        };
-        let out = crate::godot_node::derive_bevy_components(di)
-            .unwrap()
-            .to_string();
-        assert!(!out.contains("# [class (base")); // user owns the class; we do NOT generate it
-        assert!(out.contains("AutoSyncBundleRegistry"));
-        assert!(out.contains("Speed (to_speed (node . bind () . speed . clone ()))"));
-        assert!(out.contains("Player :: default ()"));
-        assert!(!out.contains("GodotRequiredComponents")); // GF has no trigger
-        assert!(!out.contains("bevy_bundle"));
-    }
-
-    #[test]
-    fn cf_skips_companion_already_in_sibling_require() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode, Default)]
-            #[require(Stunned)]
-            #[gdbevy(require(Stunned), require(speed: Speed, as = f32))]
-            struct Player;
-        };
-        let out = crate::godot_node::derive_godot_node_component(di)
-            .unwrap()
-            .to_string();
-        assert!(
-            !out.contains("try_register_required_components :: < Player , Stunned >")
-                && !out.contains("< Player , Stunned >")
-        );
-        assert!(out.contains("try_register_required_components_with"));
-    }
-}
+include!("emit_tests.rs");

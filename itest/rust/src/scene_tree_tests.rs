@@ -1,17 +1,9 @@
-/*
- * Scene tree integration tests
- *
- * Tests automatic entity creation, removal, renaming, reparenting,
- * ProtectedNodeEntity, GodotNodeHandle validity, and NodeEntityIndex.
- */
-
 use godot::obj::NewAlloc;
 use godot::prelude::*;
 use godot_bevy::plugins::scene_tree::ProtectedNodeEntity;
 use godot_bevy::prelude::*;
 use godot_bevy_test::prelude::*;
 
-/// Test that adding a node to the scene tree creates an entity
 #[itest(async)]
 fn test_node_added_creates_entity(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -165,7 +157,6 @@ fn test_reparent_to_root_clears_godot_child_of(ctx: &TestContext) -> godot::task
     })
 }
 
-/// Test that removing a node generates appropriate events/cleanup
 #[itest(async)]
 fn test_node_removed_cleanup(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -191,7 +182,6 @@ fn test_node_removed_cleanup(ctx: &TestContext) -> godot::task::TaskHandle {
     })
 }
 
-/// Test that renaming a node is handled correctly
 #[itest(async)]
 fn test_node_renamed_event(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -204,7 +194,6 @@ fn test_node_renamed_event(ctx: &TestContext) -> godot::task::TaskHandle {
         let node_id = node.instance_id();
 
         node.set_name("RenamedNode");
-        // Wait for rename to propagate to ECS
         app.updates(2).await;
 
         assert!(
@@ -217,7 +206,6 @@ fn test_node_renamed_event(ctx: &TestContext) -> godot::task::TaskHandle {
     })
 }
 
-/// Test that ProtectedNodeEntity prevents despawn when node is freed
 #[itest(async)]
 fn test_protected_node_entity(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -236,7 +224,6 @@ fn test_protected_node_entity(ctx: &TestContext) -> godot::task::TaskHandle {
         });
 
         node.queue_free();
-        // Wait for removal to propagate to ECS
         app.updates(2).await;
 
         let entity_still_exists = app.with_world(|world| world.get_entity(entity).is_ok());
@@ -265,7 +252,6 @@ fn test_protected_node_entity(ctx: &TestContext) -> godot::task::TaskHandle {
     })
 }
 
-/// Test that GodotNodeHandle points to correct node
 #[itest(async)]
 fn test_node_handle_validity(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -312,7 +298,6 @@ fn test_node_handle_validity(ctx: &TestContext) -> godot::task::TaskHandle {
     })
 }
 
-/// Test that entity data survives node reparenting
 #[itest(async)]
 fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -332,7 +317,6 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
         child.set_name("Child");
         parent1.clone().add_child(&child);
 
-        // Wait for entities to be created
         app.updates(2).await;
 
         let entity = app
@@ -347,7 +331,6 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
         });
 
         child.reparent(&parent2);
-        // Wait for reparent to propagate to ECS
         app.updates(2).await;
 
         let entity_exists = app.with_world(|world| world.get_entity(entity).is_ok());
@@ -381,7 +364,7 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
     })
 }
 
-/// Test that a reparent does not re-seed the registry-initialized Transform from the node,
+/// A reparent must not re-seed the registry-initialized Transform from the node,
 /// clobbering a value a system authored. Uses `auto_sync: false` so the ECS value never
 /// propagates to the node and stays observably distinct.
 #[itest(async)]
@@ -413,14 +396,12 @@ fn test_reparent_preserves_registry_transform(ctx: &TestContext) -> godot::task:
             .clone()
             .add_child(&child.clone().upcast::<godot::classes::Node>());
 
-        // Wait for the entity to be created and its Transform seeded from the node.
         app.updates(2).await;
 
         let entity = app
             .entity_for_node(child.instance_id())
             .expect("Child entity should exist");
 
-        // A system authors a sentinel translation the node does not carry.
         app.with_world_mut(|world| {
             let mut transform = world
                 .get_mut::<Transform>(entity)
@@ -448,7 +429,6 @@ fn test_reparent_preserves_registry_transform(ctx: &TestContext) -> godot::task:
     })
 }
 
-/// Test that remove_child() despawns the entity (unlike reparent which preserves it)
 #[itest(async)]
 fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -464,7 +444,6 @@ fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHand
         child.set_name("RemoveChildTest");
         parent.clone().add_child(&child);
 
-        // Wait for entities to be created
         app.updates(2).await;
 
         let entity = app
@@ -472,7 +451,6 @@ fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHand
             .expect("Child entity should exist");
 
         parent.remove_child(&child);
-        // Wait for removal to propagate to ECS
         app.updates(2).await;
 
         let entity_exists = app.with_world(|world| world.get_entity(entity).is_ok());
@@ -487,7 +465,6 @@ fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHand
     })
 }
 
-/// Test that NodeEntityIndex is populated when nodes are added
 #[itest(async)]
 fn test_node_entity_index_populated_on_add(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -519,7 +496,6 @@ fn test_node_entity_index_populated_on_add(ctx: &TestContext) -> godot::task::Ta
     })
 }
 
-/// Test that NodeEntityIndex is updated when nodes are removed
 #[itest(async)]
 fn test_node_entity_index_updated_on_remove(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -539,7 +515,6 @@ fn test_node_entity_index_updated_on_remove(ctx: &TestContext) -> godot::task::T
         );
 
         node.queue_free();
-        // Wait for removal to propagate to ECS
         app.updates(2).await;
 
         assert!(
@@ -552,8 +527,7 @@ fn test_node_entity_index_updated_on_remove(ctx: &TestContext) -> godot::task::T
 }
 
 /// A packed-scene spawn (handle attached outside the scene-tree plugin) must
-/// reconcile to its existing entity on NodeAdded, never spawn a duplicate — the
-/// invariant the naive "route lookups through NodeEntityIndex" change broke.
+/// reconcile to its existing entity on NodeAdded rather than spawning a duplicate.
 #[itest(async)]
 fn test_packed_scene_spawn_reconciles_to_single_entity(
     ctx: &TestContext,

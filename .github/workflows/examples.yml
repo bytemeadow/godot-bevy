@@ -31,7 +31,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Detect which examples changed
   changes:
     name: detect changes
     runs-on: ubuntu-latest
@@ -68,7 +67,6 @@ jobs:
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
 
-  # Build example libraries on all platforms (needed for cross-platform Godot export)
   build:
     name: build ${{ matrix.example }} (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
@@ -80,8 +78,6 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         example: ${{ fromJson(needs.changes.outputs.examples) }}
         exclude:
-          # Exclude nothing - all examples build for native platforms
-          # simple-node2d-movement also has a web build in the build-web job
           - example: ""
         include:
           - os: ubuntu-latest
@@ -123,8 +119,6 @@ jobs:
             target/release/*.dll
           if-no-files-found: warn
 
-  # Export examples for all platforms (requires libraries from build).
-  # Runs when dodge-the-creeps-2d or platformer-2d changed.
   export:
     name: export (${{ matrix.example }})
     runs-on: macos-latest
@@ -198,7 +192,6 @@ jobs:
           path: examples/${{ matrix.example }}/godot/exports/
           if-no-files-found: error
 
-  # Build simple-node2d-movement for WebAssembly (requires Emscripten)
   build-web:
     name: build simple-node2d-movement (wasm)
     runs-on: ubuntu-latest
