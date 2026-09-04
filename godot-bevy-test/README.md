@@ -74,6 +74,8 @@ godot --headless --path godot --import
 GODOT_BEVY_ITEST=1 godot --headless --fixed-fps 60 --path godot --scene res://addons/godot-bevy/test/TestRunner.tscn --quit-after 10000
 ```
 
+Godot can crash on exit after a headless import once a GDExtension is loaded ([godot#111645](https://github.com/godotengine/godot/issues/111645)). The `.godot` folder is written before that, so the crash is harmless and the runner skips the import on later runs.
+
 ## Runner configuration
 
 | Variable | Meaning |

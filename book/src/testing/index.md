@@ -75,6 +75,8 @@ godot --headless --path godot --import
 GODOT_BEVY_ITEST=1 godot --headless --fixed-fps 60 --path godot --scene res://addons/godot-bevy/test/TestRunner.tscn --quit-after 10000
 ```
 
+Godot can crash on exit after a headless import once a GDExtension is loaded ([godot#111645](https://github.com/godotengine/godot/issues/111645)). The `.godot` folder is written before that, so the crash is harmless and the runner skips the import on later runs.
+
 `ITEST_FILTER` selects comma-separated, case-sensitive name substrings. `ITEST_REPEAT` repeats selected tests. `ITEST_JSON_PATH` writes a report. `#[itest(skip)]` reports a skipped test, while `#[itest(focus)]` selects focused tests; set `ITEST_DENY_FOCUS=1` in CI to reject focus mode. The full configuration table is in the [godot-bevy-test README](https://github.com/bytemeadow/godot-bevy/tree/main/godot-bevy-test#runner-configuration).
 
 ## Troubleshooting

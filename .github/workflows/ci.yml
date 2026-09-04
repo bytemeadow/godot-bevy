@@ -237,6 +237,13 @@ jobs:
           GODOT4_BIN: godot
         run: ./run-tests.sh ${{ matrix.profile == 'release' && '--release' || '' }} --json ../target/itest-${{ matrix.profile }}.json
 
+      - name: Import platformer Godot project
+        # Headless import can segfault on exit once a GDExtension is loaded
+        # (godotengine/godot#111645). The .godot folder is written before that, so
+        # tolerate the exit status like run-tests.sh does; cargo-godot-lib then skips
+        # its own import.
+        run: godot --headless --path examples/platformer-2d/godot --import --quit || true
+
       - name: Run platformer integration tests
         env:
           GODOT4_BIN: godot
