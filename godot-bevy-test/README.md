@@ -1,155 +1,82 @@
 # godot-bevy-test
 
-Integration testing framework for godot-bevy projects.
+`godot-bevy-test` runs integration tests inside Godot with real frame progression.
 
-This crate provides a testing framework for writing integration tests that run inside Godot with full access to both Bevy ECS and Godot's runtime. Tests execute in headless mode with real frame progression, allowing you to verify your game logic works correctly in the actual runtime environment.
+## Setup
 
-## Features
-
-- **Real Godot Integration**: Tests run in Godot's headless mode with actual frame progression
-- **Async Test Support**: Wait for frames, test across multiple update cycles
-- **Bevy-style API**: Familiar `TestApp` pattern with world access
-- **Structured Reports**: Versioned JSON with per-attempt timing and failures
-- **Filtering & Repeats**: Select by name, repeat tests, and detect flakes
-- **Benchmark Support**: Performance benchmarking with statistical analysis
-- **Focus & Skip**: Easily focus on specific tests or skip work-in-progress
-- **Cross-platform**: Works on Linux, macOS, and Windows
-
-## Quick Start
-
-### 1. Create a Test Crate
-
-Create a separate crate for your integration tests:
+Keep tests in the game crate and gate them behind an `itest` feature. The game keeps its existing `cdylib` and `#[bevy_app]` entry point.
 
 ```toml
-# my-game-tests/Cargo.toml
-[package]
-name = "my-game-tests"
-version = "0.1.0"
-edition = "2024"
-
-[lib]
-crate-type = ["cdylib"]
-
 [dependencies]
+bevy = { version = "0.19", default-features = false }
 godot = "0.5"
 godot-bevy = "0.11"
-godot-bevy-test = "0.11"
-bevy = { version = "0.18", default-features = false }
+godot-bevy-test = { version = "0.11", optional = true }
 
-# Your game crate (for testing your components/systems)
-my-game = { path = "../my-game" }
+[features]
+itest = ["dep:godot-bevy-test", "godot-bevy-test/test-frame-signal"]
 ```
 
-### 2. Set Up the Test Entry Point
+Register the runner in the same library as the game extension:
 
 ```rust
-// my-game-tests/src/lib.rs
-use godot::init::{ExtensionLibrary, gdextension};
-use godot_bevy_test::prelude::*;
+#[cfg(feature = "itest")]
+mod itests;
 
-// Declare the test runner class for Godot
+#[cfg(feature = "itest")]
 godot_bevy_test::declare_test_runner!();
-
-// Include your test modules
-mod player_tests;
-mod combat_tests;
-
-#[gdextension(entry_symbol = my_game_tests)]
-unsafe impl ExtensionLibrary for IntegrationTests {}
 ```
 
-### 3. Write Tests
+Use the game’s Godot project. It needs the `godot-bevy` addon and the `BevyAppSingleton` autoload. Launch `res://addons/godot-bevy/test/TestRunner.tscn` with `--scene`; do not copy the runner scene into another project. Set `GODOT_BEVY_ITEST=1` before starting Godot so the autoload does not boot the game before the runner initializes it.
+
+## Writing tests
+
+The usual form is an async function with an owned `TestContext`:
 
 ```rust
-// my-game-tests/src/player_tests.rs
 use bevy::prelude::*;
 use godot_bevy_test::prelude::*;
-use my_game::Player;
 
-#[itest(async)]
-fn test_player_movement(ctx: &TestContext) -> godot::task::TaskHandle {
-    godot::task::spawn(async move {
-        let mut app = TestApp::new(&ctx, |app| {
-            app.add_plugins(my_game::PlayerPlugin);
-        }).await;
-
-        // Spawn a player
-        app.with_world_mut(|world| {
-            world.spawn((Player::default(), Transform::default()));
-        });
-
-        // Run a few frames
-        for _ in 0..5 {
-            app.update().await;
-        }
-
-        // Verify player moved
-        let pos = app.with_world(|world| {
-            world.query::<&Transform>()
-                .iter(world)
-                .next()
-                .unwrap()
-                .translation
-        });
-        
-        assert!(pos.x > 0.0, "Player should have moved");
+#[itest]
+async fn player_spawns(ctx: TestContext) {
+    let mut app = TestApp::new(&ctx, |app| {
+        app.add_plugins(PlayerPlugin);
     })
+    .await;
+
+    app.with_world_mut(|world| {
+        let mut players = world.query::<&Player>();
+        assert_eq!(players.iter(world).count(), 0);
+    });
+
+    app.cleanup().await;
 }
 ```
 
-### 4. Set Up Godot Test Project
+Use `with_world` for read-only access. Queries require `with_world_mut`, because constructing a Bevy query mutates world-local query state.
 
-Create a minimal Godot project for running tests:
+`#[itest(async)] fn test(ctx: &TestContext) -> godot::task::TaskHandle` is still supported when a test must return an explicitly spawned task. Async functions cannot take `&TestContext` because that reference cannot outlive the wrapper.
 
-```
-my-game-tests/
-├── godot/
-│   ├── project.godot
-│   └── my-game-tests.gdextension
-```
+`#[itest(skip)]` leaves a test in the report without running it. `#[itest(focus)]` runs only focused tests. `ITEST_DENY_FOCUS=1` rejects focused registrations in CI.
 
-The `.gdextension` file should point to your test library:
+## Running tests
 
-```ini
-[configuration]
-entry_symbol = "my_game_tests"
-compatibility_minimum = 4.3
-
-[libraries]
-linux.debug.x86_64 = "res://../target/debug/libmy_game_tests.so"
-# ... other platforms
-```
-
-**Important:** The godot-bevy plugin must be enabled (or `BevyAppSingleton` registered as an autoload) in the test project's `project.godot`. `TestApp` uses the autoload to match production node layout.
-
-### 5. Run Tests
+Run the game crate’s runner:
 
 ```bash
-cd my-game-tests
-cargo build
-godot4 --headless --path godot --quit-after 5000
+cargo run --features itest
 ```
 
-## API Reference
+For a direct launch, import once after adding or changing the extension, then run:
 
-### Test Macros
-
-```rust
-#[itest]                    // Sync test
-#[itest(async)]             // Async test (most common)
-#[itest(skip)]              // Skip this test
-#[itest(focus)]             // Only run focused tests
-#[itest(async, skip)]       // Combine attributes
+```bash
+godot --headless --path godot --import
+GODOT_BEVY_ITEST=1 godot --headless --fixed-fps 60 --path godot --scene res://addons/godot-bevy/test/TestRunner.tscn --quit-after 10000
 ```
 
-Macro options are exact tokens. Unknown or misspelled options are compile errors.
-Focus selects only focused registrations and still intersects with `ITEST_FILTER`.
-Set `ITEST_DENY_FOCUS=1` in CI to reject focus mode before tests execute.
+Godot can crash on exit after a headless import once a GDExtension is loaded ([godot#111645](https://github.com/godotengine/godot/issues/111645)). The `.godot` folder is written before that, so the crash is harmless and the runner skips the import on later runs.
 
-### Runner Configuration
-
-The runner reads these environment variables:
+## Runner configuration
 
 | Variable | Meaning |
 | --- | --- |
@@ -160,99 +87,41 @@ The runner reads these environment variables:
 | `ITEST_DENY_FOCUS` | `1`/`true` rejects focused runs; default false |
 | `ITEST_BUILD_PROFILE` | `debug` or `release` report metadata |
 
-Filters are trimmed and empty terms are discarded; a fully empty filter or a
-zero-test selection is a configuration error. Skip affects execution after
-selection, so selected skipped tests remain visible in the report.
+Filters are trimmed and empty terms are discarded. Empty selections are configuration errors. Skip affects execution after selection, so selected skipped tests remain visible in the report.
 
-The report schema is published at
-`schema/itest-report-v1.schema.json`. Requested reports are checkpointed with
-`complete: false` after every logical test and atomically finalized. Exit codes
-are 0 for pass, 1 for failed/flaky/timeout results, and 2 for configuration or
-harness errors.
+## TestApp
 
-### TestApp
+`TestApp::new(&ctx, build_app)` can boot the full game because `#[bevy_app]` leaves `build_app` as a normal function. Prefer adding the specific plugins a test needs. `update().await` advances one frame, and `physics_update().await` guarantees a physics tick. Call `cleanup().await` before freeing Godot nodes used by the test.
 
-The main testing interface:
+## Benchmarks
 
-```rust
-// Create with custom setup
-let mut app = TestApp::new(&ctx, |app| {
-    app.add_plugins(MyPlugin);
-}).await;
-
-// Step one frame
-app.update().await;
-
-// Access the world
-app.with_world(|world| { /* read-only */ });
-app.with_world_mut(|world| { /* read-write */ });
-
-// Convenience methods
-let transform = app.get_single::<Transform>();
-let entity = app.single_entity_with::<Player>();
-
-// Cleanup (automatic on drop, but prefer explicit async cleanup)
-app.cleanup().await;
-```
-
-### Frame Helpers
-
-```rust
-await_frame().await;        // Wait for next frame
-await_frames(5).await;      // Wait for N frames
-```
-
-### bevy_app_test! Macro
-
-For quick test setup with a counter:
-
-```rust
-#[itest(async)]
-fn test_systems_run(ctx: &TestContext) -> godot::task::TaskHandle {
-    bevy_app_test!(ctx, counter, |app| {
-        app.add_systems(Update, move |c: Res<MyCounter>| {
-            counter.increment();
-        });
-    }, async {
-        await_frames(5).await;
-        assert!(counter.get() >= 4);
-    })
-}
-```
-
-### Benchmarks
+`#[bench]` runs a function repeatedly and requires a return value so its work is not optimized away:
 
 ```rust
 #[bench]
-fn my_benchmark() -> i32 {
-    // Code to benchmark - must return a value
-    expensive_operation();
+fn name() -> i32 {
     42
 }
 
-#[bench(repeat = 50)]       // Custom iteration count
-fn expensive_benchmark() -> i32 {
-    very_expensive_operation();
+#[bench(repeat = 50)]
+fn repeated_name() -> i32 {
     42
 }
 ```
 
-## Custom Test Runner Name
+Build the Rust crate with `--release`, then launch:
 
-If you need a custom class name:
-
-```rust
-godot_bevy_test::declare_test_runner!(MyCustomTestRunner);
-
-#[gdextension(entry_symbol = my_tests)]
-unsafe impl ExtensionLibrary for MyCustomTestRunner {}
+```bash
+godot --headless --path godot --scene res://addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000
 ```
 
-Then update `addons/godot-bevy/test/TestRunner.gd`:
+## Troubleshooting
 
-```gdscript
-@export var test_class_name: String = "MyCustomTestRunner"
-```
+`BevyApp` defined multiple times means the game and test dependencies resolved different copies of `godot-bevy`. Run `cargo tree -d` and align their sources and versions. `IntegrationTests class not found` usually means Godot has not imported the extension or `.godot/extension_list.cfg` does not contain it; run the one-time `--import` command. A separate test crate that links the game as an rlib is unsupported because it creates duplicate GDExtension entry symbols.
+
+### Game code runs before the first test
+
+Without `GODOT_BEVY_ITEST`, the game autoload boots for a frame or two before the runner. Its startup logs and any nodes it adds under root appear before `Run godot-bevy integration tests` and leak into every test's scene scan. Set `GODOT_BEVY_ITEST=1` in the process that launches Godot.
 
 ## License
 

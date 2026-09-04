@@ -1,56 +1,48 @@
-//! Integration testing framework for godot-bevy projects
+//! Integration tests for godot-bevy projects.
 //!
-//! This crate provides a testing framework for writing integration tests
-//! that run inside Godot with full access to both Bevy ECS and Godot's runtime.
+//! Tests live in the game crate behind an `itest` feature and run in that
+//! crate's Godot project. The runner needs the godot-bevy addon and the
+//! `BevyAppSingleton` autoload already used by the game.
 //!
 //! # Quick Start
 //!
-//! 1. Add dependencies to your test crate's `Cargo.toml`:
+//! Add the optional dependency and feature to the game crate's `Cargo.toml`:
 //! ```toml
-//! [package]
-//! name = "my-game-tests"
-//! edition = "2024"
-//!
-//! [lib]
-//! crate-type = ["cdylib"]
-//!
 //! [dependencies]
-//! godot = "0.4"
-//! godot-bevy = "0.9"
-//! godot-bevy-test = "0.9"
+//! godot = "0.5"
+//! godot-bevy = "0.11"
+//! godot-bevy-test = { version = "0.11", optional = true }
+//! bevy = { version = "0.19", default-features = false }
+//!
+//! [features]
+//! itest = ["dep:godot-bevy-test", "godot-bevy-test/test-frame-signal"]
 //! ```
 //!
-//! 2. Set up your test entry point in `src/lib.rs`:
+//! Register the test runner alongside the normal `#[bevy_app]` entry point:
 //! ```no_run
-//! use godot::init::{ExtensionLibrary, gdextension};
-//! use godot_bevy_test::prelude::*;
-//!
+//! #[cfg(feature = "itest")]
 //! godot_bevy_test::declare_test_runner!();
 //!
-//! mod my_tests {}
-//!
-//! #[gdextension(entry_symbol = my_game_tests)]
-//! unsafe impl ExtensionLibrary for IntegrationTests {}
+//! #[cfg(feature = "itest")]
+//! mod itests;
 //! # fn main() {}
 //! ```
 //!
-//! 3. Write tests using the `#[itest]` macro:
+//! Write asynchronous tests with an owned [`TestContext`]:
 //! ```no_run
 //! use godot_bevy_test::prelude::*;
 //!
-//! #[itest(async)]
-//! fn test_player_spawns(ctx: &TestContext) -> godot::task::TaskHandle {
-//!     let ctx = ctx.clone();
-//!     godot::task::spawn(async move {
-//!         let mut app = TestApp::new(&ctx, |_app| {}).await;
-//!
-//!         app.update().await;
-//!     })
+//! #[itest]
+//! async fn test_player_spawns(ctx: TestContext) {
+//!     let mut app = TestApp::new(&ctx, |_app| {}).await;
+//!     app.update().await;
+//!     app.cleanup().await;
 //! }
 //! # fn main() {}
 //! ```
 //!
-//! 4. Set up a Godot project with `TestRunner.gd` and run tests headlessly.
+//! The explicit alternative is `#[itest(async)] fn test(ctx: &TestContext) ->
+//! godot::task::TaskHandle`, returning `godot::task::spawn(async move { ... })`.
 
 pub mod bencher;
 mod config;
@@ -98,7 +90,7 @@ pub mod prelude {
 /// Macro to declare the test runner GodotClass in user's crate
 ///
 /// This creates the `IntegrationTests` class (or custom name) that Godot will instantiate.
-/// Must be called once in your test crate's lib.rs.
+/// Must be called once in your game crate's lib.rs.
 ///
 /// # Example
 /// ```no_run

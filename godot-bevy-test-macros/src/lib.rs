@@ -2,7 +2,9 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream};
-use syn::{Ident, ItemFn, Lit, Meta, MetaNameValue, ReturnType, Token, parse_macro_input};
+use syn::{
+    FnArg, Ident, ItemFn, Lit, Meta, MetaNameValue, ReturnType, Token, Type, parse_macro_input,
+};
 
 #[derive(Default)]
 struct ITestOptions {
@@ -45,13 +47,15 @@ impl Parse for ITestOptions {
     }
 }
 
-/// Attribute macro for integration tests
+/// Attribute macro for integration tests.
 ///
 /// Usage:
 /// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#itest -->
 /// ```ignore
 /// #[itest]
-/// fn my_sync_test(ctx: &TestContext) {
+/// async fn my_test(ctx: TestContext) {
+///     let app = TestApp::new(&ctx, |_| {}).await;
+///     app.update().await;
 /// }
 ///
 /// #[itest(async)]
@@ -78,10 +82,25 @@ impl Parse for ITestOptions {
 /// #[itest(foucs)]
 /// fn misspelled_option() {}
 /// ```
+///
+/// Async functions take `TestContext` by value. References cannot outlive the
+/// wrapper that starts the task:
+/// ```compile_fail
+/// use godot_bevy_test_macros::itest;
+///
+/// struct TestContext;
+///
+/// #[itest]
+/// async fn borrowed_context(_ctx: &TestContext) {}
+/// ```
 #[proc_macro_attribute]
 pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);
     let options = parse_macro_input!(attr as ITestOptions);
+    expand_itest(input, options).into()
+}
+
+fn expand_itest(input: ItemFn, options: ITestOptions) -> proc_macro2::TokenStream {
     let is_async = options.is_async;
     let is_skipped = options.is_skipped;
     let is_focused = options.is_focused;
@@ -98,13 +117,74 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
         quote! { _ctx: &::godot_bevy_test::TestContext }
     };
 
-    if is_async {
+    if input.sig.asyncness.is_some() {
+        if !matches!(input.sig.output, ReturnType::Default) {
+            return syn::Error::new_spanned(
+                &input.sig.output,
+                "async #[itest] functions must return ()",
+            )
+            .into_compile_error();
+        }
+
+        if input.sig.inputs.len() > 1 {
+            return syn::Error::new_spanned(
+                &input.sig.inputs,
+                "async #[itest] functions accept at most one TestContext parameter",
+            )
+            .into_compile_error();
+        }
+
+        let (wrapper_param, context) = match input.sig.inputs.first() {
+            Some(FnArg::Typed(param)) => {
+                if matches!(&*param.ty, Type::Reference(_)) {
+                    return syn::Error::new_spanned(
+                        &param.ty,
+                        "async #[itest] functions must take TestContext by value",
+                    )
+                    .into_compile_error();
+                }
+                let pattern = &param.pat;
+                let ty = &param.ty;
+                (
+                    quote! { ctx: &::godot_bevy_test::TestContext },
+                    quote! { let #pattern: #ty = ctx.clone(); },
+                )
+            }
+            Some(FnArg::Receiver(receiver)) => {
+                return syn::Error::new_spanned(
+                    receiver,
+                    "async #[itest] functions accept TestContext by value",
+                )
+                .into_compile_error();
+            }
+            None => (quote! { _ctx: &::godot_bevy_test::TestContext }, quote! {}),
+        };
+
+        quote! {
+            #visibility fn #test_name(#wrapper_param) -> ::godot::task::TaskHandle {
+                #context
+                ::godot::task::spawn(async move #body)
+            }
+
+            ::godot::sys::shard_add!(
+                ::godot_bevy_test::__GODOT_ASYNC_ITEST;
+                ::godot_bevy_test::AsyncRustTestCase {
+                    name: #test_name_str,
+                    file: file!(),
+                    skipped: #is_skipped,
+                    focused: #is_focused,
+                    line: line!(),
+                    function: #test_name,
+                }
+            );
+        }
+    } else if is_async {
         let return_ty = match &input.sig.output {
             ReturnType::Type(_, ty) => quote! { -> #ty },
             ReturnType::Default => quote! { -> ::godot::task::TaskHandle },
         };
 
-        TokenStream::from(quote! {
+        quote! {
             #visibility fn #test_name(#param) #return_ty {
                 #body
             }
@@ -120,9 +200,9 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
                     function: #test_name,
                 }
             );
-        })
+        }
     } else {
-        TokenStream::from(quote! {
+        quote! {
             #visibility fn #test_name(#param) {
                 #body
             }
@@ -138,7 +218,7 @@ pub fn itest(attr: TokenStream, item: TokenStream) -> TokenStream {
                     function: #test_name,
                 }
             );
-        })
+        }
     }
 }
 

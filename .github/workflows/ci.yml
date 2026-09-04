@@ -139,6 +139,7 @@ jobs:
               - 'Cargo.lock'
             itest:
               - 'itest/**'
+              - 'examples/platformer-2d/**'
               - '.github/workflows/ci.yml'
             qualification:
               - '.cargo/mutants.toml'
@@ -235,6 +236,17 @@ jobs:
         env:
           GODOT4_BIN: godot
         run: ./run-tests.sh ${{ matrix.profile == 'release' && '--release' || '' }} --json ../target/itest-${{ matrix.profile }}.json
+
+      - name: Run platformer integration tests
+        env:
+          GODOT4_BIN: godot
+          GODOT: godot
+        # The first run also does the headless import, which can segfault on exit once a
+        # GDExtension is loaded (godotengine/godot#111645) after .godot is already written.
+        # Retrying once then skips the import and just runs the tests.
+        run: |
+          CMD="cargo run ${{ matrix.profile == 'release' && '--release' || '' }} --features itest --manifest-path examples/platformer-2d/rust/Cargo.toml"
+          $CMD || { test -d examples/platformer-2d/godot/.godot && $CMD; }
 
       - name: Upload integration test report
         # skipped under act: no artifact service locally (ACTIONS_RUNTIME_TOKEN)

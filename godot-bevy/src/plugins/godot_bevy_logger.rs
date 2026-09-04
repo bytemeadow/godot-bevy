@@ -76,18 +76,20 @@ impl Plugin for GodotBevyLogPlugin {
             timestamp_format: self.timestamp_format.clone(),
         };
 
+        // A second app in the same process (itest re-initialization) finds the first one's
+        // subscriber already installed; keep it rather than panic.
         #[cfg(feature = "trace_tracy")]
-        tracing_subscriber::registry()
+        let _ = tracing_subscriber::registry()
             .with(godot_proxy_layer)
             .with(filter_layer)
             .with(tracing_tracy::TracyLayer::default())
-            .init();
+            .try_init();
 
         #[cfg(not(feature = "trace_tracy"))]
-        tracing_subscriber::registry()
+        let _ = tracing_subscriber::registry()
             .with(godot_proxy_layer)
             .with(filter_layer)
-            .init();
+            .try_init();
     }
 }
 
