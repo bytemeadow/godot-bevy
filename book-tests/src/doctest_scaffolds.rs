@@ -174,7 +174,7 @@ mod itest {
 
     #[itest]
     async fn my_test(ctx: TestContext) {
-        let mut app = TestApp::new(&ctx, |_| {}).await;
+        let app = TestApp::new(&ctx, |_| {}).await;
         app.update().await;
     }
 
