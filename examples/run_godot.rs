@@ -14,10 +14,22 @@ fn main() {
 fn main() {
     unsafe { std::env::set_var("GODOT_BEVY_ITEST", "1") };
 
+    // Godot always loads the `.debug` entry, so point both entries at the profile
+    // this binary was built with; otherwise `cargo run --release` loads nothing.
+    let profile = if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    };
     let runner = cargo_godot_lib::GodotRunner::create(
         env!("CARGO_PKG_NAME"),
         &std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../godot"),
-    );
+    )
+    .gdextension_config(move |config| {
+        config
+            .debug_target(Some(profile.to_string()))
+            .release_target(Some(profile.to_string()))
+    });
 
     let runner = runner.godot_cli_arguments(vec![
         "--headless",

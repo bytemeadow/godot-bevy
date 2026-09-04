@@ -173,6 +173,12 @@ mod itest {
     use godot_bevy_test::prelude::*;
 
     #[itest]
+    async fn my_test(ctx: TestContext) {
+        let mut app = TestApp::new(&ctx, |_| {}).await;
+        app.update().await;
+    }
+
+    #[itest]
     fn my_sync_test(_ctx: &TestContext) {}
 
     #[itest(async)]
