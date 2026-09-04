@@ -9,6 +9,14 @@ mod level_manager;
 mod main_menu;
 mod scene_management;
 
+// ANCHOR: itest
+#[cfg(feature = "itest")]
+mod itests;
+
+#[cfg(feature = "itest")]
+godot_bevy_test::declare_test_runner!();
+// ANCHOR_END: itest
+
 #[bevy_app]
 fn build_app(app: &mut App) {
     // This example uses most godot-bevy features

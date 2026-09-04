@@ -1,4 +1,4 @@
-# Copy this file and TestRunner.tscn to your test project's godot/ directory.
+# Launch this scene from the installed addon with --scene; copying is not needed.
 # If you used a custom name with declare_test_runner!(CustomName),
 # update test_class_name to match.
 

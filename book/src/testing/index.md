@@ -1,332 +1,118 @@
 # Integration Testing
 
-Testing game logic can be tricky. Unit tests work great for pure Rust functions, but godot-bevy code interacts deeply with both Godot's runtime and Bevy's ECS. That's where integration testing comes in.
+Integration tests run game code in Godot with real frame progression. Use them when a system depends on the scene tree, Godot nodes, or Godot's frame loop. Pure Rust logic is still a good fit for unit tests.
 
-The `godot-bevy-test` crate provides a framework for writing tests that run inside Godot with real frame progression. Your tests have full access to both Bevy's ECS and Godot's scene tree, letting you verify that your game logic actually works in the runtime environment.
+## Project layout
 
-## Why Integration Tests?
+Tests live in the game crate and run in its Godot project:
 
-Consider testing a player movement system:
-
-```rust
-fn player_movement(
-    time: Res<Time>,
-    mut query: Query<(&mut Transform, &GodotNodeHandle), With<Player>>,
-) {
-    for (mut transform, handle) in query.iter_mut() {
-        transform.translation.x += 100.0 * time.delta_secs();
-    }
-}
+```text
+my-game/
+├── godot/
+│   ├── addons/godot-bevy/
+│   ├── project.godot
+│   └── .godot/extension_list.cfg
+└── rust/
+    ├── Cargo.toml
+    ├── run_godot.rs
+    └── src/
+        ├── lib.rs
+        └── itests.rs
 ```
 
-A unit test can't verify this works correctly because:
-- `Time` comes from Bevy's runtime
-- `GodotNodeHandle` requires a real Godot node
-- Transform sync needs Godot's scene tree
-- Frame timing depends on Godot's main loop
+Install or symlink the addon into `godot/addons/godot-bevy`, and configure its `BevyAppSingleton` autoload. The generated GDExtension must be imported once so Godot records it in `.godot/extension_list.cfg`.
 
-Integration tests solve this by running your code in the actual Godot environment.
+## Setup
 
-## Setting Up Integration Tests
-
-### 1. Create a Test Crate
-
-Integration tests live in a separate crate that compiles to a GDExtension library:
+Add the optional test dependency and enable the frame signal used by the harness:
 
 ```toml
-# my-game-tests/Cargo.toml
-[package]
-name = "my-game-tests"
-version = "0.1.0"
-edition = "2024"
-
-[lib]
-crate-type = ["cdylib"]
-
-[dependencies]
-godot = "0.4"
-godot-bevy = "0.11"
-godot-bevy-test = "0.11"
-bevy = { version = "0.18", default-features = false }
-
-# Import your game crate to test its systems
-my-game = { path = "../my-game" }
+godot-bevy-test = { version = "0.11", optional = true }
 ```
 
-### 2. Create the Test Entry Point
+```toml
+itest = ["dep:godot-bevy-test", "godot-bevy-test/test-frame-signal"]
+```
+
+Register the runner in the game library. Keep `#[bevy_app] fn build_app` as the only GDExtension entry point.
 
 ```rust
-// my-game-tests/src/lib.rs
-use godot::init::{ExtensionLibrary, gdextension};
-use godot_bevy_test::prelude::*;
-
-// This macro creates the Godot class that runs tests
-godot_bevy_test::declare_test_runner!();
-
-// Include test modules
-mod movement_tests;
-mod combat_tests;
-
-#[gdextension(entry_symbol = my_game_tests)]
-unsafe impl ExtensionLibrary for IntegrationTests {}
+{{#include ../../../examples/platformer-2d/rust/src/lib.rs:itest}}
 ```
 
-### 3. Set Up the Godot Project
+Set up `run_godot.rs` as shown in [Cargo Run Godot](../getting-started/gdenv.md). Its `itest` path starts the runner scene and sets `GODOT_BEVY_ITEST=1` for the child Godot process.
 
-Create a minimal Godot project to run the tests:
+`#[bevy_app]` leaves `build_app` as a normal function, so `TestApp::new(&ctx, build_app)` works. Most tests should add only the plugins they cover.
 
-```
-my-game-tests/
-├── rust/
-│   └── ... (your test crate)
-└── godot/
-    ├── project.godot
-    └── my-game-tests.gdextension
-```
+## Writing tests
 
-Your `.gdextension` file should point to your test library:
-
-```ini
-[configuration]
-entry_symbol = "my_game_tests"
-compatibility_minimum = 4.3
-
-[libraries]
-linux.debug.x86_64 = "res://../target/debug/libmy_game_tests.so"
-macos.debug = "res://../target/debug/libmy_game_tests.dylib"
-windows.debug.x86_64 = "res://../target/debug/my_game_tests.dll"
-```
-
-## Writing Tests
-
-### Basic Async Test
-
-Most tests are async because they need to wait for Godot frames:
+Use `#[itest]` on an async function with an owned `TestContext`. `TestApp` initializes the autoload, waits for the initial scene-tree population, and gives the test explicit frame control.
 
 ```rust
-use godot_bevy_test::prelude::*;
-use bevy::prelude::*;
-
-#[itest(async)]
-fn test_entity_spawns(ctx: &TestContext) -> godot::task::TaskHandle {
-    godot::task::spawn(async move {
-        // Create a test app with your plugins
-        let mut app = TestApp::new(&ctx, |app| {
-            app.add_plugins(MyGamePlugin);
-        }).await;
-
-        // Run one frame to initialize
-        app.update().await;
-
-        // Spawn an entity
-        app.with_world_mut(|world| {
-            world.spawn((Player::default(), Transform::default()));
-        });
-
-        // Run another frame
-        app.update().await;
-
-        // Verify the entity exists
-        let count = app.with_world(|world| {
-            world.query::<&Player>().iter(world).count()
-        });
-        
-        assert_eq!(count, 1, "Player should exist");
-    })
-}
+{{#include ../../../examples/platformer-2d/rust/src/itests.rs:gem_collected}}
 ```
 
-### Using bevy_app_test! for Quick Tests
-
-For simpler tests, the `bevy_app_test!` macro reduces boilerplate:
+Use `with_world` for read-only access. Use `with_world_mut` for mutations and queries, since creating a Bevy query needs mutable world access.
 
 ```rust
-#[itest(async)]
-fn test_system_runs_each_frame(ctx: &TestContext) -> godot::task::TaskHandle {
-    bevy_app_test!(ctx, counter, |app| {
-        #[derive(Resource)]
-        struct FrameCount(Counter);
-        
-        app.insert_resource(FrameCount(counter.clone()));
-        app.add_systems(Update, |count: Res<FrameCount>| {
-            count.0.increment();
-        });
-    }, async {
-        await_frames(5).await;
-        assert!(counter.get() >= 4, "System should run each frame");
-    })
-}
+{{#include ../../../examples/platformer-2d/rust/src/itests.rs:with_world_mut_query}}
 ```
 
-### Skip and Focus
+`#[itest(async)] fn test(ctx: &TestContext) -> godot::task::TaskHandle` remains available when a test returns an explicitly spawned task. Async functions use an owned context, because a reference cannot outlive the spawned task.
 
-During development, you can skip or focus tests:
+## Running tests
 
-```rust
-#[itest(skip)]              // Skip this test
-fn test_not_ready_yet(ctx: &TestContext) {
-    // Work in progress
-}
-
-#[itest(focus)]             // Only run focused tests
-fn test_debugging_this(ctx: &TestContext) {
-    // When any test has focus, only focused tests run
-}
-
-#[itest(async, skip)]       // Combine attributes
-fn test_flaky(ctx: &TestContext) -> godot::task::TaskHandle {
-    // ...
-}
-```
-
-## Running Tests
-
-Build and run tests in headless mode:
+Run the game crate's runner:
 
 ```bash
-cd my-game-tests
-
-# Build the test library
-cargo build
-
-# Run tests (adjust path to your Godot binary)
-godot4 --headless --path godot --quit-after 5000
+cargo run --features itest
 ```
 
-You'll see output like:
-
-```
-Run godot-bevy async integration tests...
-  Found 5 async tests in 2 files.
-  test_entity_spawns ... ok
-  test_transform_syncs ... ok
-  test_system_runs_each_frame ... ok
-  test_not_ready_yet ... [SKIP]
-  test_player_movement ... ok
-
-Test result:
-  4 passed, 1 skipped in 0.42s
-All tests passed!
-```
-
-### Test Script
-
-Create a shell script for convenience:
+After adding or changing the extension, import the project once. Then a direct invocation is:
 
 ```bash
-#!/bin/bash
-# run-tests.sh
-set -e
-
-cd "$(dirname "$0")"
-cargo build
-
-# Cross-platform temp file for exit code
-EXIT_FILE="${TMPDIR:-/tmp}/godot_test_exit_code"
-rm -f "$EXIT_FILE"
-export GODOT_TEST_EXIT_CODE_PATH="$EXIT_FILE"
-
-godot4 --headless --path godot --quit-after 5000
-
-if [ -f "$EXIT_FILE" ]; then
-    exit $(cat "$EXIT_FILE")
-else
-    exit 1
-fi
+godot --headless --path godot --import
+GODOT_BEVY_ITEST=1 godot --headless --fixed-fps 60 --path godot --scene res://addons/godot-bevy/test/TestRunner.tscn --quit-after 10000
 ```
+
+`ITEST_FILTER` selects comma-separated, case-sensitive name substrings. `ITEST_REPEAT` repeats selected tests. `ITEST_JSON_PATH` writes a report. `#[itest(skip)]` reports a skipped test, while `#[itest(focus)]` selects focused tests; set `ITEST_DENY_FOCUS=1` in CI to reject focus mode. The full configuration table is in the [godot-bevy-test README](https://github.com/bytemeadow/godot-bevy/tree/main/godot-bevy-test#runner-configuration).
+
+## Troubleshooting
+
+### BevyApp defined multiple times
+
+The game and test dependencies resolved different copies of `godot-bevy`. Run `cargo tree -d`, then align their sources and versions. A second test crate that links the game as an rlib is unsupported because it creates duplicate GDExtension entry symbols.
+
+### IntegrationTests class not found
+
+Godot did not load the extension. Run `--import` once and check that `.godot/extension_list.cfg` lists the generated GDExtension.
+
+### Must be run in headless mode
+
+The test runner only runs headlessly. Pass `--headless` when starting Godot.
+
+### Game code runs before the first test
+
+Without `GODOT_BEVY_ITEST`, the game autoload boots for a frame or two before the runner. Its startup logs and any nodes it adds under root appear before `Run godot-bevy integration tests` and leak into every test's scene scan. Set `GODOT_BEVY_ITEST=1` in the process that launches Godot.
 
 ## Benchmarks
 
-The framework also supports benchmarks:
+`#[bench]` runs a function repeatedly and requires a return value so its work is not optimized away:
 
 ```rust
-use godot_bevy_test::bench;
-
 #[bench]
-fn benchmark_spawning() -> i32 {
-    // Code to benchmark - must return a value to prevent optimization
-    let mut count = 0;
-    for _ in 0..1000 {
-        count += 1;
-    }
-    count
+fn name() -> i32 {
+    42
 }
 
-#[bench(repeat = 50)]       // Custom iteration count
-fn benchmark_expensive_op() -> i32 {
-    expensive_operation();
+#[bench(repeat = 50)]
+fn repeated_name() -> i32 {
     42
 }
 ```
 
-Run benchmarks with a separate runner:
+Build the Rust crate with `--release`, then launch the benchmark runner:
 
 ```bash
-godot4 --headless --path godot -s addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000
-```
-
-## Best Practices
-
-### 1. Test Real Behavior
-
-Don't mock Godot - use real nodes and scene tree:
-
-```rust
-// Good: Real Godot node
-let mut node = Node2D::new_alloc();
-ctx.scene_tree.clone().add_child(&node);
-
-// Bad: Trying to fake it
-// let fake_handle = GodotNodeHandle::fake(); // Don't do this
-```
-
-### 2. Clean Up After Tests
-
-Always clean up nodes you create:
-
-```rust
-#[itest(async)]
-fn test_with_cleanup(ctx: &TestContext) -> godot::task::TaskHandle {
-    godot::task::spawn(async move {
-        let mut node = Node2D::new_alloc();
-        ctx.scene_tree.clone().add_child(&node);
-
-        let mut app = TestApp::new(&ctx, |_| {}).await;
-        
-        // ... test code ...
-
-        // Clean up: BevyApp first, then nodes
-        app.cleanup();
-        node.queue_free();
-        await_frame().await;
-    })
-}
-```
-
-### 3. Wait for Frame Processing
-
-Operations often need a frame to complete:
-
-```rust
-// Spawn entity
-app.with_world_mut(|world| { world.spawn(MyComponent); });
-
-// Wait for systems to process
-app.update().await;
-
-// Now query the result
-```
-
-### 4. Use TestApp::cleanup() Before Freeing Nodes
-
-If your test creates Godot nodes that are tracked by Bevy, clean up the BevyApp first:
-
-```rust
-// Wrong order: may crash
-node.queue_free();
-app.cleanup();  // Transform sync might access freed node!
-
-// Correct order
-app.cleanup();  // Stop Bevy systems first
-node.queue_free();
+godot --headless --path godot --scene res://addons/godot-bevy/test/BenchRunner.tscn --quit-after 30000
 ```

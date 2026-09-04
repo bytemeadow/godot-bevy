@@ -103,6 +103,10 @@ fn log_plugin_diagnostics(app: &App) {
     );
 }
 
+/// Godot node hosting the Bevy `App`; the `BevyAppSingleton` autoload is one of these.
+///
+/// Integration-test runs set `GODOT_BEVY_ITEST` so the autoload does not boot the
+/// `#[bevy_app]` function; `TestApp` initializes it per test instead.
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct BevyApp {
@@ -455,6 +459,12 @@ impl INode for BevyApp {
         // Registered before the init check so it exists without a full Bevy app.
         #[cfg(debug_assertions)]
         self.register_optimized_bulk_operations();
+
+        // Integration-test runs set this so the autoload stays inert until TestApp initializes it;
+        // the runner scene loads after the autoload and cannot stop it otherwise.
+        if std::env::var_os("GODOT_BEVY_ITEST").is_some() {
+            return;
+        }
 
         let has_init = self.instance_init_func.is_some() || BEVY_INIT_FUNC.get().is_some();
         if !has_init {

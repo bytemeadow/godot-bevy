@@ -12,14 +12,17 @@ fn main() {
 
 #[cfg(feature = "itest")]
 fn main() {
+    unsafe { std::env::set_var("GODOT_BEVY_ITEST", "1") };
+
     let runner = cargo_godot_lib::GodotRunner::create(
         env!("CARGO_PKG_NAME"),
         &std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../godot"),
     );
 
-    #[cfg(feature = "itest")]
     let runner = runner.godot_cli_arguments(vec![
         "--headless",
+        "--fixed-fps",
+        "60",
         "--scene",
         "res://addons/godot-bevy/test/TestRunner.tscn",
         "--quit-after",
