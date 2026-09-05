@@ -711,7 +711,6 @@ pub fn parse_attachable_component(input: &DeriveInput) -> syn::Result<TokenStrea
 
     let mut target_type: Option<Path> = None;
 
-    // Parse the #[godot_sync(target = YourBevyComponent)] attribute
     for attr in &input.attrs {
         if attr.path().is_ident("gdbevy") {
             attr.parse_nested_meta(|meta| {

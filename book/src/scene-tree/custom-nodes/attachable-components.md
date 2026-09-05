@@ -1,4 +1,4 @@
-# Attachable components
+# Attachable Components
 
 `AttachableComponent` turns an editor-authored child node into a component on
 its parent's Bevy entity. The child is a one-shot carrier: successful attachment
