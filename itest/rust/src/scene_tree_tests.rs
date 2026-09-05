@@ -1,8 +1,54 @@
-use godot::obj::NewAlloc;
+use bevy::prelude::{Component, Entity, Name};
+use godot::obj::{InstanceId, NewAlloc};
 use godot::prelude::*;
 use godot_bevy::plugins::scene_tree::ProtectedNodeEntity;
 use godot_bevy::prelude::*;
 use godot_bevy_test::prelude::*;
+
+#[derive(Component, Clone, Copy, Debug, PartialEq)]
+struct SceneTreePayload(i32);
+
+async fn settle_scene_tree(app: &TestApp) {
+    for _ in 0..4 {
+        app.physics_update().await;
+    }
+}
+
+fn assert_node_alive(id: InstanceId) {
+    let node = Gd::<Node>::try_from_instance_id(id).expect("node must remain valid");
+    assert!(
+        !node.is_queued_for_deletion(),
+        "node must not be queued for deletion"
+    );
+}
+
+fn assert_unmirrored(app: &TestApp, id: InstanceId, entity: Entity, protected: bool) {
+    assert_eq!(
+        app.entity_for_node(id),
+        None,
+        "departed node must leave the index"
+    );
+    app.with_world(|world| {
+        if protected {
+            assert_eq!(
+                world.get::<SceneTreePayload>(entity),
+                Some(&SceneTreePayload(42))
+            );
+            assert!(world.get::<ProtectedNodeEntity>(entity).is_some());
+            assert!(world.get::<GodotNodeHandle>(entity).is_none());
+            assert!(world.get::<GodotScene>(entity).is_none());
+            assert!(world.get::<Name>(entity).is_none());
+            assert!(world.get::<Groups>(entity).is_none());
+            assert!(world.get::<GodotChildOf>(entity).is_none());
+            assert!(world.get::<GodotChildren>(entity).is_none());
+        } else {
+            assert!(
+                world.get_entity(entity).is_err(),
+                "ordinary mirror entity must despawn"
+            );
+        }
+    });
+}
 
 #[itest(async)]
 fn test_node_added_creates_entity(ctx: &TestContext) -> godot::task::TaskHandle {
@@ -77,35 +123,31 @@ fn test_bevy_exclude_skips_subtree(ctx: &TestContext) -> godot::task::TaskHandle
     })
 }
 
-/// A node reparented under a subtree carrying `_bevy_exclude` is torn down: its
-/// NodeAdded is dropped by the watcher, so the entity must not linger with a stale
-/// parent and keep syncing.
 #[itest(async)]
 fn test_reparent_into_excluded_tears_down_entity(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
-
     godot::task::spawn(async move {
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
-
-        let (node, _entity) = app.add_node::<godot::classes::Node>("Reparented").await;
+        let (mut node, entity) = app.add_node::<Node>("Reparented").await;
         let node_id = node.instance_id();
-        assert!(
-            app.has_entity_for_node(node_id),
-            "node should be mirrored before the reparent"
-        );
-
+        let child = Node::new_alloc();
+        let child_id = child.instance_id();
+        node.add_child(&child);
         let mut excluded_parent = Node::new_alloc();
         excluded_parent.set_meta("_bevy_exclude", &true.to_variant());
         ctx_clone.scene_tree.clone().add_child(&excluded_parent);
-        app.updates(2).await;
+        settle_scene_tree(&app).await;
+        let child_entity = app.entity_for_node(child_id).expect("child entity");
 
-        node.clone().reparent(&excluded_parent);
-        app.updates(3).await;
+        node.reparent(&excluded_parent);
+        settle_scene_tree(&app).await;
 
-        assert!(
-            !app.has_entity_for_node(node_id),
-            "entity must be torn down after reparenting into an excluded subtree"
-        );
+        for (id, entity) in [(node_id, entity), (child_id, child_entity)] {
+            assert_node_alive(id);
+            assert_unmirrored(&app, id, entity, false);
+        }
+        assert_eq!(node.get_parent(), Some(excluded_parent.clone()));
+        assert_eq!(child.get_parent(), Some(node));
 
         app.cleanup().await;
         excluded_parent.free();
@@ -209,46 +251,38 @@ fn test_node_renamed_event(ctx: &TestContext) -> godot::task::TaskHandle {
 #[itest(async)]
 fn test_protected_node_entity(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
-
     godot::task::spawn(async move {
-        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+        for queued in [false, true] {
+            let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+            let (mut node, entity) = app.add_node::<Node>("ProtectedNode").await;
+            let node_id = node.instance_id();
+            app.with_world_mut(|world| {
+                world
+                    .entity_mut(entity)
+                    .insert((ProtectedNodeEntity, SceneTreePayload(42)));
+            });
 
-        let (mut node, entity) = app
-            .add_node::<godot::classes::Node2D>("ProtectedNode")
-            .await;
+            if queued {
+                node.queue_free();
+                assert!(node.is_queued_for_deletion());
+            } else {
+                node.free();
+                assert!(!node_id.lookup_validity());
+            }
+            settle_scene_tree(&app).await;
 
-        let node_id = node.instance_id();
-
-        app.with_world_mut(|world| {
-            world.entity_mut(entity).insert(ProtectedNodeEntity);
-        });
-
-        node.queue_free();
-        app.updates(2).await;
-
-        let entity_still_exists = app.with_world(|world| world.get_entity(entity).is_ok());
-
-        assert!(
-            entity_still_exists,
-            "Protected entity should not be despawned when node is freed"
-        );
-
-        let handle_removed = app.with_world(|world| world.get::<GodotNodeHandle>(entity).is_none());
-
-        assert!(
-            handle_removed,
-            "GodotNodeHandle should be removed from protected entity"
-        );
-
-        let index_cleared =
-            app.with_world(|world| !world.resource::<NodeEntityIndex>().contains(node_id));
-
-        assert!(
-            index_cleared,
-            "NodeEntityIndex should remove entry for protected entity when node is freed"
-        );
-
-        app.cleanup().await;
+            assert!(!node_id.lookup_validity());
+            assert_eq!(app.entity_for_node(node_id), None);
+            app.with_world(|world| {
+                assert_eq!(
+                    world.get::<SceneTreePayload>(entity),
+                    Some(&SceneTreePayload(42))
+                );
+                assert!(world.get::<ProtectedNodeEntity>(entity).is_some());
+                assert!(world.get::<GodotNodeHandle>(entity).is_none());
+            });
+            app.cleanup().await;
+        }
     })
 }
 
@@ -301,66 +335,58 @@ fn test_node_handle_validity(ctx: &TestContext) -> godot::task::TaskHandle {
 #[itest(async)]
 fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
-
     godot::task::spawn(async move {
-        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+        for protected in [false, true] {
+            for remove_add in [false, true] {
+                let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+                let (mut parent1, _) = app.add_node::<Node>("Parent1").await;
+                let (mut parent2, parent2_entity) = app.add_node::<Node>("Parent2").await;
+                let mut child = Node::new_alloc();
+                let child_id = child.instance_id();
+                parent1.add_child(&child);
+                settle_scene_tree(&app).await;
+                let entity = app.entity_for_node(child_id).expect("child entity");
+                app.with_world_mut(|world| {
+                    world.entity_mut(entity).insert(SceneTreePayload(42));
+                    if protected {
+                        world.entity_mut(entity).insert(ProtectedNodeEntity);
+                    }
+                });
 
-        let mut parent1 = Node::new_alloc();
-        parent1.set_name("Parent1");
-        let mut parent2 = Node::new_alloc();
-        parent2.set_name("Parent2");
+                if remove_add {
+                    parent1.remove_child(&child);
+                    parent2.add_child(&child);
+                } else {
+                    child.reparent(&parent2);
+                }
+                settle_scene_tree(&app).await;
 
-        ctx_clone.scene_tree.clone().add_child(&parent1);
-        ctx_clone.scene_tree.clone().add_child(&parent2);
+                assert_node_alive(child_id);
+                assert_eq!(
+                    app.entity_for_node(child_id),
+                    Some(entity),
+                    "Entity should still exist after reparenting"
+                );
+                app.with_world(|world| {
+                    assert_eq!(
+                        world.get::<SceneTreePayload>(entity),
+                        Some(&SceneTreePayload(42))
+                    );
+                    assert_eq!(
+                        world.get::<GodotChildOf>(entity).map(GodotChildOf::get),
+                        Some(parent2_entity)
+                    );
+                    assert_eq!(
+                        world.get::<GodotNodeHandle>(entity).unwrap().instance_id(),
+                        child_id
+                    );
+                });
 
-        let mut child = Node::new_alloc();
-        child.set_name("Child");
-        parent1.clone().add_child(&child);
-
-        app.updates(2).await;
-
-        let entity = app
-            .entity_for_node(child.instance_id())
-            .expect("Child entity should exist");
-
-        #[derive(bevy::prelude::Component, Clone, Copy, Debug, PartialEq)]
-        struct CustomData(i32);
-
-        app.with_world_mut(|world| {
-            world.entity_mut(entity).insert(CustomData(42));
-        });
-
-        child.reparent(&parent2);
-        app.updates(2).await;
-
-        let entity_exists = app.with_world(|world| world.get_entity(entity).is_ok());
-
-        assert!(
-            entity_exists,
-            "Entity should still exist after reparenting (BUG: entity gets despawned)"
-        );
-
-        if entity_exists {
-            let data = app.with_world(|world| world.get::<CustomData>(entity).copied());
-            assert_eq!(
-                data,
-                Some(CustomData(42)),
-                "Component data should be preserved"
-            );
-
-            let child_id = child.instance_id();
-            let index_entity =
-                app.with_world(|world| world.resource::<NodeEntityIndex>().get(child_id));
-            assert_eq!(
-                index_entity,
-                Some(entity),
-                "NodeEntityIndex should still map to same entity after reparenting"
-            );
+                app.cleanup().await;
+                parent1.free();
+                parent2.free();
+            }
         }
-
-        app.cleanup().await;
-        parent1.free();
-        parent2.free();
     })
 }
 
@@ -432,35 +458,28 @@ fn test_reparent_preserves_registry_transform(ctx: &TestContext) -> godot::task:
 #[itest(async)]
 fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
-
     godot::task::spawn(async move {
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
-
-        let mut parent = Node::new_alloc();
-        parent.set_name("RemoveChildParent");
-        ctx_clone.scene_tree.clone().add_child(&parent);
-
-        let mut child = Node::new_alloc();
-        child.set_name("RemoveChildTest");
-        parent.clone().add_child(&child);
-
-        app.updates(2).await;
-
-        let entity = app
-            .entity_for_node(child.instance_id())
-            .expect("Child entity should exist");
+        let (mut parent, _) = app.add_node::<Node>("RemoveChildParent").await;
+        let child = Node::new_alloc();
+        let child_id = child.instance_id();
+        parent.add_child(&child);
+        settle_scene_tree(&app).await;
+        let entity = app.entity_for_node(child_id).expect("child entity");
 
         parent.remove_child(&child);
-        app.updates(2).await;
+        settle_scene_tree(&app).await;
 
-        let entity_exists = app.with_world(|world| world.get_entity(entity).is_ok());
-
+        assert_node_alive(child_id);
         assert!(
-            !entity_exists,
+            app.with_world(|world| world.get_entity(entity).is_err()),
             "Entity should be despawned after remove_child()"
         );
+        assert_unmirrored(&app, child_id, entity, false);
+        assert!(!child.is_inside_tree());
 
         app.cleanup().await;
+        child.free();
         parent.free();
     })
 }
@@ -499,29 +518,18 @@ fn test_node_entity_index_populated_on_add(ctx: &TestContext) -> godot::task::Ta
 #[itest(async)]
 fn test_node_entity_index_updated_on_remove(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
-
     godot::task::spawn(async move {
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
-
-        let (mut node, _entity) = app
-            .add_node::<godot::classes::Node2D>("IndexRemovalTestNode")
-            .await;
-
+        let (mut node, entity) = app.add_node::<Node>("IndexRemovalTestNode").await;
         let node_id = node.instance_id();
-
-        assert!(
-            app.has_entity_for_node(node_id),
-            "Node should be in index after add"
-        );
+        assert_eq!(app.entity_for_node(node_id), Some(entity));
 
         node.queue_free();
-        app.updates(2).await;
+        assert!(node.is_queued_for_deletion());
+        settle_scene_tree(&app).await;
 
-        assert!(
-            !app.has_entity_for_node(node_id),
-            "NodeEntityIndex should remove entry when node is freed"
-        );
-
+        assert!(!node_id.lookup_validity());
+        assert_unmirrored(&app, node_id, entity, false);
         app.cleanup().await;
     })
 }
@@ -580,5 +588,501 @@ fn test_packed_scene_spawn_reconciles_to_single_entity(
         }
         app.updates(2).await;
         app.cleanup().await;
+    })
+}
+
+#[itest(async)]
+fn test_protected_detach_preserves_node(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+        let (mut parent, parent_entity) = app.add_node::<Node>("ProtectedDetachParent").await;
+        let child = Node::new_alloc();
+        let child_id = child.instance_id();
+        parent.add_child(&child);
+        settle_scene_tree(&app).await;
+        let entity = app.entity_for_node(child_id).expect("child entity");
+        app.with_world_mut(|world| {
+            assert_eq!(
+                world.get::<GodotChildOf>(entity).map(GodotChildOf::get),
+                Some(parent_entity)
+            );
+            world
+                .entity_mut(entity)
+                .insert((ProtectedNodeEntity, SceneTreePayload(42)));
+        });
+
+        parent.remove_child(&child);
+        settle_scene_tree(&app).await;
+
+        assert_node_alive(child_id);
+        assert_unmirrored(&app, child_id, entity, true);
+        app.with_world(|world| {
+            assert!(
+                !world
+                    .get::<GodotChildren>(parent_entity)
+                    .is_some_and(|children| children.contains(entity))
+            );
+        });
+        app.cleanup().await;
+        child.free();
+        parent.free();
+    })
+}
+
+#[itest(async)]
+fn test_detached_subtree_cleanup(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        for auto_despawn_children in [true, false] {
+            for protected_root in [false, true] {
+                for protected_child in [false, true] {
+                    let mut app = TestApp::new(&ctx_clone, move |app| {
+                        app.world_mut()
+                            .resource_mut::<SceneTreeConfig>()
+                            .auto_despawn_children = auto_despawn_children;
+                    })
+                    .await;
+                    let (mut parent, _) = app.add_node::<Node>("SubtreeParent").await;
+                    let mut node = Node::new_alloc();
+                    let mut child = Node::new_alloc();
+                    let grandchild = Node::new_alloc();
+                    child.add_child(&grandchild);
+                    node.add_child(&child);
+                    parent.add_child(&node);
+                    settle_scene_tree(&app).await;
+                    let members = [
+                        (&node, protected_root),
+                        (&child, protected_child),
+                        (&grandchild, !protected_child),
+                    ]
+                    .map(|(node, protected)| {
+                        let id = node.instance_id();
+                        let entity = app.entity_for_node(id).expect("subtree entity");
+                        app.with_world_mut(|world| {
+                            world.entity_mut(entity).insert(SceneTreePayload(42));
+                            if protected {
+                                world.entity_mut(entity).insert(ProtectedNodeEntity);
+                            }
+                        });
+                        (id, entity, protected)
+                    });
+
+                    parent.remove_child(&node);
+                    settle_scene_tree(&app).await;
+
+                    for (id, entity, protected) in members {
+                        assert_node_alive(id);
+                        assert_unmirrored(&app, id, entity, protected);
+                    }
+                    assert!(!node.is_inside_tree());
+                    assert_eq!(child.get_parent(), Some(node.clone()));
+                    assert_eq!(grandchild.get_parent(), Some(child));
+
+                    app.cleanup().await;
+                    node.free();
+                    parent.free();
+                }
+            }
+        }
+    })
+}
+
+#[itest(async)]
+fn test_reparent_to_detached_parent(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+        let (mut node, entity) = app.add_node::<Node>("OfflineReparent").await;
+        let node_id = node.instance_id();
+        let offline_parent = Node::new_alloc();
+
+        node.reparent(&offline_parent);
+        settle_scene_tree(&app).await;
+
+        assert_node_alive(node_id);
+        assert_unmirrored(&app, node_id, entity, false);
+        assert!(!node.is_inside_tree());
+        assert_eq!(node.get_parent(), Some(offline_parent.clone()));
+
+        app.cleanup().await;
+        offline_parent.free();
+    })
+}
+
+#[itest(async)]
+fn test_protected_reparent_into_excluded(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+        let (mut node, entity) = app.add_node::<Node>("ProtectedExcluded").await;
+        let node_id = node.instance_id();
+        let child = Node::new_alloc();
+        let child_id = child.instance_id();
+        node.add_child(&child);
+        let mut excluded_parent = Node::new_alloc();
+        excluded_parent.set_meta("_bevy_exclude", &true.to_variant());
+        ctx_clone.scene_tree.clone().add_child(&excluded_parent);
+        settle_scene_tree(&app).await;
+        let child_entity = app.entity_for_node(child_id).expect("child entity");
+        app.with_world_mut(|world| {
+            for entity in [entity, child_entity] {
+                world
+                    .entity_mut(entity)
+                    .insert((ProtectedNodeEntity, SceneTreePayload(42)));
+            }
+        });
+
+        node.reparent(&excluded_parent);
+        settle_scene_tree(&app).await;
+
+        for (id, entity) in [(node_id, entity), (child_id, child_entity)] {
+            assert_node_alive(id);
+            assert_unmirrored(&app, id, entity, true);
+        }
+        assert_eq!(node.get_parent(), Some(excluded_parent.clone()));
+        assert_eq!(child.get_parent(), Some(node));
+
+        app.cleanup().await;
+        excluded_parent.free();
+    })
+}
+
+#[itest(async)]
+fn test_reparent_out_of_excluded_creates_entities(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+        let mut excluded_parent = Node::new_alloc();
+        excluded_parent.set_meta("_bevy_exclude", &true.to_variant());
+        let mut node = Node::new_alloc();
+        let child = Node::new_alloc();
+        let node_id = node.instance_id();
+        let child_id = child.instance_id();
+        node.add_child(&child);
+        excluded_parent.add_child(&node);
+        ctx_clone.scene_tree.clone().add_child(&excluded_parent);
+        let (destination, destination_entity) = app.add_node::<Node>("IncludedParent").await;
+        settle_scene_tree(&app).await;
+        assert_eq!(app.entity_for_node(node_id), None);
+        assert_eq!(app.entity_for_node(child_id), None);
+
+        node.reparent(&destination);
+        settle_scene_tree(&app).await;
+
+        assert_node_alive(node_id);
+        assert_node_alive(child_id);
+        let entity = app
+            .entity_for_node(node_id)
+            .expect("node must enter the mirror");
+        let child_entity = app
+            .entity_for_node(child_id)
+            .expect("child must enter the mirror");
+        app.with_world(|world| {
+            assert_eq!(
+                world.get::<GodotNodeHandle>(entity).unwrap().instance_id(),
+                node_id
+            );
+            assert_eq!(
+                world
+                    .get::<GodotNodeHandle>(child_entity)
+                    .unwrap()
+                    .instance_id(),
+                child_id
+            );
+            assert_eq!(
+                world.get::<GodotChildOf>(entity).map(GodotChildOf::get),
+                Some(destination_entity)
+            );
+            assert_eq!(
+                world
+                    .get::<GodotChildOf>(child_entity)
+                    .map(GodotChildOf::get),
+                Some(entity)
+            );
+        });
+
+        app.cleanup().await;
+        excluded_parent.free();
+        destination.free();
+    })
+}
+
+#[itest(async)]
+fn test_excluded_detach_preserves_node(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+        let mut excluded_parent = Node::new_alloc();
+        excluded_parent.set_meta("_bevy_exclude", &true.to_variant());
+        let mut node = Node::new_alloc();
+        let child = Node::new_alloc();
+        let ids = [node.instance_id(), child.instance_id()];
+        node.add_child(&child);
+        excluded_parent.add_child(&node);
+        ctx_clone.scene_tree.clone().add_child(&excluded_parent);
+        settle_scene_tree(&app).await;
+        for id in ids {
+            assert_eq!(app.entity_for_node(id), None);
+        }
+
+        excluded_parent.remove_child(&node);
+        settle_scene_tree(&app).await;
+
+        for id in ids {
+            assert_node_alive(id);
+            assert_eq!(app.entity_for_node(id), None);
+        }
+        app.cleanup().await;
+        node.free();
+        excluded_parent.free();
+    })
+}
+
+#[itest(async)]
+fn test_detached_node_reenters_tree(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        for protected in [false, true] {
+            let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+            let (mut parent, _) = app.add_node::<Node>("ReentryParent").await;
+            let node = Node::new_alloc();
+            let node_id = node.instance_id();
+            parent.add_child(&node);
+            settle_scene_tree(&app).await;
+            let old_entity = app.entity_for_node(node_id).expect("initial entity");
+            app.with_world_mut(|world| {
+                world.entity_mut(old_entity).insert(SceneTreePayload(42));
+                if protected {
+                    world.entity_mut(old_entity).insert(ProtectedNodeEntity);
+                }
+            });
+
+            parent.remove_child(&node);
+            settle_scene_tree(&app).await;
+            assert_node_alive(node_id);
+            assert_unmirrored(&app, node_id, old_entity, protected);
+
+            parent.add_child(&node);
+            settle_scene_tree(&app).await;
+
+            assert_node_alive(node_id);
+            assert_eq!(node.instance_id(), node_id);
+            let new_entity = app.entity_for_node(node_id).expect("reentry entity");
+            assert_ne!(new_entity, old_entity);
+            app.with_world(|world| {
+                assert!(world.get::<SceneTreePayload>(new_entity).is_none());
+                assert_eq!(
+                    world
+                        .get::<GodotNodeHandle>(new_entity)
+                        .unwrap()
+                        .instance_id(),
+                    node_id
+                );
+                if protected {
+                    assert_eq!(
+                        world.get::<SceneTreePayload>(old_entity),
+                        Some(&SceneTreePayload(42))
+                    );
+                    assert!(world.get::<GodotNodeHandle>(old_entity).is_none());
+                } else {
+                    assert!(world.get_entity(old_entity).is_err());
+                }
+            });
+            app.cleanup().await;
+            parent.free();
+        }
+    })
+}
+
+#[itest(async)]
+fn test_protected_rebind_then_despawn(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        for reattach in [false, true] {
+            let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+            let (mut parent, _) = app.add_node::<Node>("RebindParent").await;
+            let node = Node::new_alloc();
+            let node_id = node.instance_id();
+            parent.add_child(&node);
+            settle_scene_tree(&app).await;
+            let entity = app.entity_for_node(node_id).expect("initial entity");
+            app.with_world_mut(|world| {
+                world
+                    .entity_mut(entity)
+                    .insert((ProtectedNodeEntity, SceneTreePayload(42)));
+            });
+
+            parent.remove_child(&node);
+            settle_scene_tree(&app).await;
+            assert_node_alive(node_id);
+            assert_unmirrored(&app, node_id, entity, true);
+            app.with_world_mut(|world| {
+                world
+                    .entity_mut(entity)
+                    .insert(GodotNodeHandle::from(node_id));
+            });
+            if reattach {
+                parent.add_child(&node);
+                settle_scene_tree(&app).await;
+            }
+            assert_eq!(app.entity_for_node(node_id), Some(entity));
+            app.with_world_mut(|world| {
+                assert_eq!(
+                    world.get::<SceneTreePayload>(entity),
+                    Some(&SceneTreePayload(42))
+                );
+                world.entity_mut(entity).despawn();
+            });
+            assert!(node.is_queued_for_deletion());
+            settle_scene_tree(&app).await;
+
+            assert!(!node_id.lookup_validity());
+            assert_unmirrored(&app, node_id, entity, false);
+            app.cleanup().await;
+            parent.free();
+        }
+    })
+}
+
+#[itest(async)]
+fn test_ecs_despawn_frees_node(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        for protected in [false, true] {
+            for detach in [false, true] {
+                let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+                let (mut parent, _) = app.add_node::<Node>("DespawnParent").await;
+                let node = Node::new_alloc();
+                let node_id = node.instance_id();
+                parent.add_child(&node);
+                settle_scene_tree(&app).await;
+                let entity = app.entity_for_node(node_id).expect("node entity");
+                app.with_world_mut(|world| {
+                    if protected {
+                        world.entity_mut(entity).insert(ProtectedNodeEntity);
+                    }
+                });
+
+                if detach {
+                    parent.remove_child(&node);
+                }
+                app.with_world_mut(|world| {
+                    world.entity_mut(entity).despawn();
+                });
+                assert!(node.is_queued_for_deletion());
+                settle_scene_tree(&app).await;
+
+                assert!(!node_id.lookup_validity());
+                assert_unmirrored(&app, node_id, entity, false);
+                app.cleanup().await;
+                parent.free();
+            }
+        }
+    })
+}
+
+#[itest(async)]
+fn test_handle_removal_frees_node(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        for protected in [false, true] {
+            for detach in [false, true] {
+                let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+                let (mut parent, _) = app.add_node::<Node>("HandleRemovalParent").await;
+                let node = Node::new_alloc();
+                let node_id = node.instance_id();
+                parent.add_child(&node);
+                settle_scene_tree(&app).await;
+                let entity = app.entity_for_node(node_id).expect("node entity");
+                app.with_world_mut(|world| {
+                    world.entity_mut(entity).insert(SceneTreePayload(42));
+                    if protected {
+                        world.entity_mut(entity).insert(ProtectedNodeEntity);
+                    }
+                });
+
+                if detach {
+                    parent.remove_child(&node);
+                }
+                app.with_world_mut(|world| {
+                    world.entity_mut(entity).remove::<GodotNodeHandle>();
+                });
+                assert!(node.is_queued_for_deletion());
+                settle_scene_tree(&app).await;
+
+                assert!(!node_id.lookup_validity());
+                assert_eq!(app.entity_for_node(node_id), None);
+                app.with_world(|world| {
+                    assert_eq!(
+                        world.get::<SceneTreePayload>(entity),
+                        Some(&SceneTreePayload(42))
+                    );
+                    assert!(world.get::<GodotNodeHandle>(entity).is_none());
+                });
+                app.cleanup().await;
+                parent.free();
+            }
+        }
+    })
+}
+
+#[itest(async)]
+fn test_free_cleans_up_entity(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+        let (node, entity) = app.add_node::<Node>("ImmediateFree").await;
+        let node_id = node.instance_id();
+
+        node.free();
+        assert!(!node_id.lookup_validity());
+        settle_scene_tree(&app).await;
+
+        assert_unmirrored(&app, node_id, entity, false);
+        app.cleanup().await;
+    })
+}
+
+#[itest(async)]
+fn test_ecs_parent_despawn_with_auto_children_disabled(
+    ctx: &TestContext,
+) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        for protected_child in [false, true] {
+            let mut app = TestApp::new(&ctx_clone, |app| {
+                app.world_mut()
+                    .resource_mut::<SceneTreeConfig>()
+                    .auto_despawn_children = false;
+            })
+            .await;
+            let (mut parent, parent_entity) = app.add_node::<Node>("NoCascadeParent").await;
+            let parent_id = parent.instance_id();
+            let child = Node::new_alloc();
+            let child_id = child.instance_id();
+            parent.add_child(&child);
+            settle_scene_tree(&app).await;
+            let child_entity = app.entity_for_node(child_id).expect("child entity");
+            app.with_world_mut(|world| {
+                world.entity_mut(child_entity).insert(SceneTreePayload(42));
+                if protected_child {
+                    world.entity_mut(child_entity).insert(ProtectedNodeEntity);
+                }
+                world.entity_mut(parent_entity).despawn();
+                assert!(
+                    world.get_entity(child_entity).is_ok(),
+                    "ECS cascade must be disabled"
+                );
+            });
+            assert!(parent.is_queued_for_deletion());
+            settle_scene_tree(&app).await;
+
+            assert!(!parent_id.lookup_validity());
+            assert!(!child_id.lookup_validity());
+            assert_unmirrored(&app, parent_id, parent_entity, false);
+            assert_unmirrored(&app, child_id, child_entity, protected_child);
+            app.cleanup().await;
+        }
     })
 }
