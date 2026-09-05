@@ -213,6 +213,9 @@ fn extract_basic_input_events(
                 physical_keycode: Some(key_event.get_physical_keycode()),
                 pressed: key_event.is_pressed(),
                 echo: key_event.is_echo(),
+                #[cfg(any(feature = "api-4-2", feature = "api-4-3"))]
+                unicode: key_event.get_unicode() as u32,
+                #[cfg(not(any(feature = "api-4-2", feature = "api-4-3")))]
                 unicode: key_event.get_unicode(),
             });
             return;

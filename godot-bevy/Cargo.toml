@@ -16,7 +16,7 @@ bevy_asset = {version = "0.19", default-features = false}
 bevy_diagnostic = {version = "0.19", default-features = false}
 bevy_ecs = {version = "0.19", default-features = false, features = ["multi_threaded", "bevy_reflect"]}
 bevy_input = {version = "0.19", default-features = false, features = ["gestures", "keyboard", "mouse"]}
-bevy_math = {version = "0.19", default-features = false}
+bevy_math = {version = "0.19", default-features = false, features = ["std"]}
 bevy_platform = {version = "0.19", default-features = false, features = ["alloc"]}
 bevy_reflect = {version = "0.19", default-features = false}
 bevy_tasks = {version = "0.19", default-features = false, features = ["multi_threaded"]}

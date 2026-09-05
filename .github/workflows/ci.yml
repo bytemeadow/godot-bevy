@@ -105,6 +105,38 @@ jobs:
           cargo test --lib --bins --examples
           cargo test --doc -p godot-bevy -p godot-bevy-macros -p godot-bevy-test -p godot-bevy-test-macros
 
+  api-levels:
+    name: api levels
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.library == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [api-4-2, api-4-3, api-4-4, api-4-5, api-4-6]
+        feature-flags: ["", "--no-default-features"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.api }}-${{ matrix.feature-flags }}
+          workspaces: . -> target
+
+      - name: Cache and install Linux dependencies
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libasound2-dev libudev-dev pkg-config
+          version: 1.0
+
+      - name: Check API level
+        run: cargo check -p godot-bevy ${{ matrix.feature-flags }} --features ${{ matrix.api }}
+
   changes:
     name: detect changes
     runs-on: ubuntu-latest
