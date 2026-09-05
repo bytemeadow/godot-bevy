@@ -4,7 +4,7 @@ use quote::{ToTokens, format_ident, quote};
 use std::collections::HashSet;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::{Attribute, Data, DeriveInput, Expr, Ident, Path, Token, Type};
+use syn::{Attribute, Data, DeriveInput, Expr, Path, Token, Type};
 
 /// Lower a `ClassPlan` to the Godot class, autosync registration, and required-components
 /// registrar. `input` is threaded through for two things the IR doesn't carry: the primary
@@ -28,10 +28,7 @@ fn emit_node_class(plan: &ClassPlan, input: &DeriveInput) -> TokenStream2 {
 
     let mut exports: Vec<TokenStream2> = Vec::new();
     for m in &plan.primary.fields {
-        let ty = m
-            .as_type
-            .clone()
-            .or_else(|| primary_field_type(input, &m.godot_prop));
+        let ty = m.as_type.clone().or_else(|| primary_field_type(input, m));
         exports.push(export_field(m, ty));
     }
     for c in &plan.companions {
@@ -117,8 +114,22 @@ fn primary_value(primary: &PrimaryPlan) -> Option<TokenStream2> {
     if primary.fields.is_empty() {
         return Some(quote!(#path::default()));
     }
-    let inits = primary.fields.iter().map(field_init);
-    Some(quote!(#path { #(#inits,)* ..Default::default() }))
+
+    if primary.fields.iter().any(|m| m.tuple_index.is_some()) {
+        let assignments = primary.fields.iter().map(|m| {
+            let index = syn::Index::from(m.tuple_index.expect("tuple mapping has an index"));
+            let read = read_prop(m);
+            quote!(c.#index = #read;)
+        });
+        Some(quote!({
+            let mut c = #path::default();
+            #(#assignments)*
+            c
+        }))
+    } else {
+        let inits = primary.fields.iter().map(field_init);
+        Some(quote!(#path { #(#inits,)* ..Default::default() }))
+    }
 }
 
 fn companion_value(c: &ComponentPlan) -> TokenStream2 {
@@ -248,14 +259,22 @@ fn companion_default_value(m: &Mapping) -> TokenStream2 {
     }
 }
 
-fn primary_field_type(input: &DeriveInput, ident: &Ident) -> Option<Type> {
+fn primary_field_type(input: &DeriveInput, mapping: &Mapping) -> Option<Type> {
     let Data::Struct(s) = &input.data else {
         return None;
     };
-    s.fields
-        .iter()
-        .find(|f| f.ident.as_ref() == Some(ident))
-        .map(|f| f.ty.clone())
+    match &s.fields {
+        syn::Fields::Named(n) => n
+            .named
+            .iter()
+            .find(|f| f.ident.as_ref() == mapping.bevy_field.as_ref())
+            .map(|f| f.ty.clone()),
+        syn::Fields::Unnamed(u) => mapping
+            .tuple_index
+            .and_then(|index| u.unnamed.iter().nth(index))
+            .map(|f| f.ty.clone()),
+        syn::Fields::Unit => None,
+    }
 }
 
 /// gdext parses `#[init(val = expr)]` as an attribute, so a top-level comma in `expr` would be

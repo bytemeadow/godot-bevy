@@ -75,6 +75,7 @@ mod tests {
         let mapping = Mapping {
             godot_prop: parse_quote!(speed),
             bevy_field: Some(parse_quote!(velocity)),
+            tuple_index: None,
             as_type: None,
             default: None,
             with: None,
@@ -114,6 +115,7 @@ mod tests {
         let mapping = Mapping {
             godot_prop: parse_quote!(speed),
             bevy_field: None,
+            tuple_index: None,
             as_type: Some(parse_quote!(f32)),
             default: Some(parse_quote!(2.5)),
             with: Some(parse_quote!(to_speed)),
@@ -132,9 +134,45 @@ mod tests {
         let input: DeriveInput = parse_quote! {
             struct Source { speed: f32, count: usize }
         };
-        let count = primary_field_type(&input, &parse_quote!(count)).unwrap();
+        let count_mapping = Mapping {
+            godot_prop: parse_quote!(count),
+            bevy_field: Some(parse_quote!(count)),
+            tuple_index: None,
+            as_type: None,
+            default: None,
+            with: None,
+        };
+        let count = primary_field_type(&input, &count_mapping).unwrap();
         assert!(matches!(count, Type::Path(path) if path.path.is_ident("usize")));
-        assert!(primary_field_type(&input, &parse_quote!(missing)).is_none());
+        let missing_mapping = Mapping {
+            godot_prop: parse_quote!(missing),
+            bevy_field: Some(parse_quote!(missing)),
+            tuple_index: None,
+            as_type: None,
+            default: None,
+            with: None,
+        };
+        assert!(primary_field_type(&input, &missing_mapping).is_none());
+    }
+
+    #[test]
+    fn partial_tuple_primary_starts_from_default_and_assigns_by_index() {
+        let primary = PrimaryPlan {
+            path: parse_quote!(Velocity),
+            fields: vec![Mapping {
+                godot_prop: parse_quote!(value1),
+                bevy_field: None,
+                tuple_index: Some(1),
+                as_type: None,
+                default: None,
+                with: Some(parse_quote!(to_velocity)),
+            }],
+        };
+        let value: Expr = syn::parse2(primary_value(&primary).unwrap()).unwrap();
+        assert_eq!(
+            value.to_token_stream().to_string(),
+            "{ let mut c = Velocity :: default () ; c . 1 = to_velocity (node . bind () . value1 . clone ()) ; c }"
+        );
     }
 
     #[test]

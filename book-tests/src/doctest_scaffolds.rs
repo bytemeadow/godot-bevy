@@ -169,6 +169,14 @@ mod godot_node_fields {
     }
 }
 
+mod godot_node_tuple {
+    use bevy::prelude::Component;
+    use godot_bevy::prelude::GodotNode;
+
+    #[derive(Component, GodotNode, Default)]
+    struct Velocity(#[gdbevy(export)] f32, #[gdbevy(export)] f32);
+}
+
 mod itest {
     use godot_bevy_test::prelude::*;
 
