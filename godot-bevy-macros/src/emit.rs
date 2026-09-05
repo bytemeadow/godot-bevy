@@ -62,8 +62,24 @@ fn export_field(m: &Mapping, ty: Option<Type>) -> TokenStream2 {
         let val = paren_wrap(d);
         quote!(#[init(val = #val)])
     });
+    let docs = &m.docs;
+    let description = m
+        .description
+        .as_ref()
+        .map(|description| quote!(#[doc = #description]));
+    let hint = match (&m.hint, &m.hint_string) {
+        (Some(hint), Some(hint_string)) => {
+            quote!(#[var(hint = #hint, hint_string = #hint_string)])
+        }
+        (Some(hint), None) => quote!(#[var(hint = #hint)]),
+        (None, None) => quote!(),
+        (None, Some(_)) => unreachable!("`hint_string` is valid only with `hint`"),
+    };
     quote! {
+        #(#docs)*
+        #description
         #[export]
+        #hint
         #init
         #prop: #ty
     }

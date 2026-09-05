@@ -79,6 +79,10 @@ mod tests {
             as_type: None,
             default: None,
             with: None,
+            docs: Vec::new(),
+            description: None,
+            hint: None,
+            hint_string: None,
         };
         let primary = PrimaryPlan {
             path: parse_quote!(Player),
@@ -119,6 +123,10 @@ mod tests {
             as_type: Some(parse_quote!(f32)),
             default: Some(parse_quote!(2.5)),
             with: Some(parse_quote!(to_speed)),
+            docs: Vec::new(),
+            description: None,
+            hint: None,
+            hint_string: None,
         };
         let value: Expr = syn::parse2(companion_default_value(&mapping)).unwrap();
         let Expr::Call(call) = value else {
@@ -141,6 +149,10 @@ mod tests {
             as_type: None,
             default: None,
             with: None,
+            docs: Vec::new(),
+            description: None,
+            hint: None,
+            hint_string: None,
         };
         let count = primary_field_type(&input, &count_mapping).unwrap();
         assert!(matches!(count, Type::Path(path) if path.path.is_ident("usize")));
@@ -151,6 +163,10 @@ mod tests {
             as_type: None,
             default: None,
             with: None,
+            docs: Vec::new(),
+            description: None,
+            hint: None,
+            hint_string: None,
         };
         assert!(primary_field_type(&input, &missing_mapping).is_none());
     }
@@ -166,6 +182,10 @@ mod tests {
                 as_type: None,
                 default: None,
                 with: Some(parse_quote!(to_velocity)),
+                docs: Vec::new(),
+                description: None,
+                hint: None,
+                hint_string: None,
             }],
         };
         let value: Expr = syn::parse2(primary_value(&primary).unwrap()).unwrap();
@@ -205,5 +225,85 @@ mod tests {
     fn require_entry_consumes_trailing_default_syntax() {
         let entry: RequireEntry = syn::parse2(quote!(Speed = default_speed())).unwrap();
         assert!(entry.0.is_ident("Speed"));
+    }
+
+    #[test]
+    fn emits_docs_and_hints_for_generated_exports() {
+        let di: syn::DeriveInput = syn::parse_quote! {
+            #[derive(Component, GodotNode, Default)]
+            #[gdbevy(base = Node2D, class_name = WeaponNode)]
+            #[gdbevy(require(
+                kind: WeaponKind,
+                as = GString,
+                with = from_godot_string,
+                description = "Weapon kind",
+                hint = ENUM,
+                hint_string = "Hands,Knife"
+            ))]
+            struct Weapon;
+        };
+        let out = crate::godot_node::derive_godot_node_component(di)
+            .unwrap()
+            .to_string();
+        assert!(out.contains("# [doc = \"Weapon kind\"]"));
+        assert!(out.contains("# [var (hint = ENUM , hint_string = \"Hands,Knife\")]"));
+    }
+
+    #[test]
+    fn forwards_field_docs_to_generated_exports() {
+        let di: syn::DeriveInput = syn::parse_quote! {
+            /// Player settings.
+            #[derive(Component, GodotNode, Default)]
+            #[gdbevy(base = Node2D, class_name = PlayerNode)]
+            struct Player {
+                /// Movement speed in pixels per second.
+                #[gdbevy(export)]
+                speed: f32,
+                /// Weapon kind
+                #[gdbevy(export, as = GString, with = from_godot_string, hint = ENUM, hint_string = "Hands,Knife")]
+                kind: String,
+            }
+        };
+        let out = crate::godot_node::derive_godot_node_component(di)
+            .unwrap()
+            .to_string();
+        assert!(out.contains("Movement speed in pixels per second."));
+        assert!(out.contains("Weapon kind"));
+        assert!(out.contains("# [var (hint = ENUM , hint_string = \"Hands,Knife\")]"));
+    }
+
+    #[test]
+    fn primary_docs_precede_description_and_preserve_tuple_position() {
+        for definition in [
+            quote!(
+                struct Settings {
+                    /// Field docs.
+                    #[gdbevy(export, as = GString, with = convert, description = "Explicit description", hint = ENUM)]
+                    value: String,
+                }
+            ),
+            quote!(
+                struct Settings(
+                    u32,
+                    /// Field docs.
+                    #[gdbevy(export, as = GString, with = convert, description = "Explicit description", hint = ENUM)]
+                    String,
+                );
+            ),
+        ] {
+            let input = syn::parse2(definition).unwrap();
+            let output = crate::godot_node::derive_godot_node_component(input)
+                .unwrap()
+                .to_string();
+            assert!(
+                output.find("Field docs.").unwrap() < output.find("Explicit description").unwrap()
+            );
+            assert!(output.contains("# [var (hint = ENUM)]"));
+            assert!(output.contains(": GString"));
+            if output.contains("value1") {
+                assert!(output.contains("c . 1 = convert (node . bind () . value1 . clone ())"));
+                assert!(!output.contains("value0"));
+            }
+        }
     }
 }

@@ -26,7 +26,7 @@ profile-tracy = [
 
 [dependencies]
 godot = { workspace = true, features = ["__trace"] }
-godot-bevy = { path = "../../godot-bevy" }
+godot-bevy = { path = "../../godot-bevy", features = ["register-docs"] }
 godot-bevy-test = { path = "../../godot-bevy-test" }
 bevy = { version = "0.19", default-features = false, features = [
   "bevy_asset",

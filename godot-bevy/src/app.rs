@@ -4,7 +4,7 @@ use crate::plugins::{
 use crate::watchers::collision_watcher::CollisionWatcher;
 use crate::watchers::input_watcher::GodotInputWatcher;
 use crate::watchers::scene_tree_watcher::SceneTreeWatcher;
-use bevy_app::{App, PluginsState};
+use bevy_app::{App, AppExit, Last, PluginsState};
 use bevy_ecs::message::Messages;
 use crossbeam_channel::unbounded;
 use godot::prelude::*;
@@ -21,17 +21,20 @@ static TEST_FRAME_PANICS: Mutex<Vec<(&'static str, String)>> = Mutex::new(Vec::n
 
 #[cfg(feature = "test-frame-signal")]
 fn record_test_frame_panic(callback: &'static str, payload: &(dyn std::any::Any + Send)) {
-    let message = if let Some(message) = payload.downcast_ref::<String>() {
+    TEST_FRAME_PANICS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .push((callback, panic_message(payload)));
+}
+
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<String>() {
         message.clone()
     } else if let Some(message) = payload.downcast_ref::<&str>() {
         message.to_string()
     } else {
         "unknown panic payload".to_string()
-    };
-    TEST_FRAME_PANICS
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .push((callback, message));
+    }
 }
 
 #[cfg(feature = "test-frame-signal")]
@@ -105,8 +108,8 @@ fn log_plugin_diagnostics(app: &App) {
 
 /// Godot node hosting the Bevy `App`; the `BevyAppSingleton` autoload is one of these.
 ///
-/// Integration-test runs set `GODOT_BEVY_ITEST` so the autoload does not boot the
-/// `#[bevy_app]` function; `TestApp` initializes it per test instead.
+/// Setting `GODOT_BEVY_ITEST` skips automatic initialization in `ready`.
+/// `TestApp` initializes the autoload explicitly for each test.
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct BevyApp {
@@ -179,9 +182,31 @@ impl BevyApp {
         self.instance_init_func = Some(func);
     }
 
-    /// Tear down the Bevy app and remove all watchers.
+    /// Dispose of the world and remove its watchers. Call between frames.
+    ///
+    /// A started app receives `AppExit::Success` and one final `Last` pass.
+    /// Repeated calls are inert. Cleanup panics are caught and reported.
     pub fn teardown(&mut self) {
-        self.app = None;
+        self.finalize_app(true);
+        self.remove_watchers();
+    }
+
+    fn finalize_app(&mut self, run_terminal: bool) {
+        let started = std::mem::take(&mut self.started);
+        self.prefix_done_this_frame = false;
+        let Some(mut app) = self.app.take() else {
+            return;
+        };
+        if run_terminal && started && !std::thread::panicking() {
+            catch_shutdown_panic("shutdown Last", || {
+                app.world_mut().write_message(AppExit::Success);
+                app.world_mut().run_schedule(Last);
+            });
+        }
+        catch_shutdown_panic("shutdown Drop", || drop(app));
+    }
+
+    fn remove_watchers(&mut self) {
         for name in &[
             "SceneTreeWatcher",
             "OptimizedSceneTreeWatcher",
@@ -207,8 +232,6 @@ impl BevyApp {
     }
 
     fn do_initialize(&mut self) {
-        // Reset per-app state so that re-initialization (e.g. the itest harness
-        // calling teardown -> do_initialize) runs startup fresh.
         self.started = false;
         self.prefix_done_this_frame = false;
 
@@ -452,7 +475,7 @@ impl INode for BevyApp {
 
     #[tracing::instrument(skip_all)]
     fn ready(&mut self) {
-        if godot::classes::Engine::singleton().is_editor_hint() {
+        if godot::classes::Engine::singleton().is_editor_hint() || self.app.is_some() {
             return;
         }
 
@@ -535,7 +558,8 @@ impl INode for BevyApp {
         if let Some(Err(e)) = result {
             #[cfg(feature = "test-frame-signal")]
             record_test_frame_panic("_process", e.as_ref());
-            self.app = None;
+            self.finalize_app(false);
+            self.remove_watchers();
             godot::global::godot_error!(
                 "godot-bevy: Bevy app panicked during _process and was permanently torn down; \
                  it will not recover this session. See the panic above."
@@ -577,7 +601,8 @@ impl INode for BevyApp {
         {
             #[cfg(feature = "test-frame-signal")]
             record_test_frame_panic("_physics_process", e.as_ref());
-            self.app = None;
+            self.finalize_app(false);
+            self.remove_watchers();
             godot::global::godot_error!(
                 "godot-bevy: Bevy app panicked during _physics_process and was permanently torn down; \
                  it will not recover this session. See the panic above."
@@ -586,6 +611,23 @@ impl INode for BevyApp {
         }
         self.started = true;
         self.prefix_done_this_frame = true;
+    }
+}
+
+impl Drop for BevyApp {
+    fn drop(&mut self) {
+        // gdext destroys this instance across extern "C"; an escaped panic would abort.
+        // Native children are already freed, so only dispose of the owned app here.
+        self.finalize_app(true);
+    }
+}
+
+fn catch_shutdown_panic(callback: &'static str, action: impl FnOnce()) {
+    if let Err(payload) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(action)) {
+        #[cfg(feature = "test-frame-signal")]
+        record_test_frame_panic(callback, payload.as_ref());
+        let message = panic_message(payload.as_ref());
+        godot::global::godot_error!("godot-bevy: Bevy app panicked during {callback}: {message}");
     }
 }
 

@@ -405,4 +405,159 @@ mod tests {
                 .contains("not yet available")
         );
     }
+
+    #[test]
+    fn hint_string_requires_hint() {
+        let di: syn::DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode)]
+            #[gdbevy(require(speed: Speed, as = f32, hint_string = "one"))]
+            struct Player;
+        };
+        assert!(
+            parse_component_first(&di)
+                .unwrap_err()
+                .to_string()
+                .contains("`hint_string` requires `hint`")
+        );
+    }
+
+    #[test]
+    fn parses_export_description_and_hint() {
+        let di: syn::DeriveInput = parse_quote! {
+            #[derive(Component, GodotNode)]
+            #[gdbevy(require(
+                kind: Kind,
+                as = GString,
+                with = from_godot_string,
+                description = "Weapon kind",
+                hint = ENUM,
+                hint_string = "Hands,Knife"
+            ))]
+            struct Player;
+        };
+        let plan = parse_component_first(&di).expect("valid export metadata");
+        let ComponentInit::Newtype(mapping) = &plan.companions[0].init else {
+            panic!("expected generated newtype mapping");
+        };
+        assert_eq!(mapping.description.as_ref().unwrap().value(), "Weapon kind");
+        assert_eq!(mapping.hint.as_ref().unwrap().to_string(), "ENUM");
+        assert!(mapping.hint_string.is_some());
+    }
+
+    #[test]
+    fn metadata_survives_named_tuple_and_struct_companion_mappings() {
+        let metadata = quote!(
+            as = GString, with = convert, default = initial(),
+            description = "Description", hint = ENUM, hint_string = labels()
+        );
+        for definition in [
+            quote!(
+                struct Settings {
+                    #[gdbevy(export, #metadata)]
+                    value: String,
+                }
+            ),
+            quote!(
+                struct Settings(u32, #[gdbevy(export, #metadata)] String);
+            ),
+            quote!(
+                #[gdbevy(require(settings: SettingsData { value(#metadata) }))]
+                struct Settings;
+            ),
+        ] {
+            let input = syn::parse2(definition).unwrap();
+            let plan = parse_component_first(&input).unwrap();
+            let mapping = if let Some(mapping) = plan.primary.fields.first() {
+                if mapping.bevy_field.is_none() {
+                    assert_eq!(mapping.tuple_index, Some(1));
+                    assert_eq!(mapping.godot_prop.to_string(), "value1");
+                }
+                mapping
+            } else {
+                let ComponentInit::Fields(fields) = &plan.companions[0].init else {
+                    panic!("expected struct companion");
+                };
+                &fields[0]
+            };
+            assert_eq!(mapping.description.as_ref().unwrap().value(), "Description");
+            assert_eq!(mapping.hint.as_ref().unwrap().to_string(), "ENUM");
+            assert!(mapping.hint_string.is_some());
+            assert!(mapping.as_type.is_some());
+            assert!(mapping.with.is_some());
+            assert!(mapping.default.is_some());
+        }
+    }
+
+    #[test]
+    fn invalid_metadata_is_rejected_at_each_generated_placement() {
+        for (directives, expected) in [
+            (
+                quote!(description = "a", description = "b"),
+                "duplicate `description`",
+            ),
+            (quote!(hint = ENUM, hint = RANGE), "duplicate `hint`"),
+            (
+                quote!(hint = ENUM, hint_string = "a", hint_string = "b"),
+                "duplicate `hint_string`",
+            ),
+            (
+                quote!(description = description()),
+                "expected string literal",
+            ),
+            (quote!(hint_string = "a"), "`hint_string` requires `hint`"),
+            (quote!(unknown = "a"), "unknown key `unknown`"),
+        ] {
+            for definition in [
+                quote!(
+                    struct Settings {
+                        #[gdbevy(export, #directives)]
+                        value: GString,
+                    }
+                ),
+                quote!(
+                    struct Settings(#[gdbevy(export, #directives)] GString);
+                ),
+                quote!(
+                    #[gdbevy(require(value: Value, as = GString, #directives))]
+                    struct Settings;
+                ),
+                quote!(
+                    #[gdbevy(require(settings: SettingsData { value(as = GString, #directives) }))]
+                    struct Settings;
+                ),
+            ] {
+                let input = syn::parse2(definition).unwrap();
+                assert!(
+                    parse_component_first(&input)
+                        .unwrap_err()
+                        .to_string()
+                        .contains(expected),
+                    "{expected}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn godot_first_metadata_uses_native_attributes() {
+        for metadata in [
+            quote!(description = "Description"),
+            quote!(hint = ENUM),
+            quote!(hint = ENUM, hint_string = "a,b"),
+        ] {
+            let input = syn::parse2(quote! {
+                struct SettingsNode {
+                    #[gdbevy(component = Settings, #metadata)]
+                    value: GString,
+                }
+            })
+            .unwrap();
+            assert!(
+                parse_godot_first(&input)
+                    .unwrap_err()
+                    .to_string()
+                    .contains("only valid on generated component-first exports")
+            );
+        }
+    }
 }

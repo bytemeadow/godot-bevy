@@ -168,11 +168,11 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// Valid keys on a field-level `#[gdbevy(...)]`:
-/// - `component = Comp` (**required**) — the Bevy component type to insert.
-/// - `with = fn` — a function `fn(T) -> T` (or any `Into` adapter) applied to the Godot
-///   value before it is passed to the component constructor.
-/// - `as` and `default` are **not** allowed on Godot-first field bindings.
+/// A field binding requires `component = Comp`. Optional `with = fn` converts the
+/// Godot value before passing it to the component constructor. Use gdext's native
+/// `#[export]`, `#[var(hint = ..., hint_string = ...)]`, and `#[init(val = ...)]`
+/// attributes for property metadata and defaults. `as`, `default`, `description`,
+/// `hint`, and `hint_string` are not valid Godot-first `gdbevy` keys.
 ///
 /// ## Struct-level companions
 ///
@@ -283,6 +283,16 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 ///
 ///     #[gdbevy(export, as = f32, with = meters_to_units)]
 ///     range: f32,
+///
+///     /// Label shown to the player.
+///     #[gdbevy(export, as = GString, with = from_godot_string,
+///         default = GString::from("Open"), description = "Door label",
+///         hint = ENUM, hint_string = "Open,Locked")]
+///     label: String,
+/// }
+///
+/// fn from_godot_string(value: GString) -> String {
+///     value.to_string()
 /// }
 /// ```
 ///
@@ -304,6 +314,23 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 /// | `as = T` | Godot export type (defaults to the field's Rust type when omitted). |
 /// | `default = expr` | Editor default value passed to `#[init(val = …)]`. A pure-Bevy `spawn(T)` uses the struct's own `Default` — make them agree if you rely on `spawn(T)`. |
 /// | `with = fn` | Converts the Godot export value before assigning to the field. |
+/// | `description = "..."` | Adds property docs to a primary field or generated companion export. |
+/// | `hint = NAME` | Sets the Godot `PropertyHint` variant. |
+/// | `hint_string = expr` | Supplies the hint string; requires `hint = NAME`. |
+///
+/// Metadata applies to named and tuple primary fields, `require(prop: Comp, ...)`,
+/// and each field in `require(group: Comp { field(as = T, ...), ... })`.
+/// Use one `#[gdbevy(export, ...)]` attribute per primary field.
+/// `description` must be a string literal. `hint` is a bare `PropertyHint` variant.
+/// Rust `///` docs on primary fields precede an explicit `description`.
+///
+/// Enable `godot-bevy/register-docs` to register descriptions in Godot's editor.
+/// This feature is off by default and requires Godot API 4.3 or later.
+/// Without it, hints still work and descriptions remain Rust docs. The same feature
+/// enables native gdext property docs on Godot-first classes.
+///
+/// Export types must implement gdext's `Export` trait. For Rust `String` fields,
+/// export a `GString` and convert it with `with`, as in the `Door` example.
 ///
 /// ## Reserved keys
 ///

@@ -4,8 +4,8 @@ use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
-    Attribute, Data, DeriveInput, Error, Expr, Field, Fields, Ident, Meta, Path, Token, Type,
-    braced, parenthesized, parse_quote,
+    Attribute, Data, DeriveInput, Error, Expr, Field, Fields, Ident, LitStr, Meta, Path, Token,
+    Type, braced, parenthesized, parse_quote,
 };
 
 /// The Godot class + Bevy components a single derive expands to.
@@ -47,6 +47,10 @@ pub struct Mapping {
     pub as_type: Option<syn::Type>,
     pub default: Option<syn::Expr>,
     pub with: Option<syn::Path>,
+    pub docs: Vec<Attribute>,
+    pub description: Option<LitStr>,
+    pub hint: Option<Ident>,
+    pub hint_string: Option<Expr>,
 }
 
 // Summary Debug so tests can `.unwrap_err()` on `Result<ClassPlan, _>`;
@@ -73,6 +77,9 @@ struct Directives {
     with: Option<Path>,
     component: Option<Path>,
     export: bool,
+    description: Option<LitStr>,
+    hint: Option<Ident>,
+    hint_string: Option<Expr>,
 }
 
 fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
@@ -110,6 +117,27 @@ fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
                     }
                     d.with = Some(input.parse()?);
                 }
+                "description" => {
+                    input.parse::<Token![=]>()?;
+                    if d.description.is_some() {
+                        return Err(Error::new(key.span(), "duplicate `description`"));
+                    }
+                    d.description = Some(input.parse()?);
+                }
+                "hint" => {
+                    input.parse::<Token![=]>()?;
+                    if d.hint.is_some() {
+                        return Err(Error::new(key.span(), "duplicate `hint`"));
+                    }
+                    d.hint = Some(input.parse()?);
+                }
+                "hint_string" => {
+                    input.parse::<Token![=]>()?;
+                    if d.hint_string.is_some() {
+                        return Err(Error::new(key.span(), "duplicate `hint_string`"));
+                    }
+                    d.hint_string = Some(input.parse()?);
+                }
                 "component" => {
                     input.parse::<Token![=]>()?;
                     if d.component.is_some() {
@@ -127,7 +155,7 @@ fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
                     return Err(Error::new(
                         key.span(),
                         format!(
-                            "unknown key `{name}`; expected `as`, `default`, `with`, `component`, or `export`"
+                            "unknown key `{name}`; expected `as`, `default`, `with`, `description`, `hint`, `hint_string`, `component`, or `export`"
                         ),
                     ));
                 }
@@ -139,7 +167,22 @@ fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
             break;
         }
     }
+    if d.hint_string.is_some() && d.hint.is_none() {
+        return Err(Error::new(
+            input.span(),
+            "`hint_string` requires `hint` to also be provided",
+        ));
+    }
     Ok(d)
+}
+
+fn doc_attributes(field: &Field) -> Vec<Attribute> {
+    field
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("doc"))
+        .cloned()
+        .collect()
 }
 
 /// The syntactic shape of one `require(...)` entry, before front-end validation.
@@ -367,6 +410,10 @@ fn cf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
                     as_type: Some(as_type),
                     default: cfg.default,
                     with: cfg.with,
+                    docs: Vec::new(),
+                    description: cfg.description,
+                    hint: cfg.hint,
+                    hint_string: cfg.hint_string,
                 }),
             })
         }
@@ -392,6 +439,10 @@ fn cf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
                     as_type: Some(as_type),
                     default: cfg.default,
                     with: cfg.with,
+                    docs: Vec::new(),
+                    description: cfg.description,
+                    hint: cfg.hint,
+                    hint_string: cfg.hint_string,
                 });
             }
             Ok(ComponentPlan {
@@ -432,6 +483,10 @@ fn gf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
                     as_type: None,
                     default: None,
                     with: None,
+                    docs: Vec::new(),
+                    description: None,
+                    hint: None,
+                    hint_string: None,
                 })
                 .collect();
             Ok(ComponentPlan {
@@ -473,6 +528,10 @@ fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
             as_type: d.as_type,
             default: d.default,
             with: d.with,
+            docs: doc_attributes(field),
+            description: d.description,
+            hint: d.hint,
+            hint_string: d.hint_string,
         });
     }
     Ok(out)
@@ -514,6 +573,12 @@ fn collect_field_bindings(input: &DeriveInput) -> syn::Result<Vec<ComponentPlan>
                 "`export` is not valid on a Godot-first field binding",
             ));
         }
+        if d.description.is_some() || d.hint.is_some() || d.hint_string.is_some() {
+            return Err(Error::new_spanned(
+                attr,
+                "`description`, `hint`, and `hint_string` are only valid on generated component-first exports",
+            ));
+        }
         let Some(component) = d.component else {
             return Err(Error::new_spanned(
                 attr,
@@ -530,6 +595,10 @@ fn collect_field_bindings(input: &DeriveInput) -> syn::Result<Vec<ComponentPlan>
                 as_type: None,
                 default: None,
                 with: d.with,
+                docs: Vec::new(),
+                description: None,
+                hint: None,
+                hint_string: None,
             }),
         });
     }
