@@ -596,9 +596,9 @@ fn collect_field_bindings(input: &DeriveInput) -> syn::Result<Vec<ComponentPlan>
                 default: None,
                 with: d.with,
                 docs: Vec::new(),
-                description: d.description,
-                hint: d.hint,
-                hint_string: d.hint_string,
+                description: None,
+                hint: None,
+                hint_string: None,
             }),
         });
     }

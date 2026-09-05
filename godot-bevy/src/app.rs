@@ -21,17 +21,20 @@ static TEST_FRAME_PANICS: Mutex<Vec<(&'static str, String)>> = Mutex::new(Vec::n
 
 #[cfg(feature = "test-frame-signal")]
 fn record_test_frame_panic(callback: &'static str, payload: &(dyn std::any::Any + Send)) {
-    let message = if let Some(message) = payload.downcast_ref::<String>() {
+    TEST_FRAME_PANICS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .push((callback, panic_message(payload)));
+}
+
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<String>() {
         message.clone()
     } else if let Some(message) = payload.downcast_ref::<&str>() {
         message.to_string()
     } else {
         "unknown panic payload".to_string()
-    };
-    TEST_FRAME_PANICS
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .push((callback, message));
+    }
 }
 
 #[cfg(feature = "test-frame-signal")]
@@ -620,12 +623,11 @@ impl Drop for BevyApp {
 }
 
 fn catch_shutdown_panic(callback: &'static str, action: impl FnOnce()) {
-    if let Err(_payload) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(action)) {
+    if let Err(payload) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(action)) {
         #[cfg(feature = "test-frame-signal")]
-        record_test_frame_panic(callback, _payload.as_ref());
-        godot::global::godot_error!(
-            "godot-bevy: Bevy app panicked during {callback}; see the panic above."
-        );
+        record_test_frame_panic(callback, payload.as_ref());
+        let message = panic_message(payload.as_ref());
+        godot::global::godot_error!("godot-bevy: Bevy app panicked during {callback}: {message}");
     }
 }
 
