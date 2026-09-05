@@ -248,7 +248,11 @@ def verify_doctests() -> None:
         "doctest-audit",
         "doctests",
         DOCTEST_ARTIFACT,
-        {"fences": 40, "compiled_no_run": 29, "compiled_scaffold": 11},
+        {
+            "fences": len(expected),
+            "compiled_no_run": len(expected) - ignored,
+            "compiled_scaffold": ignored,
+        },
     )
     print("PASS doctest policy: unchecked-ignore=0")
     print("PASS doctest scaffolds: synchronized")
