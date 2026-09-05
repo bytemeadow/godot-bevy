@@ -1,0 +1,15 @@
+diff --git a/godot-bevy/src/plugins/assets.rs b/godot-bevy/src/plugins/assets.rs
+--- a/godot-bevy/src/plugins/assets.rs
++++ b/godot-bevy/src/plugins/assets.rs
+@@ -212,10 +212,7 @@ impl Reader for GodotFileReader {
+ /// `None` branch (mapped to `NotFound`), distinct from an empty file (`Some`, length 0).
+ fn read_godot_file(godot_path: &str) -> io::Result<Vec<u8>> {
+     match FileAccess::open(godot_path, ModeFlags::READ) {
+-        Some(mut fa) => {
+-            let len = fa.get_length() as i64;
+-            Ok(fa.get_buffer(len).to_vec())
+-        }
++        Some(_) => Ok(Vec::new()),
+         None => Err(io::Error::new(
+             io::ErrorKind::NotFound,
+             format!("Godot FileAccess could not open '{godot_path}'"),

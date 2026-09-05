@@ -1,0 +1,50 @@
+name: qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Qualification suite
+        type: choice
+        options:
+          - mutants
+          - faults
+          - both
+        default: both
+        required: true
+
+env:
+  ITEST_DENY_FOCUS: "1"
+  # hosted runners: one ~10G mutants scratch fits, two don't; full sweep needs >30min
+  QUALIFICATION_JOBS: "1"
+  QUALIFICATION_WALL_CLOCK: "7200"
+
+permissions:
+  contents: read
+
+jobs:
+  qualification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: cachix/install-nix-action@v31
+      - uses: cachix/cachix-action@v16
+        with:
+          name: devenv
+      - name: Install devenv
+        run: nix profile add nixpkgs#devenv
+      - name: Run mutation qualification
+        if: inputs.suite == 'mutants' || inputs.suite == 'both'
+        run: devenv shell -- mutants full
+      - name: Run fault qualification
+        if: always() && (inputs.suite == 'faults' || inputs.suite == 'both')
+        run: devenv shell -- qualification faults --profiles debug,release
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qualification-${{ inputs.suite }}
+          path: target/qualification/
+          if-no-files-found: warn

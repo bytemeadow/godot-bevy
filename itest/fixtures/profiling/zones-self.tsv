@@ -1,0 +1,82 @@
+name	src_file	src_line	ns_since_start	exec_time_ns	thread	value
+__gbprof::run_begin{run_id=fixture-run}	godot-bevy-test/src/profiling.rs	64	100	5	1	
+__gbprof::benchmark{benchmark=fixture_bench inner_repetitions=3}	godot-bevy-test/src/profiling.rs	72	200	50	1	
+__gbprof::phase{benchmark=fixture_bench phase=warmup}	godot-bevy-test/src/profiling.rs	82	220	30	1	
+__gbprof::iteration{benchmark=fixture_bench phase=warmup iteration=0 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	240	20	1	
+__gbprof::measured{benchmark=fixture_bench phase=warmup iteration=0}	godot-bevy-test/src/profiling.rs	111	260	10	1	
+warmup_zone	itest/rust/src/benchmarks.rs	15	270	15	1	
+__gbprof::iteration{benchmark=fixture_bench phase=warmup iteration=1 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	400	20	1	
+__gbprof::measured{benchmark=fixture_bench phase=warmup iteration=1}	godot-bevy-test/src/profiling.rs	111	420	10	1	
+__gbprof::iteration{benchmark=fixture_bench phase=warmup iteration=2 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	560	20	1	
+__gbprof::measured{benchmark=fixture_bench phase=warmup iteration=2}	godot-bevy-test/src/profiling.rs	111	580	10	1	
+__gbprof::iteration{benchmark=fixture_bench phase=warmup iteration=3 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	720	20	1	
+__gbprof::measured{benchmark=fixture_bench phase=warmup iteration=3}	godot-bevy-test/src/profiling.rs	111	740	10	1	
+__gbprof::iteration{benchmark=fixture_bench phase=warmup iteration=4 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	880	20	1	
+__gbprof::measured{benchmark=fixture_bench phase=warmup iteration=4}	godot-bevy-test/src/profiling.rs	111	900	10	1	
+__gbprof::phase{benchmark=fixture_bench phase=sample}	godot-bevy-test/src/profiling.rs	82	1200	40	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=0 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	1220	25	1	
+setup_zone	itest/rust/src/benchmarks.rs	10	1225	10	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=0}	godot-bevy-test/src/profiling.rs	111	1240	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	1250	30	1	
+occasional_zone	itest/rust/src/benchmarks.rs	30	1300	5	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=1 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	1380	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=1}	godot-bevy-test/src/profiling.rs	111	1400	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	1410	31	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=2 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	1540	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=2}	godot-bevy-test/src/profiling.rs	111	1560	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	1570	32	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=3 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	1700	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=3}	godot-bevy-test/src/profiling.rs	111	1720	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	1730	33	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=4 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	1860	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=4}	godot-bevy-test/src/profiling.rs	111	1880	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	1890	34	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=5 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	2020	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=5}	godot-bevy-test/src/profiling.rs	111	2040	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	2050	35	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=6 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	2180	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=6}	godot-bevy-test/src/profiling.rs	111	2200	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	2210	36	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=7 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	2340	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=7}	godot-bevy-test/src/profiling.rs	111	2360	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	2370	37	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=8 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	2500	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=8}	godot-bevy-test/src/profiling.rs	111	2520	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	2530	38	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=9 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	2660	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=9}	godot-bevy-test/src/profiling.rs	111	2680	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	2690	39	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=10 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	2820	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=10}	godot-bevy-test/src/profiling.rs	111	2840	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	2850	40	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=11 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	2980	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=11}	godot-bevy-test/src/profiling.rs	111	3000	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	3010	41	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=12 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	3140	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=12}	godot-bevy-test/src/profiling.rs	111	3160	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	3170	42	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=13 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	3300	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=13}	godot-bevy-test/src/profiling.rs	111	3320	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	3330	43	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=14 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	3460	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=14}	godot-bevy-test/src/profiling.rs	111	3480	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	3490	44	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=15 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	3620	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=15}	godot-bevy-test/src/profiling.rs	111	3640	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	3650	45	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=16 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	3780	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=16}	godot-bevy-test/src/profiling.rs	111	3800	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	3810	46	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=17 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	3940	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=17}	godot-bevy-test/src/profiling.rs	111	3960	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	3970	47	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=18 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	4100	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=18}	godot-bevy-test/src/profiling.rs	111	4120	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	4130	48	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=19 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	4260	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=19}	godot-bevy-test/src/profiling.rs	111	4280	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	4290	49	1	
+__gbprof::iteration{benchmark=fixture_bench phase=sample iteration=20 inner_repetitions=3}	godot-bevy-test/src/profiling.rs	95	4420	25	1	
+__gbprof::measured{benchmark=fixture_bench phase=sample iteration=20}	godot-bevy-test/src/profiling.rs	111	4440	10	1	
+hot_zone	itest/rust/src/benchmarks.rs	20	4450	50	1	
+__gbprof::run_end{run_id=fixture-run}	godot-bevy-test/src/profiling.rs	68	5300	5	1	

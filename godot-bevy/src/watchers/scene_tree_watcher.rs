@@ -40,7 +40,7 @@ impl SceneTreeWatcher {
             let _ = channel.send(SceneTreeMessage {
                 node_id: GodotNodeHandle::from(node.instance_id()),
                 message_type,
-                node_type: None, // No type optimization in basic method
+                node_type: None,
                 node_name: None,
                 parent_id: None,
                 collision_mask: None,
@@ -60,7 +60,7 @@ impl SceneTreeWatcher {
             let _ = channel.send(SceneTreeMessage {
                 node_id: GodotNodeHandle::from(node.instance_id()),
                 message_type,
-                node_type: Some(node_type), // Pre-analyzed type from GDScript
+                node_type: Some(node_type),
                 node_name: None,
                 parent_id: None,
                 collision_mask: None,

@@ -4,8 +4,7 @@ pub use crate::node_tree_view::{NodeTreeView, NodeTreeViewError};
 #[cfg(feature = "godot_bevy_log")]
 pub use crate::plugins::godot_bevy_logger::GodotBevyLogPlugin;
 pub use crate::plugins::{
-    GodotCorePlugins,
-    GodotDefaultPlugins,
+    GodotCorePlugins, GodotDefaultPlugins,
     assets::{GodotAssetsPlugin, GodotResource},
     audio::{
         Audio, AudioApp, AudioChannel, AudioChannelMarker, AudioEasing, AudioError, AudioOutput,
@@ -17,25 +16,19 @@ pub use crate::plugins::{
         CollisionEnded, CollisionStarted, Collisions, GodotCollisionsPlugin,
     },
     core::FindEntityByNameExt,
-    // Debugger
     debugger::{DebuggerConfig, GodotDebuggerPlugin},
-    // Event bridge
     event_bridge::{AddGodotEventAppExt, EventBridgeSet, GodotEventSender, send_event},
-    // Collisions
     input::{
         Action, ActionInput, BevyInputBridgePlugin, GodotActions, GodotActionsPlugin,
         GodotInputEventPlugin, GodotInputSet, GodotKeyboardInput, GodotMouseButtonInput,
         GodotMouseMotion,
     },
-    // Core functionality
     packed_scene::{GodotPackedScenePlugin, GodotScene},
-    // Input
     scene_tree::{
         AutoSyncBundleRegistry, GodotChildOf, GodotChildren, GodotRequiredComponents,
         GodotSceneTreePlugin, Groups, NodeEntityIndex, SceneTreeConfig, SceneTreeRef,
     },
     signals::{DeferredSignalConnections, GodotSignals, GodotSignalsPlugin},
-    // Scene tree
     transforms::{
         DisableGodotTransformRead, GodotTransformConfig, GodotTransformSyncPlugin,
         GodotTransformSyncPluginExt, NO_TRANSFORM_READ_GROUP, TransformSyncMetadata,

@@ -17,7 +17,7 @@ on:
       - ".github/workflows/book.yml"
       - ".github/workflows/benchmark*.yml"
       - ".github/workflows/examples.yml"
-  workflow_dispatch: # Allows manual runs and local testing with act
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -34,7 +34,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Fast-fail lint job - runs once on Linux, catches formatting/clippy errors quickly
   lint:
     name: lint
     runs-on: ubuntu-latest
@@ -64,8 +63,6 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets -- -D warnings
 
-  # Test job - runs on all platforms after lint passes
-  # For workflow_dispatch (local act testing), runs only on ubuntu-latest
   test:
     name: test (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
@@ -104,49 +101,86 @@ jobs:
           version: 1.0
 
       - name: Run unit tests
-        run: cargo test --lib --bins --examples
+        run: |
+          cargo test --lib --bins --examples
+          cargo test --doc -p godot-bevy -p godot-bevy-macros -p godot-bevy-test -p godot-bevy-test-macros
 
-  # Detect which paths changed to conditionally run downstream jobs
   changes:
     name: detect changes
     runs-on: ubuntu-latest
     outputs:
       library: ${{ steps.manual.outputs.library || steps.filter.outputs.library }}
       itest: ${{ steps.manual.outputs.itest || steps.filter.outputs.itest }}
+      qualification: ${{ steps.manual.outputs.qualification || steps.filter.outputs.qualification }}
     steps:
       - uses: actions/checkout@v4
 
-      # For manual triggers (workflow_dispatch), always run all jobs
-      # This enables local testing with act and explicit manual runs
       - name: Manual trigger - run all
         id: manual
         if: github.event_name == 'workflow_dispatch'
         run: |
           echo "library=true" >> $GITHUB_OUTPUT
           echo "itest=true" >> $GITHUB_OUTPUT
+          echo "qualification=true" >> $GITHUB_OUTPUT
 
-      # For push/PR events, use paths-filter to detect changes
       - uses: dorny/paths-filter@v3
         id: filter
         if: github.event_name != 'workflow_dispatch'
         with:
           filters: |
             library:
+              - 'book-tests/**'
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
+              - 'godot-bevy-test/**'
+              - 'godot-bevy-test-macros/**'
               - '.github/workflows/ci.yml'
               - 'Cargo.toml'
               - 'Cargo.lock'
             itest:
               - 'itest/**'
+              - 'examples/platformer-2d/**'
+              - '.github/workflows/ci.yml'
+            qualification:
+              - '.cargo/mutants.toml'
+              - 'devenv.nix'
+              - 'itest/schema/**'
+              - 'itest/faults/**'
+              - 'itest/fixtures/qualification/**'
+              - 'itest/qualification*.py'
+              - 'itest/qualification/**'
+              - 'itest/test_qualification.py'
+              - 'itest/verify-qualification.sh'
+              - '.github/workflows/qualification.yml'
+              - '.github/workflows/coverage.yml'
               - '.github/workflows/ci.yml'
 
-  # Integration tests with Godot runtime
+  qualification-static:
+    name: qualification static contract
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: |
+      needs.changes.outputs.library == 'true' ||
+      needs.changes.outputs.itest == 'true' ||
+      needs.changes.outputs.qualification == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify qualification evidence contract
+        run: ./itest/verify-qualification.sh contract
+      - name: Verify fault patch applicability
+        run: ./itest/verify-qualification.sh faults
+      - name: Verify tolerance and no-op audit
+        run: ./itest/verify-qualification.sh assertions
+      - name: Verify coverage evidence contract
+        run: ./itest/verify-coverage.sh contract
+
   # For local testing with act: act workflow_dispatch -j integration-tests --container-architecture linux/amd64
   integration-tests:
     name: integration tests (${{ matrix.profile }})
     runs-on: ubuntu-latest
     needs: [lint, changes]
+    env:
+      ITEST_DENY_FOCUS: "1"
     if: |
       always() &&
       (github.event_name == 'workflow_dispatch' ||
@@ -201,4 +235,24 @@ jobs:
         working-directory: itest
         env:
           GODOT4_BIN: godot
-        run: ./run-tests.sh ${{ matrix.profile == 'release' && '--release' || '' }}
+        run: ./run-tests.sh ${{ matrix.profile == 'release' && '--release' || '' }} --json ../target/itest-${{ matrix.profile }}.json
+
+      - name: Run platformer integration tests
+        env:
+          GODOT4_BIN: godot
+          GODOT: godot
+        # The first run also does the headless import, which can segfault on exit once a
+        # GDExtension is loaded (godotengine/godot#111645) after .godot is already written.
+        # Retrying once then skips the import and just runs the tests.
+        run: |
+          CMD="cargo run ${{ matrix.profile == 'release' && '--release' || '' }} --features itest --manifest-path examples/platformer-2d/rust/Cargo.toml"
+          $CMD || { test -d examples/platformer-2d/godot/.godot && $CMD; }
+
+      - name: Upload integration test report
+        # skipped under act: no artifact service locally (ACTIONS_RUNTIME_TOKEN)
+        if: ${{ always() && !env.ACT }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: itest-report-${{ matrix.profile }}
+          path: target/itest-${{ matrix.profile }}.json
+          if-no-files-found: warn

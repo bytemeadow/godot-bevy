@@ -48,9 +48,9 @@ pub struct GodotActions {
     pub(crate) action_keys: Vec<String>,
     /// Actions already warned about in debug so each unknown name warns only once.
     warned: Mutex<HashSet<String>>,
+    #[cfg(test)]
+    poll_override: Option<fn(&mut GodotActions, Clock)>,
 }
-
-// ── typed handle ────────────────────────────────────────────────────────────
 
 /// A typed action handle. Construct once; reuse across systems.
 ///
@@ -69,8 +69,6 @@ impl Action {
         Self { name, key }
     }
 }
-
-// ── borrow helper ────────────────────────────────────────────────────────────
 
 /// Short-lived borrow used by every accessor. Never allocates.
 pub struct ActionRef<'a> {
@@ -105,8 +103,6 @@ impl<'a> From<&'a Action> for ActionRef<'a> {
         }
     }
 }
-
-// ── accessors ────────────────────────────────────────────────────────────────
 
 impl GodotActions {
     fn snapshot(&self) -> &Snapshot {
@@ -184,6 +180,11 @@ impl GodotActions {
     /// any actions; zero-alloc once seeded -- `action_keys` holds the
     /// pre-stringified keys.
     pub(crate) fn poll(&mut self, clock: Clock) {
+        #[cfg(test)]
+        if let Some(poll_override) = self.poll_override {
+            poll_override(self, clock);
+            return;
+        }
         if self.action_set.is_empty() {
             let acts: Vec<StringName> = InputMap::singleton().get_actions().iter_shared().collect();
             let keys: Vec<String> = acts.iter().map(|n| n.to_string()).collect();
@@ -223,8 +224,6 @@ impl GodotActions {
     }
 }
 
-// ── driver helpers ───────────────────────────────────────────────────────────
-
 /// Called by `godot_fixed_driver` before `FixedMain` runs. Sets the active
 /// clock to `Physics` and refreshes the physics snapshot via FFI. No-op if
 /// `GodotActions` hasn't been added (allows apps that don't use action input
@@ -249,8 +248,6 @@ fn poll_process_actions(mut ga: ResMut<GodotActions>) {
     ga.set_active(Clock::Process);
     ga.poll(Clock::Process);
 }
-
-// ── plugin ────────────────────────────────────────────────────────────────────
 
 /// Marker set for the `Update`-schedule process-clock poll.
 ///
@@ -278,188 +275,5 @@ impl Plugin for GodotActionsPlugin {
     }
 }
 
-// ── tests ────────────────────────────────────────────────────────────────────
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn make_state_full(
-        pressed: bool,
-        just_pressed: bool,
-        just_released: bool,
-        strength: f32,
-        raw_strength: f32,
-    ) -> ActionState {
-        ActionState {
-            pressed,
-            just_pressed,
-            just_released,
-            strength,
-            raw_strength,
-        }
-    }
-
-    // ── 1. Active-clock flip with divergent snapshots ────────────────────────
-
-    #[test]
-    fn active_clock_flip_divergent_snapshots() {
-        let mut ga = GodotActions::default();
-
-        // process: "a" pressed+just_pressed, "b" all-false
-        ga.process
-            .actions
-            .insert("a".to_owned(), make_state_full(true, true, false, 0.0, 0.0));
-        ga.process
-            .actions
-            .insert("b".to_owned(), ActionState::default());
-
-        // physics: "a" all-false, "b" pressed+just_pressed
-        ga.physics
-            .actions
-            .insert("a".to_owned(), ActionState::default());
-        ga.physics
-            .actions
-            .insert("b".to_owned(), make_state_full(true, true, false, 0.0, 0.0));
-
-        assert!(ga.pressed("a"), "process: a should be pressed");
-        assert!(!ga.pressed("b"), "process: b should not be pressed");
-
-        ga.set_active(Clock::Physics);
-        assert!(!ga.pressed("a"), "physics: a should not be pressed");
-        assert!(ga.pressed("b"), "physics: b should be pressed");
-
-        ga.set_active(Clock::Process);
-        assert!(ga.pressed("a"), "reverted: a should be pressed again");
-        assert!(!ga.pressed("b"), "reverted: b should not be pressed again");
-    }
-
-    // ── 2. Shared helper returns the executing clock's data ──────────────────
-
-    fn read_a(ga: &GodotActions) -> bool {
-        ga.pressed("a")
-    }
-
-    #[test]
-    fn shared_helper_sees_active_clock() {
-        let mut ga = GodotActions::default();
-
-        ga.process.actions.insert(
-            "a".to_owned(),
-            make_state_full(true, false, false, 0.0, 0.0),
-        );
-        ga.physics.actions.insert(
-            "a".to_owned(),
-            make_state_full(false, false, false, 0.0, 0.0),
-        );
-
-        assert!(read_a(&ga), "helper under Process should see pressed=true");
-        ga.set_active(Clock::Physics);
-        assert!(
-            !read_a(&ga),
-            "helper under Physics should see pressed=false"
-        );
-    }
-
-    // ── 3. Edge independence -- no aliasing between fields ───────────────────
-
-    #[test]
-    fn edge_independence_no_aliasing() {
-        let mut ga = GodotActions::default();
-
-        ga.process.actions.insert(
-            "held".to_owned(),
-            make_state_full(true, false, false, 0.0, 0.0),
-        );
-        ga.process.actions.insert(
-            "rising".to_owned(),
-            make_state_full(true, true, false, 0.0, 0.0),
-        );
-        ga.process.actions.insert(
-            "falling".to_owned(),
-            make_state_full(false, false, true, 0.0, 0.0),
-        );
-
-        assert!(ga.pressed("held"));
-        assert!(!ga.just_pressed("held"));
-        assert!(!ga.just_released("held"));
-
-        assert!(ga.pressed("rising"));
-        assert!(ga.just_pressed("rising"));
-        assert!(!ga.just_released("rising"));
-
-        assert!(!ga.pressed("falling"));
-        assert!(!ga.just_pressed("falling"));
-        assert!(ga.just_released("falling"));
-    }
-
-    // ── 4. strength / raw_strength / axis / vector ───────────────────────────
-
-    #[test]
-    fn strength_raw_strength_axis_vector() {
-        let mut ga = GodotActions::default();
-
-        ga.process.actions.insert(
-            "left".to_owned(),
-            make_state_full(true, false, false, 0.8, 1.0),
-        );
-        ga.process.actions.insert(
-            "right".to_owned(),
-            make_state_full(true, false, false, 0.6, 0.9),
-        );
-        ga.process.actions.insert(
-            "up".to_owned(),
-            make_state_full(true, false, false, 0.4, 0.5),
-        );
-        ga.process.actions.insert(
-            "down".to_owned(),
-            make_state_full(true, false, false, 0.3, 0.7),
-        );
-
-        // strength != raw_strength
-        assert_ne!(ga.strength("left"), ga.raw_strength("left"));
-        assert!((ga.strength("left") - 0.8).abs() < f32::EPSILON);
-        assert!((ga.raw_strength("left") - 1.0).abs() < f32::EPSILON);
-
-        // axis == pos - neg
-        let ax = ga.axis("left", "right");
-        assert!(
-            (ax - (0.6 - 0.8)).abs() < f32::EPSILON,
-            "axis={ax}, expected {}",
-            0.6 - 0.8
-        );
-
-        // vector componentwise
-        let v = ga.vector("left", "right", "up", "down");
-        assert!((v.x - (0.6 - 0.8)).abs() < f32::EPSILON, "v.x={}", v.x);
-        assert!((v.y - (0.3 - 0.4)).abs() < f32::EPSILON, "v.y={}", v.y);
-    }
-
-    // ── 5. poll_physics_actions without resource is a noop ───────────────────
-
-    #[test]
-    fn poll_physics_actions_without_resource_is_noop() {
-        let mut world = bevy_ecs::world::World::new();
-        // Neither call should panic; the resource must remain absent.
-        poll_physics_actions(&mut world);
-        restore_process_clock(&mut world);
-        assert!(
-            world.get_resource::<GodotActions>().is_none(),
-            "GodotActions must not be inserted by the driver helpers"
-        );
-    }
-
-    // ── 6. Unknown &str -- no panic, defaults returned, warn-once ────────────
-
-    #[test]
-    fn unknown_action_returns_defaults_no_panic() {
-        let ga = GodotActions::default();
-
-        assert!(!ga.pressed("does_not_exist"));
-        assert!((ga.strength("does_not_exist") - 0.0).abs() < f32::EPSILON);
-
-        // Second call -- warn-once must not panic even if already warned.
-        assert!(!ga.pressed("does_not_exist"));
-        assert!((ga.strength("does_not_exist") - 0.0).abs() < f32::EPSILON);
-    }
-}
+include!("actions_tests.rs");

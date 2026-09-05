@@ -28,7 +28,7 @@ godot-bevy-test = { version = "0.11", optional = true }
 # Update or add your features section with:
 [features]
 # Add godot-bevy-test if you want to also set up integration tests
-itest = ["dep:godot-bevy-test"]
+itest = ["dep:godot-bevy-test", "godot-bevy-test/test-frame-signal"]
 ```
 
 Create a new `run_godot.rs` file. Put it at the same folder level as `Cargo.toml`.
@@ -46,10 +46,14 @@ fn main() {
 // Run with `cargo run --features itest` to run integration tests
 #[cfg(feature = "itest")]
 fn main() {
+    unsafe { std::env::set_var("GODOT_BEVY_ITEST", "1") };
+
     gdenv_lib::api::godot_runner::GodotRunner::init()
         .and_then(|r| {
             r.godot_cli_arguments(Some(vec![
                 "--headless".to_string(),
+                "--fixed-fps".to_string(),
+                "60".to_string(),
                 "--scene".to_string(),
                 "res://addons/godot-bevy/test/TestRunner.tscn".to_string(),
                 "--quit-after".to_string(),

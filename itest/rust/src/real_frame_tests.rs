@@ -1,8 +1,3 @@
-/*
- * Real frame-driven integration tests
- * These tests verify actual Godot frame progression
- */
-
 use bevy::prelude::*;
 use godot_bevy_test::prelude::*;
 
@@ -302,7 +297,6 @@ fn test_reinit_runs_startup(ctx: &TestContext) -> godot::task::TaskHandle {
     })
 }
 
-/// Test that Update systems run on real Godot frames
 #[itest(async)]
 fn test_update_runs_on_real_frames(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -333,7 +327,6 @@ fn test_update_runs_on_real_frames(ctx: &TestContext) -> godot::task::TaskHandle
     })
 }
 
-/// Test FixedUpdate runs on physics frames
 #[itest(async)]
 fn test_fixed_update_runs_each_frame(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -363,7 +356,6 @@ fn test_fixed_update_runs_each_frame(ctx: &TestContext) -> godot::task::TaskHand
     })
 }
 
-/// Test frame pacing is controlled by Godot
 #[itest(async)]
 fn test_frame_pacing_controlled_by_godot(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -396,14 +388,7 @@ fn test_frame_pacing_controlled_by_godot(ctx: &TestContext) -> godot::task::Task
     })
 }
 
-/// FixedUpdate now ticks on Godot's physics clock: each physics tick runs
-/// FixedMain exactly once, and Res<Time> inside it is positive.
-///
-/// IMPORTANT: never `assert!` inside a Bevy system — that panics into Godot's
-/// `_physics_process` callback, where `BevyApp::physics_process`'s catch_unwind
-/// swallows it and the async runner (which only checks `has_godot_task_panicked`)
-/// never sees the failure. Record observations into a resource and assert in the
-/// task body after `.await`, like every other itest.
+/// Each Godot physics tick runs FixedMain exactly once with positive `Res<Time>`.
 #[itest(async)]
 fn test_fixed_update_runs_on_physics_tick(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -543,11 +528,3 @@ fn test_update_returns_after_full_frame(ctx: &TestContext) -> godot::task::TaskH
         app.cleanup().await;
     })
 }
-
-// Panic-safety note: process() emits bevy_frame_complete BEFORE resume_unwind and
-// even when app == None, so a panicking frame resumes its awaiter (fast clean
-// failure) instead of hanging the suite to --quit-after. We can't ship a
-// deliberate-panic itest to guard this -- the harness flags any system panic via
-// has_godot_task_panicked, so such a test can never be green. The contract is
-// structural (see the emit in app.rs) and the app==None branch is exercised by
-// every test's cleanup(), which awaits the signal after teardown.

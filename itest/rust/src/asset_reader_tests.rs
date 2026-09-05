@@ -1,11 +1,4 @@
 /*
- * Asset-reader itests: the FileAccess-backed GodotAssetReader.
- *
- * These pin the three load-bearing properties: a byte loader gets real file
- * bytes through the reader, the GodotResource/ResourceLoader path still works
- * (the reader's lazy Ok never interferes), and a missing data file fails cleanly
- * without aborting the world.
- *
  * GodotCorePlugins (the itest autoload) has no asset system, so each test's setup
  * adds GodotAssetsPlugin. Loads are async with +-1-frame slop, so we poll for the
  * terminal LoadState within a bounded budget rather than asserting on a fixed tick.
@@ -49,7 +42,6 @@ impl AssetLoader for GreetingLoader {
 }
 
 /// A byte loader reading `res://...greeting` receives the real file bytes.
-/// Fails hard against the old stub (empty stream -> `Greeting("")`).
 #[itest(async)]
 fn test_read_delivers_real_bytes(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();

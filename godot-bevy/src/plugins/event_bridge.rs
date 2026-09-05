@@ -158,6 +158,28 @@ impl AddGodotEventAppExt for App {
     }
 }
 
+#[doc(hidden)]
+pub struct EventBridgeReceipt(());
+
+#[doc(hidden)]
+pub trait EventBridgeTarget {
+    fn enqueue_event<T>(&self, event: T) -> EventBridgeReceipt
+    where
+        T: Event + Clone + Send + 'static,
+        for<'a> T::Trigger<'a>: Default;
+}
+
+impl EventBridgeTarget for Gd<BevyApp> {
+    fn enqueue_event<T>(&self, event: T) -> EventBridgeReceipt
+    where
+        T: Event + Clone + Send + 'static,
+        for<'a> T::Trigger<'a>: Default,
+    {
+        self.bind().send_event(event);
+        EventBridgeReceipt(())
+    }
+}
+
 /// Send a typed event into a specific `BevyApp`'s ECS from Godot Rust code that
 /// holds a `Gd<BevyApp>`. It reaches `On<T>` observers on the next `First` drain
 /// — it enqueues, it doesn't `trigger` synchronously, so code already inside a
@@ -170,126 +192,13 @@ impl AddGodotEventAppExt for App {
 /// is running (from a system, or a signal a system emitted synchronously): the
 /// `bind()` panics inside gdext and the frame's `catch_unwind` tears the app
 /// down. Off-thread, hold a cloned `GodotEventSender` and send through that.
-pub fn send_event<T>(app: &Gd<BevyApp>, event: T)
+pub fn send_event<T>(app: &impl EventBridgeTarget, event: T)
 where
     T: Event + Clone + Send + 'static,
     for<'a> T::Trigger<'a>: Default,
 {
-    app.bind().send_event(event);
+    let _receipt = app.enqueue_event(event);
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use bevy_ecs::prelude::*;
-
-    #[derive(Event, Clone)]
-    struct Damage {
-        amount: i32,
-    }
-
-    #[derive(Resource, Default)]
-    struct Hits(Vec<i32>);
-
-    fn build() -> App {
-        let mut app = App::new();
-        ensure_event_channel(&mut app);
-        app.init_resource::<Hits>();
-        app.add_observer(|t: On<Damage>, mut hits: ResMut<Hits>| {
-            hits.0.push(t.event().amount);
-        });
-        app
-    }
-
-    fn enqueue(app: &App, amount: i32) {
-        app.world()
-            .resource::<GodotEventSender>()
-            .send(Damage { amount });
-    }
-
-    #[test]
-    fn channel_round_trip_triggers_observer_once() {
-        let mut app = build();
-        enqueue(&app, 7);
-        app.world_mut().run_schedule(First);
-        assert_eq!(app.world().resource::<Hits>().0, vec![7]);
-    }
-
-    #[test]
-    fn drain_is_fifo() {
-        let mut app = build();
-        enqueue(&app, 1);
-        enqueue(&app, 2);
-        enqueue(&app, 3);
-        app.world_mut().run_schedule(First);
-        assert_eq!(app.world().resource::<Hits>().0, vec![1, 2, 3]);
-    }
-
-    #[test]
-    fn add_godot_event_installs_channel_and_registry() {
-        let mut app = App::new();
-        app.add_godot_event::<Damage>("damage", |_p| Some(Damage { amount: 0 }));
-        assert!(app.world().contains_resource::<GodotEventSender>());
-        assert!(app.world().contains_resource::<GodotEventRegistry>());
-    }
-
-    #[test]
-    fn add_godot_event_registers_named_mapper() {
-        let mut app = App::new();
-        app.add_godot_event::<Damage>("damage", |_p| Some(Damage { amount: 0 }));
-        assert!(
-            app.world()
-                .resource::<GodotEventRegistry>()
-                .mappers
-                .contains_key("damage")
-        );
-    }
-
-    #[test]
-    fn re_registering_same_name_is_last_wins() {
-        let mut app = App::new();
-        app.add_godot_event::<Damage>("x", |_p| Some(Damage { amount: 1 }));
-        app.add_godot_event::<Damage>("x", |_p| Some(Damage { amount: 2 }));
-        assert_eq!(
-            app.world().resource::<GodotEventRegistry>().mappers.len(),
-            1
-        );
-    }
-
-    #[derive(Event, Clone, godot::prelude::GodotConvert)]
-    #[godot(transparent)]
-    struct Volume(f64);
-
-    #[test]
-    fn add_godot_event_from_registers_named_mapper() {
-        let mut app = App::new();
-        app.add_godot_event_from::<Volume>("volume");
-        assert!(
-            app.world()
-                .resource::<GodotEventRegistry>()
-                .mappers
-                .contains_key("volume")
-        );
-    }
-
-    #[test]
-    fn rate_limited_warner_decays_per_name() {
-        let mut w = RateLimitedWarner::default();
-        let logged: Vec<bool> = (0..8).map(|_| w.should_log("damage")).collect();
-        // counts 1,2,4,8 log; 3,5,6,7 do not
-        assert_eq!(
-            logged,
-            vec![true, true, false, true, false, false, false, true]
-        );
-    }
-
-    #[test]
-    fn rate_limited_warner_tracks_names_independently() {
-        let mut w = RateLimitedWarner::default();
-        assert!(w.should_log("a")); // 1
-        assert!(w.should_log("b")); // 1
-        assert!(w.should_log("a")); // 2 -> logs
-        assert!(!w.should_log("a")); // 3 -> suppressed
-        assert!(w.should_log("b")); // 2 -> logs
-    }
-}
+include!("event_bridge_tests.rs");

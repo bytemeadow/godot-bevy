@@ -5,8 +5,7 @@ from typing import List
 
 
 def make_indent_log():
-    # The stack can have several frames before the 'indent_log' function is called,
-    # this will normalize the indentation depth
+    # Capture the first call depth so wrapper frames do not affect indentation.
     first_stack_depth = None
 
     def log(message):
@@ -15,7 +14,6 @@ def make_indent_log():
             first_stack_depth = len(inspect.stack())
         depth = len(inspect.stack()) - first_stack_depth
 
-        # Create the indentation string (e.g., 2 spaces per level)
         indent = "    " * depth
         print(f"{indent}{message}")
 
@@ -26,9 +24,7 @@ indent_log = make_indent_log()
 
 
 def run_cargo_fmt(file_paths: List[Path], project_root: Path) -> None:
-    """Run cargo fmt on a specific file to format generated Rust code"""
     try:
-        # Run cargo fmt on the specific file
         result = subprocess.run(
             ["cargo", "fmt", "--", *file_paths],
             cwd=project_root,

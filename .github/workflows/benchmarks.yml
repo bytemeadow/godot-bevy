@@ -57,7 +57,6 @@ jobs:
           include-templates: false
           cache: true
 
-      # ── Benchmark comparison (interleaved base vs PR, noise-gated) ───
       # Delegates to itest/compare-benches.sh — the same script used locally — so
       # CI and local results can't drift. It builds the base branch (with this
       # PR's benchmarks.rs, falling back to the base's own if that doesn't

@@ -58,6 +58,5 @@ impl Drop for GodotResourceHandle {
                 }
             }
         }
-        // If try_get returns None, the resource was already freed, which is fine
     }
 }

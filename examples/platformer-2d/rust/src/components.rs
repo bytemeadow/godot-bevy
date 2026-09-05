@@ -1,9 +1,3 @@
-//! Shared components for the platformer game
-//!
-//! This module defines reusable components that can be used across different
-//! entity types (players, enemies, etc.) to avoid duplication when using
-//! the BevyComponent macro.
-
 use crate::level_manager::LevelId;
 use bevy::prelude::*;
 use godot_bevy::prelude::GodotNode;

@@ -1,0 +1,211 @@
+use std::env::VarError;
+use std::path::PathBuf;
+
+pub(crate) const DEFAULT_REPEAT: u32 = 1;
+pub(crate) const DEFAULT_TIMEOUT_FRAMES: u32 = 600;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Filter {
+    pub(crate) normalized: String,
+    pub(crate) patterns: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum BenchmarkSelector {
+    All,
+    Exact(String),
+    Filter(Filter),
+}
+
+impl BenchmarkSelector {
+    pub(crate) fn matches(&self, name: &str) -> bool {
+        match self {
+            Self::All => true,
+            Self::Exact(exact) => name == exact,
+            Self::Filter(filter) => filter.patterns.iter().any(|pattern| name.contains(pattern)),
+        }
+    }
+
+    #[cfg(any(feature = "profile-tracy", test))]
+    pub(crate) fn is_all(&self) -> bool {
+        matches!(self, Self::All)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct TestConfig {
+    pub(crate) filter: Option<Filter>,
+    pub(crate) repeat: u32,
+    pub(crate) timeout_frames: u32,
+    pub(crate) json_path: Option<PathBuf>,
+    pub(crate) deny_focus: bool,
+    pub(crate) build_profile: String,
+}
+
+impl TestConfig {
+    pub(crate) fn from_env() -> Result<Self, String> {
+        Ok(Self {
+            filter: filter_from_env("ITEST_FILTER")?,
+            repeat: positive_u32_from_env("ITEST_REPEAT", DEFAULT_REPEAT)?,
+            timeout_frames: positive_u32_from_env("ITEST_TIMEOUT_FRAMES", DEFAULT_TIMEOUT_FRAMES)?,
+            json_path: report_path_from_env()?,
+            deny_focus: boolean_from_env("ITEST_DENY_FOCUS", false)?,
+            build_profile: build_profile_from_env()?,
+        })
+    }
+
+    pub(crate) fn fallback() -> Self {
+        Self {
+            filter: None,
+            repeat: DEFAULT_REPEAT,
+            timeout_frames: DEFAULT_TIMEOUT_FRAMES,
+            json_path: None,
+            deny_focus: false,
+            build_profile: default_build_profile().to_string(),
+        }
+    }
+}
+
+pub(crate) fn filter_from_env(name: &str) -> Result<Option<Filter>, String> {
+    match std::env::var(name) {
+        Ok(value) => parse_filter(name, &value).map(Some),
+        Err(VarError::NotPresent) => Ok(None),
+        Err(VarError::NotUnicode(_)) => Err(format!("{name} must be valid Unicode")),
+    }
+}
+
+pub(crate) fn benchmark_selector_from_env() -> Result<BenchmarkSelector, String> {
+    let exact = optional_nonempty_from_env("BENCHMARK_EXACT")?;
+    let filter = filter_from_env("BENCHMARK_FILTER")?;
+    match (exact, filter) {
+        (Some(_), Some(_)) => {
+            Err("BENCHMARK_EXACT and BENCHMARK_FILTER are mutually exclusive".to_string())
+        }
+        (Some(exact), None) => Ok(BenchmarkSelector::Exact(exact)),
+        (None, Some(filter)) => Ok(BenchmarkSelector::Filter(filter)),
+        (None, None) => Ok(BenchmarkSelector::All),
+    }
+}
+
+pub(crate) fn native_profile_seconds_from_env() -> Result<Option<u32>, String> {
+    let Some(value) = optional_nonempty_from_env("GBPROF_NATIVE_SECONDS")? else {
+        return Ok(None);
+    };
+    let seconds = parse_positive_u32("GBPROF_NATIVE_SECONDS", &value)?;
+    if seconds < 5 {
+        return Err("GBPROF_NATIVE_SECONDS must be at least 5".to_string());
+    }
+    Ok(Some(seconds))
+}
+
+#[cfg(any(feature = "profile-tracy", test))]
+pub(crate) fn required_nonempty_from_env(name: &str) -> Result<String, String> {
+    optional_nonempty_from_env(name)?.ok_or_else(|| format!("{name} is required"))
+}
+
+fn optional_nonempty_from_env(name: &str) -> Result<Option<String>, String> {
+    match std::env::var(name) {
+        Ok(value) if value.trim().is_empty() => Err(format!("{name} must not be empty")),
+        Ok(value) => Ok(Some(value.trim().to_string())),
+        Err(VarError::NotPresent) => Ok(None),
+        Err(VarError::NotUnicode(_)) => Err(format!("{name} must be valid Unicode")),
+    }
+}
+
+pub(crate) fn report_path_from_env() -> Result<Option<PathBuf>, String> {
+    let path = match std::env::var("ITEST_JSON_PATH") {
+        Ok(value) if value.trim().is_empty() => {
+            return Err("ITEST_JSON_PATH must not be empty".to_string());
+        }
+        Ok(value) => PathBuf::from(value),
+        Err(VarError::NotPresent) => return Ok(None),
+        Err(VarError::NotUnicode(_)) => {
+            return Err("ITEST_JSON_PATH must be valid Unicode".to_string());
+        }
+    };
+
+    if path.is_absolute() {
+        Ok(Some(path))
+    } else {
+        std::env::current_dir()
+            .map(|current_dir| Some(current_dir.join(path)))
+            .map_err(|error| format!("failed to resolve ITEST_JSON_PATH: {error}"))
+    }
+}
+
+fn parse_filter(name: &str, value: &str) -> Result<Filter, String> {
+    let patterns: Vec<String> = value
+        .split(',')
+        .map(str::trim)
+        .filter(|pattern| !pattern.is_empty())
+        .map(str::to_string)
+        .collect();
+
+    if patterns.is_empty() {
+        return Err(format!("{name} must contain at least one nonempty pattern"));
+    }
+
+    Ok(Filter {
+        normalized: patterns.join(","),
+        patterns,
+    })
+}
+
+fn positive_u32_from_env(name: &str, default: u32) -> Result<u32, String> {
+    match std::env::var(name) {
+        Ok(value) => parse_positive_u32(name, &value),
+        Err(VarError::NotPresent) => Ok(default),
+        Err(VarError::NotUnicode(_)) => Err(format!("{name} must be valid Unicode")),
+    }
+}
+
+fn parse_positive_u32(name: &str, value: &str) -> Result<u32, String> {
+    if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(format!("{name} must be a positive integer"));
+    }
+    let parsed = value
+        .parse::<u32>()
+        .map_err(|_| format!("{name} must be a positive integer"))?;
+    if parsed == 0 {
+        return Err(format!("{name} must be a positive integer"));
+    }
+    Ok(parsed)
+}
+
+fn boolean_from_env(name: &str, default: bool) -> Result<bool, String> {
+    match std::env::var(name) {
+        Ok(value) => parse_boolean(name, &value),
+        Err(VarError::NotPresent) => Ok(default),
+        Err(VarError::NotUnicode(_)) => Err(format!("{name} must be valid Unicode")),
+    }
+}
+
+fn parse_boolean(name: &str, value: &str) -> Result<bool, String> {
+    match value {
+        "1" | "true" => Ok(true),
+        "0" | "false" => Ok(false),
+        _ => Err(format!("{name} must be one of 0, 1, false, or true")),
+    }
+}
+
+fn build_profile_from_env() -> Result<String, String> {
+    match std::env::var("ITEST_BUILD_PROFILE") {
+        Ok(value) if matches!(value.as_str(), "debug" | "release") => Ok(value),
+        Ok(_) => Err("ITEST_BUILD_PROFILE must be debug or release".to_string()),
+        Err(VarError::NotPresent) => Ok(default_build_profile().to_string()),
+        Err(VarError::NotUnicode(_)) => {
+            Err("ITEST_BUILD_PROFILE must be valid Unicode".to_string())
+        }
+    }
+}
+
+fn default_build_profile() -> &'static str {
+    if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    }
+}
+
+#[cfg(test)]
+include!("config_tests.rs");

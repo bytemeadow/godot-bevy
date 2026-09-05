@@ -1,12 +1,12 @@
-//! Deterministic, FFI-free validation of the TwoWay multi-step clobber fix.
+//! Deterministic, FFI-free validation of TwoWay multi-step synchronization.
 //!
-//! The bug: the Godot->Bevy read used to run once per render frame (PreUpdate),
-//! but the whole-transform write runs once per physics step (FixedLast). On a
+//! The failure mode: if the Godot->Bevy read runs once per render frame (PreUpdate)
+//! while the whole-transform write runs once per physics step (FixedLast), a
 //! frame with 2+ physics steps, steps 2..N wrote without a fresh read, so the
 //! step's whole-transform write dragged a stale Bevy value over any axis a Godot
 //! physics-clock author moved between steps -- silently clobbering it.
 //!
-//! The fix inverts the read cadence: FixedFirst reads every
+//! The required cadence has FixedFirst read every
 //! physics step (matching the FixedLast write), so each step gets a fresh per-axis
 //! read before its write. PreUpdate becomes the 0-tick fallback -- it runs only on
 //! render frames with zero physics steps, where the Main prefix is the `_process`
@@ -73,7 +73,6 @@ fn merge_reads(q: &mut Query<(&mut Transform, &GodotNode, &mut TransformSyncMeta
     }
 }
 
-/// PreUpdate read stub: the 0-tick fallback read. Bumps only `preupdate`.
 fn read_stub_preupdate(
     mut q: Query<(&mut Transform, &GodotNode, &mut TransformSyncMetadata)>,
     mut count: ResMut<ReadCount>,
@@ -82,7 +81,6 @@ fn read_stub_preupdate(
     merge_reads(&mut q);
 }
 
-/// FixedFirst read stub: the per-step read. Bumps only `fixedfirst`.
 fn read_stub_fixedfirst(
     mut q: Query<(&mut Transform, &GodotNode, &mut TransformSyncMetadata)>,
     mut count: ResMut<ReadCount>,
@@ -169,8 +167,6 @@ fn frame(app: &mut App, n_steps: u32, mut godot_author: impl FnMut(&mut World, u
     let world = app.world_mut();
     let need_startup = !world.contains_resource::<StartupRan>();
 
-    // prefix_done mirrors app.rs's prefix_done_this_frame: true once the first
-    // physics step runs the prefix.
     let mut prefix_done = false;
     for step in 0..n_steps {
         godot_author(world, step);
@@ -178,9 +174,6 @@ fn frame(app: &mut App, n_steps: u32, mut godot_author: impl FnMut(&mut World, u
         prefix_done = true;
     }
 
-    // End-of-frame _process(): publish the process-fallback flag (true only on an
-    // idle 0-step frame), run the prefix if no physics step did, then the suffix
-    // and clear_trackers.
     if let Some(mut f) = world.get_resource_mut::<ProcessFallbackPrefix>() {
         f.0 = !prefix_done;
     }
@@ -205,11 +198,10 @@ fn close(a: f32, b: f32) -> bool {
     (a - b).abs() < 1e-4
 }
 
-/// Core regression: a 2-step frame where a Godot physics-clock author moves the
-/// node's y between steps. The FixedFirst read runs every step, so step 2
+/// A 2-step frame where a Godot physics-clock author moves the node's y between
+/// steps. The FixedFirst read runs every step, so step 2
 /// pulls the fresh y before its whole-transform write -- the Godot y survives and
-/// the Bevy x advances both steps. Fails on pre-fix code (no FixedFirst read),
-/// where step 2's write drags a stale y=0 over the Godot move.
+/// the Bevy x advances both steps.
 #[test]
 fn twoway_multistep_does_not_clobber_godot_axis() {
     let (mut app, entity) = wired_app(TransformSyncMode::TwoWay, true);
@@ -233,10 +225,9 @@ fn twoway_multistep_does_not_clobber_godot_axis() {
     );
 }
 
-/// Control that proves the scenario genuinely triggers the bug: the same 2-step
-/// frame, but the FixedFirst read is omitted. With PreUpdate now gated to 0-tick
-/// frames, a 2-step frame reads nothing, so the step-2 write clobbers the Godot y
-/// back to 0 -- confirming the regression test above is not vacuous.
+/// The same 2-step frame without the FixedFirst read. Because PreUpdate is gated
+/// to 0-tick frames, a 2-step frame reads nothing, so the step-2 write must clobber
+/// the Godot y back to 0; this is the control for the preceding test.
 #[test]
 fn twoway_multistep_clobbers_without_fixed_first_read() {
     let (mut app, entity) = wired_app(TransformSyncMode::TwoWay, false);
@@ -262,8 +253,7 @@ fn twoway_multistep_clobbers_without_fixed_first_read() {
 
 /// N-step frame with a distinct y delta in every gap between steps: each step's
 /// FixedFirst read picks up that gap's move, so the final y equals the sum of all
-/// deltas (none clobbered). Fails on pre-fix code, where intermediate moves are
-/// dragged away.
+/// deltas without clobbering an intermediate move.
 #[test]
 fn twoway_nstep_accumulates_every_godot_move() {
     let (mut app, entity) = wired_app(TransformSyncMode::TwoWay, true);
@@ -294,8 +284,8 @@ fn twoway_nstep_accumulates_every_godot_move() {
 
 /// Brownfield idle path: after a Godot move, a 0-step render frame must still pull
 /// the value via the PreUpdate fallback read (FixedFirst never runs with 0 steps).
-/// This is the test that proves the new `prefix_ran_in_process_fallback` gate fires
-/// on a 0-tick frame -- it depends on `frame()` publishing the flag.
+/// The `prefix_ran_in_process_fallback` gate depends on `frame()` publishing the
+/// 0-tick flag.
 #[test]
 fn idle_frame_reads_via_preupdate_fallback() {
     let (mut app, entity) = wired_app(TransformSyncMode::TwoWay, true);
@@ -363,7 +353,7 @@ fn read_count_partitions_steps() {
     }
 }
 
-/// OneWay regression: with sync disabled in the Godot->Bevy direction, neither
+/// With sync disabled in the Godot->Bevy direction, neither
 /// read body runs at any cadence, while the FixedLast write still fires per step.
 #[test]
 fn oneway_never_reads_but_still_writes_per_step() {
@@ -392,9 +382,6 @@ fn oneway_never_reads_but_still_writes_per_step() {
     );
 }
 
-// ── structural wiring test (no FFI) ────────────────────────────────────────────
-
-/// Returns true if any system in `label`'s schedule has a name containing `needle`.
 /// Initializes the schedule (builds the executable) without running it, so no
 /// system body or FFI is touched. Relies on bevy_utils' `debug` feature (enabled
 /// by this crate) for real system names.

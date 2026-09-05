@@ -22,7 +22,6 @@ def generate_type_checking_code(
     type_checking_file: Path,
     api: ExtensionApi,
 ) -> None:
-    """Generate the complete type checking implementation"""
     indent_log("🔍 Generating type checking code...")
 
     node_types = api.classes_descended_from("Node")
@@ -43,12 +42,10 @@ def generate_type_checking_code(
             ec: &mut EntityCommands,
             node_type: &str,
         ) -> bool {{
-            // Add appropriate markers based on the type string
             {textwrap.indent(_generate_string_match_marker_insertion(api), "            ").strip()}
         }}
         
         pub fn remove_comprehensive_node_type_markers(ec: &mut EntityCommands) {{
-            // All nodes inherit from Node, so remove this first
             {textwrap.indent(_generate_node_marker_removal(api), "            ").strip()}
         }}
         
@@ -65,10 +62,8 @@ def generate_node_type_checking_dispatcher(
     output_file: Path,
     versions: list[str],
 ) -> None:
-    """Generate the node_type_checking.rs file that dispatches to version-specific modules"""
     indent_log("🔌 Generating node type checking dispatcher...")
 
-    # Helper to convert "4.2.1" to "4_2_1" for module names and "4-2-1" for feature names
     def format_ver(v: str, sep: str) -> str:
         return v.replace(".", sep)
 
@@ -85,21 +80,18 @@ def generate_node_type_checking_dispatcher(
 
         """)
 
-    # 1. Module declarations
     for ver in versions:
         content += f'#[cfg(feature = "api-{format_ver(ver, "-")}")]\n'
         content += f'mod type_checking{format_ver(ver, "_")};\n'
 
     content += "\n"
 
-    # 2. Public re-exports
     for ver in versions:
         content += f'#[cfg(feature = "api-{format_ver(ver, "-")}")]\n'
         content += f'pub use type_checking{format_ver(ver, "_")}::*;\n'
 
     content += "\n"
 
-    # 3. Default fallback (usually the latest version)
     not_any_conditions = "\n".join(
         [f'    feature = "api-{format_ver(v, "-")}",' for v in versions]
     )
@@ -121,7 +113,6 @@ def generate_node_type_checking_dispatcher(
 
 
 def _count_parents(node_type: str, parent_map: Dict[str, str]) -> int:
-    """Count the number of parents for a given node type"""
     count = 0
     parent = parent_map.get(node_type, None)
     while parent is not None:
@@ -131,7 +122,6 @@ def _count_parents(node_type: str, parent_map: Dict[str, str]) -> int:
 
 
 def _ancestor_chain(node_type: str, parent_map: Dict[str, str]) -> List[str]:
-    """Return the class and its ancestors up to and including Node, leaf -> root"""
     chain = [node_type]
     current = node_type
     while current != "Node":
@@ -146,11 +136,9 @@ def _ancestor_chain(node_type: str, parent_map: Dict[str, str]) -> List[str]:
 def _generate_string_match_marker_insertion(
     api: ExtensionApi,
 ) -> str:
-    """Generate match arms for the string-based marker function"""
     node_types = api.classes_descended_from("Node")
     parent_map = api.parent_map()
 
-    # Sort node types by parent count (fewer parents first), then alphabetically
     sorted_node_types = sorted(
         node_types, key=lambda nt: (_count_parents(nt, parent_map), nt)
     )
@@ -179,11 +167,9 @@ def _generate_string_match_marker_insertion(
 
 
 def _generate_node_marker_removal(api: ExtensionApi):
-    """Generate marker removal code for all node types"""
     node_types = api.classes_descended_from("Node")
     parent_map = api.parent_map()
 
-    # Sort node types by parent count (fewer parents first), then alphabetically
     sorted_node_types = sorted(
         node_types, key=lambda nt: (_count_parents(nt, parent_map), nt)
     )

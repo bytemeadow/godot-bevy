@@ -100,7 +100,6 @@ fn fixed_update_system(
     stats.fixed_update_runs += 1;
     counter.physics_process_calls += 1;
 
-    // FixedUpdate now ticks on Godot's authoritative physics clock (default 60 Hz).
     // Res<Time>.delta_secs() is Godot's physics delta — one clock, not two.
     if stats.fixed_update_runs.is_multiple_of(60) {
         godot_print!(

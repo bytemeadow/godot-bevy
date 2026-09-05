@@ -1,20 +1,3 @@
-/*
- * Ecosystem input integration tests
- *
- * Guards that godot-bevy's input bridge + split-Main loop don't break the two
- * major downstream input crates. In headless the bridge is the sole populator of
- * ButtonInput<KeyCode>, so a regression there yields zero reads in both crates:
- *
- * - leafwing-input-manager (pull-style ActionState): probed in both Update and
- *   FixedUpdate, so a fixed-clock reader also sees the input. leafwing keeps a
- *   separate fixed-input buffer via the Before/AfterFixedMainLoop anchors that
- *   godot-bevy hosts (host_fixed_main_loop) for ecosystem crates.
- * - bevy_enhanced_input (push-style observer): an On<Fire<Jump>> global observer,
- *   the path that previously exposed a godot-bevy bug.
- *
- * Both crates bind raw KeyCode::Space, so no Godot InputMap action is needed.
- */
-
 use bevy::prelude::*;
 use godot::classes::{Input, InputEventKey};
 use godot::global::Key;
@@ -142,7 +125,6 @@ fn test_leafwing_action_state_both_clocks(ctx: &TestContext) -> godot::task::Tas
             fix_press.len()
         );
 
-        // Update clock
         assert_eq!(
             u_jp, 1,
             "leafwing Update just_pressed must fire exactly once; frames: {upd_press:?}"
@@ -235,7 +217,6 @@ fn test_enhanced_input_observer_fires(ctx: &TestContext) -> godot::task::TaskHan
                 actions!(Player[(Action::<Jump>::new(), bindings![KeyCode::Space])]),
             ));
         });
-        // Let the context register and evaluate once with no input held.
         app.updates(2).await;
 
         let before = app.with_world(|w| w.resource::<JumpFireCount>().0);
