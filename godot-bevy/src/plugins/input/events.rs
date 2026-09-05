@@ -214,7 +214,7 @@ fn extract_basic_input_events(
                 pressed: key_event.is_pressed(),
                 echo: key_event.is_echo(),
                 #[cfg(any(feature = "api-4-2", feature = "api-4-3"))]
-                unicode: key_event.get_unicode() as u32,
+                unicode: u32::try_from(key_event.get_unicode()).unwrap_or_default(),
                 #[cfg(not(any(feature = "api-4-2", feature = "api-4-3")))]
                 unicode: key_event.get_unicode(),
             });
