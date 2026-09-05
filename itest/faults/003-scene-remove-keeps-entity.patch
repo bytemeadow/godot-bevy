@@ -1,12 +1,12 @@
 diff --git a/godot-bevy/src/plugins/scene_tree/plugin.rs b/godot-bevy/src/plugins/scene_tree/plugin.rs
 --- a/godot-bevy/src/plugins/scene_tree/plugin.rs
 +++ b/godot-bevy/src/plugins/scene_tree/plugin.rs
-@@ -837,7 +837,7 @@ fn process_scene_tree_messages(
-                             .map(|(_, _, prot, _)| prot.is_some())
-                             .unwrap_or(false);
-                         if !protected {
--                            commands.entity(ent).despawn();
-+                            _strip_godot_components(commands, ent);
-                         } else {
-                             _strip_godot_components(commands, ent);
-                         }
+@@ -1058,7 +1058,7 @@ fn unmirror_node_entity(commands: &mut Commands, ent: Entity, protected: bool) {
+     entity_commands.insert(GodotNodeUnmirroring);
+     // Unlink first so the parent's despawn hook cannot free live descendants.
+     entity_commands.remove::<(GodotChildOf, GodotChildren)>();
+-    if !protected {
++    if !protected && false {
+         entity_commands.despawn();
+         return;
+     }

@@ -1,15 +1,14 @@
 diff --git a/godot-bevy/src/plugins/scene_tree/plugin.rs b/godot-bevy/src/plugins/scene_tree/plugin.rs
 --- a/godot-bevy/src/plugins/scene_tree/plugin.rs
 +++ b/godot-bevy/src/plugins/scene_tree/plugin.rs
-@@ -808,10 +808,7 @@ fn process_scene_tree_messages(
-                     // During reparenting, the node is temporarily removed from old parent
-                     // but still exists in the scene tree (has a parent)
-                     // We need to try_get because the node handle might be invalid if freed
--                    let is_reparenting = godot
--                        .try_get::<Node>(node_handle)
--                        .map(|godot_node| godot_node.get_parent().is_some())
--                        .unwrap_or(false);
-+                    let is_reparenting = false;
+@@ -783,9 +783,7 @@ fn create_scene_tree_entity(
+             }
+             SceneTreeMessageType::NodeRemoved => {
+                 if let Some(ent) = existing_entity {
+-                    let still_mirrored = godot.try_get::<Node>(node_handle).is_some_and(|node| {
+-                        node.is_inside_tree() && !is_excluded_from_mirror(&node)
+-                    });
++                    let still_mirrored = false;
  
-                     if is_reparenting {
-                         // A node reparented under an excluded subtree has its NodeAdded dropped
+                     if still_mirrored {
+                         trace!(target: "godot_scene_tree_events",

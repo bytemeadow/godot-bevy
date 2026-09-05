@@ -362,7 +362,11 @@ fn test_node_reparenting_preserves_entity(ctx: &TestContext) -> godot::task::Tas
                 settle_scene_tree(&app).await;
 
                 assert_node_alive(child_id);
-                assert_eq!(app.entity_for_node(child_id), Some(entity));
+                assert_eq!(
+                    app.entity_for_node(child_id),
+                    Some(entity),
+                    "Entity should still exist after reparenting"
+                );
                 app.with_world(|world| {
                     assert_eq!(
                         world.get::<SceneTreePayload>(entity),
@@ -467,6 +471,10 @@ fn test_remove_child_despawns_entity(ctx: &TestContext) -> godot::task::TaskHand
         settle_scene_tree(&app).await;
 
         assert_node_alive(child_id);
+        assert!(
+            app.with_world(|world| world.get_entity(entity).is_err()),
+            "Entity should be despawned after remove_child()"
+        );
         assert_unmirrored(&app, child_id, entity, false);
         assert!(!child.is_inside_tree());
 
