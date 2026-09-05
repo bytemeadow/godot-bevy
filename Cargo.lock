@@ -2438,6 +2438,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37dc9ce1b970e798df827dcccfe68d5985804f93b5fbab156e507999272965f0"
 dependencies = [
  "godot-bindings",
+ "litrs",
+ "markdown",
  "proc-macro2",
  "quote",
  "venial",
@@ -3038,6 +3040,9 @@ name = "litrs"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
+dependencies = [
+ "proc-macro2",
+]
 
 [[package]]
 name = "lock_api"
@@ -3065,6 +3070,15 @@ dependencies = [
  "scoped-tls",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "markdown"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5cab8f2cadc416a82d2e783a1946388b31654d391d1c7d92cc1f03e295b1deb"
+dependencies = [
+ "unicode-id",
 ]
 
 [[package]]
@@ -4643,6 +4657,12 @@ name = "typewit"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc19094686c694eb41b3b99dcc2f2975d4b078512fa22ae6c63f7ca318bdcff7"
+
+[[package]]
+name = "unicode-id"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70ba288e709927c043cbe476718d37be306be53fb1fafecd0dbe36d072be2580"
 
 [[package]]
 name = "unicode-ident"

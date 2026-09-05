@@ -89,9 +89,31 @@ This macro:
 
 ### Shutdown lifecycle
 
-When a `BevyApp` node leaves the Godot scene tree, godot-bevy writes
-`AppExit::Success` and runs Bevy's `Last` schedule before tearing down the embedded
-app. Use `Last` systems for per-instance cleanup that must run when that node exits.
+A `BevyApp` disposes of its world when the node is destroyed or when you call
+`teardown`. Reinitialization, `TestApp::cleanup`, and `TestApp` Drop use the same
+teardown path. Call explicit teardown or reinitialization between frames.
+Repeated teardown calls do nothing.
+
+After hosted Startup completes, a healthy app receives `AppExit::Success` and one
+final `Last` pass before disposal. Ordinary `Last` systems also run every render
+frame. Unstarted apps are dropped without running Startup or `Last`. Frame panics
+and an existing unwind suppress the terminal pass.
+
+Destruction includes `free`, queued node or ancestor deletion, scene replacement
+for scene-local apps, and graceful engine quit. An autoload survives scene
+replacement. Detaching or reparenting does not itself shut down a hosted world;
+scene-mirrored entities still follow their normal membership rules. The caller
+must eventually free a detached node. Use `queue_free` to delete a host or its
+ancestor from a system. Synchronous destruction while its Rust instance is
+borrowed is unsupported.
+
+At destruction, the node's children are already freed. At engine quit, other
+nodes may be gone too. `Last` systems and pending signal connections must tolerate
+expired Godot handles. Call `teardown` before deletion if cleanup needs live nodes.
+A terminal panic is caught and reported, and the app is still dropped. Resource
+destructor panics are also caught and reported. Other cleanup systems may not
+finish after a panic. Hard termination and aborting or double panics cannot
+provide this cleanup guarantee. Bevy `AppExit` messages do not quit Godot.
 
 The extension's `on_stage_deinit` hook is a separate process-level lifecycle event;
 it shuts down extension-wide services such as profiling and is not a replacement for

@@ -39,21 +39,31 @@ Each inner `field(as = T, …)` follows the same `as`/`default`/`with` grammar a
 
 ### Inspector metadata for generated exports
 
-Generated exports can carry Inspector metadata:
+Metadata can be placed on a named or tuple primary field with
+`#[gdbevy(export, ...)]`, on `require(prop: Comp, ...)`, or on each field inside
+`require(group: Comp { field(as = T, ...), ... })`. Use one attribute per primary field.
+
+Export types must implement gdext's `Export` trait. Rust `String` does not, so
+export a `GString` and convert it when constructing the component:
 
 ```rust
-#[gdbevy(require(
-    kind: WeaponKind,
-    as = String,
-    description = "Weapon selected by the designer",
-    hint = ENUM,
-    hint_string = "Hands,Knife"
-))]
+{{#include ../../../../book-tests/src/inspector_metadata.rs}}
 ```
 
-`description` becomes the Godot property description. `hint` names a Godot
-`PropertyHint` variant, and `hint_string` supplies its optional string. A
-`hint_string` requires `hint`.
+`description` takes a string literal. Primary field `///` docs are copied before
+an explicit description. `hint` names a bare Godot `PropertyHint` variant, and
+`hint_string` takes an expression. A hint string requires a hint.
+
+Enable the `register-docs` feature on your `godot-bevy` dependency to register
+property descriptions in Godot's editor:
+
+```toml
+godot-bevy = { version = "0.11", features = ["register-docs"] }
+```
+
+This feature is off by default and requires Godot API 4.3 or later. With it off,
+hints still work and descriptions remain Rust docs. API 4.2 consumers must leave
+it disabled.
 
 ### Marker companion
 
@@ -79,7 +89,7 @@ pub struct Slider {
 fn percentage_to_fraction(v: f32) -> f32 { v / 100.0 }
 ```
 
-`as = T` is optional when the field type is already Godot-compatible; add it only when the export type differs from the Rust field type.
+`as = T` is optional when the field type already implements gdext's `Export` trait; add it only when the export type differs from the Rust field type.
 
 ### Tuple fields
 
@@ -107,6 +117,9 @@ pub struct Velocity(
 | `require(prop: Comp, …)` | `as = T` | **yes** | Export type for the generated property |
 | `require(prop: Comp, …)` | `default = expr` | no | Export default |
 | `require(prop: Comp, …)` | `with = fn` | no | Conversion before constructing the component |
+| generated primary or companion field | `description = "..."` | no | Property docs, registered with `register-docs` |
+| generated primary or companion field | `hint = NAME` | no | Bare Godot `PropertyHint` variant |
+| generated primary or companion field | `hint_string = expr` | no | Hint string, requires `hint` |
 
 ## Godot-first (`BevyComponents`)
 
@@ -172,6 +185,9 @@ pub struct PlayerNode {
 Godot-first classes own their gdext declaration, so use gdext's native
 `#[var(hint = ..., hint_string = ...)]` and Rust documentation attributes for
 Inspector metadata on those fields.
+
+Native property descriptions also require `godot-bevy/register-docs` and Godot
+API 4.3 or later. Keep metadata on the native attributes, outside `gdbevy`.
 
 ## Reserved keys
 

@@ -276,11 +276,11 @@ impl TestApp {
         &self.ctx
     }
 
-    /// Clean up the TestApp, resetting the autoload's BevyApp for the next test.
+    /// Dispose of the world and its watchers, then wait for a frame boundary.
     ///
-    /// This should be called BEFORE calling queue_free() on any Godot nodes
-    /// that have entities in the ECS. This prevents transform sync systems
-    /// from trying to access freed nodes.
+    /// A started app receives `AppExit::Success` and one final `Last` pass.
+    /// Drop uses the same teardown path. Repeated cleanup calls are inert.
+    /// Call this before freeing nodes needed by cleanup systems.
     pub async fn cleanup(&mut self) {
         if let Some(mut app) = self.bevy_app.take() {
             app.bind_mut().teardown();

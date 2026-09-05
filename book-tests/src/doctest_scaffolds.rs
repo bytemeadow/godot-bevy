@@ -166,6 +166,15 @@ mod godot_node_fields {
         level_id: LevelId,
         #[gdbevy(export, as = f32, with = meters_to_units)]
         range: f32,
+        /// Label shown to the player.
+        #[gdbevy(export, as = GString, with = from_godot_string,
+            default = GString::from("Open"), description = "Door label",
+            hint = ENUM, hint_string = "Open,Locked")]
+        label: String,
+    }
+
+    fn from_godot_string(value: GString) -> String {
+        value.to_string()
     }
 }
 

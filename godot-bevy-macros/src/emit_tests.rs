@@ -234,7 +234,8 @@ mod tests {
             #[gdbevy(base = Node2D, class_name = WeaponNode)]
             #[gdbevy(require(
                 kind: WeaponKind,
-                as = String,
+                as = GString,
+                with = from_godot_string,
                 description = "Weapon kind",
                 hint = ENUM,
                 hint_string = "Hands,Knife"
@@ -259,7 +260,7 @@ mod tests {
                 #[gdbevy(export)]
                 speed: f32,
                 /// Weapon kind
-                #[gdbevy(export, hint = ENUM, hint_string = "Hands,Knife")]
+                #[gdbevy(export, as = GString, with = from_godot_string, hint = ENUM, hint_string = "Hands,Knife")]
                 kind: String,
             }
         };
@@ -269,5 +270,40 @@ mod tests {
         assert!(out.contains("Movement speed in pixels per second."));
         assert!(out.contains("Weapon kind"));
         assert!(out.contains("# [var (hint = ENUM , hint_string = \"Hands,Knife\")]"));
+    }
+
+    #[test]
+    fn primary_docs_precede_description_and_preserve_tuple_position() {
+        for definition in [
+            quote!(
+                struct Settings {
+                    /// Field docs.
+                    #[gdbevy(export, as = GString, with = convert, description = "Explicit description", hint = ENUM)]
+                    value: String,
+                }
+            ),
+            quote!(
+                struct Settings(
+                    u32,
+                    /// Field docs.
+                    #[gdbevy(export, as = GString, with = convert, description = "Explicit description", hint = ENUM)]
+                    String,
+                );
+            ),
+        ] {
+            let input = syn::parse2(definition).unwrap();
+            let output = crate::godot_node::derive_godot_node_component(input)
+                .unwrap()
+                .to_string();
+            assert!(
+                output.find("Field docs.").unwrap() < output.find("Explicit description").unwrap()
+            );
+            assert!(output.contains("# [var (hint = ENUM)]"));
+            assert!(output.contains(": GString"));
+            if output.contains("value1") {
+                assert!(output.contains("c . 1 = convert (node . bind () . value1 . clone ())"));
+                assert!(!output.contains("value0"));
+            }
+        }
     }
 }
