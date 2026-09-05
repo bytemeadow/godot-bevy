@@ -9,7 +9,6 @@ from godot_bevy_codegen.src.util import indent_log
 
 
 def run_godot_dump_api(destination_file: Path, godot_version: str) -> None:
-    """Run godot --dump-extension-api-with-docs to generate extension_api.json"""
     indent_log("🚀 Generating extension_api.json from Godot...")
 
     try:
@@ -19,7 +18,6 @@ def run_godot_dump_api(destination_file: Path, godot_version: str) -> None:
 
         switch_to_godot_version(godot_version)
 
-        # Try different common Godot executable names
         godot_commands = [
             "godot",
             "godot4",
@@ -45,7 +43,6 @@ def run_godot_dump_api(destination_file: Path, godot_version: str) -> None:
                 )
 
                 if result.returncode == 0 and godot_output_file.exists():
-                    # Relocate Godot's output file to the destination directory
                     godot_output_file.rename(destination_file)
                     indent_log(
                         f"✅ Successfully generated '{destination_file}' using '{cmd}'"
@@ -55,7 +52,6 @@ def run_godot_dump_api(destination_file: Path, godot_version: str) -> None:
             except (subprocess.TimeoutExpired, FileNotFoundError):
                 continue
 
-        # If all commands failed, give helpful error
         raise RuntimeError(
             "Could not run Godot to generate extension_api.json.\n"
             "Please ensure Godot 4 is installed and available in PATH."
@@ -88,7 +84,6 @@ def switch_to_godot_version(godot_version: str) -> None:
 def load_extension_api(
     api_file: Path,
 ) -> ExtensionApi:
-    """Load and parse the extension API to extract node types"""
     indent_log("📖 Parsing extension API...")
 
     if not api_file.exists():

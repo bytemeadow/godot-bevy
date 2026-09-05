@@ -3,7 +3,6 @@ pub mod node_type_checking;
 pub mod plugin;
 pub mod relationship;
 
-// Re-export main components
 pub use autosync::{
     AttachComponentRegistry, AutoSyncBundleRegistry, BundleCreatorFn, GodotRequiredComponents,
     RequiredComponentsRegistrarFn, register_all_attach_components, register_all_autosync_bundles,

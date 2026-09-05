@@ -41,7 +41,6 @@ impl Default for GodotBevyLogPlugin {
             filter: bevy_log::DEFAULT_FILTER.to_string(),
             level: Level::INFO,
             color: true,
-            // Timestamp formatting reference https://docs.rs/chrono/0.4.41/chrono/format/strftime/index.html
             timestamp_format: Some("%T%.3f".to_owned()),
         }
     }
@@ -49,6 +48,11 @@ impl Default for GodotBevyLogPlugin {
 
 impl Plugin for GodotBevyLogPlugin {
     fn build(&self, _app: &mut App) {
+        // The profile harness installs the sole global subscriber before benchmark startup.
+        if std::env::var_os("GBPROF_RUN_ID").is_some() {
+            return;
+        }
+
         // Copied behavior from https://docs.rs/bevy_log/0.16.1/src/bevy_log/lib.rs.html#279
         let default_filter = { format!("{},{}", self.level, self.filter) };
         let filter_layer = EnvFilter::try_from_default_env()
@@ -72,18 +76,20 @@ impl Plugin for GodotBevyLogPlugin {
             timestamp_format: self.timestamp_format.clone(),
         };
 
+        // A second app in the same process (itest re-initialization) finds the first one's
+        // subscriber already installed; keep it rather than panic.
         #[cfg(feature = "trace_tracy")]
-        tracing_subscriber::registry()
+        let _ = tracing_subscriber::registry()
             .with(godot_proxy_layer)
             .with(filter_layer)
             .with(tracing_tracy::TracyLayer::default())
-            .init();
+            .try_init();
 
         #[cfg(not(feature = "trace_tracy"))]
-        tracing_subscriber::registry()
+        let _ = tracing_subscriber::registry()
             .with(godot_proxy_layer)
             .with(filter_layer)
-            .init();
+            .try_init();
     }
 }
 
@@ -120,7 +126,6 @@ where
         let mut msg_vistor = GodotProxyLayerVisitor(None);
         event.record(&mut msg_vistor);
 
-        // Timestamp formatting reference https://docs.rs/chrono/0.4.41/chrono/format/strftime/index.html
         let timestamp = if let Some(format) = &self.timestamp_format {
             format!("{} ", Local::now().format(format))
         } else {

@@ -11,10 +11,6 @@ impl Plugin for DoorPlugin {
     }
 }
 
-/// System that detects door-player collisions and fires events
-///
-/// This system only handles collision detection and event firing,
-/// allowing it to run in parallel with other collision detection systems.
 fn detect_door_collisions(
     doors: Query<(Entity, &Door)>,
     players: Query<Entity, With<Player>>,

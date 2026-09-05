@@ -48,7 +48,6 @@ pub fn node_tree_view(input: DeriveInput) -> syn::Result<TokenStream2> {
         return Err(error);
     }
 
-    // Generate associated constants for node paths
     let path_constants = data_struct
         .fields
         .iter()
@@ -62,7 +61,6 @@ pub fn node_tree_view(input: DeriveInput) -> syn::Result<TokenStream2> {
                 }
             })?;
 
-            // Convert field name to SCREAMING_SNAKE_CASE and append _PATH
             // Trim leading underscores to allow unused fields.
             let field_str = field_name.to_string().trim_start_matches('_').to_string();
             let const_name_str = format!("{}_PATH", field_str.to_uppercase());
@@ -121,7 +119,6 @@ fn create_get_node_expr(field: &Field) -> syn::Result<TokenStream2> {
     let field_ty = &field.ty;
     let span = field_ty.span();
 
-    // Check if the type is GodotNodeHandle or Option<GodotNodeHandle>
     let (is_optional, _inner_type) = match get_option_inner_type(field_ty) {
         Some(inner) => (true, inner),
         None => (false, field_ty),
@@ -129,11 +126,9 @@ fn create_get_node_expr(field: &Field) -> syn::Result<TokenStream2> {
 
     let path_value = node_path.value();
 
-    // Check if the path contains wildcards for pattern matching
     if path_value.contains('*') {
         create_pattern_matching_expr(&path_value, is_optional, span)
     } else {
-        // Use existing direct path logic for non-pattern paths
         create_direct_path_expr(&node_path, is_optional, span)
     }
 }
@@ -201,7 +196,6 @@ fn create_pattern_matching_expr(
     Ok(expr)
 }
 
-// Helper function to extract the inner type of an Option<T>
 fn get_option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
     if let syn::Type::Path(type_path) = ty
         && type_path.path.segments.len() == 1

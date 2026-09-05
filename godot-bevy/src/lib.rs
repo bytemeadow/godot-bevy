@@ -18,7 +18,6 @@ pub mod watchers;
 #[cfg(test)]
 mod tests;
 
-// Re-export BevyApp for testing and advanced usage
 pub use app::{BEVY_INIT_FUNC, BevyApp};
 pub use plugins::event_bridge::send_event;
 

@@ -7,8 +7,6 @@ use godot_bevy::prelude::*;
 
 use crate::scene_management::SceneOperationMessage;
 
-/// Event fired when the Godot scene changes.
-/// This demonstrates using `connect_object` to listen to singleton signals.
 #[derive(Event, Debug, Clone)]
 struct SceneChanged;
 
@@ -60,7 +58,6 @@ impl CurrentLevel {
     }
 }
 
-/// Resource for tracking level loading state (internal to level manager)
 #[derive(Resource, Default)]
 struct LevelLoadingState {
     pub loading_handle: Option<Handle<GodotResource>>,
@@ -92,7 +89,6 @@ impl Plugin for LevelManagerPlugin {
             .init_resource::<PendingLevel>()
             .init_resource::<LevelLoadingState>()
             .init_resource::<SceneTreeSignalConnected>()
-            // Enable signal routing for SceneTree.scene_changed
             .add_plugins(GodotSignalsPlugin::<SceneChanged>::default())
             .add_observer(on_load_level_request)
             .add_observer(on_scene_changed)
@@ -107,12 +103,9 @@ impl Plugin for LevelManagerPlugin {
     }
 }
 
-/// Tracks whether we've connected to the SceneTree signal
 #[derive(Resource, Default)]
 struct SceneTreeSignalConnected(bool);
 
-/// Connect to the SceneTree's scene_changed signal.
-/// This demonstrates using `connect_object` for non-entity signals.
 fn connect_scene_tree_signal(
     mut connected: ResMut<SceneTreeSignalConnected>,
     signals: GodotSignals<SceneChanged>,
@@ -131,12 +124,10 @@ fn connect_scene_tree_signal(
     info!("Connected to SceneTree.scene_changed signal");
 }
 
-/// Observer that logs when a scene change occurs
 fn on_scene_changed(_trigger: On<SceneChanged>) {
     info!("Scene changed!");
 }
 
-/// Observer that handles level loading requests - loads the asset
 fn on_load_level_request(
     trigger: On<LoadLevelMessage>,
     mut loading_state: ResMut<LevelLoadingState>,
@@ -146,19 +137,15 @@ fn on_load_level_request(
     let event = trigger.event();
     info!("Loading level asset: {:?}", event.level_id);
 
-    // Load the level scene through Bevy's asset system
     let level_handle: Handle<GodotResource> = asset_server.load(event.level_id.scene_path());
 
-    // Track loading state separately from current level
     loading_state.loading_handle = Some(level_handle);
 
-    // Update current level
     current_level.set(event.level_id);
 
     info!("Level asset loading started for: {:?}", event.level_id);
 }
 
-/// System that handles actual scene changing once assets are loaded
 fn handle_level_scene_change(
     current_level: Res<CurrentLevel>,
     mut loading_state: ResMut<LevelLoadingState>,
@@ -167,23 +154,17 @@ fn handle_level_scene_change(
     mut assets: ResMut<Assets<GodotResource>>,
 ) {
     if let (Some(level_id), Some(handle)) = (current_level.level_id, &loading_state.loading_handle)
+        && assets.get_mut(handle).is_some()
     {
-        // Check if the asset is loaded
-        if let Some(_godot_resource) = assets.get_mut(handle) {
-            info!("Requesting level scene change: {:?}", level_id);
+        info!("Requesting level scene change: {:?}", level_id);
 
-            // Request scene change through centralized scene management
-            scene_events.write(SceneOperationMessage::change_to_packed(handle.clone()));
+        scene_events.write(SceneOperationMessage::change_to_packed(handle.clone()));
 
-            // Do NOT emit LevelLoadedMessage here!
-            pending_level.level_id = Some(level_id);
+        pending_level.level_id = Some(level_id);
 
-            info!("Level scene change requested for: {:?}", level_id);
+        info!("Level scene change requested for: {:?}", level_id);
 
-            // Clear the loading handle since we've used it
-            loading_state.loading_handle = None;
-        }
-        // If asset isn't loaded yet, we'll try again next frame
+        loading_state.loading_handle = None;
     }
 }
 

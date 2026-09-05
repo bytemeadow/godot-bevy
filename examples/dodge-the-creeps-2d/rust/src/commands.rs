@@ -154,7 +154,6 @@ impl Plugin for CommandSystemPlugin {
             .add_systems(
                 Update,
                 (
-                    // Main thread systems that process commands
                     process_ui_commands,
                     process_node_commands,
                     process_animation_commands,
@@ -165,7 +164,6 @@ impl Plugin for CommandSystemPlugin {
     }
 }
 
-/// Main thread system that processes UI commands
 fn process_ui_commands(
     mut ui_commands: MessageReader<UICommand>,
     ui_handles: Res<UIHandles>,
@@ -200,7 +198,6 @@ fn process_ui_commands(
     }
 }
 
-/// Main thread system that processes node commands
 fn process_node_commands(
     mut node_commands: MessageReader<NodeCommand>,
     nodes: Query<&GodotNodeHandle>,
@@ -237,7 +234,6 @@ fn process_node_commands(
     }
 }
 
-/// Main thread system that processes animation commands
 fn process_animation_commands(
     mut animation_commands: MessageReader<AnimationCommand>,
     nodes: Query<&GodotNodeHandle>,
@@ -268,7 +264,6 @@ fn process_animation_commands(
     }
 }
 
-/// Main thread system that syncs visibility state to Godot nodes
 fn sync_visibility_state(
     mut nodes: Query<(&GodotNodeHandle, &mut VisibilityState), Changed<VisibilityState>>,
     mut godot: GodotAccess,
@@ -285,7 +280,6 @@ fn sync_visibility_state(
     }
 }
 
-/// Main thread system that syncs animation state to Godot sprites
 fn sync_animation_state(
     mut nodes: Query<(&GodotNodeHandle, &mut AnimationState), Changed<AnimationState>>,
     mut godot: GodotAccess,
@@ -294,12 +288,9 @@ fn sync_animation_state(
 
     for (handle, mut anim_state) in nodes.iter_mut() {
         if anim_state.dirty {
-            // First try to get the node directly as AnimatedSprite2D
             if let Some(mut sprite) = godot.try_get::<AnimatedSprite2D>(*handle) {
                 apply_animation_state(&mut sprite, &anim_state);
-            }
-            // If that fails, try to find AnimatedSprite2D as a child
-            else if let Some(node) = godot.try_get::<godot::classes::Node>(*handle) {
+            } else if let Some(node) = godot.try_get::<godot::classes::Node>(*handle) {
                 let mut sprite = node.get_node_as::<AnimatedSprite2D>("AnimatedSprite2D");
                 apply_animation_state(&mut sprite, &anim_state);
             }
@@ -308,7 +299,6 @@ fn sync_animation_state(
     }
 }
 
-/// Helper function to apply animation state to a sprite
 fn apply_animation_state(sprite: &mut Gd<AnimatedSprite2D>, anim_state: &AnimationState) {
     if anim_state.playing {
         if let Some(ref animation) = anim_state.current_animation {

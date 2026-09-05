@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bytemeadow/godot-bevy/profile-comparison-v1.schema.json",
+  "title": "godot-bevy profile comparison v1",
+  "description": "Diagnostic comparison of instrumented Tracy span profiles. It is not benchmark-compatible evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "run_id",
+    "evidence_kind",
+    "benchmark_compatible",
+    "disclosure",
+    "complete",
+    "outcome",
+    "generated_at",
+    "quality",
+    "noise_analysis",
+    "significance_sigma",
+    "compatibility",
+    "rounds",
+    "inputs",
+    "spans",
+    "summary",
+    "warnings",
+    "errors",
+    "artifacts",
+    "metadata"
+  ],
+  "properties": {
+    "$schema": { "const": "profile-comparison-v1.schema.json" },
+    "schema_version": { "const": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "evidence_kind": { "const": "tracy-profile-comparison" },
+    "benchmark_compatible": { "const": false },
+    "disclosure": { "const": "INSTRUMENTED PROFILE — NOT BENCHMARK RESULTS" },
+    "complete": { "type": "boolean" },
+    "outcome": { "enum": ["incomplete", "pass", "error"] },
+    "generated_at": { "type": "string", "minLength": 1 },
+    "quality": { "enum": ["descriptive", "interleaved"] },
+    "noise_analysis": { "type": "boolean" },
+    "significance_sigma": { "type": ["number", "null"], "minimum": 0 },
+    "compatibility": { "$ref": "#/$defs/compatibility" },
+    "rounds": { "$ref": "#/$defs/rounds" },
+    "inputs": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/input" }
+    },
+    "spans": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/span" }
+    },
+    "summary": { "$ref": "#/$defs/summary" },
+    "warnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "metadata": { "$ref": "#/$defs/metadata" }
+  },
+  "$defs": {
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_schema",
+        "profile_schema_version",
+        "platform",
+        "cpu",
+        "versions",
+        "cargo_profile",
+        "features",
+        "selector"
+      ],
+      "properties": {
+        "profile_schema": { "const": "profile-spans-v1.schema.json" },
+        "profile_schema_version": { "const": 1 },
+        "platform": { "$ref": "#/$defs/platform" },
+        "cpu": { "type": "string", "minLength": 1 },
+        "versions": { "$ref": "#/$defs/versions" },
+        "cargo_profile": { "const": "profiling" },
+        "features": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "selector": { "$ref": "#/$defs/selector" }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "arch"],
+      "properties": {
+        "os": { "type": "string", "minLength": 1 },
+        "arch": { "type": "string", "minLength": 1 }
+      }
+    },
+    "versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["godot", "rustc", "tracy"],
+      "properties": {
+        "godot": { "type": "string", "minLength": 1 },
+        "rustc": { "type": "string", "minLength": 1 },
+        "tracy": { "type": "string", "minLength": 1 }
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "requested", "patterns", "benchmarks"],
+      "properties": {
+        "mode": { "enum": ["exact", "filter"] },
+        "requested": { "type": "string", "minLength": 1 },
+        "patterns": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "benchmarks": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "rounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline", "current", "interleaved"],
+      "properties": {
+        "baseline": { "type": "integer", "minimum": 1 },
+        "current": { "type": "integer", "minimum": 1 },
+        "interleaved": { "type": "boolean" }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["side", "round", "run_id", "path", "metadata"],
+      "properties": {
+        "side": { "enum": ["baseline", "current"] },
+        "round": { "type": "integer", "minimum": 1 },
+        "run_id": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "benchmark",
+        "name",
+        "source_file",
+        "source_line",
+        "status",
+        "metrics"
+      ],
+      "properties": {
+        "benchmark": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "source_file": { "type": "string", "minLength": 1 },
+        "source_line": { "type": "integer", "minimum": 0 },
+        "status": { "enum": ["matched", "added", "removed"] },
+        "metrics": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/metric" }
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "unit",
+        "baseline",
+        "current",
+        "change_pct",
+        "noise_pct",
+        "assessment"
+      ],
+      "properties": {
+        "kind": { "enum": ["self", "inclusive", "count"] },
+        "unit": { "enum": ["nanoseconds", "calls"] },
+        "baseline": { "type": ["number", "null"], "minimum": 0 },
+        "current": { "type": ["number", "null"], "minimum": 0 },
+        "change_pct": { "type": ["number", "null"] },
+        "noise_pct": { "type": ["number", "null"], "minimum": 0 },
+        "assessment": {
+          "enum": [
+            "descriptive",
+            "higher",
+            "lower",
+            "within-noise",
+            "added",
+            "removed"
+          ]
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["matched", "added", "removed"],
+      "properties": {
+        "matched": { "type": "integer", "minimum": 0 },
+        "added": { "type": "integer", "minimum": 0 },
+        "removed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "message", "metadata"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "present", "size_bytes", "metadata"],
+      "properties": {
+        "kind": { "enum": ["baseline-profile", "current-profile"] },
+        "path": { "type": "string", "minLength": 1 },
+        "present": { "type": "boolean" },
+        "size_bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

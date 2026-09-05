@@ -1,8 +1,9 @@
 # Excluding Nodes
 
-By default every Godot node becomes a Bevy entity. To keep a node -- and everything
-under it -- out of the ECS, give it the `_bevy_exclude` metadata. Excluded nodes never
-cross into Bevy: the GDScript watcher filters them out before they reach Rust.
+By default every Godot node becomes a Bevy entity. To keep a node and its descendants
+out of the ECS, give it the `_bevy_exclude` metadata. The GDScript watcher filters
+excluded additions before they reach Rust. Removal messages still reach Bevy so
+entities can be cleaned up when mirrored nodes move into excluded subtrees.
 
 The typical use is a UI or editor-only subtree you never query from ECS. Set the metadata
 in the editor (select the node, **Inspector > Add Metadata**, name it `_bevy_exclude`,
@@ -41,7 +42,11 @@ instead.
 
 ## Timing
 
-Exclusion is decided once, when the node is added. Adding or removing the metadata at
-runtime does not retroactively mirror or unmirror a node. The one exception:
-**reparenting an already-mirrored node into an excluded subtree tears its entity down**,
-so a node that moves out of the ECS does not linger with a stale parent.
+Exclusion is decided when the node is added. Adding or removing the metadata at
+runtime does not retroactively mirror or unmirror a node. Reparenting a mirrored
+node into an excluded subtree removes its ordinary mirror entity while preserving
+the Godot node and its descendants. `ProtectedNodeEntity` entities keep their gameplay
+components but lose their Godot handles, index entries, and scene-tree relationships.
+The caller remains responsible for the surviving nodes. Moving them back into the
+mirrored tree after cleanup creates fresh entities unless handles were explicitly
+reassociated with protected survivors before re-entry.

@@ -13,23 +13,19 @@ var _bevy_debugger: EditorDebuggerPlugin = null
 var _bevy_inspector: Control = null
 
 func _enable_plugin():
-	# Automatically register the BevyApp singleton when plugin is enabled
 	add_autoload_singleton(AUTOLOAD_NAME, AUTOLOAD_PATH)
 	print("godot-bevy: BevyAppSingleton autoload registered")
 
 func _disable_plugin():
-	# Remove the autoload when plugin is disabled
 	remove_autoload_singleton(AUTOLOAD_NAME)
 	print("godot-bevy: BevyAppSingleton autoload removed")
 
 func _enter_tree():
 	print("godot-bevy: _enter_tree() called")
 
-	# Add menu items
 	add_tool_menu_item("Setup godot-bevy Project", _on_setup_project)
 	add_tool_menu_item("Build Rust Project", _on_build_rust)
 
-	# Create the Bevy Inspector panel (dock tab next to Scene)
 	var inspector_scene = load(BEVY_INSPECTOR_SCENE) as PackedScene
 	if inspector_scene:
 		_bevy_inspector = inspector_scene.instantiate()
@@ -38,11 +34,9 @@ func _enter_tree():
 	else:
 		push_error("godot-bevy: Failed to load Bevy Inspector scene")
 
-	# Register the Bevy debugger plugin (for message capture)
 	var debugger_script = load(BEVY_DEBUGGER_SCRIPT)
 	if debugger_script:
 		_bevy_debugger = debugger_script.new()
-		# Connect debugger to inspector panel
 		if _bevy_inspector:
 			_bevy_debugger.inspector_panel = _bevy_inspector
 		add_debugger_plugin(_bevy_debugger)
@@ -53,17 +47,14 @@ func _enter_tree():
 	print("godot-bevy plugin activated!")
 
 func _exit_tree():
-	# Remove menu items
 	remove_tool_menu_item("Setup godot-bevy Project")
 	remove_tool_menu_item("Build Rust Project")
 
-	# Remove the Bevy Inspector panel
 	if is_instance_valid(_bevy_inspector):
 		remove_control_from_docks(_bevy_inspector)
 		_bevy_inspector.free()
 		_bevy_inspector = null
 
-	# Remove the Bevy debugger plugin
 	if _bevy_debugger:
 		remove_debugger_plugin(_bevy_debugger)
 		_bevy_debugger = null
@@ -72,7 +63,6 @@ func _exit_tree():
 		wizard_dialog.queue_free()
 
 func _on_setup_project():
-	# Show project wizard dialog
 	if not wizard_dialog:
 		var wizard_scene = load(WIZARD_SCENE_PATH)
 		if wizard_scene:
@@ -86,10 +76,8 @@ func _on_setup_project():
 
 
 func _on_project_created(project_info: Dictionary):
-	# Handle the project creation based on wizard input
 	_scaffold_rust_project(project_info)
 
-	# Automatically build the Rust project and restart after
 	var is_release = project_info.get("release_build", false)
 	_should_restart_after_build = true
 	_build_rust_project(is_release)
@@ -99,26 +87,21 @@ func _scaffold_rust_project(info: Dictionary):
 	var rust_path = base_path.path_join("rust")
 	var cargo_toml_path = rust_path.path_join("Cargo.toml")
 
-	# Check if Rust project already exists
 	if FileAccess.file_exists(cargo_toml_path):
 		push_warning("Rust project already exists at 'rust/' directory. Skipping Rust scaffolding.")
 		print("Found existing Cargo.toml at: ", cargo_toml_path)
 		return
 
-	# Debug: Print the info dictionary
 	print("Project info received: ", info)
 	print("Project name value: '", info.get("project_name", "KEY_NOT_FOUND"), "'")
 
-	# Validate project name
 	var project_name = info.project_name.strip_edges()
 	if project_name.is_empty():
 		project_name = "my_game"
 		push_warning("Empty project name, using default: my_game")
 
-	# Create directory structure
 	DirAccess.make_dir_recursive_absolute(rust_path.path_join("src"))
 
-	# Create Cargo.toml
 	var cargo_content = """[package]
 name = "%s"
 version = "0.1.0"
@@ -146,7 +129,6 @@ opt-level = 3
 	# Users can customize plugin selection in their generated code
 	var plugin_config = "app.add_plugins(GodotDefaultPlugins);"
 
-	# Create lib.rs
 	var lib_content = """use godot::prelude::*;
 use bevy::prelude::*;
 use godot_bevy::prelude::*;
@@ -160,12 +142,10 @@ fn build_app(app: &mut App) {
 	//     .add_plugins(BevyInputBridgePlugin);
 	%s
 
-	// Add your systems here
 	app.add_systems(Update, hello_world_system);
 }
 
 fn hello_world_system(mut timer: Local<f32>, time: Res<Time>) {
-	// This runs every frame in Bevy's Update schedule
 	*timer += time.delta_secs();
 	if *timer > 1.0 {
 		*timer = 0.0;
@@ -176,7 +156,6 @@ fn hello_world_system(mut timer: Local<f32>, time: Res<Time>) {
 
 	_save_file(rust_path.path_join("src/lib.rs"), lib_content)
 
-	# Create .gdextension file
 	var gdextension_content = """[configuration]
 entry_symbol = "gdext_rust_init"
 compatibility_minimum = 4.1
@@ -207,20 +186,17 @@ macos.release.arm64 = "res://rust/target/release/lib%s.dylib"
 	push_warning("Rust project scaffolded successfully! Building now...")
 
 func _on_build_rust():
-	# Build the Rust project (called from menu)
-	_should_restart_after_build = false  # Don't restart for manual builds
-	_build_rust_project(false)  # Default to debug build
+	_should_restart_after_build = false
+	_build_rust_project(false)
 
 func _build_rust_project(release_build: bool):
 	var base_path = ProjectSettings.globalize_path("res://")
 	var rust_path = base_path.path_join("rust")
 
-	# Check if rust directory exists
 	if not DirAccess.dir_exists_absolute(rust_path):
 		push_error("No Rust project found! Run 'Setup godot-bevy Project' first.")
 		return
 
-	# Prepare cargo command with working directory
 	var args = ["build", "--manifest-path", rust_path.path_join("Cargo.toml")]
 	if release_build:
 		args.append("--release")
@@ -228,11 +204,9 @@ func _build_rust_project(release_build: bool):
 	print("Building Rust project...")
 	print("Running: cargo ", " ".join(args))
 
-	# Execute cargo build
 	var output = []
 	var exit_code = OS.execute("cargo", args, output, true, true)
 
-	# Process results
 	if exit_code == 0:
 		var build_type = "debug" if not release_build else "release"
 		push_warning("Rust build completed successfully! (%s)" % build_type)
@@ -240,7 +214,6 @@ func _build_rust_project(release_build: bool):
 		for line in output:
 			print("  ", line)
 
-		# Restart editor if this was called from project setup
 		if _should_restart_after_build:
 			push_warning("Restarting editor to apply autoload changes...")
 			EditorInterface.restart_editor()

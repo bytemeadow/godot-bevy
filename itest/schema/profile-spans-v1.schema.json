@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bytemeadow/godot-bevy/profile-spans-v1.schema.json",
+  "title": "godot-bevy Tracy span profile v1",
+  "description": "Tracy CPU-zone evidence. Harness marker zones use the reserved __gbprof:: prefix and are excluded from spans.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "run_id",
+    "evidence_kind",
+    "benchmark_compatible",
+    "disclosure",
+    "complete",
+    "outcome",
+    "generated_at",
+    "environment",
+    "selection",
+    "workload",
+    "quantiles",
+    "spans",
+    "warnings",
+    "errors",
+    "artifacts",
+    "metadata"
+  ],
+  "properties": {
+    "$schema": { "const": "profile-spans-v1.schema.json" },
+    "schema_version": { "const": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "evidence_kind": { "const": "tracy-span-profile" },
+    "benchmark_compatible": { "const": false },
+    "disclosure": {
+      "const": "INSTRUMENTED PROFILE — NOT BENCHMARK RESULTS"
+    },
+    "complete": { "type": "boolean" },
+    "outcome": { "enum": ["incomplete", "pass", "error"] },
+    "generated_at": { "type": "string", "minLength": 1 },
+    "environment": { "$ref": "#/$defs/environment" },
+    "selection": { "$ref": "#/$defs/selection" },
+    "workload": { "$ref": "#/$defs/workload" },
+    "quantiles": { "$ref": "#/$defs/quantiles" },
+    "spans": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/span" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "metadata": { "$ref": "#/$defs/metadata" }
+  },
+  "$defs": {
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cargo_profile",
+        "git_commit",
+        "git_short",
+        "git_dirty",
+        "os",
+        "arch",
+        "cpu",
+        "rustc_version",
+        "godot_version",
+        "tracy_version",
+        "features"
+      ],
+      "properties": {
+        "cargo_profile": { "const": "profiling" },
+        "git_commit": { "type": "string", "minLength": 1 },
+        "git_short": { "type": "string", "minLength": 1 },
+        "git_dirty": { "type": "boolean" },
+        "os": { "type": "string", "minLength": 1 },
+        "arch": { "type": "string", "minLength": 1 },
+        "cpu": { "type": "string", "minLength": 1 },
+        "rustc_version": { "type": "string", "minLength": 1 },
+        "godot_version": { "type": "string", "minLength": 1 },
+        "tracy_version": { "type": "string", "minLength": 1 },
+        "features": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "requested",
+        "patterns",
+        "registered",
+        "selected",
+        "benchmarks"
+      ],
+      "properties": {
+        "mode": { "enum": ["exact", "filter"] },
+        "requested": { "type": "string", "minLength": 1 },
+        "patterns": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "registered": { "type": "integer", "minimum": 0 },
+        "selected": { "type": "integer", "minimum": 0 },
+        "benchmarks": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "connection_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mechanism", "timeout_seconds"],
+      "properties": {
+        "mechanism": { "const": "ondemand+Client::is_connected" },
+        "timeout_seconds": { "const": 10 }
+      }
+    },
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "warmup_iterations",
+        "sample_iterations",
+        "connection_gate",
+        "benchmarks"
+      ],
+      "properties": {
+        "kind": { "const": "itest-benchmark" },
+        "warmup_iterations": { "const": 5 },
+        "sample_iterations": { "const": 21 },
+        "connection_gate": { "$ref": "#/$defs/connection_gate" },
+        "benchmarks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/workload_benchmark" }
+        }
+      }
+    },
+    "workload_benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "inner_repetitions", "measured"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "inner_repetitions": { "type": "integer", "minimum": 1 },
+        "measured": { "type": "boolean" }
+      }
+    },
+    "quantiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "p95_min_occurrences", "p99_min_occurrences"],
+      "properties": {
+        "method": { "const": "nearest-rank" },
+        "p95_min_occurrences": { "const": 20 },
+        "p99_min_occurrences": { "const": 100 }
+      }
+    },
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "benchmark",
+        "name",
+        "source_file",
+        "source_line",
+        "inclusive",
+        "self"
+      ],
+      "properties": {
+        "benchmark": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "source_file": { "type": "string", "minLength": 1 },
+        "source_line": { "type": "integer", "minimum": 0 },
+        "inclusive": { "$ref": "#/$defs/timing" },
+        "self": { "$ref": "#/$defs/timing" }
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "occurrence_count",
+        "total_ns",
+        "mean_ns",
+        "median_ns",
+        "p95_ns",
+        "p95_reason",
+        "p99_ns",
+        "p99_reason",
+        "per_sample"
+      ],
+      "properties": {
+        "occurrence_count": { "type": "integer", "minimum": 1 },
+        "total_ns": { "type": "integer", "minimum": 0 },
+        "mean_ns": { "type": "number", "minimum": 0 },
+        "median_ns": { "type": "number", "minimum": 0 },
+        "p95_ns": { "type": ["number", "null"], "minimum": 0 },
+        "p95_reason": { "type": ["string", "null"] },
+        "p99_ns": { "type": ["number", "null"], "minimum": 0 },
+        "p99_reason": { "type": ["string", "null"] },
+        "per_sample": {
+          "type": "array",
+          "minItems": 21,
+          "maxItems": 21,
+          "items": { "$ref": "#/$defs/sample" }
+        }
+      }
+    },
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["iteration", "normalized_total_ns", "normalized_count"],
+      "properties": {
+        "iteration": { "type": "integer", "minimum": 0 },
+        "normalized_total_ns": { "type": "number", "minimum": 0 },
+        "normalized_count": { "type": "number", "minimum": 0 }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "message", "metadata"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "present", "size_bytes", "metadata"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "capture",
+            "zones-inclusive",
+            "zones-self",
+            "capture-log",
+            "godot-log",
+            "workload"
+          ]
+        },
+        "path": { "type": "string", "minLength": 1 },
+        "present": { "type": "boolean" },
+        "size_bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

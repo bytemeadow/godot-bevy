@@ -1,0 +1,163 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "logs/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Test",
+          "duration": 0.25,
+          "process_status": "Success",
+          "argv": ["cargo", "test", "--locked"]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "godot-bevy/src/fixture.rs:2:11: replace + with - in add_one",
+          "package": "godot-bevy",
+          "file": "./godot-bevy/src/fixture.rs",
+          "function": {
+            "function_name": "add_one",
+            "return_type": "-> i32",
+            "span": {
+              "start": {"line": 1, "column": 1},
+              "end": {"line": 3, "column": 2}
+            }
+          },
+          "span": {
+            "start": {"line": 2, "column": 11},
+            "end": {"line": 2, "column": 12}
+          },
+          "replacement": "-",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "logs/caught.log",
+      "diff_path": "diff/caught.diff",
+      "phase_results": [
+        {
+          "phase": "Test",
+          "duration": 0.5,
+          "process_status": {"Failure": 101},
+          "argv": ["cargo", "test", "--locked"]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "godot-bevy/src/fixture.rs:6:5: replace enabled -> bool with false",
+          "package": "godot-bevy",
+          "file": "godot-bevy/src/fixture.rs",
+          "function": {
+            "function_name": "enabled",
+            "return_type": "-> bool",
+            "span": {
+              "start": {"line": 5, "column": 1},
+              "end": {"line": 7, "column": 2}
+            }
+          },
+          "span": {
+            "start": {"line": 6, "column": 5},
+            "end": {"line": 6, "column": 11}
+          },
+          "replacement": "false",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "MissedMutant",
+      "log_path": "logs/missed.log",
+      "diff_path": "diff/missed.diff",
+      "phase_results": [
+        {
+          "phase": "Test",
+          "duration": 0.5,
+          "process_status": "Success",
+          "argv": ["cargo", "test", "--locked"]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "godot-bevy/src/fixture.rs:6:5: replace enabled -> bool with true",
+          "package": "godot-bevy",
+          "file": "godot-bevy/src/fixture.rs",
+          "function": {
+            "function_name": "enabled",
+            "return_type": "-> bool",
+            "span": {
+              "start": {"line": 5, "column": 1},
+              "end": {"line": 7, "column": 2}
+            }
+          },
+          "span": {
+            "start": {"line": 6, "column": 5},
+            "end": {"line": 6, "column": 11}
+          },
+          "replacement": "true",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Timeout",
+      "log_path": "logs/timeout.log",
+      "diff_path": "diff/timeout.diff",
+      "phase_results": [
+        {
+          "phase": "Test",
+          "duration": 20.0,
+          "process_status": "Timeout",
+          "argv": ["cargo", "test", "--locked"]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "godot-bevy/src/fixture.rs:2:13: replace 1 with 0",
+          "package": "godot-bevy",
+          "file": "godot-bevy/src/fixture.rs",
+          "function": {
+            "function_name": "add_one",
+            "return_type": "-> i32",
+            "span": {
+              "start": {"line": 1, "column": 1},
+              "end": {"line": 3, "column": 2}
+            }
+          },
+          "span": {
+            "start": {"line": 2, "column": 13},
+            "end": {"line": 2, "column": 14}
+          },
+          "replacement": "0",
+          "genre": "FnValue"
+        }
+      },
+      "summary": "Unviable",
+      "log_path": "logs/unviable.log",
+      "diff_path": "diff/unviable.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.5,
+          "process_status": {"Failure": 101},
+          "argv": ["cargo", "test", "--no-run", "--locked"]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 4,
+  "missed": 1,
+  "caught": 1,
+  "timeout": 1,
+  "unviable": 1,
+  "success": 0,
+  "start_time": "2026-08-29T00:00:00Z",
+  "end_time": "2026-08-29T00:00:04Z",
+  "cargo_mutants_version": "27.1.0"
+}

@@ -9,7 +9,6 @@ use bevy_ecs::system::EntityCommands;
 /// This provides significant performance improvements by eliminating multiple
 /// GodotNode::try_get calls for each node.
 pub fn add_node_type_markers_from_string(ec: &mut EntityCommands, node_type: &str) -> bool {
-    // Add appropriate markers based on the type string
     match node_type {
         "Node" => {
             ec.insert(NodeMarker);
@@ -2105,7 +2104,6 @@ pub fn add_node_type_markers_from_string(ec: &mut EntityCommands, node_type: &st
 }
 
 pub fn remove_comprehensive_node_type_markers(ec: &mut EntityCommands) {
-    // All nodes inherit from Node, so remove this first
     ec.remove::<NodeMarker>();
     ec.remove::<AnimationMixerMarker>();
     ec.remove::<AudioStreamPlayerMarker>();

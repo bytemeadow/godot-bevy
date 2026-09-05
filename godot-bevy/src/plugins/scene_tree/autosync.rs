@@ -32,7 +32,6 @@ pub struct AutoSyncBundleRegistry {
     pub create_bundle_fn: BundleCreatorFn,
 }
 
-// Collect all auto-sync bundle registrations
 crate::inventory::collect!(AutoSyncBundleRegistry);
 
 /// Registry entry for attachable components, constructed only by the derive macros
@@ -189,28 +188,4 @@ pub(crate) fn try_attach_component_to_parent(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use bevy_app::App;
-    use bevy_ecs::prelude::Component;
-
-    #[derive(Component)]
-    struct Primary;
-    #[derive(Component, PartialEq, Debug, Default)]
-    struct Companion(u8);
-
-    fn register_primary(world: &mut World) {
-        let _ = world.try_register_required_components_with::<Primary, Companion>(|| Companion(7));
-    }
-    crate::inventory::submit! {
-        GodotRequiredComponents { component_name: "Primary", registrar_fn: register_primary }
-    }
-
-    #[test]
-    fn registrar_entries_apply_to_new_world() {
-        let mut app = App::new();
-        register_all_required_components(&mut app);
-        let e = app.world_mut().spawn(Primary).id();
-        assert_eq!(app.world().get::<Companion>(e), Some(&Companion(7)));
-    }
-}
+include!("autosync_tests.rs");

@@ -2,7 +2,7 @@
 //! and the Godot-driven fixed schedule freezes whenever `Time<Virtual>` is paused.
 //!
 //! `BevyApp` is `process_mode = ALWAYS`, so both callbacks keep firing under a tree-pause and
-//! these awaits resolve; a regression to PAUSABLE would hang the suite until `--quit-after`.
+//! these awaits resolve; PAUSABLE mode would hang the suite until `--quit-after`.
 //! `SceneTree` and `Time<Virtual>` are process-global, so every test resets pause via a drop guard.
 //!
 //! Counting rule: physics_process still fires under pause, so the frame signal's step count is
@@ -33,8 +33,6 @@ struct FixedTicks(Counter);
 #[derive(Resource)]
 struct UpdateTicks(Counter);
 
-/// Build an app with a FixedUpdate counter and a (non-delta-scaled) Update counter, and
-/// return handles to read them from the test.
 async fn app_with_counters(ctx: &TestContext) -> (TestApp, Counter, Counter) {
     let fixed = Counter::new();
     let update = Counter::new();
@@ -51,8 +49,6 @@ async fn app_with_counters(ctx: &TestContext) -> (TestApp, Counter, Counter) {
     (app, fixed, update)
 }
 
-/// A tree-pause freezes FixedUpdate wholesale while a non-delta-scaled Update
-/// system keeps running -- the breaking change from `process_mode = ALWAYS`.
 #[itest(async)]
 fn test_tree_pause_freezes_fixed_runs_update(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx = ctx.clone();
@@ -60,7 +56,6 @@ fn test_tree_pause_freezes_fixed_runs_update(ctx: &TestContext) -> godot::task::
         let (mut app, fixed, update) = app_with_counters(&ctx).await;
         let _reset = ResetPause(tree(&ctx));
 
-        // Baseline: both schedules advance while unpaused.
         app.updates(5).await;
         assert!(fixed.get() > 0, "FixedUpdate should advance before pause");
         assert!(update.get() > 0, "Update should advance before pause");
@@ -100,7 +95,7 @@ fn test_bevy_only_pause_freezes_fixed_tree_untouched(ctx: &TestContext) -> godot
         app.updates(5).await;
 
         app.with_world_mut(|w| w.resource_mut::<Time<Virtual>>().pause());
-        app.updates(3).await; // settle
+        app.updates(3).await; // Allow the virtual-pause gate to reach the fixed driver.
 
         let fixed_at_pause = fixed.get();
         let update_at_pause = update.get();
@@ -136,7 +131,7 @@ fn test_edge_mirror_does_not_clobber_user_pause(ctx: &TestContext) -> godot::tas
 
         app.updates(3).await;
         app.with_world_mut(|w| w.resource_mut::<Time<Virtual>>().pause());
-        app.updates(3).await; // settle
+        app.updates(3).await; // Allow the virtual-pause gate to reach the fixed driver.
 
         let fixed_at_pause = fixed.get();
         app.updates(20).await; // long window: an every-frame overwrite would leak here
@@ -169,13 +164,11 @@ fn test_user_pause_survives_tree_pause_cycle(ctx: &TestContext) -> godot::task::
         let (mut app, fixed, _update) = app_with_counters(&ctx).await;
         let _reset = ResetPause(tree(&ctx));
 
-        // User pauses virtual time; the tree keeps running.
         app.updates(3).await;
         app.with_world_mut(|w| w.resource_mut::<Time<Virtual>>().pause());
-        app.updates(3).await; // settle
+        app.updates(3).await; // Allow the virtual-pause gate to reach the fixed driver.
         let frozen = fixed.get();
 
-        // A tree pause/unpause cycle rides over the user's pause without claiming it.
         tree(&ctx).set_pause(true);
         app.updates(3).await;
         tree(&ctx).set_pause(false);
@@ -195,7 +188,6 @@ fn test_user_pause_survives_tree_pause_cycle(ctx: &TestContext) -> godot::task::
     })
 }
 
-/// Unpausing the tree resumes FixedUpdate (falling edge -> Time<Virtual>::unpause()).
 #[itest(async)]
 fn test_unpause_resumes_fixedupdate(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx = ctx.clone();
@@ -204,13 +196,13 @@ fn test_unpause_resumes_fixedupdate(ctx: &TestContext) -> godot::task::TaskHandl
         let _reset = ResetPause(tree(&ctx));
 
         tree(&ctx).set_pause(true);
-        app.updates(3).await; // settle paused
+        app.updates(3).await; // Allow the tree-pause edge to reach the fixed driver.
         let frozen = fixed.get();
         app.updates(5).await;
         assert_eq!(fixed.get(), frozen, "FixedUpdate frozen while paused");
 
         tree(&ctx).set_pause(false);
-        app.updates(3).await; // settle unpaused
+        app.updates(3).await; // Allow the tree-unpause edge to reach the fixed driver.
         let resumed_base = fixed.get();
         app.updates(10).await;
         assert!(
@@ -247,13 +239,11 @@ fn test_transform_read_frozen_under_pause(ctx: &TestContext) -> godot::task::Tas
 
         let entity = app.entity_for_node(node_id).expect("entity for node");
 
-        // Settle at the origin, then record the baseline Bevy x.
         app.physics_update().await;
         let x_before = app.with_world(|w| w.get::<Transform>(entity).unwrap().translation.x);
 
-        // Pause, then author x purely from Godot. The read is frozen, so Bevy must not see it.
         tree(&ctx).set_pause(true);
-        app.updates(3).await; // settle pause
+        app.updates(3).await; // Allow the tree-pause edge to reach transform sync.
         node.set_position(Vector2::new(50.0, 0.0));
         for _ in 0..5 {
             app.physics_update().await;
@@ -265,7 +255,6 @@ fn test_transform_read_frozen_under_pause(ctx: &TestContext) -> godot::task::Tas
             "a Godot move must not read into Bevy while paused, expected ~{x_before:.1}, got {x_paused:.1}"
         );
 
-        // Unpause: the read resumes and picks up the Godot position.
         tree(&ctx).set_pause(false);
         for _ in 0..5 {
             app.physics_update().await;

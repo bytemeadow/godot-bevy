@@ -6,9 +6,7 @@ from typing import List, Dict
 def get_type_cfg_attribute(
     node_type: str,
 ) -> str:
-    """Get the cfg attribute for a type if it needs version or feature gating."""
     cfg = []
-    # Check for WASM-excluded types first
     if node_type in SpecialCases.wasm_excluded_types:
         cfg.append('not(feature = "experimental-wasm")\n')
     if node_type in SpecialCases.experimental_classes:
@@ -24,8 +22,6 @@ def get_type_cfg_attribute(
 def categorize_types_by_hierarchy(
     node_types: List[str], parent_map: Dict[str, str]
 ) -> Dict[str, List[str]]:
-    """Categorize node types by their inheritance hierarchy"""
-
     def is_descendant_of(ancestor_node_type: str, ancestor: str) -> bool:
         current = ancestor_node_type
         while current in parent_map:

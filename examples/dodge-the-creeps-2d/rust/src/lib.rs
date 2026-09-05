@@ -12,9 +12,6 @@ mod nodes;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
-    // Note: Asset loading with path verification bypass is now handled automatically
-    // by GodotCorePlugin, so Bevy's asset_server can load Godot resources from .pck files
-
     // This example uses most godot-bevy features, so we'll use the convenience bundle
     app.add_plugins(GodotDefaultPlugins)
         .add_plugins(StatesPlugin)

@@ -9,6 +9,14 @@ mod level_manager;
 mod main_menu;
 mod scene_management;
 
+// ANCHOR: itest
+#[cfg(feature = "itest")]
+mod itests;
+
+#[cfg(feature = "itest")]
+godot_bevy_test::declare_test_runner!();
+// ANCHOR_END: itest
+
 #[bevy_app]
 fn build_app(app: &mut App) {
     // This example uses most godot-bevy features
@@ -27,7 +35,6 @@ fn build_app(app: &mut App) {
             level_manager::LevelManagerPlugin,
             gameplay::GameplayPlugin,
         ))
-        // Register types for inspector reflection
         .register_type::<components::Speed>()
         .register_type::<components::JumpVelocity>()
         .register_type::<components::Gravity>()

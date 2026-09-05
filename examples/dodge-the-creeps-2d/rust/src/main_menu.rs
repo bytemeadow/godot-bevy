@@ -28,7 +28,6 @@ pub struct MainMenuPlugin;
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuAssets>()
-            // enable typed signal routing for menu
             .add_plugins(GodotSignalsPlugin::<StartGameRequested>::default())
             .add_systems(
                 OnExit(GameState::Loading),
@@ -37,7 +36,6 @@ impl Plugin for MainMenuPlugin {
                     connect_start_button.after(init_menu_assets),
                 ),
             )
-            // Use observer instead of system with MessageReader
             .add_observer(on_start_game_requested)
             .add_systems(OnExit(GameState::MainMenu), hide_play_button)
             .add_systems(OnEnter(GameState::MainMenu), show_play_button);
@@ -67,7 +65,6 @@ fn init_menu_assets(
     menu_assets.start_button = Some(menu_ui.start_button);
     menu_assets.score_label = Some(menu_ui.score_label);
 
-    // Initialize UI handles for command system
     ui_handles.start_button = Some(menu_ui.start_button);
     ui_handles.score_label = Some(menu_ui.score_label);
     ui_handles.message_label = Some(menu_ui.message_label);
@@ -92,7 +89,6 @@ fn on_start_game_requested(
     mut app_state: ResMut<NextState<GameState>>,
     state: Res<bevy::state::state::State<GameState>>,
 ) {
-    // Only respond when in MainMenu state
     if *state.get() == GameState::MainMenu {
         app_state.set(GameState::Countdown);
     }

@@ -1,22 +1,17 @@
 @tool
 extends Panel
-## Bevy Entity Inspector Panel
-##
 ## Displays Bevy entities and their components in the editor when the game is running.
 
-# UI elements
 var entity_tree: Tree
 var status_label: Label
 
 # Track expanded state by entity_bits (persists across refreshes)
 var _expanded_entities: Dictionary = {}
 
-# Editor icons cache
 var _icon_entity: Texture2D
 var _icon_entity_godot: Texture2D
 var _icon_component: Texture2D
 
-# Dynamic icon cache (icon_name -> icon)
 var _icon_cache: Dictionary = {}
 
 func _ready() -> void:
@@ -24,7 +19,6 @@ func _ready() -> void:
 	_setup_ui()
 
 func _load_icons() -> void:
-	# Load editor icons for visual presentation
 	var theme := EditorInterface.get_editor_theme()
 	if theme:
 		_icon_entity = theme.get_icon(&"Node", &"EditorIcons")
@@ -40,7 +34,6 @@ func _setup_ui() -> void:
 	main_vbox.add_theme_constant_override("separation", 4)
 	add_child(main_vbox)
 
-	# Header
 	var header := HBoxContainer.new()
 	var title := Label.new()
 	title.text = "Bevy Entities"
@@ -55,7 +48,6 @@ func _setup_ui() -> void:
 
 	main_vbox.add_child(header)
 
-	# Entity tree with hierarchy
 	entity_tree = Tree.new()
 	entity_tree.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	entity_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -108,7 +100,6 @@ func update_entities(data: Array) -> void:
 				children_by_parent[parent_bits] = []
 			children_by_parent[parent_bits].append(entity_bits)
 
-	# Build tree recursively starting from root entities (parent_bits == -1)
 	var tree_items: Dictionary = {}
 	_build_entity_tree(tree_root, -1, entities_by_id, children_by_parent, tree_items)
 
@@ -126,12 +117,10 @@ func _build_entity_tree(parent_item: TreeItem, parent_bits: int, entities_by_id:
 		entity_item.set_metadata(0, entity_bits)
 		tree_items[entity_bits] = entity_item
 
-		# Find the node type from marker components and set appropriate icon
 		var entity_icon: Texture2D = _get_entity_icon(info["components"], info["has_godot_node"])
 		if entity_icon:
 			entity_item.set_icon(0, entity_icon)
 
-		# Add components as children of entity
 		for component in info["components"]:
 			# Skip hierarchy components - already shown visually in the tree
 			if component is Dictionary:
@@ -141,10 +130,8 @@ func _build_entity_tree(parent_item: TreeItem, parent_bits: int, entities_by_id:
 					continue
 			_add_component_item(entity_item, component)
 
-		# Recursively add child entities
 		_build_entity_tree(entity_item, entity_bits, entities_by_id, children_by_parent, tree_items)
 
-		# Restore expanded/collapsed state
 		var has_children: bool = info["components"].size() > 0 or children_by_parent.has(entity_bits)
 		if has_children:
 			var is_expanded: bool = _expanded_entities.get(entity_bits, false)
@@ -174,7 +161,6 @@ func _add_component_item(parent_item: TreeItem, component) -> void:
 		else:
 			short_name = full_name
 
-	# Format display based on whether we have reflected value
 	var display_text: String = short_name
 	if component_value != null:
 		var value_str: String = _format_value(component_value)
@@ -185,21 +171,17 @@ func _add_component_item(parent_item: TreeItem, component) -> void:
 	comp_item.set_tooltip_text(0, full_name)
 	comp_item.set_custom_color(0, Color(0.6, 0.8, 1.0))
 
-	# Set component icon based on type
 	var icon: Texture2D = _get_component_icon(short_name)
 	if icon:
 		comp_item.set_icon(0, icon)
 
-	# Add fields as children if we have structured data
 	if component_value is Dictionary and component_value.has("fields"):
 		_add_fields(comp_item, component_value)
 
 func _get_icon(icon_name: String) -> Texture2D:
-	# Check cache first
 	if _icon_cache.has(icon_name):
 		return _icon_cache[icon_name]
 
-	# Look up icon from editor theme
 	var theme := EditorInterface.get_editor_theme()
 	if theme:
 		var icon: Texture2D = theme.get_icon(icon_name, &"EditorIcons")
@@ -229,9 +211,7 @@ func _get_entity_icon(components: Array, has_godot_node: bool) -> Texture2D:
 			else:
 				short_name = full_name
 
-		# Check if this is a marker component (ends with "Marker")
 		if short_name.ends_with("Marker"):
-			# Extract the node type name (e.g., "Node2DMarker" -> "Node2D")
 			var node_type: StringName = StringName(short_name.substr(0, short_name.length() - 6))
 
 			if best_node_type.is_empty():
@@ -245,14 +225,12 @@ func _get_entity_icon(components: Array, has_godot_node: bool) -> Texture2D:
 		if icon:
 			return icon
 
-	# Fallback icons
 	if has_godot_node:
 		return _icon_entity_godot
 
 	return _icon_entity
 
 func _get_component_icon(short_name: String) -> Texture2D:
-	# Map component types to appropriate icons
 	match short_name:
 		"Transform", "GlobalTransform", "Transform2D", "Transform3D":
 			return _get_icon("Transform3D")
@@ -275,7 +253,6 @@ func _get_component_icon(short_name: String) -> Texture2D:
 		"TransformTreeChanged":
 			return _get_icon("StatusWarning")
 
-	# Check if this is a marker component - use the corresponding Godot node icon
 	if short_name.ends_with("Marker"):
 		var node_type: String = short_name.substr(0, short_name.length() - 6)
 		var icon: Texture2D = _get_icon(node_type)
@@ -297,7 +274,6 @@ func _add_fields(parent_item: TreeItem, value_dict: Dictionary) -> void:
 			field_item.set_text(0, display)
 			field_item.set_custom_color(0, Color(0.8, 0.8, 0.6))
 
-			# Recurse for nested structs
 			if field_value is Dictionary and field_value.has("fields"):
 				_add_fields(field_item, field_value)
 	elif fields is Array:

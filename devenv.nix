@@ -9,24 +9,36 @@ let
   system = pkgs.stdenv.system;
   rustPkgs = import inputs.nixpkgs { inherit system overlays; };
   emscriptenPkgs = import inputs.nixpkgs-emscripten { inherit system; };
-  rust-toolchain = rustPkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+  cargoLlvmCovPkgs = import inputs.nixpkgs-cargo-llvm-cov { inherit system; };
+  rust-toolchain = (rustPkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml).override {
+    extensions = [ "rust-src" "rust-analyzer" "llvm-tools" ];
+  };
   # -Zbuild-std (web builds) requires nightly
   rust-nightly = rustPkgs.rust-bin.nightly.latest.default.override {
     extensions = [ "rust-src" ];
   };
   godot-bin = pkgs.callPackage ./nix/godot-bin.nix { };
-  tracy = inputs.tracy.packages.${system}.default;
 in
 {
   packages =
     with pkgs;
     [
       sccache # rust build artifact cache
-      python3 # godot type generation script
+      cargo-mutants
+      (assert lib.assertMsg (cargoLlvmCovPkgs.cargo-llvm-cov.version == "0.9.0")
+        "cargo-llvm-cov must stay at 0.9.0";
+        cargoLlvmCovPkgs.cargo-llvm-cov)
+      python3 # itest verification drivers
+      uv # resolves the codegen's dacite/jinja2 from uv.lock
       mdbook # builds book/
       rust-toolchain
       rust-nightly # web builds
       act # run GitHub Actions locally
+      inferno
+      samply
+      # tracy's wire protocol must match tracy-client-sys in Cargo.lock
+      # (0.28.0 bundles Tracy 0.13.1); nixpkgs tracy is 0.13.1
+      tracy
 
       # emscripten 4.x breaks the godot-rust linker, so pin 3.1.73 (+ matching binaryen)
       emscriptenPkgs.emscripten
@@ -35,8 +47,6 @@ in
       godot-bin
     ]
     ++ lib.optionals pkgs.stdenv.isLinux [
-      tracy
-
       alsa-lib
       libGL
       libxkbcommon
@@ -56,14 +66,15 @@ in
 
   env.RUSTC_WRAPPER = "${pkgs.sccache}/bin/sccache";
 
-  # nightly for web builds
+  # keep uv on the devenv interpreter instead of fetching its own CPython
+  env.UV_PYTHON_DOWNLOADS = "never";
+
   env.CARGO_NIGHTLY = "${rust-nightly}/bin/cargo";
   env.RUSTC_NIGHTLY = "${rust-nightly}/bin/rustc";
 
   # rustfmt runs on commit; clippy stays in CI
   git-hooks.hooks.rustfmt.enable = true;
 
-  # enable claude code
   claude.code.enable = true;
 
   scripts = {
@@ -97,10 +108,32 @@ in
       cd itest && ./run-tests.sh "$@"
     '';
 
+    mutants.exec = ''
+      python3 itest/qualification_mutants.py "$@"
+    '';
+
+    qualification.exec = ''
+      python3 itest/qualification.py "$@"
+    '';
+
+    coverage.exec = ''
+      python3 itest/coverage.py "$@"
+    '';
+
     # native, needs local godot
     bench.exec = ''
       echo "Running benchmarks..."
       cd itest && ./run-benches.sh "$@"
+    '';
+
+    # native, needs local godot; tracy span table (default) or samply flamegraph (--native)
+    profile.exec = ''
+      cd itest && ./run-profile.sh "$@"
+    '';
+
+    # native, needs local godot; interleaved span comparison vs a base ref (or --self)
+    profile-compare.exec = ''
+      cd itest && ./compare-profiles.sh "$@"
     '';
 
     book.exec = ''

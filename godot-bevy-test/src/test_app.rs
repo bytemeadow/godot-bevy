@@ -25,9 +25,13 @@ use crate::{TestContext, await_frame};
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use bevy::prelude::Transform;
+/// # use godot_bevy::prelude::GodotTransformSyncPlugin;
+/// # use godot_bevy_test::{TestApp, TestContext};
+/// # async fn example(ctx: &TestContext) {
 /// let mut app = TestApp::new(ctx, |app| {
-///     app.add_plugins(GodotTransformSyncPlugin);
+///     app.add_plugins(GodotTransformSyncPlugin::default());
 /// }).await;
 ///
 /// let entity = app.with_world_mut(|world| {
@@ -42,6 +46,7 @@ use crate::{TestContext, await_frame};
 /// assert_eq!(translation_x, 0.0);
 ///
 /// app.cleanup().await;
+/// # }
 /// ```
 pub struct TestApp {
     ctx: TestContext,
@@ -78,7 +83,7 @@ impl TestApp {
     {
         use std::sync::Mutex;
 
-        await_frame().await; // Wait for any previous test cleanup
+        await_frame().await; // A previous test's cleanup may still be pending.
 
         let scene_tree = ctx.scene_tree.get_tree();
         let root = scene_tree.get_root().expect("Root should exist");
@@ -123,8 +128,6 @@ impl TestApp {
     }
 
     /// Advance multiple Godot frames.
-    ///
-    /// Convenience for calling `update()` N times.
     pub async fn updates(&self, count: u32) {
         for _ in 0..count {
             self.update().await;
@@ -141,8 +144,6 @@ impl TestApp {
     }
 
     /// Get immutable access to the Bevy World
-    ///
-    /// Use this to query component state, just like in Bevy tests.
     /// Note: This uses a closure to avoid lifetime issues with the Gd borrow.
     pub fn with_world<F, R>(&self, f: F) -> R
     where
@@ -154,8 +155,6 @@ impl TestApp {
     }
 
     /// Get mutable access to the Bevy World
-    ///
-    /// Use this to spawn entities, modify components, etc.
     pub fn with_world_mut<F, R>(&mut self, f: F) -> R
     where
         F: FnOnce(&mut World) -> R,
@@ -277,11 +276,11 @@ impl TestApp {
         &self.ctx
     }
 
-    /// Clean up the TestApp, resetting the autoload's BevyApp for the next test.
+    /// Dispose of the world and its watchers, then wait for a frame boundary.
     ///
-    /// This should be called BEFORE calling queue_free() on any Godot nodes
-    /// that have entities in the ECS. This prevents transform sync systems
-    /// from trying to access freed nodes.
+    /// A started app receives `AppExit::Success` and one final `Last` pass.
+    /// Drop uses the same teardown path. Repeated cleanup calls are inert.
+    /// Call this before freeing nodes needed by cleanup systems.
     pub async fn cleanup(&mut self) {
         if let Some(mut app) = self.bevy_app.take() {
             app.bind_mut().teardown();

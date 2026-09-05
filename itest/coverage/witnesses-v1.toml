@@ -1,0 +1,19 @@
+version = 1
+
+[[witnesses]]
+id = "post_update_godot_transforms"
+source = "godot-bevy/src/plugins/transforms/sync_systems.rs"
+function = "post_update_godot_transforms"
+line_contains = "obj.set_transform(transform_ref.to_godot_transform_2d());"
+test = "test_bevy_to_godot_transform_sync"
+unit_runtime = "zero"
+itest_runtime = "positive"
+
+[[witnesses]]
+id = "is_reasonable_float"
+source = "godot-bevy/src/utils/math.rs"
+function = "is_reasonable_float"
+line_contains = "value.is_finite()"
+test = "test_is_reasonable_float"
+unit_runtime = "positive"
+itest_runtime = "zero"

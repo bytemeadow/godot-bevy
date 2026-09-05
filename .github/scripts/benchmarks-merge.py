@@ -31,7 +31,12 @@ def format_duration(ns: float) -> str:
 
 def load_json(path: Path) -> dict:
     with open(path) as f:
-        return json.load(f)
+        data = json.load(f)
+    if data.get("benchmark_compatible") is False:
+        raise SystemExit(
+            f"Refusing instrumented profile workload as benchmark input: {path}"
+        )
+    return data
 
 
 def main() -> None:

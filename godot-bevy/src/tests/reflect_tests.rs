@@ -16,9 +16,6 @@ mod tests {
                 .get_type_info(std::any::TypeId::of::<Groups>())
                 .is_some()
         );
-
-        // Can't easily create Groups without Godot node, but we can test the type is reflectable
-        // The actual reflection would work at runtime
     }
 
     #[test]
@@ -41,18 +38,15 @@ mod tests {
         let config = GodotTransformConfig::default();
         let reflected = config.as_reflect();
 
-        // Check type info
         let type_info = reflected.get_represented_type_info().unwrap();
         assert!(type_info.type_path().contains("GodotTransformConfig"));
 
-        // Check struct fields
         if let ReflectRef::Struct(struct_ref) = reflected.reflect_ref() {
             assert!(struct_ref.field("sync_mode").is_some());
         } else {
             panic!("Expected Struct reflection");
         }
 
-        // Test enum reflection
         let mode = TransformSyncMode::TwoWay;
         let mode_reflected = mode.as_reflect();
         let mode_info = mode_reflected.get_represented_type_info().unwrap();
@@ -77,11 +71,9 @@ mod tests {
         };
         let reflected = config.as_reflect();
 
-        // Check type info
         let type_info = reflected.get_represented_type_info().unwrap();
         assert!(type_info.type_path().contains("SceneTreeConfig"));
 
-        // Check struct fields
         if let ReflectRef::Struct(struct_ref) = reflected.reflect_ref() {
             assert!(struct_ref.field("auto_despawn_children").is_some());
         } else {
@@ -103,7 +95,6 @@ mod tests {
         let metadata = TransformSyncMetadata::default();
         let reflected = metadata.as_reflect();
 
-        // Check type info
         let type_info = reflected.get_represented_type_info().unwrap();
         assert!(type_info.type_path().contains("TransformSyncMetadata"));
 

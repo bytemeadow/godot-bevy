@@ -109,7 +109,6 @@ fn connect_signal<T>(
     let mut mapper = mapper;
 
     let closure = move |args: &[&Variant]| -> Variant {
-        // Clone variants to owned values we can inspect
         let owned: Vec<Variant> = args.iter().map(|&v| v.clone()).collect();
         let event = mapper(&owned, source_node_handle, source_entity);
         if let Some(event) = event {
@@ -130,8 +129,9 @@ fn connect_signal<T>(
 ///
 /// # Example
 ///
-/// ```ignore
-/// use bevy::prelude::*;
+/// ```no_run
+/// use godot_bevy::bevy_app::App;
+/// use godot_bevy::bevy_ecs::prelude::{Event, On};
 /// use godot_bevy::prelude::*;
 ///
 /// #[derive(Event, Clone)]
@@ -140,8 +140,7 @@ fn connect_signal<T>(
 /// fn setup_app(app: &mut App) {
 ///     app.add_plugins(GodotSignalsPlugin::<ButtonPressed>::default());
 ///
-///     // React to button presses with a global observer
-///     app.add_observer(|_trigger: Trigger<ButtonPressed>| {
+///     app.add_observer(|_event: On<ButtonPressed>| {
 ///         println!("A button was pressed!");
 ///     });
 /// }
@@ -183,23 +182,19 @@ where
     fn build(&self, app: &mut App) {
         ensure_signal_connection_queue(app);
 
-        // Install global signal channel and drain system once
         if !app.world().contains_resource::<SignalSender>() {
             let (sender, receiver) = crossbeam_channel::unbounded::<Box<dyn SignalDispatch>>();
             app.world_mut().insert_resource(SignalSender(sender));
             app.world_mut()
                 .insert_resource(SignalReceiver::new(receiver));
 
-            // Drain signals and trigger observers
             app.add_systems(First, drain_and_trigger_signals);
         }
 
-        // Per-T deferred connection processor
         app.add_systems(First, process_deferred_signal_connections::<T>);
     }
 }
 
-/// Exclusive system to drain signal queue and trigger observers
 fn drain_and_trigger_signals(world: &mut bevy_ecs::world::World) {
     // Collect first to avoid overlapping mutable borrows of `world`
     let mut pending: Vec<Box<dyn SignalDispatch>> = Vec::new();
@@ -220,13 +215,18 @@ fn drain_and_trigger_signals(world: &mut bevy_ecs::world::World) {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use godot_bevy::bevy_ecs::prelude::{Component, Event, Query, With};
+/// # use godot_bevy::prelude::{GodotNodeHandle, GodotSignals};
+/// # #[derive(Component)]
+/// # struct MyButton;
+/// # #[derive(Event, Clone)]
+/// # struct ButtonPressed;
 /// fn connect_signals(
 ///     button: Query<&GodotNodeHandle, With<MyButton>>,
 ///     signals: GodotSignals<ButtonPressed>,
 /// ) {
 ///     if let Ok(handle) = button.single() {
-///         // Connect the Godot "pressed" signal to trigger ButtonPressed event
 ///         signals.connect(*handle, "pressed", None, |_, _, _| {
 ///             Some(ButtonPressed)
 ///         });
@@ -295,8 +295,8 @@ where
     ///
     /// # Example
     ///
-    /// ```ignore
-    /// use bevy::prelude::*;
+    /// ```no_run
+    /// use godot_bevy::bevy_ecs::prelude::Event;
     /// use godot_bevy::prelude::*;
     /// use godot_bevy::interop::signal_names::SceneTreeSignals;
     ///
@@ -364,7 +364,6 @@ where
     }
 }
 
-/// Pending connection for direct object references (singletons, Object instances, etc.)
 struct PendingDirectNodeConnection<T>
 where
     T: Event + Clone + Send + 'static,
@@ -416,7 +415,6 @@ where
     }
 }
 
-/// Process deferred signal connections for entities that now have GodotNodeHandles
 fn process_deferred_signal_connections<T>(
     mut commands: Commands,
     mut query: Query<(Entity, &GodotNodeHandle, &mut DeferredSignalConnections<T>)>,
@@ -436,16 +434,11 @@ fn process_deferred_signal_connections<T>(
                 move |args, node_handle, ent| (mapper)(args, node_handle, ent),
             );
         }
-        // Remove marker after wiring all deferred connections
         commands
             .entity(entity)
             .remove::<DeferredSignalConnections<T>>();
     }
 }
-
-// ====================
-// Deferred Connections
-// ====================
 
 /// A single deferred signal connection for event type `T`
 pub struct DeferredConnection<T: Event + Clone + Send + 'static> {
@@ -525,13 +518,11 @@ pub type TypedDeferredSignalConnections<T> = DeferredSignalConnections<T>;
 #[deprecated(note = "Use DeferredConnection instead")]
 pub type TypedDeferredConnection<T> = DeferredConnection<T>;
 
-/// Type-erased deferred connections for internal use
 #[doc(hidden)]
 pub(crate) trait DeferredSignalConnectionTrait: Send + Sync + Debug {
     fn connect(&self, root_node: &Gd<Node>, entity: Entity, sender: &SignalSender);
 }
 
-/// Deferred connection specification for packed scenes
 #[doc(hidden)]
 #[derive(Debug)]
 pub(crate) struct SignalConnectionSpec<T>

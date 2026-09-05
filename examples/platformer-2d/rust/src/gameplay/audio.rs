@@ -1,12 +1,3 @@
-//! Audio system for the platformer game with optimized parallelization
-//!
-//! Audio systems are organized into parallel system sets:
-//! - `BackgroundMusic`: Handles level music (uses `GameMusicChannel`)
-//! - `SoundEffects`: Handles sound effects (uses `GameSfxChannel`)
-//!
-//! These sets can run in parallel since they use separate audio channels
-//! and have no shared mutable state, improving audio responsiveness.
-
 use crate::GameState;
 use crate::level_manager::{LevelId, LevelLoadedMessage};
 use bevy::prelude::*;
@@ -66,7 +57,6 @@ pub enum PlaySfxMessage {
     GemCollected,
 }
 
-/// Observer that handles level music changes
 fn on_level_loaded_play_music(
     trigger: On<LevelLoadedMessage>,
     music_channel: Res<AudioChannel<GameMusicChannel>>,
@@ -74,10 +64,8 @@ fn on_level_loaded_play_music(
 ) {
     let event = trigger.event();
 
-    // Stop current music
     music_channel.stop();
 
-    // Play appropriate music for the level
     let music_handle = match event.level_id {
         LevelId::Level1 | LevelId::Level3 => &game_audio.action_theme,
         LevelId::Level2 => &game_audio.waltz_theme,
@@ -92,7 +80,6 @@ fn on_level_loaded_play_music(
     info!("Started background music for level: {:?}", event.level_id);
 }
 
-/// Observer that handles playing sound effects
 fn on_play_sfx(
     trigger: On<PlaySfxMessage>,
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
@@ -110,7 +97,6 @@ fn on_play_sfx(
     }
 }
 
-/// System that stops background music when exiting the game
 fn stop_background_music(music_channel: Res<AudioChannel<GameMusicChannel>>) {
     music_channel.stop();
     info!("Stopped background music");

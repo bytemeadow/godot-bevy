@@ -1,0 +1,12 @@
+diff --git a/godot-bevy/src/plugins/transforms/sync_systems.rs b/godot-bevy/src/plugins/transforms/sync_systems.rs
+--- a/godot-bevy/src/plugins/transforms/sync_systems.rs
++++ b/godot-bevy/src/plugins/transforms/sync_systems.rs
+@@ -101,7 +101,7 @@ pub fn pre_update_godot_transforms<F: QueryFilter>(
+             panic!("Expected AnyOf to match either a Node2D or a Node3D, is there a bug in bevy?");
+         };
+ 
+-        merge_godot_into_bevy(&mut bevy_transform, &godot_transform, &mut metadata.shadow);
++        metadata.shadow = godot_transform;
+     }
+ }
+ 

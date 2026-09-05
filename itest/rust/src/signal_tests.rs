@@ -1,8 +1,4 @@
 /*
- * Signal integration tests
- *
- * Tests typed signal connections and observer triggering.
- *
  * Deterministic signal flow (--fixed-fps 60 harness):
  *   connect → update() [Last establishes connection] → emit → update() [First drains + fires observer] → assert
  */
@@ -13,13 +9,11 @@ use godot::prelude::*;
 use godot_bevy::prelude::*;
 use godot_bevy_test::prelude::*;
 
-/// Test event type for signal testing
 #[derive(Event, Debug, Clone)]
 struct TestSignalFired {
     source_name: String,
 }
 
-/// Test that connect connections are applied same-frame and signals work next frame
 #[itest(async)]
 fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -89,11 +83,9 @@ fn test_signal_connection_same_frame(ctx: &TestContext) -> godot::task::TaskHand
     })
 }
 
-/// Event type for connect_object testing
 #[derive(Event, Debug, Clone)]
 struct NodeAdded;
 
-/// Test that connect_object connects signals from non-entity Godot objects.
 #[itest(async)]
 fn test_connect_object_signal(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -148,7 +140,6 @@ fn test_connect_object_signal(ctx: &TestContext) -> godot::task::TaskHandle {
     })
 }
 
-/// Test that multiple signal connections work correctly
 #[itest(async)]
 fn test_multiple_signal_connections(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -240,7 +231,6 @@ fn test_multiple_signal_connections(ctx: &TestContext) -> godot::task::TaskHandl
     })
 }
 
-/// Test that signal connections made via system work correctly
 #[itest(async)]
 fn test_signal_connection_via_system(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();

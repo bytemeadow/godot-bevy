@@ -3,8 +3,6 @@ from typing import List
 
 
 class FilePaths:
-    """Keeps track of all file paths used in the generation pipeline"""
-
     # Remember to update all_generated_files() if adding/removing files
     project_root = Path(__file__).parent.parent.parent
     interop_path = project_root / "godot-bevy" / "src" / "interop"

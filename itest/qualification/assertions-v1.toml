@@ -1,0 +1,431 @@
+version = 1
+
+[[assertions]]
+source = "godot-bevy/src/plugins/fixed_schedule_tests.rs"
+test = "driver_runs_fixed_update_once_per_step_with_godot_delta"
+expression_fingerprint = "sha256:c2b0815d65b358209b88f916022a3f66801c044e3695a97859b07676aa1bcfc9"
+configuration_fingerprint = "sha256:3ba944566f640a9fc4a37da4ff3719f9feccd0725e039ea952c4fee43b5e3b96"
+units = "seconds"
+tolerance = "1e-6"
+rationale = "The f32 Time conversion may round the supplied 1/60-second Duration."
+sensitivity_witness = "A zero/no-op delta differs from 1/60 by 0.0167, and the exact run counter must also reach one."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/fixed_schedule_tests.rs"
+test = "anchors_run_in_order_once_per_step_under_virtual_time"
+expression_fingerprint = "sha256:3d39067f929d1cd2ffcdff45f71f9ba08b62bd0a69e8d11f92f85af848f73405"
+configuration_fingerprint = "sha256:b8d7cafaf611aceaba9b5fc66cc7f59e0aad32d8528cd1e6069d9930453580d2"
+units = "seconds"
+tolerance = "1e-6"
+rationale = "The predicate distinguishes the f32 fixed clock from an unadvanced virtual clock."
+sensitivity_witness = "A missing fixed advance leaves delta at zero, 0.0167 outside tolerance, and the exact fixed count remains zero."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "assert_vec3_near"
+expression_fingerprint = "sha256:1980bfcca8c4bece4b62dc276b829d9d4f6b53ae246d7e49bc2bab0e0c9764ed"
+configuration_fingerprint = "sha256:9f24484f45fc8de8da6dabf0964f9fc8df02fdd7a3b319cc2f11569f8f7b875b"
+units = "f32 vector component units"
+tolerance = "caller-supplied epsilon; current callers use 1e-5"
+rationale = "Godot and Bevy transform decomposition can introduce component-scale floating-point roundoff."
+sensitivity_witness = "Non-identity callers use components at least 0.25 from defaults, over 25,000 times the active epsilon."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "assert_quat_near"
+expression_fingerprint = "sha256:dd189a44e62210e2d1949f90e032ead35d348ec120284209a837c563fd108f4a"
+configuration_fingerprint = "sha256:ffe031f0701eac4d544db9e0ae19bfe6a5573f84d3e4062d576e2d88adc92495"
+units = "unitless quaternion components"
+tolerance = "caller-supplied epsilon; current callers use 1e-5"
+rationale = "Quaternion round trips may round components and q and -q represent the same rotation."
+sensitivity_witness = "Rotation callers use PI/3 or XYZ(0.1,0.2,0.3), whose non-identity components differ from a no-op by far more than 1e-5."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "constant:EPSILON"
+expression_fingerprint = "sha256:0b59c571f30ffbf86b886e8459c88c14eef82b19b2120ec7cac6a4ecf0bb5578"
+configuration_fingerprint = "sha256:0b59c571f30ffbf86b886e8459c88c14eef82b19b2120ec7cac6a4ecf0bb5578"
+units = "f32 transform components"
+tolerance = "1e-5"
+rationale = "This bounds decomposition roundoff while remaining much smaller than every authored non-identity component."
+sensitivity_witness = "The smallest deliberate scale departure in the suite is 0.25, which is 25,000 times this tolerance."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "test_vector3_conversions"
+expression_fingerprint = "sha256:d462fbe748247f3632704b3e0671432bdd7369d16b0dcee30a6d00e245145af4"
+configuration_fingerprint = "sha256:767df630b85aab5bc3dc07827a18dd3291670e0b12f751ec99219c980f86677c"
+units = "vector component units"
+tolerance = "1e-5"
+rationale = "The round-trip assertion permits only f32 representation noise; direct legs are also exact."
+sensitivity_witness = "The exact 1/2/3 and 4/5/6 assertions reject zero/default conversion, while the round trip includes -2.7 and PI."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "test_quaternion_conversions"
+expression_fingerprint = "sha256:3dfd512d825a550329443bd7f04cd4727592ec19b22602717d17f358938e9451"
+configuration_fingerprint = "sha256:1cbfc1c52eccbc8f49380198b43dc5702229d4fefe044a5f5d3b2f2dfa3e20ae"
+units = "unitless quaternion components"
+tolerance = "1e-5"
+rationale = "Component copies and the normalized round trip can differ by f32 rounding."
+sensitivity_witness = "The Y-rotation has y about 0.383 and the explicit quaternion has y=0.707, so identity/zero output lies outside tolerance."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "test_transform_3d_identity"
+expression_fingerprint = "sha256:2420c0a6ab76f500d9e08d7ec53d0c9bfbcec6f2ef187f922db7ff0b9765e935"
+configuration_fingerprint = "sha256:e08a12a39908d58f8d451536f536cbccebc4596bb0c3d492e6f3e27c5bd73b84"
+units = "mixed transform units"
+tolerance = "1e-5"
+rationale = "Identity is the baseline for decomposition and intentionally has no authored delta."
+sensitivity_witness = "The adjacent translation, rotation, scale, and complex cases use the same path and reject a constant identity/no-op implementation."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "test_transform_3d_translation_only"
+expression_fingerprint = "sha256:64426f038eb231e0267f96c1ae03fcf71d71da86a20a14916c2e4c6557b63985"
+configuration_fingerprint = "sha256:d451189088321f3f96e3f1d3618ba6286f62b5e3d873640c986dc74afb60b4b8"
+units = "position units, unitless rotation and scale"
+tolerance = "1e-5 per component"
+rationale = "Round-trip decomposition can round components but should preserve untouched identity fields."
+sensitivity_witness = "A no-op result has translation zero, at least 10 units from the expected 10/20/30."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "test_transform_3d_rotation_only"
+expression_fingerprint = "sha256:5be4a1a486cb5922a0feabed537eb315be47d826f3904739e2e373c543cb88bb"
+configuration_fingerprint = "sha256:c5db17f52c3d109d1a4068435999a8d8578b8fa08fc202db8cb7937184bf6f88"
+units = "unitless quaternion and scale components, position units"
+tolerance = "1e-5 per component"
+rationale = "Quaternion decomposition is approximate while untouched translation and scale remain tightly bounded."
+sensitivity_witness = "The PI/3 Y rotation differs from identity by quaternion components near 0.5, far outside 1e-5."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "test_transform_3d_scale_only"
+expression_fingerprint = "sha256:eacf90872806d74520039d7dad315ce155c979c8708ac596a7075d4b8c10590c"
+configuration_fingerprint = "sha256:ef0c68e4420f2de0ba4788495bfa82a3dd9ece4c5785b4af9e472dbcde626a4c"
+units = "unitless scale and quaternion components, position units"
+tolerance = "1e-5 per component"
+rationale = "Matrix scale extraction may round but must preserve each nonuniform axis."
+sensitivity_witness = "Identity/no-op scale differs by 0.5, 1, and 2 on the three axes, all far beyond tolerance."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "test_transform_3d_complex"
+expression_fingerprint = "sha256:3cacc9ffa7fcfab623c6d8ddf9b231a6109d9f9897d4855c8bae7271e1e37329"
+configuration_fingerprint = "sha256:21111a7ca36f174b280745b714a6fa11c3151a3f8a6b3d48d98e07061851225a"
+units = "mixed transform units"
+tolerance = "1e-5 per component"
+rationale = "The combined decomposition exercises floating-point translation, XYZ rotation, and nonuniform scale."
+sensitivity_witness = "A no-op identity output misses translation by at least 5, scale by at least 0.25, and nonzero rotation components."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "test_transform_2d_identity"
+expression_fingerprint = "sha256:a2c113df390d9543beed869c665295f432eda5af68d9d90c389958f5990b397c"
+configuration_fingerprint = "sha256:4b920e6d0a5aef30864663aab6db2bd59ede7e22502894cc5970b17183c0ed04"
+units = "2D position and unitless scale components"
+tolerance = "1e-5 per component"
+rationale = "Identity is an explicit baseline for the 2D projection."
+sensitivity_witness = "The translation, rotation, scale, and complex 2D cases use the same path and reject a constant identity/no-op implementation."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "test_transform_2d_translation_only"
+expression_fingerprint = "sha256:8399a64ae03a67413778d46667d211df4fc1a0ae5518dea293a2e7551c682a07"
+configuration_fingerprint = "sha256:1114b0966111ca377df48331cd0d385e44973c523fda34eea6f0f2f9885f1f18"
+units = "2D position and unitless scale components"
+tolerance = "1e-5 per component"
+rationale = "The 2D round trip may incur f32 conversion noise while preserving identity scale."
+sensitivity_witness = "A no-op position of zero differs from the expected 10/20 by at least ten units."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "test_transform_2d_rotation_only"
+expression_fingerprint = "sha256:a0ca66b93c1246dae9e828f25f296d41d7df3814ca03bac05f6f03677b4409dc"
+configuration_fingerprint = "sha256:7d7841c42242300192a741c7a7dcab44b9234da4e2aa262d58901d63142f930d"
+units = "radians, position units, and unitless scale"
+tolerance = "1e-5"
+rationale = "Euler extraction and matrix reconstruction can round the recovered Z angle."
+sensitivity_witness = "Identity/no-op rotation is PI/4, about 0.785, from the expected angle and therefore cannot pass."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "test_transform_2d_scale_only"
+expression_fingerprint = "sha256:74d15533e95184296a526d9fe704a218876ff04200dc9952bafff665227cffce"
+configuration_fingerprint = "sha256:830c83eb4c37e018db43e1fb6ed1819de9aebf744a242cc206586742a5d013b9"
+units = "unitless scale and position components"
+tolerance = "1e-5 per component"
+rationale = "2D basis length extraction may round nonuniform scale components."
+sensitivity_witness = "Identity/no-op scale is 1 and misses the expected x=2 and y=0.5 by at least 0.5."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "test_transform_2d_complex"
+expression_fingerprint = "sha256:b8c1fd3cc8140bf85060ce8bb14be70b66fdc7c82306441511ed97c29a93e0f8"
+configuration_fingerprint = "sha256:4ae1a3033c30d97945d8e1c8710196d4f79f4ce2255a4613d14f92ffd7c9d197"
+units = "2D position, radians, and unitless scale"
+tolerance = "1e-5 per component"
+rationale = "The combined 2D transform round trip compounds trigonometric and matrix rounding."
+sensitivity_witness = "Identity/no-op output misses translation by 5 or 10, rotation by 0.785, and scale by 0.5 or 1."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "transform_2d_general_quaternion_uses_full_euler_rotation"
+expression_fingerprint = "sha256:503fa8de3e02d5217a5182a0906279defc92c7926a75899170fc966adef44541"
+configuration_fingerprint = "sha256:e721ef0e9d0a9b2bcff8526b9a6b9b524c832559d36708ec12984fe5027b54b5"
+units = "2D basis components"
+tolerance = "1e-6 per component"
+rationale = "The pinned trigonometric literals are rounded f32 results from the full Euler path."
+sensitivity_witness = "An identity/no-op matrix differs from the expected off-diagonal components by at least 1.63."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "transform_2d_fast_path_thresholds_fall_back_to_euler"
+expression_fingerprint = "sha256:3164664262c605f7424fb7c9cce81158c0181f36c4b40d7b5c96a4aa67fa381c"
+configuration_fingerprint = "sha256:3e8a7ab37205c90e26f840eb318fd05c1feec5d9b9aeb9c2b309f6c64c25ec19"
+units = "2D basis component magnitude"
+tolerance = "strictly greater than 1e-8"
+rationale = "The witness only needs to separate the Euler fallback's nonzero sine from the canceled fast-path result."
+sensitivity_witness = "The no-op/canceled fast path yields exactly zero, which cannot satisfy the strict greater-than bound."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/math_tests.rs"
+test = "test_extract_rotation_from_2d_matrix"
+expression_fingerprint = "sha256:3894e7652bc51e6c18cf61716a59db9f8cc675669f7c6cec64c5d5ff4b4f5ad2"
+configuration_fingerprint = "sha256:06602abe6a542c0f341dad7dd15e7448e5a1cb56eaa9d3150e28940c3001dd9f"
+units = "radians"
+tolerance = "1e-6"
+rationale = "atan2 results are compared to rounded f32 constants."
+sensitivity_witness = "Returning a constant zero passes the identity case but misses PI/2 by about 1.57."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/math_tests.rs"
+test = "test_create_2d_rotation_matrix"
+expression_fingerprint = "sha256:8b74ff7e58aa51534345417ac429a65f1f92d821c93128e0338847cc143d6bdf"
+configuration_fingerprint = "sha256:368050d263024b6347ee8f636b28f0110751aaaeb9143f3eae9c0c92f975f6a2"
+units = "2D basis components"
+tolerance = "1e-6 per component"
+rationale = "The expected sin/cos products are rounded decimal f32 literals."
+sensitivity_witness = "An identity/no-op matrix misses a.y=1, b.x=-1.5, and b.y=2.598 by orders of magnitude."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/math_tests.rs"
+test = "test_extract_z_rotation_from_quat"
+expression_fingerprint = "sha256:31cac832477fca3b863e1886cfbe9902e9e64321b2f36ae27dedd56f2020170b"
+configuration_fingerprint = "sha256:4a5e5ecab36ddda8853b16eda1d685710750b878c6eacc7221b621bd6b8e37e9"
+units = "radians"
+tolerance = "1e-6"
+rationale = "Quaternion-to-Euler conversion can round the recovered angle."
+sensitivity_witness = "A constant-zero/no-op implementation misses the PI/4 case by about 0.785."
+
+[[assertions]]
+source = "godot-bevy/src/tests/transform_multistep_tests.rs"
+test = "close"
+expression_fingerprint = "sha256:b7740e0ad2e2159af396155c31d3e1d8e2cd0f949364e89656d34f8c2f3544b6"
+configuration_fingerprint = "sha256:0f5d6c2f06c504ac6483191ef71ef54d4053895173f1a29d4b0a21bcd99d0746"
+units = "transform position units"
+tolerance = "1e-4"
+rationale = "The FFI-free schedule model still uses f32 transform arithmetic across several systems."
+sensitivity_witness = "All positive-path expected deltas are at least one unit, 10,000 times the tolerance."
+
+[[assertions]]
+source = "godot-bevy/src/tests/transform_multistep_tests.rs"
+test = "twoway_multistep_does_not_clobber_godot_axis"
+expression_fingerprint = "sha256:403b9a66d2f98a542f7c323617f1516f616ca252800d24e78637111a3b9fa739"
+configuration_fingerprint = "sha256:e0d9383745e91aa1da70453b687359739b01a010ed4aaab32de407e2fe2eb1f2"
+units = "transform position units"
+tolerance = "1e-4 via close"
+rationale = "Small f32 scheduling arithmetic noise is irrelevant to the per-step clobber behavior."
+sensitivity_witness = "No read/write progress leaves x or y at zero, respectively 2 and 1 units outside the expected values."
+
+[[assertions]]
+source = "godot-bevy/src/tests/transform_multistep_tests.rs"
+test = "twoway_multistep_clobbers_without_fixed_first_read"
+expression_fingerprint = "sha256:060a47a83f24c3d7b5f0f20d442157c5a29a00af716db0403f2f0a885c7c1cc4"
+configuration_fingerprint = "sha256:c29e083e9ede3ec969242fd490badb9411e0c41d5c4f6f07388315a719201e3e"
+units = "transform position units"
+tolerance = "1e-4 via close"
+rationale = "This control pins both the intentional y clobber and continued x authorship."
+sensitivity_witness = "Although y=0 is the clobber witness, a total no-op leaves x=0 and fails the exact-near expected x=2 check."
+
+[[assertions]]
+source = "godot-bevy/src/tests/transform_multistep_tests.rs"
+test = "twoway_nstep_accumulates_every_godot_move"
+expression_fingerprint = "sha256:0a37514bc3edb6681627b6d67f29c76cdc184478550c166346af510bb48ba2f2"
+configuration_fingerprint = "sha256:6353e6608b822453fe781428b3716c79c720104afb57a1f6620914e977c27570"
+units = "transform position units"
+tolerance = "1e-4 via close"
+rationale = "The sum and step increments are f32 but the semantic deltas are whole units."
+sensitivity_witness = "A no-op yields x=y=0 instead of x=4 and y=10, vastly beyond tolerance."
+
+[[assertions]]
+source = "godot-bevy/src/tests/transform_multistep_tests.rs"
+test = "idle_frame_reads_via_preupdate_fallback"
+expression_fingerprint = "sha256:e17d16c58b38c7b136aa34e400934842bde38ddc792f516e0d9d9837963850b4"
+configuration_fingerprint = "sha256:a39df2923140097a47ec0ca76b07f07eb2815d031c062c17c7d31ddfa45d8377"
+units = "transform position units"
+tolerance = "1e-4 via close"
+rationale = "The comparison tolerates only f32 transport noise across the idle fallback schedule."
+sensitivity_witness = "A missing/no-op fallback leaves Bevy y=0 rather than 5."
+
+[[assertions]]
+source = "godot-bevy/src/tests/transform_multistep_tests.rs"
+test = "oneway_never_reads_but_still_writes_per_step"
+expression_fingerprint = "sha256:6c544f0bb4fd39fcab12264697ed8e631623c43364825cd69b96b0c1eeec2954"
+configuration_fingerprint = "sha256:b8c250270ed65528cb590fdb19bc0ecd8479dafe35dc07af1a25e85182d7f02e"
+units = "transform position units"
+tolerance = "1e-4 via close"
+rationale = "The one-way schedule should author exactly three f32 unit steps."
+sensitivity_witness = "A no-op write leaves node x=0 instead of 3, while exact read counters also remain pinned."
+
+[[assertions]]
+source = "godot-bevy/src/utils/math_tests.rs"
+test = "test_normalize_angle"
+expression_fingerprint = "sha256:b85590385ef0297c6316b5ec5ad4f50072731fc0896d11c2f190c184e634dbf9"
+configuration_fingerprint = "sha256:afc456a19f1d76867708e803fe61a2f97e86fd646708c07e4dae48e99e9880ce"
+units = "radians"
+tolerance = "1e-6"
+rationale = "Modulo arithmetic around PI is subject to f32 rounding."
+sensitivity_witness = "A no-op passes PI/4 only but misses 3PI and both negative inputs by multiples of PI."
+
+[[assertions]]
+source = "itest/rust/src/pause_tests.rs"
+test = "test_transform_read_frozen_under_pause"
+expression_fingerprint = "sha256:bb855f92babb3ac0a69a5bbfd0dcc4755b5c98751cd1c3554596b9b8bd87adcd"
+configuration_fingerprint = "sha256:3ed34699e224f79f5c8ce8acfa7a841999c23f9d2be788b9b80b19c53c2ac23c"
+units = "Godot/Bevy position units"
+tolerance = "0.1 while paused; 0.5 after resume"
+rationale = "Frame-boundary synchronization can add small f32 transport noise; both bounds are tiny relative to the authored move."
+sensitivity_witness = "A permanently frozen/no-op read may pass the paused check but remains 50 units from the resumed target."
+
+[[assertions]]
+source = "itest/rust/src/scene_tree_tests.rs"
+test = "test_node_handle_validity"
+expression_fingerprint = "sha256:c2c59cbe87ca69a9185ca7955bdeab0b1a5c0abdf119ac0a3389c75c422e2668"
+configuration_fingerprint = "sha256:6e5d19dc7a5860292fbf29cf304fd183f27414edadfebb3b26320e63fbc2db89"
+units = "Godot 2D position units"
+tolerance = "0.1 per axis"
+rationale = "The assertion reads an f32 Godot position through a runtime handle after asynchronous scene registration."
+sensitivity_witness = "A wrong/default node at the origin is 42 and 84 units from the expected coordinates."
+
+[[assertions]]
+source = "itest/rust/src/time_scale_tests.rs"
+test = "test_time_scale_half_scales_virtual_not_real"
+expression_fingerprint = "sha256:32253c2842c722b9574e4447cc600fff792b6598917fd688b6267aaad7ce2e78"
+configuration_fingerprint = "sha256:1eb02513647291488015810e4971c1cf7d90521d0a30f4f852672b3cd231470e"
+units = "unitless Virtual/Real delta ratio and elapsed seconds"
+tolerance = "0.06 around 0.5; Real elapsed must exceed 60% of wall elapsed"
+rationale = "Thirty frames can include scheduler jitter; the ratio permits boundary slop while the wall-clock guard independently proves Real time advanced."
+sensitivity_witness = "Ignoring time_scale yields ratio 1.0, over eight tolerances away; a frozen Real clock also fails the strict wall-clock guard."
+
+[[assertions]]
+source = "itest/rust/src/time_scale_tests.rs"
+test = "test_time_scale_four_fast_forwards_virtual"
+expression_fingerprint = "sha256:efd605971c36460f53c361826036a83ead3467069d08c3f19a239a9f494b2b3d"
+configuration_fingerprint = "sha256:5e547a86e445c83c16a09cde346aa9e3fce1511fff927a5703a57c6087f3cde3"
+units = "unitless Virtual/Real delta ratio"
+tolerance = "0.4 around 4.0"
+rationale = "A multi-frame runtime ratio needs room for frame and clock jitter at accelerated scale."
+sensitivity_witness = "Ignoring time_scale yields ratio 1.0, three units from target and 7.5 tolerances outside the bound."
+
+[[assertions]]
+source = "itest/rust/src/time_scale_tests.rs"
+test = "test_time_scale_one_is_noop"
+expression_fingerprint = "sha256:da8227c1a5ae45e6420614e2a22c657f8e0baa2450d5e2c02e039e20f957ff2c"
+configuration_fingerprint = "sha256:1a22e9fc736282a7ec2b0abf9ef00fc91b5f046aecff5bde6158263224225215"
+units = "unitless Virtual/Real delta ratio"
+tolerance = "0.02 around 1.0"
+rationale = "This is the intentional default-scale control and uses a tighter bound than scaled runtime cases."
+sensitivity_witness = "The companion 0.5 and 4.0 tests reject an implementation that always behaves like this no-op/default case."
+
+[[assertions]]
+source = "itest/rust/src/transform_sync_tests.rs"
+test = "test_bevy_to_godot_transform_sync"
+expression_fingerprint = "sha256:0802fea21b81593a78bca23264e0cb0c450662efbf4b49f4250c6f8e22fad91c"
+configuration_fingerprint = "sha256:08a7d4870ea190a6f9714cef0fe60dded98751c87a26a0868f826472020bb6ab"
+units = "position units, radians, and unitless scale"
+tolerance = "0.1 position; 0.01 rotation and scale"
+rationale = "Godot frame synchronization and transform decomposition can introduce small f32 differences."
+sensitivity_witness = "No-op output at identity misses position by 5 or 10, rotation by about 0.785, and scale by at least 0.5."
+
+[[assertions]]
+source = "itest/rust/src/transform_sync_tests.rs"
+test = "test_godot_to_bevy_transform_sync"
+expression_fingerprint = "sha256:40e70eef479b22842568f650e227073957a26576a7c1dcc500221ce1a4c6bf8a"
+configuration_fingerprint = "sha256:46007dad970576a4d9a91fd326a8b5b82cd3e8f6c0b4bacc8d6203a2b4afaddd"
+units = "position units"
+tolerance = "0.1"
+rationale = "The asynchronous Godot-to-Bevy read transports an f32 position across a frame boundary."
+sensitivity_witness = "A missing/no-op read leaves x at zero, ten units from target."
+
+[[assertions]]
+source = "itest/rust/src/transform_sync_tests.rs"
+test = "test_disable_godot_transform_read_via_group"
+expression_fingerprint = "sha256:64fea9c2cf66328bc0a601b9913c1e62d7d9bdb82709fa089ba288caccb0818d"
+configuration_fingerprint = "sha256:210d1619db32838999054e626583926eaa2397d8df174ddfca19b26ef08bcf47"
+units = "position units"
+tolerance = "0.1"
+rationale = "The opted-out entity should remain at its baseline while the control entity crosses the runtime boundary."
+sensitivity_witness = "A total no-op can satisfy opted_x near zero but fails the control's synced_x=10 assertion."
+
+[[assertions]]
+source = "itest/rust/src/transform_sync_tests.rs"
+test = "test_bidirectional_transform_sync"
+expression_fingerprint = "sha256:71312758322a5bcd3834b1cf77ef84d96e9d7157b1443b5055913f72f251a811"
+configuration_fingerprint = "sha256:3d1862e13407be4cbf7c67674d40fc2f9f6b6aa5cb877ea34dbb36904033196c"
+units = "position units"
+tolerance = "0.1"
+rationale = "A full physics-frame round trip can carry small f32 representation noise."
+sensitivity_witness = "No-op Godot output remains at its initial value instead of the Bevy-authored x=20."
+
+[[assertions]]
+source = "itest/rust/src/transform_sync_tests.rs"
+test = "test_twoway_no_echo_back_across_fixed_boundary"
+expression_fingerprint = "sha256:d74a29204652d1c8312f1568273fb07b2b385c957c235280dd4ec51dbcc39b34"
+configuration_fingerprint = "sha256:cd7d942e028e5028700d22efe08cf2ad2e47bccc98f68f9687fbfcff3515ee16"
+units = "position units"
+tolerance = "0.1 per asserted axis"
+rationale = "The test spans fixed and process boundaries, so it permits only small f32 transport error."
+sensitivity_witness = "No-op values at zero miss Bevy x=42 and Godot y=17; stale echo also misses the repeated exact-near checks."
+
+[[assertions]]
+source = "itest/rust/src/transform_sync_tests.rs"
+test = "test_twoway_godot_and_bevy_coexist"
+expression_fingerprint = "sha256:da15964801f3478741096d97c75a4b107d694b80cfc96aec779a8ae7736d6aea"
+configuration_fingerprint = "sha256:3b15c83b7b37284704720ff027a7add04e202ea9170f4696e0e873a99e0257a5"
+units = "position units"
+tolerance = "1.0 for the Godot-authored x"
+rationale = "Six alternating Godot/Bevy frames allow up to one unit of boundary timing slop while separately requiring y accumulation."
+sensitivity_witness = "A no-op/stale x remains near zero rather than the final authored x=30, and y must independently reach at least five."
+
+[[assertions]]
+source = "itest/rust/src/transform_sync_tests.rs"
+test = "test_spawn_resets_physics_interpolation"
+expression_fingerprint = "sha256:7a4c7645184443f66a69c9c0624c10c2dbf353f8c0ad9799efa0d3a332867757"
+configuration_fingerprint = "sha256:ade07bb6ec7d163eedf0eb786799f5965c92037d8ff1610b4acdc95f76700f7c"
+units = "position units"
+tolerance = "0.5 per axis"
+rationale = "The rendered position is sampled across the first interpolated physics boundary."
+sensitivity_witness = "An uninitialized/no-op position at zero misses the target by 500 and 300 units."
+
+[[assertions]]
+source = "itest/rust/src/transform_sync_tests.rs"
+test = "test_twoway_read_before_logic"
+expression_fingerprint = "sha256:2ac0214673dfe3646bd6596761ee86c4ab0da142b6b2ce1486f26f19592702b6"
+configuration_fingerprint = "sha256:460e08f128a9232a5e1b7b4dece79206c6f3fccac72ea783f94724cd22f20f83"
+units = "position units"
+tolerance = "0.1"
+rationale = "The same-frame runtime observation can differ only by f32 transport noise."
+sensitivity_witness = "A delayed or no-op read leaves the observed value at zero instead of 99."
+
+[[assertions]]
+source = "godot-bevy/src/plugins/transforms/conversions_tests.rs"
+test = "transform_2d_y_component_alone_takes_the_euler_path"
+expression_fingerprint = "sha256:f46704a7d68657ac1275ff9336d3938bdebb5541b9c5cf5b29a126c8e500a35f"
+configuration_fingerprint = "sha256:f7f1b45a4b3b28693aff35674dba9d79acd3f562b67be8524e9bbfe2413493f4"
+units = "2D basis component magnitude"
+tolerance = "1e-6 absolute"
+rationale = "cos(PI/2) in f32 is ~-4.4e-8, not exactly zero, so the euler-path expectations need an absolute band."
+sensitivity_witness = "The pure-z fast path yields a.x = 0.5 and b.y = 1.0 for this quat, three orders of magnitude outside the band."

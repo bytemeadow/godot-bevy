@@ -35,7 +35,6 @@ BASELINE_LIB_DIR="$RESULTS_DIR/baseline-lib"
 rm -rf "$RESULTS_DIR"
 mkdir -p "$RESULTS_DIR" "$BASELINE_LIB_DIR"
 
-# ── Resolve Godot binary ────────────────────────────────────────────
 resolve_godot() {
     if [ -n "$GODOT4_BIN" ]; then return; fi
     if command -v godot4 &>/dev/null; then GODOT4_BIN="godot4"; return; fi
@@ -51,7 +50,6 @@ resolve_godot() {
     exit 1
 }
 
-# ── Project setup: point .gdextension at a library dir and import ──
 setup_project() {
     local godot_dir="$1"
     local lib_dir="$2"
@@ -78,7 +76,6 @@ EOF
     "$GODOT4_BIN" --headless --path "$godot_dir" --import --quit 2>/dev/null || true
 }
 
-# ── Single benchmark run, writing JSON to the given path ───────────
 run_once() {
     local godot_dir="$1"
     local json_out="$2"
@@ -101,7 +98,6 @@ run_once() {
     fi
 }
 
-# ── Cleanup on exit ─────────────────────────────────────────────────
 cleanup() {
     if [ -d "$WORKTREE_DIR" ]; then
         echo -e "${CYAN}Cleaning up worktree...${NC}"
@@ -110,7 +106,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# ── Main ────────────────────────────────────────────────────────────
 resolve_godot
 echo -e "${BOLD}Comparing benchmarks: current branch vs ${BASE_REF}${NC}"
 echo -e "  Godot: $GODOT4_BIN"
@@ -131,10 +126,9 @@ clean_local_crates() {
         --manifest-path "$manifest"
 }
 
-# 1. Build baseline (base branch via detached worktree, shared target dir).
-#    Build it with the *current* branch's benchmarks.rs so benchmarks added in
-#    this branch still get a baseline number; fall back to the base branch's own
-#    benchmarks.rs if that doesn't compile against the base library.
+# Build it with the *current* branch's benchmarks.rs so benchmarks added in
+# this branch still get a baseline number; fall back to the base branch's own
+# benchmarks.rs if that doesn't compile against the base library.
 echo -e "${CYAN}━━━ Building baseline (${BASE_REF}) ━━━${NC}"
 git -C "$REPO_ROOT" worktree remove "$WORKTREE_DIR" --force 2>/dev/null || true
 git -C "$REPO_ROOT" worktree add --detach "$WORKTREE_DIR" "$BASE_REF"
@@ -160,18 +154,15 @@ for lib in libgodot_bevy_itest.so libgodot_bevy_itest.dylib godot_bevy_itest.dll
     fi
 done
 
-# 2. Build current branch
 echo ""
 echo -e "${CYAN}━━━ Building current branch ━━━${NC}"
 clean_local_crates "$REPO_ROOT/itest/rust/Cargo.toml"
 CARGO_TARGET_DIR="$REPO_ROOT/target" cargo build --release \
     --manifest-path "$REPO_ROOT/itest/rust/Cargo.toml"
 
-# 3. Import both Godot projects
 setup_project "$WORKTREE_DIR/itest/godot" "$BASELINE_LIB_DIR"
 setup_project "$SCRIPT_DIR/godot" "$REPO_ROOT/target/release"
 
-# 4. Interleaved runs: base, current, base, current, ...
 for round in $(seq 1 "$ROUNDS"); do
     echo ""
     echo -e "${CYAN}━━━ Round ${round}/${ROUNDS}: baseline ━━━${NC}"
@@ -184,7 +175,6 @@ for round in $(seq 1 "$ROUNDS"); do
         "$RESULTS_DIR/current-run${round}.json" "current-run${round}"
 done
 
-# 5. Merge each side's runs (median of medians)
 python3 "$REPO_ROOT/.github/scripts/benchmarks-merge.py" \
     "$RESULTS_DIR/baseline.json" "$RESULTS_DIR"/baseline-run*.json
 python3 "$REPO_ROOT/.github/scripts/benchmarks-merge.py" \
@@ -198,7 +188,6 @@ if [ -z "$BENCHMARK_FILTER" ]; then
         "$RESULTS_DIR/current.json"
 fi
 
-# 6. Compare
 echo ""
 echo -e "${CYAN}━━━ Comparison ━━━${NC}"
 # Quiet: the noise-aware table below is the authoritative local summary
@@ -209,7 +198,6 @@ python3 "$REPO_ROOT/.github/scripts/benchmarks-compare.py" \
     --baseline-runs "$RESULTS_DIR"/baseline-run*.json \
     --current-runs "$RESULTS_DIR"/current-run*.json > /dev/null
 
-# 7. Pretty-print the comparison table with per-benchmark noise estimates
 python3 "$SCRIPT_DIR/print-comparison.py" "$RESULTS_DIR"
 
 echo -e "${GREEN}Done.${NC} Raw results in $RESULTS_DIR/"

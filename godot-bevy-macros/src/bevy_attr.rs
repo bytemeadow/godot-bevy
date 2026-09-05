@@ -5,8 +5,8 @@ use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
-    Attribute, Data, DeriveInput, Error, Expr, Field, Fields, Ident, Meta, Path, Token, Type,
-    braced, parenthesized, parse_quote,
+    Attribute, Data, DeriveInput, Error, Expr, Field, Fields, Ident, LitStr, Meta, Path, Token,
+    Type, braced, parenthesized, parse_quote,
 };
 
 /// The Godot class + Bevy components a single derive expands to.
@@ -44,9 +44,14 @@ pub enum ComponentInit {
 pub struct Mapping {
     pub godot_prop: syn::Ident,
     pub bevy_field: Option<syn::Ident>,
+    pub tuple_index: Option<usize>,
     pub as_type: Option<syn::Type>,
     pub default: Option<syn::Expr>,
     pub with: Option<syn::Path>,
+    pub docs: Vec<Attribute>,
+    pub description: Option<LitStr>,
+    pub hint: Option<Ident>,
+    pub hint_string: Option<Expr>,
 }
 
 // Summary Debug so tests can `.unwrap_err()` on `Result<ClassPlan, _>`;
@@ -73,6 +78,9 @@ struct Directives {
     with: Option<Path>,
     component: Option<Path>,
     export: bool,
+    description: Option<LitStr>,
+    hint: Option<Ident>,
+    hint_string: Option<Expr>,
 }
 
 fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
@@ -110,6 +118,27 @@ fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
                     }
                     d.with = Some(input.parse()?);
                 }
+                "description" => {
+                    input.parse::<Token![=]>()?;
+                    if d.description.is_some() {
+                        return Err(Error::new(key.span(), "duplicate `description`"));
+                    }
+                    d.description = Some(input.parse()?);
+                }
+                "hint" => {
+                    input.parse::<Token![=]>()?;
+                    if d.hint.is_some() {
+                        return Err(Error::new(key.span(), "duplicate `hint`"));
+                    }
+                    d.hint = Some(input.parse()?);
+                }
+                "hint_string" => {
+                    input.parse::<Token![=]>()?;
+                    if d.hint_string.is_some() {
+                        return Err(Error::new(key.span(), "duplicate `hint_string`"));
+                    }
+                    d.hint_string = Some(input.parse()?);
+                }
                 "component" => {
                     input.parse::<Token![=]>()?;
                     if d.component.is_some() {
@@ -127,7 +156,7 @@ fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
                     return Err(Error::new(
                         key.span(),
                         format!(
-                            "unknown key `{name}`; expected `as`, `default`, `with`, `component`, or `export`"
+                            "unknown key `{name}`; expected `as`, `default`, `with`, `description`, `hint`, `hint_string`, `component`, or `export`"
                         ),
                     ));
                 }
@@ -139,7 +168,22 @@ fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
             break;
         }
     }
+    if d.hint_string.is_some() && d.hint.is_none() {
+        return Err(Error::new(
+            input.span(),
+            "`hint_string` requires `hint` to also be provided",
+        ));
+    }
     Ok(d)
+}
+
+fn doc_attributes(field: &Field) -> Vec<Attribute> {
+    field
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("doc"))
+        .cloned()
+        .collect()
 }
 
 /// The syntactic shape of one `require(...)` entry, before front-end validation.
@@ -307,10 +351,7 @@ fn struct_fields(input: &DeriveInput) -> syn::Result<Vec<&Field>> {
         Data::Struct(s) => match &s.fields {
             Fields::Named(n) => Ok(n.named.iter().collect()),
             Fields::Unit => Ok(Vec::new()),
-            Fields::Unnamed(_) => Err(Error::new_spanned(
-                input,
-                "tuple structs are not supported; use a named-field or unit struct",
-            )),
+            Fields::Unnamed(u) => Ok(u.unnamed.iter().collect()),
         },
         _ => Err(Error::new_spanned(input, "expected a struct")),
     }
@@ -366,9 +407,14 @@ fn cf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
                 init: ComponentInit::Newtype(Mapping {
                     godot_prop: prop,
                     bevy_field: None,
+                    tuple_index: None,
                     as_type: Some(as_type),
                     default: cfg.default,
                     with: cfg.with,
+                    docs: Vec::new(),
+                    description: cfg.description,
+                    hint: cfg.hint,
+                    hint_string: cfg.hint_string,
                 }),
             })
         }
@@ -390,9 +436,14 @@ fn cf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
                 mappings.push(Mapping {
                     godot_prop: fname.clone(),
                     bevy_field: Some(fname),
+                    tuple_index: None,
                     as_type: Some(as_type),
                     default: cfg.default,
                     with: cfg.with,
+                    docs: Vec::new(),
+                    description: cfg.description,
+                    hint: cfg.hint,
+                    hint_string: cfg.hint_string,
                 });
             }
             Ok(ComponentPlan {
@@ -429,9 +480,14 @@ fn gf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
                 .map(|(bevy_field, godot_field)| Mapping {
                     godot_prop: godot_field,
                     bevy_field: Some(bevy_field),
+                    tuple_index: None,
                     as_type: None,
                     default: None,
                     with: None,
+                    docs: Vec::new(),
+                    description: None,
+                    hint: None,
+                    hint_string: None,
                 })
                 .collect();
             Ok(ComponentPlan {
@@ -445,11 +501,14 @@ fn gf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
 
 fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
     let mut out = Vec::new();
-    for field in struct_fields(input)? {
+    for (i, field) in struct_fields(input)?.into_iter().enumerate() {
         let Some(attr) = find_bevy_attr(field) else {
             continue;
         };
-        let name = field.ident.clone().unwrap();
+        let (godot_prop, bevy_field, tuple_index) = match &field.ident {
+            Some(ident) => (ident.clone(), Some(ident.clone()), None),
+            None => (format_ident!("value{i}"), None, Some(i)),
+        };
         let d = parse_field_directives(attr)?;
         if d.component.is_some() {
             return Err(Error::new_spanned(
@@ -464,23 +523,38 @@ fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
             ));
         }
         out.push(Mapping {
-            godot_prop: name.clone(),
-            bevy_field: Some(name),
+            godot_prop,
+            bevy_field,
+            tuple_index,
             as_type: d.as_type,
             default: d.default,
             with: d.with,
+            docs: doc_attributes(field),
+            description: d.description,
+            hint: d.hint,
+            hint_string: d.hint_string,
         });
     }
     Ok(out)
 }
 
 fn collect_field_bindings(input: &DeriveInput) -> syn::Result<Vec<ComponentPlan>> {
+    if matches!(&input.data, Data::Struct(s) if matches!(s.fields, Fields::Unnamed(_))) {
+        return Err(Error::new_spanned(
+            input,
+            "tuple structs are only supported for component-first `GodotNode`",
+        ));
+    }
+
     let mut out = Vec::new();
     for field in struct_fields(input)? {
         let Some(attr) = find_bevy_attr(field) else {
             continue;
         };
-        let name = field.ident.clone().unwrap();
+        let name = field
+            .ident
+            .clone()
+            .expect("tuple structs are rejected above");
         let d = parse_field_directives(attr)?;
         if d.as_type.is_some() {
             return Err(Error::new_spanned(
@@ -500,6 +574,12 @@ fn collect_field_bindings(input: &DeriveInput) -> syn::Result<Vec<ComponentPlan>
                 "`export` is not valid on a Godot-first field binding",
             ));
         }
+        if d.description.is_some() || d.hint.is_some() || d.hint_string.is_some() {
+            return Err(Error::new_spanned(
+                attr,
+                "`description`, `hint`, and `hint_string` are only valid on generated component-first exports",
+            ));
+        }
         let Some(component) = d.component else {
             return Err(Error::new_spanned(
                 attr,
@@ -512,9 +592,14 @@ fn collect_field_bindings(input: &DeriveInput) -> syn::Result<Vec<ComponentPlan>
             init: ComponentInit::Newtype(Mapping {
                 godot_prop: name,
                 bevy_field: None,
+                tuple_index: None,
                 as_type: None,
                 default: None,
                 with: d.with,
+                docs: Vec::new(),
+                description: None,
+                hint: None,
+                hint_string: None,
             }),
         });
     }
@@ -678,375 +763,4 @@ pub fn parse_attachable_component(input: &DeriveInput) -> syn::Result<TokenStrea
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use syn::parse_quote;
-
-    #[test]
-    fn cf_marker_and_newtype_companions() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode, Default)]
-            #[gdbevy(base = CharacterBody2D, class_name = Player2D)]
-            #[gdbevy(require(speed: Speed, as = f32, default = 250.0), require(Stunned))]
-            struct Player;
-        };
-        let plan = parse_component_first(&di).unwrap();
-        assert!(plan.emit_node_class);
-        assert_eq!(plan.base.to_string(), "CharacterBody2D");
-        assert_eq!(plan.godot_class.to_string(), "Player2D");
-        assert_eq!(plan.companions.len(), 2);
-        assert!(plan.companions[0].generated_exports);
-        assert_eq!(
-            plan.companions[0].path.get_ident().unwrap().to_string(),
-            "Speed"
-        );
-        assert_eq!(
-            plan.companions[1].path.get_ident().unwrap().to_string(),
-            "Stunned"
-        );
-        assert!(matches!(plan.companions[1].init, ComponentInit::Marker));
-        match &plan.companions[0].init {
-            ComponentInit::Newtype(m) => {
-                assert_eq!(m.godot_prop.to_string(), "speed");
-                assert!(m.bevy_field.is_none());
-                assert!(m.as_type.is_some());
-            }
-            _ => panic!("expected newtype companion"),
-        }
-        assert_eq!(plan.primary.path.get_ident().unwrap().to_string(), "Player");
-    }
-
-    #[test]
-    fn cf_primary_field_default() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode, Default)]
-            #[gdbevy(base = Area2D, class_name = Door2D)]
-            struct Door { #[gdbevy(export, default = LevelId::Level1)] level_id: LevelId }
-        };
-        let plan = parse_component_first(&di).unwrap();
-        assert_eq!(plan.primary.fields.len(), 1);
-        assert!(plan.primary.fields[0].default.is_some());
-        assert!(plan.primary.fields[0].as_type.is_none());
-        assert!(plan.primary.fields[0].with.is_none());
-        assert_eq!(plan.primary.fields[0].godot_prop.to_string(), "level_id");
-        assert_eq!(
-            plan.primary.fields[0]
-                .bevy_field
-                .as_ref()
-                .unwrap()
-                .to_string(),
-            "level_id"
-        );
-    }
-
-    #[test]
-    fn cf_primary_field_missing_export() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode, Default)]
-            #[gdbevy(base = Area2D, class_name = Door2D)]
-            struct Door { #[gdbevy(default = 1.0)] level_id: f32 }
-        };
-        assert!(
-            parse_component_first(&di)
-                .unwrap_err()
-                .to_string()
-                .contains("export")
-        );
-    }
-
-    #[test]
-    fn cf_primary_field_bare_export() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode, Default)]
-            #[gdbevy(base = Area2D, class_name = Door2D)]
-            struct Door { #[gdbevy(export)] level_id: LevelId }
-        };
-        let plan = parse_component_first(&di).unwrap();
-        assert_eq!(plan.primary.fields.len(), 1);
-        assert_eq!(plan.primary.fields[0].godot_prop.to_string(), "level_id");
-        assert!(plan.primary.fields[0].default.is_none());
-        assert!(plan.primary.fields[0].as_type.is_none());
-    }
-
-    #[test]
-    fn gf_field_binding() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(GodotClass, BevyComponents)]
-            #[gdbevy(require(Player))]
-            struct PlayerNode {
-                base: Base<Node2D>,
-                #[gdbevy(component = Speed, with = to_speed)]
-                #[export] speed: f32,
-            }
-        };
-        let plan = parse_godot_first(&di).unwrap();
-        assert!(!plan.emit_node_class);
-        assert!(plan.trigger.is_none());
-        assert!(plan.primary.fields.is_empty());
-        assert!(plan.primary.path.segments.is_empty());
-        assert_eq!(plan.companions.len(), 2);
-        assert_eq!(
-            plan.companions[0].path.get_ident().unwrap().to_string(),
-            "Player"
-        );
-        assert!(matches!(plan.companions[0].init, ComponentInit::Marker));
-        let speed = &plan.companions[1];
-        assert_eq!(speed.path.get_ident().unwrap().to_string(), "Speed");
-        assert!(!speed.generated_exports);
-        match &speed.init {
-            ComponentInit::Newtype(m) => {
-                assert_eq!(m.godot_prop.to_string(), "speed");
-                assert!(m.bevy_field.is_none());
-                assert_eq!(
-                    m.with.as_ref().unwrap().get_ident().unwrap().to_string(),
-                    "to_speed"
-                );
-            }
-            _ => panic!("expected newtype field binding"),
-        }
-    }
-
-    #[test]
-    fn cf_as_missing_on_companion() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode)]
-            #[gdbevy(require(speed: Speed, default = 250.0))]
-            struct Player;
-        };
-        assert!(
-            parse_component_first(&di)
-                .unwrap_err()
-                .to_string()
-                .contains("requires `as")
-        );
-    }
-
-    #[test]
-    fn cf_duplicate_export_prop() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode)]
-            #[gdbevy(require(speed: Speed, as = f32), require(speed: Boost, as = f32))]
-            struct Player;
-        };
-        assert!(
-            parse_component_first(&di)
-                .unwrap_err()
-                .to_string()
-                .contains("duplicate")
-        );
-    }
-
-    #[test]
-    fn cf_newtype_struct_mix_in_one_require() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode)]
-            #[gdbevy(require(stats: Stats { current(as = i32) }, default = 5))]
-            struct Player;
-        };
-        assert!(
-            parse_component_first(&di)
-                .unwrap_err()
-                .to_string()
-                .contains("cannot mix")
-        );
-    }
-
-    #[test]
-    fn class_name_equals_component() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode)]
-            #[gdbevy(class_name = Player)]
-            struct Player;
-        };
-        assert!(
-            parse_component_first(&di)
-                .unwrap_err()
-                .to_string()
-                .contains("class_name")
-        );
-    }
-
-    #[test]
-    fn duplicate_directive_key_is_error() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode)]
-            #[gdbevy(require(speed: Speed, as = f32, default = 1.0, default = 2.0))]
-            struct Player;
-        };
-        assert!(
-            parse_component_first(&di)
-                .unwrap_err()
-                .to_string()
-                .contains("duplicate `default`")
-        );
-    }
-
-    #[test]
-    fn gf_as_on_field_binding() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(GodotClass, BevyComponents)]
-            struct PlayerNode {
-                base: Base<Node2D>,
-                #[gdbevy(component = Speed, as = f32)]
-                #[export] speed: f32,
-            }
-        };
-        assert!(
-            parse_godot_first(&di)
-                .unwrap_err()
-                .to_string()
-                .contains("`as`")
-        );
-    }
-
-    #[test]
-    fn gf_default_on_field_binding() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(GodotClass, BevyComponents)]
-            struct PlayerNode {
-                base: Base<Node2D>,
-                #[gdbevy(component = Speed, default = 5.0)]
-                #[export] speed: f32,
-            }
-        };
-        assert!(
-            parse_godot_first(&di)
-                .unwrap_err()
-                .to_string()
-                .contains("`default`")
-        );
-    }
-
-    #[test]
-    fn gf_missing_component_key() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(GodotClass, BevyComponents)]
-            struct PlayerNode {
-                base: Base<Node2D>,
-                #[gdbevy(with = to_speed)]
-                #[export] speed: f32,
-            }
-        };
-        assert!(
-            parse_godot_first(&di)
-                .unwrap_err()
-                .to_string()
-                .contains("component")
-        );
-    }
-
-    #[test]
-    fn gf_struct_level_generated_export() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(GodotClass, BevyComponents)]
-            #[gdbevy(require(speed: Speed, as = f32))]
-            struct PlayerNode { base: Base<Node2D> }
-        };
-        assert!(
-            parse_godot_first(&di)
-                .unwrap_err()
-                .to_string()
-                .contains("Godot-first")
-        );
-    }
-
-    #[test]
-    fn base_or_class_name_on_gf() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(GodotClass, BevyComponents)]
-            #[gdbevy(base = Node2D)]
-            struct PlayerNode { base: Base<Node2D> }
-        };
-        assert!(
-            parse_godot_first(&di)
-                .unwrap_err()
-                .to_string()
-                .contains("component-first")
-        );
-    }
-
-    #[test]
-    fn sync_key_is_reserved() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode)]
-            #[gdbevy(require(speed: Speed, as = f32, sync = two_way))]
-            struct Player;
-        };
-        assert!(
-            parse_component_first(&di)
-                .unwrap_err()
-                .to_string()
-                .contains("not yet available")
-        );
-    }
-
-    #[test]
-    fn into_key_is_reserved() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode)]
-            #[gdbevy(require(speed: Speed, as = f32, into = Foo))]
-            struct Player;
-        };
-        assert!(
-            parse_component_first(&di)
-                .unwrap_err()
-                .to_string()
-                .contains("not yet available")
-        );
-    }
-
-    #[test]
-    fn attachable_component_success() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(AttachableComponent, GodotClass)]
-            #[class(init, base=Node)]
-            #[gdbevy(target = Movement)]
-            struct MovementComponent {
-                #[export]
-                max_speed: f32,
-            }
-        };
-        let tokens = parse_attachable_component(&di).unwrap();
-        let code = tokens.to_string();
-
-        // Verify the target type, struct name, and the generated function name are present
-        assert!(code.contains("Movement"));
-        assert!(code.contains("MovementComponent"));
-        assert!(code.contains("__movementcomponent"));
-    }
-
-    #[test]
-    fn attachable_component_missing_target() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(AttachableComponent, GodotClass)]
-            #[class(init, base=Node)]
-            struct MovementComponent {
-                #[export]
-                max_speed: f32,
-            }
-        };
-        let err = parse_attachable_component(&di).unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("Missing #[gdbevy(target = YourBevyComponent)] attribute")
-        );
-    }
-
-    #[test]
-    fn attachable_component_unsupported_property() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(AttachableComponent, GodotClass)]
-            #[class(init, base=Node)]
-            #[gdbevy(foo = "bar")]
-            struct MovementComponent {
-                #[export]
-                max_speed: f32,
-            }
-        };
-        let err = parse_attachable_component(&di).unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("unsupported property, expected `target`")
-        );
-    }
-}
+include!("bevy_attr_tests.rs");

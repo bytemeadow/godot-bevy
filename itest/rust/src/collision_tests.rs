@@ -1,13 +1,4 @@
 /*
- * Collision system integration tests
- *
- * Tests the full collision pipeline through real Godot frames:
- * - CollisionWatcher receives collision events via channel
- * - Godot calls _physics_process() → FixedFirst runs
- * - process_godot_collisions drains channel → updates CollisionState
- * - trigger_collision_observers reads CollisionState → fires observers
- * - Collisions SystemParam provides query access
- *
  * Frame strategy: Collision processing runs in FixedFirst, which only
  * executes during Godot's _physics_process(). Since a render frame can have
  * 0 physics ticks, we use app.physics_update() which waits for the
@@ -23,7 +14,6 @@ use godot::prelude::*;
 use godot_bevy::prelude::*;
 use godot_bevy_test::prelude::*;
 
-/// Read `Collisions::contains` through a `SystemState`, like the pure-state tests.
 fn collisions_contains(app: &mut TestApp, a: Entity, b: Entity) -> bool {
     app.with_world_mut(|world| {
         let mut system_state: bevy::ecs::system::SystemState<Collisions> =
@@ -35,7 +25,6 @@ fn collisions_contains(app: &mut TestApp, a: Entity, b: Entity) -> bool {
     })
 }
 
-/// Attach a `CollisionShape2D` with a `CircleShape2D` child to a physics node.
 fn add_circle_collision<T>(parent: &Gd<T>, radius: f32)
 where
     T: godot::obj::Inherits<Node>,
@@ -47,7 +36,6 @@ where
     parent.clone().upcast::<Node>().add_child(&shape);
 }
 
-/// Attach a `CollisionShape2D` with a `RectangleShape2D` child to a physics node.
 fn add_rect_collision<T>(parent: &Gd<T>, size: Vector2)
 where
     T: godot::obj::Inherits<Node>,
@@ -59,7 +47,6 @@ where
     parent.clone().upcast::<Node>().add_child(&shape);
 }
 
-/// Find the CollisionWatcher node in the scene tree.
 fn find_collision_watcher(
     scene_tree: &Gd<godot::classes::Node>,
 ) -> Option<Gd<godot::classes::Node>> {
@@ -68,7 +55,6 @@ fn find_collision_watcher(
     root.try_get_node_as::<godot::classes::Node>("BevyAppSingleton/CollisionWatcher")
 }
 
-/// Send a collision event through the CollisionWatcher channel.
 fn send_collision_event(
     watcher: &mut Gd<godot::classes::Node>,
     colliding_body: &Gd<godot::classes::Node>,
@@ -85,7 +71,6 @@ fn send_collision_event(
     );
 }
 
-/// Test that collision events flow through the system and update CollisionState.
 #[itest(async)]
 fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -102,7 +87,6 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
         let mut watcher = find_collision_watcher(&ctx_clone.scene_tree)
             .expect("CollisionWatcher should exist when GodotCollisionsPlugin is added");
 
-        // Send Started event
         send_collision_event(
             &mut watcher,
             &area_b.clone().upcast(),
@@ -134,7 +118,6 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
             "colliding_with should return entity_b for entity_a"
         );
 
-        // Send Ended event
         send_collision_event(
             &mut watcher,
             &area_b.clone().upcast(),
@@ -164,7 +147,6 @@ fn test_collision_state_tracks_active_pairs(ctx: &TestContext) -> godot::task::T
     })
 }
 
-/// Test that CollisionStarted observers fire from the real system pipeline.
 #[itest(async)]
 fn test_collision_started_observer_from_system(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -256,7 +238,6 @@ fn test_reparent_keeps_collision_connection(ctx: &TestContext) -> godot::task::T
     })
 }
 
-/// Test that CollisionEnded observers fire from the real system pipeline.
 #[itest(async)]
 fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -282,7 +263,6 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
         let mut watcher =
             find_collision_watcher(&ctx_clone.scene_tree).expect("CollisionWatcher should exist");
 
-        // First: Start collision
         send_collision_event(
             &mut watcher,
             &area_b.clone().upcast(),
@@ -292,7 +272,6 @@ fn test_collision_ended_observer_from_system(ctx: &TestContext) -> godot::task::
 
         app.physics_update().await;
 
-        // Then: End collision
         send_collision_event(
             &mut watcher,
             &area_b.clone().upcast(),

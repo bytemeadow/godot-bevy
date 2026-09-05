@@ -1,0 +1,564 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bytemeadow/godot-bevy/coverage-v1.schema.json",
+  "title": "godot-bevy coverage evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "run_id",
+    "mode",
+    "complete",
+    "outcome",
+    "generated_at",
+    "environment",
+    "disclosure",
+    "scope",
+    "phases",
+    "objects",
+    "test_reports",
+    "sources",
+    "files",
+    "totals",
+    "diff",
+    "witnesses",
+    "artifacts",
+    "operations",
+    "rate_gates",
+    "errors",
+    "metadata"
+  ],
+  "properties": {
+    "$schema": { "const": "coverage-v1.schema.json" },
+    "schema_version": { "const": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "mode": { "enum": ["full", "diff"] },
+    "complete": { "type": "boolean" },
+    "outcome": { "enum": ["incomplete", "pass", "fail", "skip", "error"] },
+    "generated_at": { "type": ["string", "null"] },
+    "environment": { "$ref": "#/$defs/environment" },
+    "disclosure": { "$ref": "#/$defs/disclosure" },
+    "scope": { "$ref": "#/$defs/scope" },
+    "phases": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/phase" }
+    },
+    "objects": { "$ref": "#/$defs/object_manifest" },
+    "test_reports": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/test_report" }
+    },
+    "sources": {
+      "type": "array",
+      "items": { "enum": ["unit-runtime", "test-build", "itest-runtime"] },
+      "uniqueItems": true
+    },
+    "files": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/file_coverage" }
+    },
+    "totals": { "$ref": "#/$defs/source_counts" },
+    "diff": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": [
+        "base",
+        "merge_base",
+        "sha256",
+        "processes",
+        "union_reported",
+        "intersection_gated",
+        "lines",
+        "state_counts"
+      ],
+      "properties": {
+        "base": { "type": "string", "minLength": 1 },
+        "merge_base": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "processes": { "const": 3 },
+        "union_reported": { "const": true },
+        "intersection_gated": { "const": true },
+        "lines": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/diff_line" }
+        },
+        "state_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "covered",
+            "partial",
+            "uncovered",
+            "unstable",
+            "no-region",
+            "not-mapped",
+            "out-of-scope",
+            "deleted"
+          ],
+          "properties": {
+            "covered": { "$ref": "#/$defs/nonnegative" },
+            "partial": { "$ref": "#/$defs/nonnegative" },
+            "uncovered": { "$ref": "#/$defs/nonnegative" },
+            "unstable": { "$ref": "#/$defs/nonnegative" },
+            "no-region": { "$ref": "#/$defs/nonnegative" },
+            "not-mapped": { "$ref": "#/$defs/nonnegative" },
+            "out-of-scope": { "$ref": "#/$defs/nonnegative" },
+            "deleted": { "$ref": "#/$defs/nonnegative" }
+          }
+        }
+      }
+    },
+    "witnesses": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/witness" }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "operations": { "$ref": "#/$defs/operations" },
+    "rate_gates": { "type": "array", "maxItems": 0 },
+    "errors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/error" }
+    },
+    "metadata": { "$ref": "#/$defs/metadata" }
+  },
+  "$defs": {
+    "nonnegative": { "type": "integer", "minimum": 0 },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "git_commit",
+        "git_dirty",
+        "dirty_diff_sha256",
+        "source_identity_sha256",
+        "os",
+        "arch",
+        "target_triple",
+        "rustc",
+        "rustc_llvm_version",
+        "llvm_cov",
+        "llvm_profdata",
+        "cargo_llvm_cov",
+        "godot",
+        "cargo_profile",
+        "features",
+        "cfg_variant",
+        "platform_local"
+      ],
+      "properties": {
+        "git_commit": { "type": "string", "minLength": 1 },
+        "git_dirty": { "type": "boolean" },
+        "dirty_diff_sha256": { "$ref": "#/$defs/sha256" },
+        "source_identity_sha256": { "$ref": "#/$defs/sha256" },
+        "os": { "type": "string", "minLength": 1 },
+        "arch": { "type": "string", "minLength": 1 },
+        "target_triple": { "type": "string", "minLength": 1 },
+        "rustc": { "type": "string", "minLength": 1 },
+        "rustc_llvm_version": { "type": "string", "minLength": 1 },
+        "llvm_cov": { "type": "string", "minLength": 1 },
+        "llvm_profdata": { "type": "string", "minLength": 1 },
+        "cargo_llvm_cov": { "const": "0.9.0" },
+        "godot": { "type": "string", "minLength": 1 },
+        "cargo_profile": { "const": "coverage" },
+        "features": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "cfg_variant": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "platform_local": { "const": true }
+      }
+    },
+    "disclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrumented",
+        "language_scope",
+        "godot_host_instrumented",
+        "gdscript_instrumented",
+        "benchmark_compatible",
+        "timing_valid"
+      ],
+      "properties": {
+        "instrumented": { "const": true },
+        "language_scope": {
+          "type": "array",
+          "items": { "const": "rust" },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "godot_host_instrumented": { "const": false },
+        "gdscript_instrumented": { "const": false },
+        "benchmark_compatible": { "const": false },
+        "timing_valid": { "const": false }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "config_path",
+        "config_sha256",
+        "packages",
+        "exclusions",
+        "files",
+        "summary"
+      ],
+      "properties": {
+        "version": { "const": 1 },
+        "config_path": { "const": "itest/coverage/scope-v1.toml" },
+        "config_sha256": { "$ref": "#/$defs/sha256" },
+        "packages": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/package" }
+        },
+        "exclusions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/exclusion" }
+        },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scope_file" }
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["all_rust_files", "included", "excluded", "mapped", "unmapped", "source_lines"],
+          "properties": {
+            "all_rust_files": { "$ref": "#/$defs/nonnegative" },
+            "included": { "$ref": "#/$defs/nonnegative" },
+            "excluded": { "$ref": "#/$defs/nonnegative" },
+            "mapped": { "$ref": "#/$defs/nonnegative" },
+            "unmapped": { "$ref": "#/$defs/nonnegative" },
+            "source_lines": { "$ref": "#/$defs/nonnegative" }
+          }
+        }
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "root"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "root": { "type": "string", "minLength": 1 }
+      }
+    },
+    "exclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pattern", "category"],
+      "properties": {
+        "pattern": { "type": "string", "minLength": 1 },
+        "category": { "type": "string", "minLength": 1 }
+      }
+    },
+    "scope_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "package",
+        "classification",
+        "exclusion_patterns",
+        "exclusion_categories",
+        "sha256",
+        "source_lines",
+        "mapping"
+      ],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "package": { "type": "string", "minLength": 1 },
+        "classification": { "enum": ["included", "excluded"] },
+        "exclusion_patterns": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "exclusion_categories": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "source_lines": { "$ref": "#/$defs/nonnegative" },
+        "mapping": { "enum": ["mapped", "unmapped", null] }
+      }
+    },
+    "phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "included", "source", "elapsed_seconds", "output_bytes", "raw_files", "processes", "metadata"],
+      "properties": {
+        "id": { "enum": ["unit-build", "unit-runtime", "itest-build", "import", "itest-runtime"] },
+        "included": { "type": "boolean" },
+        "source": { "enum": ["test-build", "unit-runtime", "itest-runtime", "excluded"] },
+        "elapsed_seconds": { "type": "number", "minimum": 0 },
+        "output_bytes": { "$ref": "#/$defs/nonnegative" },
+        "raw_files": { "$ref": "#/$defs/nonnegative" },
+        "processes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/process" }
+        },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "artifact_metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["instrumented", "language_scope", "godot_host_instrumented", "gdscript_instrumented", "benchmark_compatible", "timing_valid", "rate_gates"],
+      "properties": {
+        "instrumented": { "const": true },
+        "language_scope": {
+          "type": "array",
+          "items": { "const": "rust" },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "godot_host_instrumented": { "const": false },
+        "gdscript_instrumented": { "const": false },
+        "benchmark_compatible": { "const": false },
+        "timing_valid": { "const": false },
+        "rate_gates": { "type": "array", "maxItems": 0 }
+      }
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "pid", "exit_code", "expected", "elapsed_seconds", "raw_files", "report", "sentinel", "metadata"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "pid": { "type": ["integer", "null"], "minimum": 1 },
+        "exit_code": { "type": "integer" },
+        "expected": { "type": "boolean" },
+        "elapsed_seconds": { "type": "number", "minimum": 0 },
+        "raw_files": { "$ref": "#/$defs/nonnegative" },
+        "report": { "type": ["string", "null"] },
+        "sentinel": { "type": ["string", "null"] },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "object_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "count", "records"],
+      "properties": {
+        "path": { "type": ["string", "null"] },
+        "sha256": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+        "count": { "$ref": "#/$defs/nonnegative" },
+        "records": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/object" }
+        }
+      }
+    },
+    "object": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package", "target", "kind", "phase", "path", "sha256", "profile", "features", "target_triple", "included"],
+      "properties": {
+        "package": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["libtest", "proc-macro", "cdylib"] },
+        "phase": { "enum": ["unit-build", "itest-build"] },
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "opt_level", "debuginfo", "debug_assertions", "overflow_checks", "test"],
+          "properties": {
+            "name": { "const": "coverage" },
+            "opt_level": { "const": "0" },
+            "debuginfo": { "type": ["integer", "string", "null"] },
+            "debug_assertions": { "type": "boolean" },
+            "overflow_checks": { "type": "boolean" },
+            "test": { "type": "boolean" }
+          }
+        },
+        "features": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "target_triple": { "type": "string", "minLength": 1 },
+        "included": { "const": true }
+      }
+    },
+    "test_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run", "path", "sha256", "complete", "outcome", "registered", "selected", "focus", "filter", "repeat", "skipped"],
+      "properties": {
+        "run": { "type": "integer", "minimum": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "complete": { "type": "boolean" },
+        "outcome": { "enum": ["pass", "fail", "error", "incomplete"] },
+        "registered": { "$ref": "#/$defs/nonnegative" },
+        "selected": { "$ref": "#/$defs/nonnegative" },
+        "focus": { "type": "boolean" },
+        "filter": { "type": ["string", "null"] },
+        "repeat": { "const": 1 },
+        "skipped": { "$ref": "#/$defs/nonnegative" }
+      }
+    },
+    "count_pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "covered"],
+      "properties": {
+        "count": { "$ref": "#/$defs/nonnegative" },
+        "covered": { "$ref": "#/$defs/nonnegative" }
+      }
+    },
+    "coverage_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lines", "regions", "functions"],
+      "properties": {
+        "lines": { "$ref": "#/$defs/count_pair" },
+        "regions": { "$ref": "#/$defs/count_pair" },
+        "functions": { "$ref": "#/$defs/count_pair" }
+      }
+    },
+    "source_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["merged", "unit-runtime", "test-build", "itest-runtime"],
+      "properties": {
+        "merged": { "$ref": "#/$defs/coverage_counts" },
+        "unit-runtime": { "$ref": "#/$defs/coverage_counts" },
+        "test-build": { "$ref": "#/$defs/coverage_counts" },
+        "itest-runtime": { "$ref": "#/$defs/coverage_counts" }
+      }
+    },
+    "file_coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "package", "mapping", "sha256", "source_lines", "counts", "regions"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "package": { "type": "string", "minLength": 1 },
+        "mapping": { "enum": ["mapped", "unmapped"] },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "source_lines": { "$ref": "#/$defs/nonnegative" },
+        "counts": { "$ref": "#/$defs/source_counts" },
+        "regions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/region" }
+        }
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_line", "start_column", "end_line", "end_column", "kind", "merged_count", "unit_runtime_count", "test_build_count", "itest_runtime_counts"],
+      "properties": {
+        "start_line": { "type": "integer", "minimum": 1 },
+        "start_column": { "type": "integer", "minimum": 1 },
+        "end_line": { "type": "integer", "minimum": 1 },
+        "end_column": { "type": "integer", "minimum": 1 },
+        "kind": { "type": "integer", "minimum": 0 },
+        "merged_count": { "$ref": "#/$defs/nonnegative" },
+        "unit_runtime_count": { "$ref": "#/$defs/nonnegative" },
+        "test_build_count": { "$ref": "#/$defs/nonnegative" },
+        "itest_runtime_counts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonnegative" }
+        }
+      }
+    },
+    "diff_line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "old_line", "new_line", "state", "region_count", "metadata"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "old_line": { "type": ["integer", "null"], "minimum": 1 },
+        "new_line": { "type": ["integer", "null"], "minimum": 1 },
+        "state": { "enum": ["covered", "partial", "uncovered", "unstable", "no-region", "not-mapped", "out-of-scope", "deleted"] },
+        "region_count": { "$ref": "#/$defs/nonnegative" },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "witness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "function", "line", "test", "unit_runtime", "itest_runtime", "passed"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "function": { "type": "string", "minLength": 1 },
+        "line": { "type": "integer", "minimum": 1 },
+        "test": { "type": "string", "minLength": 1 },
+        "unit_runtime": { "type": "integer", "minimum": 0 },
+        "itest_runtime": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonnegative" },
+          "minItems": 1
+        },
+        "passed": { "type": "boolean" }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "sha256", "size_bytes", "retained", "metadata"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "$ref": "#/$defs/nonnegative" },
+        "retained": { "type": "boolean" },
+        "metadata": { "$ref": "#/$defs/artifact_metadata" }
+      }
+    },
+    "operations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["build_directory", "run_directory", "free_disk_before", "free_disk_after", "peak_coverage_bytes", "keep_raw", "raw_pruned", "failure_evidence_kept", "runs_kept"],
+      "properties": {
+        "build_directory": { "const": "target/coverage/build" },
+        "run_directory": { "type": "string", "minLength": 1 },
+        "free_disk_before": { "$ref": "#/$defs/nonnegative" },
+        "free_disk_after": { "$ref": "#/$defs/nonnegative" },
+        "peak_coverage_bytes": { "$ref": "#/$defs/nonnegative" },
+        "keep_raw": { "type": "boolean" },
+        "raw_pruned": { "type": "boolean" },
+        "failure_evidence_kept": { "type": "boolean" },
+        "runs_kept": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "message", "phase"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "phase": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

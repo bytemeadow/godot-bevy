@@ -1,7 +1,6 @@
 extends Node
 class_name OptimizedBulkOperations
 
-# Optimized Bulk Operations
 # Batches collision-signal connections into a single Rust-to-Godot call,
 # avoiding one FFI call per node when wiring up many colliders.
 
@@ -9,10 +8,6 @@ class_name OptimizedBulkOperations
 func _ready():
 	name = "OptimizedBulkOperations"
 
-
-# =============================================================================
-# Bulk Collision Signal Connections
-# =============================================================================
 
 # Collision mask bit flags (must match Rust constants)
 const COLLISION_MASK_BODY_ENTERED = 1

@@ -1,0 +1,62 @@
+{
+  "$schema": "itest-report-v1.schema.json",
+  "schema_version": 1,
+  "run_id": "fault-killed-fixture",
+  "runner_version": "0.11.0",
+  "complete": true,
+  "outcome": "fail",
+  "environment": {
+    "build_profile": "debug",
+    "debug_assertions": true,
+    "godot_version": "4.5",
+    "os": "macos",
+    "arch": "aarch64"
+  },
+  "selection": {
+    "registered": 100,
+    "selected": 1,
+    "focus_run": false,
+    "filter": "test_fixture_killer",
+    "patterns": ["test_fixture_killer"]
+  },
+  "repeat": 1,
+  "timeout_frames": 600,
+  "summary": {
+    "passed": 0,
+    "failed": 1,
+    "flaky": 0,
+    "skipped": 0,
+    "total": 1,
+    "attempts_passed": 0,
+    "attempts_failed": 1,
+    "total_duration_ms": 1.0
+  },
+  "tests": [
+    {
+      "id": "fixture::test_fixture_killer",
+      "name": "test_fixture_killer",
+      "file": "itest/rust/src/fixture_tests.rs",
+      "line": 1,
+      "outcome": "fail",
+      "duration_ms": 1.0,
+      "attempts": [
+        {
+          "id": "fixture::test_fixture_killer#1",
+          "index": 1,
+          "outcome": "fail",
+          "duration_ms": 1.0,
+          "failures": [
+            {
+              "kind": "panic",
+              "message": "assertion failed: expected fixture assertion signature"
+            }
+          ],
+          "artifacts": []
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "artifacts": [],
+  "metadata": {}
+}

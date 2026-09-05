@@ -1,5 +1,3 @@
-# Cross-platform Godot binary package
-# Fetches official binaries from godotengine/godot-builds
 {
   stdenv,
   lib,
@@ -7,7 +5,6 @@
   unzip,
   autoPatchelfHook,
   makeWrapper,
-  # Linux dependencies
   alsa-lib ? null,
   dbus ? null,
   fontconfig ? null,
@@ -56,7 +53,6 @@ let
 
   src = sources.${stdenv.system} or (throw "Unsupported system: ${stdenv.system}");
 
-  # Linux runtime dependencies
   linuxLibs = [
     alsa-lib
     dbus

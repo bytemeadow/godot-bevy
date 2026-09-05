@@ -66,14 +66,11 @@ impl AudioOutput {
         self.sound_to_channel.get(&sound_id).copied()
     }
 
-    // ===== DIRECT INDIVIDUAL SOUND CONTROL =====
-
     /// Set volume for a specific sound (direct execution)
     pub fn set_sound_volume(&mut self, sound_id: SoundId, volume: f32, godot: &mut GodotAccess) {
         let clamped_volume = volume.clamp(0.0, 1.0);
         if let Some(handle) = self.playing_sounds.get(&sound_id).copied() {
             set_audio_player_volume(godot, handle, clamped_volume);
-            // Track the current volume for accurate fade-outs
             self.current_volumes.insert(sound_id, clamped_volume);
             trace!("Set volume to {} for sound: {:?}", clamped_volume, sound_id);
         }
@@ -108,7 +105,7 @@ impl AudioOutput {
         if let Some(handle) = self.playing_sounds.remove(&sound_id) {
             stop_and_free_audio_player(godot, handle);
             self.sound_to_channel.remove(&sound_id);
-            self.current_volumes.remove(&sound_id); // Clean up volume tracking
+            self.current_volumes.remove(&sound_id);
             trace!("Stopped sound: {:?}", sound_id);
         }
     }
@@ -185,9 +182,6 @@ pub(crate) fn try_get_audio_player(
     }
 }
 
-// ===== HELPER FUNCTIONS FOR DIRECT AUDIO CONTROL =====
-
-/// Convert linear volume (0.0-1.0) to decibels for Godot
 fn volume_to_db(volume: f32) -> f32 {
     if volume <= 0.0 {
         -80.0 // Silence
@@ -284,14 +278,13 @@ impl ActiveTween {
     pub fn update(&mut self, delta: Duration) -> f32 {
         self.elapsed += delta;
 
-        // Handle zero duration case - return target value immediately
+        // Zero duration must not divide by zero.
         if self.duration.as_secs_f32() == 0.0 {
             return self.target_value;
         }
 
         let progress = (self.elapsed.as_secs_f32() / self.duration.as_secs_f32()).clamp(0.0, 1.0);
 
-        // Apply easing
         let eased_progress = match self.easing {
             super::AudioEasing::Linear => progress,
             super::AudioEasing::EaseIn => progress * progress,
@@ -305,7 +298,6 @@ impl ActiveTween {
             }
         };
 
-        // Interpolate between start and target
         self.start_value + (self.target_value - self.start_value) * eased_progress
     }
 

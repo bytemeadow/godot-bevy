@@ -17,7 +17,14 @@ struct TestGrounded;
 
 #[derive(Component, GodotNode, Default)]
 #[gdbevy(base = Node2D, class_name = AutoSyncPlayerNode)]
-#[gdbevy(require(TestGrounded), require(speed: TestSpeed, as = f32, default = 250.0))]
+#[gdbevy(require(TestGrounded), require(
+    speed: TestSpeed,
+    as = f32,
+    default = 250.0,
+    description = "Movement speed",
+    hint = RANGE,
+    hint_string = "0,1000,1"
+))]
 struct AutoSyncPlayer;
 
 #[itest(async)]
@@ -177,4 +184,153 @@ fn bevy_spawn_gets_declared_default(ctx: &TestContext) -> godot::task::TaskHandl
         assert!(app.with_world(|w| w.get::<TestGrounded>(e).is_some()));
         app.cleanup().await;
     })
+}
+
+#[derive(Component, Default)]
+struct InspectorKind(String);
+
+#[derive(Component, Default)]
+struct InspectorStats {
+    strength: f32,
+}
+
+fn from_godot_string(value: GString) -> String {
+    value.to_string()
+}
+
+#[derive(Component, GodotNode, Default)]
+#[gdbevy(class_name = InspectorPrimaryNode)]
+#[gdbevy(require(kind: InspectorKind, as = GString, with = from_godot_string,
+    default = GString::from("Hands"), description = "Companion kind",
+    hint = ENUM, hint_string = "Hands,Knife"))]
+#[gdbevy(require(stats: InspectorStats {
+    strength(as = f32, default = 5.0, description = "Companion strength",
+        hint = RANGE, hint_string = "0,10,0.5")
+}))]
+struct InspectorPrimary {
+    /// Primary kind from field docs.
+    #[gdbevy(export, as = GString, with = from_godot_string,
+        default = GString::from("Hands"), description = "Primary kind description",
+        hint = ENUM, hint_string = "Hands,Knife")]
+    label: String,
+}
+
+#[derive(Component, GodotNode, Default)]
+#[gdbevy(class_name = InspectorTupleNode)]
+struct InspectorTuple(
+    u32,
+    /// Tuple kind from field docs.
+    #[gdbevy(export, as = GString, with = from_godot_string,
+        default = GString::from("Hands"), description = "Tuple kind description",
+        hint = ENUM, hint_string = "Hands,Knife")]
+    String,
+);
+
+#[derive(GodotClass, BevyComponents)]
+#[class(init, base = Node)]
+struct InspectorNativeNode {
+    base: Base<Node>,
+    /// Native kind description.
+    #[export]
+    #[var(hint = ENUM, hint_string = "Hands,Knife")]
+    #[init(val = GString::from("Hands"))]
+    #[gdbevy(component = InspectorKind, with = from_godot_string)]
+    kind: GString,
+}
+
+fn assert_property(
+    node: &Gd<Node>,
+    name: &str,
+    variant_type: VariantType,
+    hint: godot::register::info::PropertyHint,
+    hint_string: &str,
+    default: Variant,
+) {
+    let property = node
+        .get_property_list()
+        .iter_shared()
+        .find(|property| property.at("name").to::<GString>() == name)
+        .expect("exported property");
+    assert_eq!(property.at("type").to::<i32>(), variant_type.ord());
+    assert_eq!(property.at("hint").to::<i32>(), hint.ord());
+    assert_eq!(property.at("hint_string").to::<GString>(), hint_string);
+    assert_eq!(node.get(name), default);
+}
+
+#[itest]
+async fn inspector_metadata_roundtrip(ctx: TestContext) {
+    use godot::register::info::PropertyHint;
+
+    let mut app = TestApp::new(&ctx, |_| {}).await;
+    let mut primary = InspectorPrimaryNode::new_alloc().upcast::<Node>();
+    let mut tuple = InspectorTupleNode::new_alloc().upcast::<Node>();
+    let mut native = InspectorNativeNode::new_alloc().upcast::<Node>();
+    for (node, name) in [
+        (&primary, "label"),
+        (&primary, "kind"),
+        (&tuple, "value1"),
+        (&native, "kind"),
+    ] {
+        assert_property(
+            node,
+            name,
+            VariantType::STRING,
+            PropertyHint::ENUM,
+            "Hands,Knife",
+            GString::from("Hands").to_variant(),
+        );
+    }
+    assert_property(
+        &primary,
+        "strength",
+        VariantType::FLOAT,
+        PropertyHint::RANGE,
+        "0,10,0.5",
+        5.0f32.to_variant(),
+    );
+    for (node, name) in [
+        (&mut primary, "label"),
+        (&mut tuple, "value1"),
+        (&mut native, "kind"),
+    ] {
+        node.set(name, &GString::from("Knife").to_variant());
+        assert_eq!(node.get(name).to::<GString>(), "Knife");
+        ctx.scene_tree.clone().add_child(&*node);
+    }
+    primary.set("kind", &GString::from("Knife").to_variant());
+    primary.set("strength", &7.5f32.to_variant());
+    assert_eq!(primary.get("kind").to::<GString>(), "Knife");
+    assert_eq!(primary.get("strength").to::<f32>(), 7.5);
+    app.updates(4).await;
+    let primary_entity = app.entity_for_node(primary.instance_id()).unwrap();
+    let tuple_entity = app.entity_for_node(tuple.instance_id()).unwrap();
+    let native_entity = app.entity_for_node(native.instance_id()).unwrap();
+    app.with_world(|world| {
+        assert_eq!(
+            world.get::<InspectorPrimary>(primary_entity).unwrap().label,
+            "Knife"
+        );
+        assert_eq!(
+            world.get::<InspectorKind>(primary_entity).unwrap().0,
+            "Knife"
+        );
+        assert_eq!(
+            world
+                .get::<InspectorStats>(primary_entity)
+                .unwrap()
+                .strength,
+            7.5
+        );
+        let tuple = world.get::<InspectorTuple>(tuple_entity).unwrap();
+        assert_eq!(tuple.0, 0);
+        assert_eq!(tuple.1, "Knife");
+        assert_eq!(
+            world.get::<InspectorKind>(native_entity).unwrap().0,
+            "Knife"
+        );
+    });
+    app.cleanup().await;
+    primary.free();
+    tuple.free();
+    native.free();
 }

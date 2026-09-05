@@ -1,0 +1,14 @@
+diff --git a/godot-bevy/src/plugins/scene_tree/plugin.rs b/godot-bevy/src/plugins/scene_tree/plugin.rs
+--- a/godot-bevy/src/plugins/scene_tree/plugin.rs
++++ b/godot-bevy/src/plugins/scene_tree/plugin.rs
+@@ -783,9 +783,7 @@ fn create_scene_tree_entity(
+             }
+             SceneTreeMessageType::NodeRemoved => {
+                 if let Some(ent) = existing_entity {
+-                    let still_mirrored = godot.try_get::<Node>(node_handle).is_some_and(|node| {
+-                        node.is_inside_tree() && !is_excluded_from_mirror(&node)
+-                    });
++                    let still_mirrored = false;
+ 
+                     if still_mirrored {
+                         trace!(target: "godot_scene_tree_events",

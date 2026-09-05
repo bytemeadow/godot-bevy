@@ -1,0 +1,35 @@
+{
+  "$schema": "qualification-v1.schema.json",
+  "schema_version": 1,
+  "run_id": "fixture-error",
+  "evidence_kind": "fault-pack",
+  "mode": "faults",
+  "complete": false,
+  "outcome": "error",
+  "generated_at": "2026-08-29T00:00:00Z",
+  "environment": {
+    "git_commit": "0123456789abcdef",
+    "git_dirty": false,
+    "os": "fixture-os",
+    "arch": "fixture-arch",
+    "cargo_profile": null,
+    "tools": {},
+    "metadata": {}
+  },
+  "summary": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "invalid": 1,
+    "skipped": 0,
+    "counts": {}
+  },
+  "mutants": [],
+  "faults": [],
+  "checks": [],
+  "errors": [
+    {"kind": "fixture", "message": "invalid fixture evidence", "check": null}
+  ],
+  "artifacts": [],
+  "metadata": {}
+}

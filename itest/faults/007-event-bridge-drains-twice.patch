@@ -1,0 +1,34 @@
+diff --git a/godot-bevy/src/plugins/event_bridge.rs b/godot-bevy/src/plugins/event_bridge.rs
+--- a/godot-bevy/src/plugins/event_bridge.rs
++++ b/godot-bevy/src/plugins/event_bridge.rs
+@@ -75,6 +75,7 @@ fn drain_and_trigger_events(world: &mut bevy_ecs::world::World) {
+     }
+     for dispatch in pending {
+         dispatch.trigger_in_world(world);
++        dispatch.trigger_in_world(world);
+     }
+ }
+ 
+diff --git a/godot-bevy/src/plugins/signals.rs b/godot-bevy/src/plugins/signals.rs
+--- a/godot-bevy/src/plugins/signals.rs
++++ b/godot-bevy/src/plugins/signals.rs
+@@ -20,7 +20,7 @@ use tracing::error;
+ 
+ /// Trait for type-erased signal dispatch that triggers observers
+ pub(crate) trait SignalDispatch: Send {
+-    fn trigger_in_world(self: Box<Self>, world: &mut bevy_ecs::world::World);
++    fn trigger_in_world(&self, world: &mut bevy_ecs::world::World);
+ }
+ 
+ /// Envelope that carries a signal event for observer triggering.
+@@ -33,8 +33,8 @@ impl<T: Event + Clone + Send + 'static> SignalDispatch for SignalEnvelope<T>
+ where
+     for<'a> T::Trigger<'a>: Default,
+ {
+-    fn trigger_in_world(self: Box<Self>, world: &mut bevy_ecs::world::World) {
+-        world.trigger(self.event);
++    fn trigger_in_world(&self, world: &mut bevy_ecs::world::World) {
++        world.trigger(self.event.clone());
+     }
+ }
+ 

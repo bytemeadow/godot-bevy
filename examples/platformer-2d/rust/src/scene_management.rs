@@ -1,5 +1,3 @@
-//! Simplified Scene Management System
-//!
 //! This module provides a simpler approach to reduce SceneTreeRef conflicts
 //! while maintaining the parallelization benefits.
 
@@ -29,8 +27,6 @@ impl Plugin for SceneManagementPlugin {
     }
 }
 
-/// Central system that processes scene tree operations
-///
 /// This system reduces SceneTreeRef conflicts by handling scene operations centrally.
 fn process_scene_operations(
     mut scene_tree: SceneTreeRef,
@@ -67,19 +63,15 @@ fn process_scene_operations(
     }
 }
 
-/// Convenience functions for common scene operations
 impl SceneOperationMessage {
-    /// Create a reload current scene event
     pub fn reload() -> Self {
         Self::ReloadCurrent
     }
 
-    /// Create a change to file event
     pub fn change_to_file(path: impl Into<String>) -> Self {
         Self::ChangeToFile { path: path.into() }
     }
 
-    /// Create a change to packed scene event
     pub fn change_to_packed(scene: Handle<GodotResource>) -> Self {
         Self::ChangeToPacked { scene }
     }

@@ -36,7 +36,6 @@ impl Default for GodotTransformSyncPlugin {
 
 impl Plugin for GodotTransformSyncPlugin {
     fn build(&self, app: &mut App) {
-        // Register Transform component with custom initialization that reads from Godot
         app.register_scene_tree_component_with_init::<Transform, _>(|entity, node| {
             if let Some(node3d) = node.try_get::<Node3D>() {
                 entity.insert(node3d.get_transform().to_bevy_transform());
@@ -62,12 +61,10 @@ impl Plugin for GodotTransformSyncPlugin {
             });
         });
 
-        // Register the transform configuration resource with the plugin's config
         app.insert_resource(GodotTransformConfig {
             sync_mode: self.sync_mode,
         });
 
-        // Only add automatic sync systems if auto_sync is enabled
         if self.auto_sync {
             // Members of the reserved group opt out of the Godot->Bevy read at spawn, so the
             // opt-out can be authored in-editor.
@@ -116,7 +113,6 @@ impl Plugin for GodotTransformSyncPlugin {
 }
 
 fn transform_sync_enabled(config: Res<GodotTransformConfig>) -> bool {
-    // aka one way or two way
     config.sync_mode != TransformSyncMode::Disabled
 }
 

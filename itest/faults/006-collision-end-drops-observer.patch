@@ -1,0 +1,14 @@
+diff --git a/godot-bevy/src/plugins/collisions.rs b/godot-bevy/src/plugins/collisions.rs
+--- a/godot-bevy/src/plugins/collisions.rs
++++ b/godot-bevy/src/plugins/collisions.rs
+@@ -549,9 +549,7 @@ fn trigger_collision_observers(
+     for &event in started_reader.read() {
+         commands.trigger(event);
+     }
+-    for &event in ended_reader.read() {
+-        commands.trigger(event);
+-    }
++    for _ in ended_reader.read() {}
+ }
+ 
+ /// Purge collision pairs when a node's `GodotNodeHandle` is removed. `Remove` fires

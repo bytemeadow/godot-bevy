@@ -7,14 +7,10 @@ use godot::classes::CharacterBody2D;
 use godot::global::move_toward;
 use godot_bevy::prelude::*;
 
-/// System sets for player operations with better parallelization
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PlayerSystemSet {
-    /// Input detection (can run in parallel with other input systems)
     InputDetection,
-    /// Physics and movement (runs after input detection)
     Movement,
-    /// Animation updates (runs after movement)
     Animation,
 }
 
@@ -43,22 +39,15 @@ impl Plugin for PlayerPlugin {
             .add_systems(
                 FixedUpdate,
                 (
-                    // Input detection runs first and can run in parallel with other input systems
                     detect_player_input.in_set(PlayerSystemSet::InputDetection),
-                    // Movement runs after input detection
                     apply_player_movement.in_set(PlayerSystemSet::Movement),
-                    // Animation runs after movement
                     update_player_animation.in_set(PlayerSystemSet::Animation),
                 )
-                    .chain(), // Ensure proper execution order
+                    .chain(),
             );
     }
 }
 
-/// System that detects player input and converts it to events
-///
-/// Runs in InputDetection set and can execute in parallel with other input systems.
-/// Only reads input and writes events, enabling better parallelization.
 fn detect_player_input(
     player: Query<&GodotNodeHandle, With<Player>>,
     mut input_events: MessageWriter<PlayerInputMessage>,
@@ -66,9 +55,9 @@ fn detect_player_input(
     mut godot: GodotAccess,
 ) {
     if let Ok(handle) = player.single() {
-        // Use try_get to handle case where Godot node might be invalid during scene transitions
+        // Scene transitions can invalidate the Godot node before this system runs.
         let Some(character_body) = godot.try_get::<CharacterBody2D>(*handle) else {
-            return; // Node is invalid, skip this frame
+            return;
         };
 
         let movement_direction = actions.axis("move_left", "move_right");
@@ -85,10 +74,6 @@ fn detect_player_input(
     }
 }
 
-/// System that handles player movement physics based on input events
-///
-/// Runs in Movement set after input detection. Handles all physics calculations
-/// and movement execution separately from input detection.
 fn apply_player_movement(
     mut input_events: MessageReader<PlayerInputMessage>,
     player: Query<(&GodotNodeHandle, &Speed, &JumpVelocity, &Gravity), With<Player>>,
@@ -99,50 +84,42 @@ fn apply_player_movement(
 ) {
     if let Ok((handle, speed, jump_velocity, gravity)) = player.single() {
         let Some(mut character_body) = godot.try_get::<CharacterBody2D>(*handle) else {
-            return; // Node is invalid, skip this frame
+            return;
         };
 
         let mut velocity = character_body.get_velocity();
         let mut movement_occurred = false;
         let mut last_movement_direction = 0.0;
 
-        // Always apply gravity if not on floor
         if !character_body.is_on_floor() {
             velocity.y += gravity.0 * time.delta_secs();
         }
 
-        // Process input events (should always have at least one per frame now)
         let mut processed_input = false;
         for input_event in input_events.read() {
             processed_input = true;
             last_movement_direction = input_event.movement_direction;
 
-            // Handle jumping
             if input_event.jump_pressed && input_event.is_on_floor {
                 velocity.y = jump_velocity.0;
                 commands.trigger(PlaySfxMessage::PlayerJump);
             }
 
-            // Handle horizontal movement
             if input_event.movement_direction != 0.0 {
                 velocity.x = input_event.movement_direction * speed.0;
                 movement_occurred = true;
             } else {
-                // Player released movement keys - apply deceleration
                 velocity.x = move_toward(velocity.x as f64, 0.0, speed.0 as f64 / 2.0) as f32;
             }
         }
 
-        // Fallback: if no input events, apply deceleration (shouldn't happen normally)
         if !processed_input {
             velocity.x = move_toward(velocity.x as f64, 0.0, speed.0 as f64 / 2.0) as f32;
         }
 
-        // Always apply movement and physics
         character_body.set_velocity(velocity);
         character_body.move_and_slide();
 
-        // Send movement event for animation system
         movement_events.write(PlayerMovementMessage {
             is_moving: movement_occurred,
             is_on_floor: character_body.is_on_floor(),
@@ -151,10 +128,6 @@ fn apply_player_movement(
     }
 }
 
-/// System that updates player animations based on movement events
-///
-/// Runs in Animation set after movement. Handles all animation state
-/// separately from physics and input.
 fn update_player_animation(
     mut movement_events: MessageReader<PlayerMovementMessage>,
     player: Query<&GodotNodeHandle, With<Player>>,
@@ -162,16 +135,14 @@ fn update_player_animation(
 ) {
     if let Ok(handle) = player.single() {
         let Some(character_body) = godot.try_get::<CharacterBody2D>(*handle) else {
-            return; // Node is invalid, skip this frame
+            return;
         };
 
         let mut sprite = character_body.get_node_as::<AnimatedSprite2D>("AnimatedSprite2D");
 
         for movement_event in movement_events.read() {
-            // Update sprite direction
             sprite.set_flip_h(movement_event.facing_left);
 
-            // Update animation based on state
             if !movement_event.is_on_floor {
                 sprite.play_ex().name("jump").done();
             } else if movement_event.is_moving {

@@ -1,21 +1,9 @@
-/*
- * Transform synchronization tests
- *
- * Tests all transform sync modes using Bevy-style TestApp API:
- * - OneWay (Bevy → Godot only)
- * - TwoWay (bidirectional)
- * - Disabled (no sync)
- *
- * Uses explicit frame-by-frame control with app.update().await
- */
-
 use bevy::prelude::*;
 use godot::obj::NewAlloc;
 use godot::prelude::*;
 use godot_bevy::prelude::*;
 use godot_bevy_test::prelude::*;
 
-/// Test that position, rotation, and scale sync from Bevy to Godot (OneWay mode)
 #[itest(async)]
 fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -49,7 +37,6 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         })
         .await;
 
-        // Wait for Bevy transform to sync to Godot node.
         // The write runs in FixedLast (physics rate), so we need a physics tick.
         app.physics_update().await;
 
@@ -84,7 +71,6 @@ fn test_bevy_to_godot_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
     })
 }
 
-/// Test that transforms sync from Godot to Bevy (TwoWay mode)
 #[itest(async)]
 fn test_godot_to_bevy_transform_sync(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -105,10 +91,8 @@ fn test_godot_to_bevy_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
         let initial_x =
             app.with_world(|world| world.get::<Transform>(entity).unwrap().translation.x);
 
-        // Move the Godot node (should sync to Bevy in TwoWay mode)
         node.set_position(Vector2::new(10.0, 0.0));
 
-        // Wait for Godot position change to sync into Bevy
         app.update().await;
 
         let synced_x =
@@ -189,7 +173,6 @@ fn test_disable_godot_transform_read_via_group(ctx: &TestContext) -> godot::task
     })
 }
 
-/// Test bidirectional transform sync (TwoWay mode)
 #[itest(async)]
 fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -227,7 +210,6 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
 
         let bevy_start = bevy_node.get_position().x;
 
-        // Move Godot node (tests Godot→Bevy sync)
         godot_node.set_position(Vector2::new(20.0, 0.0));
 
         // Run several physics ticks so the Bevy-controlled node accumulates
@@ -239,13 +221,11 @@ fn test_bidirectional_transform_sync(ctx: &TestContext) -> godot::task::TaskHand
 
         let bevy_end = bevy_node.get_position().x;
 
-        // Check Bevy→Godot sync
         assert!(
             bevy_end > bevy_start,
             "Bevy-controlled node should move (Bevy→Godot), start={bevy_start:.1}, end={bevy_end:.1}"
         );
 
-        // Check Godot→Bevy sync
         let godot_entity_x = app.with_world_mut(|world| {
             let mut query = world.query::<(&GodotNodeHandle, &Transform)>();
             for (handle, transform) in query.iter(world) {
@@ -444,7 +424,7 @@ fn test_twoway_godot_and_bevy_coexist(ctx: &TestContext) -> godot::task::TaskHan
     })
 }
 
-/// Test that spawning a synced node at a non-origin position does not produce
+/// A synced node spawned at a non-origin position must not produce
 /// a one-tick interpolation slide from the origin when physics interpolation is
 /// enabled. reset_physics_interpolation() must be called on the first Bevy→Godot
 /// write after the node is registered so the engine treats the set position as
@@ -491,7 +471,6 @@ fn test_spawn_resets_physics_interpolation(ctx: &TestContext) -> godot::task::Ta
     })
 }
 
-/// Test that sync can be disabled
 #[itest(async)]
 fn test_transform_sync_disabled(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -529,7 +508,6 @@ fn test_transform_sync_disabled(ctx: &TestContext) -> godot::task::TaskHandle {
 
         let end_pos = node.get_position().x;
 
-        // Verify Bevy entity moved internally
         let entity = app.single_entity_with::<Transform>();
         let bevy_x = app.with_world(|world| world.get::<Transform>(entity).unwrap().translation.x);
 
@@ -573,7 +551,6 @@ fn test_twoway_read_before_logic(ctx: &TestContext) -> godot::task::TaskHandle {
             app.add_plugins(GodotTransformSyncPlugin::default());
             app.insert_resource(GodotTransformConfig::two_way());
             app.init_resource::<Observed>();
-            // Record what the Bevy value is when Update logic runs.
             app.add_systems(
                 Update,
                 move |q: Query<(&GodotNodeHandle, &Transform)>, mut obs: ResMut<Observed>| {
@@ -613,12 +590,11 @@ fn test_twoway_read_before_logic(ctx: &TestContext) -> godot::task::TaskHandle {
 /// the dead-handle window; a second untouched node proves one dead node doesn't wedge
 /// the write batch.
 ///
-/// This only discriminates fixed-vs-unfixed in *release*, where the individual write's
-/// `godot.get` on the dead handle panics pre-fix and tears the app down (the
-/// `has_entity_for_node` call below then fails). Debug -- what CI runs -- never tears
-/// down here (the bulk path's dead-id deref is a non-fatal GDScript error), so in
-/// debug this is a liveness smoke test, not a regression guard. Run in release to
-/// exercise the fix.
+/// This only discriminates the dead-handle behavior in *release*, where an unguarded
+/// `godot.get` panics and tears the app down (the `has_entity_for_node` call below then
+/// fails). Debug -- what CI runs -- never tears down here because the bulk path's
+/// dead-id dereference is a non-fatal GDScript error, so in debug this is only a
+/// liveness smoke test.
 #[itest(async)]
 fn test_freeing_synced_node_is_non_fatal(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();
@@ -671,12 +647,12 @@ fn test_freeing_synced_node_is_non_fatal(ctx: &TestContext) -> godot::task::Task
         })
         .await;
 
-        // Settle both nodes into steady sync, then record the survivor's baseline.
+        // Two ticks establish the steady-state shadow before sampling.
         app.physics_update().await;
         app.physics_update().await;
         let survivor_x_before = survivor.get_position().x;
 
-        // Free the victim on the next physics step (in-system, mid-FixedMain).
+        // The flag frees the victim inside the next FixedMain.
         app.with_world_mut(|w| w.resource_mut::<FreeVictim>().0 = true);
         app.physics_update().await;
 

@@ -7,7 +7,10 @@ use bevy_ecs::query::{AnyOf, Changed, QueryFilter};
 use bevy_ecs::system::Query;
 use bevy_math::Quat;
 use bevy_transform::components::Transform as BevyTransform;
-use godot::classes::{Engine, Node, Node2D, Node3D, SceneTree};
+#[cfg(not(feature = "api-4-2"))]
+use godot::classes::{Engine, Node, SceneTree};
+use godot::classes::{Node2D, Node3D};
+#[cfg(not(feature = "api-4-2"))]
 use godot::obj::Singleton;
 
 use super::change_filter::TransformSyncMetadata;
@@ -72,7 +75,7 @@ pub(crate) fn write_needed(bevy: &BevyTransform, shadow: &BevyTransform) -> bool
         || rotation_differs(bevy.rotation, shadow.rotation)
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub fn pre_update_godot_transforms<F: QueryFilter>(
     mut entities: Query<
         (
@@ -105,7 +108,7 @@ pub fn pre_update_godot_transforms<F: QueryFilter>(
     }
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub fn post_update_godot_transforms<F: QueryFilter>(
     mut entities: Query<
         (
@@ -119,6 +122,7 @@ pub fn post_update_godot_transforms<F: QueryFilter>(
     mut godot: GodotAccess,
 ) {
     // Read once per system run to avoid per-entity FFI.
+    #[cfg(not(feature = "api-4-2"))]
     let fti_enabled = physics_interpolation_enabled();
 
     for (transform_ref, reference, mut metadata, (node2d, node3d)) in entities.iter_mut() {
@@ -146,6 +150,7 @@ pub fn post_update_godot_transforms<F: QueryFilter>(
         metadata.shadow = *transform_ref;
         if is_first_write {
             metadata.written_once = true;
+            #[cfg(not(feature = "api-4-2"))]
             if fti_enabled && let Some(mut node) = godot.try_get::<Node>(*reference) {
                 node.reset_physics_interpolation();
             }
@@ -153,7 +158,7 @@ pub fn post_update_godot_transforms<F: QueryFilter>(
     }
 }
 
-/// Whether Godot's project-wide physics interpolation is enabled.
+#[cfg(not(feature = "api-4-2"))]
 fn physics_interpolation_enabled() -> bool {
     Engine::singleton()
         .get_main_loop()

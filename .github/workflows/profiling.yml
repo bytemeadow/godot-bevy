@@ -1,0 +1,62 @@
+name: profiling
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend:
+        description: Profiling backend
+        type: choice
+        options:
+          - tracy
+          - native
+          - both
+        default: both
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  tracy:
+    if: inputs.backend == 'tracy' || inputs.backend == 'both'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - uses: cachix/cachix-action@v16
+        with:
+          name: devenv
+      - name: Install devenv
+        run: nix profile add nixpkgs#devenv
+      - name: Capture Tracy profile
+        run: devenv shell -- ./itest/run-profile.sh --bench transform_sync_bevy_to_godot_3d
+      - name: Upload Tracy artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tracy-profile
+          path: target/profiles/
+          if-no-files-found: warn
+
+  native:
+    if: inputs.backend == 'native' || inputs.backend == 'both'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - uses: cachix/cachix-action@v16
+        with:
+          name: devenv
+      - name: Install devenv
+        run: nix profile add nixpkgs#devenv
+      - name: Allow perf sampling
+        run: sudo sysctl -w kernel.perf_event_paranoid=1
+      - name: Capture native profile
+        run: devenv shell -- ./itest/run-profile.sh --native --bench transform_sync_bevy_to_godot_3d
+      - name: Upload native artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-profile
+          path: target/profiles/
+          if-no-files-found: warn

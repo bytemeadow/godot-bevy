@@ -10,7 +10,6 @@ def generate_node_markers(
     node_markers_file: Path,
     api: ExtensionApi,
 ) -> None:
-    """Generate the node_markers.rs file"""
     indent_log("🏷️  Generating node markers...")
 
     content = textwrap.dedent("""\
@@ -26,7 +25,6 @@ def generate_node_markers(
         
         """)
 
-    # Generate all markers
     node_classes = sorted(api.classes_descended_from("Node"))
 
     for node_class in node_classes:
@@ -47,10 +45,8 @@ def generate_node_markers_dispatcher(
     output_file: Path,
     versions: list[str],
 ) -> None:
-    """Generate the node_markers.rs file that dispatches to version-specific modules"""
     indent_log("🔌 Generating node markers dispatcher...")
 
-    # Helper to convert "4.2.1" to "4_2_1" for module names and "4-2-1" for feature names
     def format_ver(v: str, sep: str) -> str:
         return v.replace(".", sep)
 
@@ -67,21 +63,18 @@ def generate_node_markers_dispatcher(
 
         """)
 
-    # 1. Module declarations
     for ver in versions:
         content += f'#[cfg(feature = "api-{format_ver(ver, "-")}")]\n'
         content += f'mod node_markers{format_ver(ver, "_")};\n'
 
     content += "\n"
 
-    # 2. Public re-exports
     for ver in versions:
         content += f'#[cfg(feature = "api-{format_ver(ver, "-")}")]\n'
         content += f'pub use node_markers{format_ver(ver, "_")}::*;\n'
 
     content += "\n"
 
-    # 3. Default fallback (usually the latest version)
     not_any_conditions = "\n".join(
         [f'    feature = "api-{format_ver(v, "-")}",' for v in versions]
     )

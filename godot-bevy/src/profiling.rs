@@ -7,10 +7,9 @@
 #[cfg(feature = "trace_tracy")]
 use once_cell::sync::Lazy;
 
-/// Tracy client instance (only exists when tracy feature is enabled)
 #[cfg(feature = "trace_tracy")]
 static TRACY_CLIENT: Lazy<tracing_tracy::client::Client> =
-    Lazy::new(|| tracing_tracy::client::Client::start());
+    Lazy::new(tracing_tracy::client::Client::start);
 
 /// Initialize the profiling system
 /// Called by the #[bevy_app] macro during library initialization
@@ -27,24 +26,16 @@ pub fn init_profiler() {
             editor_port
         };
 
-        // Start Godot editor Tracy client on different port than game instances
-        // so the editor and game can be profiled separately
+        // Editor and game instances require distinct Tracy ports.
         if godot::classes::Engine::singleton().is_editor_hint() {
-            // Set port before tracy client initialization
             godot::classes::Os::singleton().set_environment("TRACY_PORT", &editor_port);
         }
 
-        // Force Tracy client initialization
         let _ = &*TRACY_CLIENT;
 
-        // Restore original port for game instances
+        // Game instances must not inherit the editor's Tracy port.
         godot::classes::Os::singleton().set_environment("TRACY_PORT", &original_port);
-
-        // Optional: Set up tracing subscriber with Tracy layer
-        // This could be done elsewhere if needed
     }
-
-    // When Tracy is disabled, this is a no-op
 }
 
 /// Shutdown the profiling system cleanly
@@ -52,18 +43,11 @@ pub fn init_profiler() {
 pub fn shutdown_profiler() {
     #[cfg(feature = "trace_tracy")]
     {
-        // Mark final frame before shutdown
         TRACY_CLIENT.frame_mark();
 
         // Give Tracy time to flush data
         std::thread::sleep(std::time::Duration::from_millis(100));
-
-        // Note: With newer versions of tracy-client, manual shutdown is handled
-        // automatically when the client is dropped. The old ___tracy_shutdown_profiler
-        // function is no longer exposed in the public API.
     }
-
-    // When Tracy is disabled, this is a no-op
 }
 
 /// Mark the beginning of a frame
@@ -80,23 +64,21 @@ pub fn frame_mark() {
 pub fn secondary_frame_mark(name: &str) {
     #[cfg(feature = "trace_tracy")]
     {
-        // The frame_name! macro only accepts literals, so we need to handle
-        // the "physics" case specially since that's what we use
+        // Tracy's frame_name! macro accepts only literals; physics is our only secondary frame.
         match name {
             "physics" => {
                 use tracing_tracy::client::frame_name;
                 TRACY_CLIENT.secondary_frame_mark(frame_name!("physics"));
             }
             _ => {
-                // For other names, we can't use secondary frames
-                // Just mark a regular frame instead
+                // Tracy secondary frame names must be compile-time literals.
                 TRACY_CLIENT.frame_mark();
             }
         }
     }
     #[cfg(not(feature = "trace_tracy"))]
     {
-        let _ = name; // Avoid unused variable warning
+        let _ = name;
     }
 }
 
@@ -133,7 +115,5 @@ pub use tracing::instrument as profile;
 #[cfg(not(feature = "trace_tracy"))]
 #[macro_export]
 macro_rules! profile {
-    ($($tt:tt)*) => {
-        // No-op when Tracy is disabled
-    };
+    ($($tt:tt)*) => {};
 }

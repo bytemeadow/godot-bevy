@@ -16,7 +16,6 @@ pub fn bevy_app(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as syn::ItemFn);
     let name = &input_fn.sig.ident;
 
-    // Parse attribute for configuration options
     let config = if !attr.is_empty() {
         match parse_bevy_app_config(attr) {
             Ok(cfg) => cfg,
@@ -92,6 +91,7 @@ fn parse_bevy_app_config(attr: TokenStream) -> Result<BevyAppConfig, Error> {
 /// Derive this macro on a struct for easy access to a scene's nodes.
 ///
 /// Example:
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#node_tree_view -->
 /// ```ignore
 /// #[derive(NodeTreeView)]
 /// pub struct MenuUi {
@@ -115,6 +115,7 @@ fn parse_bevy_app_config(attr: TokenStream) -> Result<BevyAppConfig, Error> {
 /// in the struct that derives `NodeTreeView`.
 ///
 /// Example:
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#node_tree_paths -->
 /// ```ignore
 /// #[derive(NodeTreeView)]
 /// pub struct MobNodes {
@@ -124,7 +125,6 @@ fn parse_bevy_app_config(attr: TokenStream) -> Result<BevyAppConfig, Error> {
 ///     #[node("Node2D/*/VisibleOnScreenNotifier2D")]
 ///     visibility_notifier: GodotNodeHandle,
 /// }
-/// /// Generated companion string constants:
 /// impl MobNodes {
 ///     pub const ANIMATED_SPRITE_PATH: &'static str = "AnimatedSprite2D";
 ///     pub const VISIBILITY_NOTIFIER_PATH: &'static str = "Node2D/*/VisibleOnScreenNotifier2D";
@@ -151,8 +151,10 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
 /// Annotate each `#[export]` field with `#[gdbevy(component = Comp)]` to map it onto a
 /// newtype component:
 ///
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#bevy_components_fields -->
 /// ```rust,ignore
 /// #[derive(GodotClass, BevyComponents)]
+/// #[class(init, base=Node2D)]
 /// struct PlayerNode {
 ///     base: Base<Node2D>,
 ///
@@ -168,19 +170,21 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// Valid keys on a field-level `#[gdbevy(...)]`:
-/// - `component = Comp` (**required**) — the Bevy component type to insert.
-/// - `with = fn` — a function `fn(T) -> T` (or any `Into` adapter) applied to the Godot
-///   value before it is passed to the component constructor.
-/// - `as` and `default` are **not** allowed on Godot-first field bindings.
+/// A field binding requires `component = Comp`. Optional `with = fn` converts the
+/// Godot value before passing it to the component constructor. Use gdext's native
+/// `#[export]`, `#[var(hint = ..., hint_string = ...)]`, and `#[init(val = ...)]`
+/// attributes for property metadata and defaults. `as`, `default`, `description`,
+/// `hint`, and `hint_string` are not valid Godot-first `gdbevy` keys.
 ///
 /// ## Struct-level companions
 ///
 /// Use `#[gdbevy(require(...))]` at the struct level to add components that are not tied to
 /// a specific exported property:
 ///
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#bevy_components_require -->
 /// ```rust,ignore
 /// #[derive(GodotClass, BevyComponents)]
+/// #[class(init, base=Node2D)]
 /// #[gdbevy(require(Player))]          // marker — inserted via `Player::default()`
 /// #[gdbevy(require(Stats { current: max_health, max: max_health }))]  // N→1 binding
 /// struct PlayerNode {
@@ -217,6 +221,7 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 /// Place `#[gdbevy(...)]` directly on the struct to set class metadata and declare companion
 /// components:
 ///
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#godot_node -->
 /// ```rust,ignore
 /// #[derive(Component, GodotNode, Default)]
 /// #[gdbevy(base = CharacterBody2D, class_name = Player2D)]
@@ -237,11 +242,13 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 /// Declares a companion Bevy component. Three forms:
 ///
 /// **Marker** — inserts the component via `Default`:
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#godot_node_marker -->
 /// ```rust,ignore
 /// #[gdbevy(require(Stunned))]
 /// ```
 ///
 /// **Newtype** — generates one `#[export]` property and creates the component from it:
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#godot_node_newtype -->
 /// ```rust,ignore
 /// #[gdbevy(require(speed: Speed, as = f32, default = 250.0, with = to_speed))]
 /// //               ^^^^^ prop name  ^^^^ Godot export type
@@ -251,6 +258,7 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 /// the component.
 ///
 /// **Struct** — generates multiple `#[export]` properties for a multi-field component:
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#godot_node_struct -->
 /// ```rust,ignore
 /// #[gdbevy(require(stats: Stats { current(as = i32, default = 100), max(as = i32, default = 100) }))]
 /// ```
@@ -267,6 +275,7 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 /// properties on the generated Godot class. `export` is required — it marks the field as a
 /// generated Godot export:
 ///
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#godot_node_fields -->
 /// ```rust,ignore
 /// #[derive(Component, GodotNode, Default)]
 /// #[gdbevy(base = Area2D, class_name = Door2D)]
@@ -276,7 +285,29 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 ///
 ///     #[gdbevy(export, as = f32, with = meters_to_units)]
 ///     range: f32,
+///
+///     /// Label shown to the player.
+///     #[gdbevy(export, as = GString, with = from_godot_string,
+///         default = GString::from("Open"), description = "Door label",
+///         hint = ENUM, hint_string = "Open,Locked")]
+///     label: String,
 /// }
+///
+/// fn from_godot_string(value: GString) -> String {
+///     value.to_string()
+/// }
+/// ```
+///
+/// Tuple structs are supported for component-first nodes. Exported fields use `value0`,
+/// `value1`, and so on as their Godot property names.
+///
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#godot_node_tuple -->
+/// ```ignore
+/// #[derive(Component, GodotNode, Default)]
+/// struct Velocity(
+///     #[gdbevy(export)] f32,
+///     #[gdbevy(export)] f32,
+/// );
 /// ```
 ///
 /// | Key | Meaning |
@@ -285,6 +316,23 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 /// | `as = T` | Godot export type (defaults to the field's Rust type when omitted). |
 /// | `default = expr` | Editor default value passed to `#[init(val = …)]`. A pure-Bevy `spawn(T)` uses the struct's own `Default` — make them agree if you rely on `spawn(T)`. |
 /// | `with = fn` | Converts the Godot export value before assigning to the field. |
+/// | `description = "..."` | Adds property docs to a primary field or generated companion export. |
+/// | `hint = NAME` | Sets the Godot `PropertyHint` variant. |
+/// | `hint_string = expr` | Supplies the hint string; requires `hint = NAME`. |
+///
+/// Metadata applies to named and tuple primary fields, `require(prop: Comp, ...)`,
+/// and each field in `require(group: Comp { field(as = T, ...), ... })`.
+/// Use one `#[gdbevy(export, ...)]` attribute per primary field.
+/// `description` must be a string literal. `hint` is a bare `PropertyHint` variant.
+/// Rust `///` docs on primary fields precede an explicit `description`.
+///
+/// Enable `godot-bevy/register-docs` to register descriptions in Godot's editor.
+/// This feature is off by default and requires Godot API 4.3 or later.
+/// Without it, hints still work and descriptions remain Rust docs. The same feature
+/// enables native gdext property docs on Godot-first classes.
+///
+/// Export types must implement gdext's `Export` trait. For Rust `String` fields,
+/// export a `GString` and convert it with `with`, as in the `Door` example.
 ///
 /// ## Reserved keys
 ///

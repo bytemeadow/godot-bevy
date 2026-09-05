@@ -1,0 +1,497 @@
+{
+  "$schema": "coverage-v1.schema.json",
+  "schema_version": 1,
+  "run_id": "fixture-diff",
+  "mode": "diff",
+  "complete": true,
+  "outcome": "fail",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "environment": {
+    "git_commit": "fixture",
+    "git_dirty": false,
+    "dirty_diff_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "source_identity_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "os": "linux",
+    "arch": "x86_64",
+    "target_triple": "x86_64-unknown-linux-gnu",
+    "rustc": "rustc 1.97.0",
+    "rustc_llvm_version": "22.1.0",
+    "llvm_cov": "LLVM version 22.1.0",
+    "llvm_profdata": "LLVM version 22.1.0",
+    "cargo_llvm_cov": "0.9.0",
+    "godot": "4.6.2",
+    "cargo_profile": "coverage",
+    "features": [
+      "autosync-tests",
+      "coverage-flush",
+      "test-frame-signal"
+    ],
+    "cfg_variant": [
+      "coverage"
+    ],
+    "platform_local": true
+  },
+  "disclosure": {
+    "instrumented": true,
+    "language_scope": [
+      "rust"
+    ],
+    "godot_host_instrumented": false,
+    "gdscript_instrumented": false,
+    "benchmark_compatible": false,
+    "timing_valid": false
+  },
+  "scope": {
+    "version": 1,
+    "config_path": "itest/coverage/scope-v1.toml",
+    "config_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "packages": [
+      {
+        "name": "godot-bevy",
+        "root": "godot-bevy/src"
+      },
+      {
+        "name": "godot-bevy-macros",
+        "root": "godot-bevy-macros/src"
+      },
+      {
+        "name": "godot-bevy-test",
+        "root": "godot-bevy-test/src"
+      },
+      {
+        "name": "godot-bevy-test-macros",
+        "root": "godot-bevy-test-macros/src"
+      }
+    ],
+    "exclusions": [
+      {
+        "pattern": "**/*_tests.rs",
+        "category": "test-code"
+      }
+    ],
+    "files": [
+      {
+        "path": "godot-bevy/src/fixture.rs",
+        "package": "godot-bevy",
+        "classification": "included",
+        "exclusion_patterns": [],
+        "exclusion_categories": [],
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "source_lines": 1,
+        "mapping": "mapped"
+      }
+    ],
+    "summary": {
+      "all_rust_files": 1,
+      "included": 1,
+      "excluded": 0,
+      "mapped": 1,
+      "unmapped": 0,
+      "source_lines": 1
+    }
+  },
+  "phases": [
+    {
+      "id": "unit-build",
+      "included": true,
+      "source": "test-build",
+      "elapsed_seconds": 1.0,
+      "output_bytes": 1,
+      "raw_files": 1,
+      "processes": [],
+      "metadata": {}
+    },
+    {
+      "id": "unit-runtime",
+      "included": true,
+      "source": "unit-runtime",
+      "elapsed_seconds": 1.0,
+      "output_bytes": 1,
+      "raw_files": 1,
+      "processes": [],
+      "metadata": {}
+    },
+    {
+      "id": "itest-build",
+      "included": true,
+      "source": "test-build",
+      "elapsed_seconds": 1.0,
+      "output_bytes": 1,
+      "raw_files": 1,
+      "processes": [],
+      "metadata": {}
+    },
+    {
+      "id": "import",
+      "included": false,
+      "source": "excluded",
+      "elapsed_seconds": 1.0,
+      "output_bytes": 1,
+      "raw_files": 1,
+      "processes": [],
+      "metadata": {}
+    },
+    {
+      "id": "itest-runtime",
+      "included": true,
+      "source": "itest-runtime",
+      "elapsed_seconds": 1.0,
+      "output_bytes": 1,
+      "raw_files": 1,
+      "processes": [],
+      "metadata": {}
+    }
+  ],
+  "objects": {
+    "path": "target/coverage/runs/fixture-full/objects-v1.json",
+    "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "count": 1,
+    "records": [
+      {
+        "package": "godot-bevy",
+        "target": "godot_bevy",
+        "kind": "libtest",
+        "phase": "unit-build",
+        "path": "target/coverage/build/coverage/deps/godot_bevy-test",
+        "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "profile": {
+          "name": "coverage",
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "target_triple": "x86_64-unknown-linux-gnu",
+        "included": true
+      }
+    ]
+  },
+  "test_reports": [
+    {
+      "run": 1,
+      "path": "target/coverage/runs/fixture-full/itest-run-1.json",
+      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "complete": true,
+      "outcome": "pass",
+      "registered": 1,
+      "selected": 1,
+      "focus": false,
+      "filter": null,
+      "repeat": 1,
+      "skipped": 0
+    },
+    {
+      "run": 2,
+      "path": "target/coverage/runs/fixture-full/itest-run-1.json",
+      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "complete": true,
+      "outcome": "pass",
+      "registered": 1,
+      "selected": 1,
+      "focus": false,
+      "filter": null,
+      "repeat": 1,
+      "skipped": 0
+    },
+    {
+      "run": 3,
+      "path": "target/coverage/runs/fixture-full/itest-run-1.json",
+      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "complete": true,
+      "outcome": "pass",
+      "registered": 1,
+      "selected": 1,
+      "focus": false,
+      "filter": null,
+      "repeat": 1,
+      "skipped": 0
+    }
+  ],
+  "sources": [
+    "unit-runtime",
+    "test-build",
+    "itest-runtime"
+  ],
+  "files": [
+    {
+      "path": "godot-bevy/src/fixture.rs",
+      "package": "godot-bevy",
+      "mapping": "mapped",
+      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "source_lines": 1,
+      "counts": {
+        "merged": {
+          "lines": {
+            "count": 1,
+            "covered": 1
+          },
+          "regions": {
+            "count": 1,
+            "covered": 1
+          },
+          "functions": {
+            "count": 1,
+            "covered": 1
+          }
+        },
+        "unit-runtime": {
+          "lines": {
+            "count": 1,
+            "covered": 1
+          },
+          "regions": {
+            "count": 1,
+            "covered": 1
+          },
+          "functions": {
+            "count": 1,
+            "covered": 1
+          }
+        },
+        "test-build": {
+          "lines": {
+            "count": 1,
+            "covered": 1
+          },
+          "regions": {
+            "count": 1,
+            "covered": 1
+          },
+          "functions": {
+            "count": 1,
+            "covered": 1
+          }
+        },
+        "itest-runtime": {
+          "lines": {
+            "count": 1,
+            "covered": 1
+          },
+          "regions": {
+            "count": 1,
+            "covered": 1
+          },
+          "functions": {
+            "count": 1,
+            "covered": 1
+          }
+        }
+      },
+      "regions": [
+        {
+          "start_line": 1,
+          "start_column": 1,
+          "end_line": 1,
+          "end_column": 2,
+          "kind": 0,
+          "merged_count": 1,
+          "unit_runtime_count": 1,
+          "test_build_count": 0,
+          "itest_runtime_counts": [
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    }
+  ],
+  "totals": {
+    "merged": {
+      "lines": {
+        "count": 1,
+        "covered": 1
+      },
+      "regions": {
+        "count": 1,
+        "covered": 1
+      },
+      "functions": {
+        "count": 1,
+        "covered": 1
+      }
+    },
+    "unit-runtime": {
+      "lines": {
+        "count": 1,
+        "covered": 1
+      },
+      "regions": {
+        "count": 1,
+        "covered": 1
+      },
+      "functions": {
+        "count": 1,
+        "covered": 1
+      }
+    },
+    "test-build": {
+      "lines": {
+        "count": 1,
+        "covered": 1
+      },
+      "regions": {
+        "count": 1,
+        "covered": 1
+      },
+      "functions": {
+        "count": 1,
+        "covered": 1
+      }
+    },
+    "itest-runtime": {
+      "lines": {
+        "count": 1,
+        "covered": 1
+      },
+      "regions": {
+        "count": 1,
+        "covered": 1
+      },
+      "functions": {
+        "count": 1,
+        "covered": 1
+      }
+    }
+  },
+  "diff": {
+    "base": "main",
+    "merge_base": "fixture",
+    "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "processes": 3,
+    "union_reported": true,
+    "intersection_gated": true,
+    "lines": [
+      {
+        "path": "godot-bevy/src/fixture.rs",
+        "old_line": null,
+        "new_line": 1,
+        "state": "covered",
+        "region_count": 1,
+        "metadata": {}
+      },
+      {
+        "path": "godot-bevy/src/fixture.rs",
+        "old_line": null,
+        "new_line": 2,
+        "state": "partial",
+        "region_count": 1,
+        "metadata": {}
+      },
+      {
+        "path": "godot-bevy/src/fixture.rs",
+        "old_line": null,
+        "new_line": 3,
+        "state": "uncovered",
+        "region_count": 1,
+        "metadata": {}
+      },
+      {
+        "path": "godot-bevy/src/fixture.rs",
+        "old_line": null,
+        "new_line": 4,
+        "state": "unstable",
+        "region_count": 1,
+        "metadata": {}
+      },
+      {
+        "path": "godot-bevy/src/fixture.rs",
+        "old_line": null,
+        "new_line": 5,
+        "state": "no-region",
+        "region_count": 0,
+        "metadata": {}
+      },
+      {
+        "path": "godot-bevy/src/fixture.rs",
+        "old_line": null,
+        "new_line": 7,
+        "state": "out-of-scope",
+        "region_count": 0,
+        "metadata": {}
+      },
+      {
+        "path": "godot-bevy/src/fixture.rs",
+        "old_line": 1,
+        "new_line": null,
+        "state": "deleted",
+        "region_count": 0,
+        "metadata": {}
+      }
+    ],
+    "state_counts": {
+      "covered": 1,
+      "partial": 1,
+      "uncovered": 1,
+      "unstable": 1,
+      "no-region": 1,
+      "not-mapped": 0,
+      "out-of-scope": 1,
+      "deleted": 1
+    }
+  },
+  "witnesses": [
+    {
+      "id": "fixture",
+      "source": "godot-bevy/src/fixture.rs",
+      "function": "fixture",
+      "line": 1,
+      "test": "test_fixture",
+      "unit_runtime": 1,
+      "itest_runtime": [
+        0
+      ],
+      "passed": true
+    }
+  ],
+  "artifacts": [
+    {
+      "kind": "llvm-cov-json",
+      "path": "target/coverage/runs/fixture-full/llvm-cov.json.gz",
+      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "size_bytes": 1,
+      "retained": true,
+      "metadata": {
+        "instrumented": true,
+        "language_scope": ["rust"],
+        "godot_host_instrumented": false,
+        "gdscript_instrumented": false,
+        "benchmark_compatible": false,
+        "timing_valid": false,
+        "rate_gates": []
+      }
+    },
+    {
+      "kind": "lcov",
+      "path": "target/coverage/runs/fixture-full/lcov.info",
+      "sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "size_bytes": 1,
+      "retained": true,
+      "metadata": {
+        "instrumented": true,
+        "language_scope": ["rust"],
+        "godot_host_instrumented": false,
+        "gdscript_instrumented": false,
+        "benchmark_compatible": false,
+        "timing_valid": false,
+        "rate_gates": []
+      }
+    }
+  ],
+  "operations": {
+    "build_directory": "target/coverage/build",
+    "run_directory": "target/coverage/runs/fixture-full",
+    "free_disk_before": 1,
+    "free_disk_after": 1,
+    "peak_coverage_bytes": 1,
+    "keep_raw": false,
+    "raw_pruned": false,
+    "failure_evidence_kept": true,
+    "runs_kept": 3
+  },
+  "rate_gates": [],
+  "errors": [],
+  "metadata": {}
+}

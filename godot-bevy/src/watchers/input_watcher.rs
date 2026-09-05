@@ -22,7 +22,6 @@ impl INode for GodotInputWatcher {
     }
 
     fn ready(&mut self) {
-        // Enable input processing for this node
         self.base_mut().set_process_input(true);
         self.base_mut().set_process_unhandled_input(true);
     }

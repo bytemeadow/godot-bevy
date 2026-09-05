@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/bytemeadow/godot-bevy/itest-report-v1.schema.json",
+  "title": "godot-bevy integration test report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "run_id",
+    "runner_version",
+    "complete",
+    "outcome",
+    "environment",
+    "selection",
+    "repeat",
+    "timeout_frames",
+    "summary",
+    "tests",
+    "errors",
+    "artifacts",
+    "metadata"
+  ],
+  "properties": {
+    "$schema": { "const": "itest-report-v1.schema.json" },
+    "schema_version": { "const": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "runner_version": { "type": "string", "minLength": 1 },
+    "complete": { "type": "boolean" },
+    "outcome": {
+      "enum": ["incomplete", "pass", "fail", "error"]
+    },
+    "environment": { "$ref": "#/$defs/environment" },
+    "selection": { "$ref": "#/$defs/selection" },
+    "repeat": { "type": "integer", "minimum": 1 },
+    "timeout_frames": { "type": "integer", "minimum": 1 },
+    "summary": { "$ref": "#/$defs/summary" },
+    "tests": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/test" }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/error" }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "metadata": { "$ref": "#/$defs/metadata" }
+  },
+  "$defs": {
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "build_profile",
+        "debug_assertions",
+        "godot_version",
+        "os",
+        "arch"
+      ],
+      "properties": {
+        "build_profile": { "enum": ["debug", "release"] },
+        "debug_assertions": { "type": "boolean" },
+        "godot_version": { "type": "string" },
+        "os": { "type": "string" },
+        "arch": { "type": "string" }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registered",
+        "selected",
+        "focus_run",
+        "filter",
+        "patterns"
+      ],
+      "properties": {
+        "registered": { "type": "integer", "minimum": 0 },
+        "selected": { "type": "integer", "minimum": 0 },
+        "focus_run": { "type": "boolean" },
+        "filter": { "type": ["string", "null"] },
+        "patterns": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "passed",
+        "failed",
+        "flaky",
+        "skipped",
+        "total",
+        "attempts_passed",
+        "attempts_failed",
+        "total_duration_ms"
+      ],
+      "properties": {
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "flaky": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 },
+        "attempts_passed": { "type": "integer", "minimum": 0 },
+        "attempts_failed": { "type": "integer", "minimum": 0 },
+        "total_duration_ms": { "type": "number", "minimum": 0 }
+      }
+    },
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "file",
+        "line",
+        "outcome",
+        "duration_ms",
+        "attempts"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "file": { "type": "string", "minLength": 1 },
+        "line": { "type": "integer", "minimum": 1 },
+        "outcome": { "enum": ["pass", "fail", "flaky", "skip"] },
+        "duration_ms": { "type": "number", "minimum": 0 },
+        "attempts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/attempt" }
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "index",
+        "outcome",
+        "duration_ms",
+        "failures",
+        "artifacts"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "index": { "type": "integer", "minimum": 1 },
+        "outcome": { "enum": ["pass", "fail"] },
+        "duration_ms": { "type": "number", "minimum": 0 },
+        "failures": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/failure" }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifact" }
+        }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "message"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "location": { "type": "string" },
+        "gdext_context": { "type": "string" },
+        "callback": { "type": "string" }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "message"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "metadata"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/metadata" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

@@ -34,7 +34,6 @@ impl Default for DebuggerConfig {
     }
 }
 
-/// Timer resource for the debugger
 #[derive(Resource, Default)]
 struct DebuggerTimer {
     elapsed: f32,
@@ -108,7 +107,6 @@ fn debugger_exclusive_system(world: &mut World) {
             .map(|child_of| child_of.get().to_bits() as i64)
             .unwrap_or(-1);
 
-        // Build component data with reflection
         let mut components = VarArray::new();
         let archetype = entity_ref.archetype();
 
@@ -119,7 +117,6 @@ fn debugger_exclusive_system(world: &mut World) {
 
             let mut component_dict = Dictionary::new();
 
-            // Try to get pretty type name from registry, fallback to extracting from full path
             let (full_name, short_name) = if let Some(ref registry) = type_registry {
                 let registry = registry.read();
                 if let Some(type_id) = component_info.type_id() {
@@ -149,7 +146,6 @@ fn debugger_exclusive_system(world: &mut World) {
             component_dict.set("name", full_name.as_str());
             component_dict.set("short_name", short_name.as_str());
 
-            // Try to get reflected value
             if let Some(ref registry) = type_registry {
                 let registry = registry.read();
                 if let Some(type_id) = component_info.type_id()
@@ -181,7 +177,6 @@ fn debugger_exclusive_system(world: &mut World) {
     debugger.send_message("bevy:entities", &entities);
 }
 
-/// Extract a short type name from a full path (e.g., "foo::bar::Baz" -> "Baz")
 fn extract_short_name(full_name: String) -> (String, String) {
     let short = if let Some(pos) = full_name.rfind("::") {
         full_name[pos + 2..].to_string()
@@ -191,7 +186,6 @@ fn extract_short_name(full_name: String) -> (String, String) {
     (full_name, short)
 }
 
-/// Convert a reflected value to a Godot Dictionary
 fn reflect_to_dict(value: &dyn PartialReflect) -> Dictionary {
     let mut dict = Dictionary::new();
 
@@ -275,7 +269,6 @@ fn reflect_to_dict(value: &dyn PartialReflect) -> Dictionary {
         }
         ReflectRef::Opaque(_) => {
             dict.set("type", "opaque");
-            // Try to get debug representation
             if let Some(debug_str) = value.try_as_reflect().map(|r| format!("{r:?}")) {
                 dict.set("debug", debug_str.as_str());
             }
@@ -285,9 +278,7 @@ fn reflect_to_dict(value: &dyn PartialReflect) -> Dictionary {
     dict
 }
 
-/// Convert a reflected value to a simple Godot Variant for display
 fn reflect_value_to_variant(value: &dyn PartialReflect) -> Variant {
-    // Try common primitive types first
     if let Some(v) = value.try_downcast_ref::<f32>() {
         return Variant::from(*v);
     }
@@ -316,6 +307,5 @@ fn reflect_value_to_variant(value: &dyn PartialReflect) -> Variant {
         return v.to_variant();
     }
 
-    // For complex types, recurse
     reflect_to_dict(value).to_variant()
 }

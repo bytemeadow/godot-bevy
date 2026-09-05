@@ -68,7 +68,6 @@ fn player_on_ready(
         let screen_size = player.get_viewport_rect().size;
         player_data.speed = player.bind().speed;
 
-        // Mark as initialized and add command system components
         commands
             .entity(entity)
             .insert(PlayerInitialized)
@@ -89,10 +88,9 @@ fn setup_player(
     mut godot: GodotAccess,
 ) -> Result {
     if let Ok((_entity, mut visibility, mut transform)) = player.single_mut() {
-        // Set player visible using command system
         visibility.set_visible(true);
 
-        // Still need main thread access for getting start position
+        // Reading the Godot-authored start position requires main-thread access.
         let start_handle = entities
             .iter()
             .find_entity_by_name("StartPosition")
@@ -119,7 +117,6 @@ fn move_player(
         let mut velocity = Vector2::ZERO;
         let input = godot.singleton::<Input>();
 
-        // Input handling - can be done without Godot API calls by caching input state
         if input.is_action_pressed("move_right") {
             velocity.x += 1.0;
         }
@@ -136,7 +133,6 @@ fn move_player(
             velocity.y -= 1.0;
         }
 
-        // Animation logic using command system
         if velocity.length() > 0.0 {
             velocity = velocity.normalized() * player_data.speed;
 
@@ -151,7 +147,6 @@ fn move_player(
             anim_state.stop();
         }
 
-        // Transform update using cached screen size
         transform.translation.x += velocity.x * time.delta_secs();
         transform.translation.y += velocity.y * time.delta_secs();
         transform.translation.x = transform.translation.x.clamp(0., screen_cache.size.x);

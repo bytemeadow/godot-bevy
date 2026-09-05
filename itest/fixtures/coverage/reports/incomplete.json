@@ -1,0 +1,177 @@
+{
+  "$schema": "coverage-v1.schema.json",
+  "schema_version": 1,
+  "run_id": "fixture-incomplete",
+  "mode": "full",
+  "complete": false,
+  "outcome": "incomplete",
+  "generated_at": null,
+  "environment": {
+    "git_commit": "fixture",
+    "git_dirty": false,
+    "dirty_diff_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "source_identity_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "os": "linux",
+    "arch": "x86_64",
+    "target_triple": "x86_64-unknown-linux-gnu",
+    "rustc": "rustc 1.97.0",
+    "rustc_llvm_version": "22.1.0",
+    "llvm_cov": "LLVM version 22.1.0",
+    "llvm_profdata": "LLVM version 22.1.0",
+    "cargo_llvm_cov": "0.9.0",
+    "godot": "4.6.2",
+    "cargo_profile": "coverage",
+    "features": [
+      "autosync-tests",
+      "coverage-flush",
+      "test-frame-signal"
+    ],
+    "cfg_variant": [
+      "coverage"
+    ],
+    "platform_local": true
+  },
+  "disclosure": {
+    "instrumented": true,
+    "language_scope": [
+      "rust"
+    ],
+    "godot_host_instrumented": false,
+    "gdscript_instrumented": false,
+    "benchmark_compatible": false,
+    "timing_valid": false
+  },
+  "scope": {
+    "version": 1,
+    "config_path": "itest/coverage/scope-v1.toml",
+    "config_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "packages": [
+      {
+        "name": "godot-bevy",
+        "root": "godot-bevy/src"
+      },
+      {
+        "name": "godot-bevy-macros",
+        "root": "godot-bevy-macros/src"
+      },
+      {
+        "name": "godot-bevy-test",
+        "root": "godot-bevy-test/src"
+      },
+      {
+        "name": "godot-bevy-test-macros",
+        "root": "godot-bevy-test-macros/src"
+      }
+    ],
+    "exclusions": [
+      {
+        "pattern": "**/*_tests.rs",
+        "category": "test-code"
+      }
+    ],
+    "files": [],
+    "summary": {
+      "all_rust_files": 0,
+      "included": 0,
+      "excluded": 0,
+      "mapped": 0,
+      "unmapped": 0,
+      "source_lines": 0
+    }
+  },
+  "phases": [],
+  "objects": {
+    "path": null,
+    "sha256": null,
+    "count": 0,
+    "records": []
+  },
+  "test_reports": [],
+  "sources": [
+    "unit-runtime",
+    "test-build",
+    "itest-runtime"
+  ],
+  "files": [],
+  "totals": {
+    "merged": {
+      "lines": {
+        "count": 0,
+        "covered": 0
+      },
+      "regions": {
+        "count": 0,
+        "covered": 0
+      },
+      "functions": {
+        "count": 0,
+        "covered": 0
+      }
+    },
+    "unit-runtime": {
+      "lines": {
+        "count": 0,
+        "covered": 0
+      },
+      "regions": {
+        "count": 0,
+        "covered": 0
+      },
+      "functions": {
+        "count": 0,
+        "covered": 0
+      }
+    },
+    "test-build": {
+      "lines": {
+        "count": 0,
+        "covered": 0
+      },
+      "regions": {
+        "count": 0,
+        "covered": 0
+      },
+      "functions": {
+        "count": 0,
+        "covered": 0
+      }
+    },
+    "itest-runtime": {
+      "lines": {
+        "count": 0,
+        "covered": 0
+      },
+      "regions": {
+        "count": 0,
+        "covered": 0
+      },
+      "functions": {
+        "count": 0,
+        "covered": 0
+      }
+    }
+  },
+  "diff": null,
+  "witnesses": [],
+  "artifacts": [],
+  "operations": {
+    "build_directory": "target/coverage/build",
+    "run_directory": "target/coverage/runs/fixture-full",
+    "free_disk_before": 1,
+    "free_disk_after": 1,
+    "peak_coverage_bytes": 1,
+    "keep_raw": false,
+    "raw_pruned": false,
+    "failure_evidence_kept": true,
+    "runs_kept": 3
+  },
+  "rate_gates": [],
+  "errors": [
+    {
+      "kind": "missing-profile",
+      "message": "fixture",
+      "phase": "merge"
+    }
+  ],
+  "metadata": {}
+}

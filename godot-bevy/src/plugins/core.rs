@@ -4,6 +4,7 @@ use bevy_ecs::event::EntityEvent;
 use bevy_ecs::lifecycle::Remove;
 use bevy_ecs::observer::On;
 use bevy_ecs::prelude::{Name, Resource};
+use bevy_ecs::query::Without;
 use bevy_ecs::schedule::IntoScheduleConfigs;
 use bevy_ecs::system::{Query, ResMut};
 use bevy_time::{Time, Virtual};
@@ -15,13 +16,11 @@ use godot::classes::Node;
 use godot::obj::Singleton;
 use tracing::debug;
 
-/// Function that adds a component to an entity with access to the Godot node
 type ComponentInserter = Box<dyn Fn(&mut EntityCommands, &mut GodotNode) + Send + Sync>;
 
 /// Registry for components that should be added to entities spawned from the scene tree
 #[derive(Resource, Default)]
 pub struct SceneTreeComponentRegistry {
-    /// Components to add to every entity spawned from scene tree
     /// Stored as (TypeId, inserter) to avoid duplicates
     components: Vec<(TypeId, ComponentInserter)>,
 }
@@ -34,7 +33,6 @@ impl SceneTreeComponentRegistry {
     {
         let type_id = TypeId::of::<C>();
 
-        // Check if already registered
         if self.components.iter().any(|(id, _)| *id == type_id) {
             return;
         }
@@ -53,7 +51,6 @@ impl SceneTreeComponentRegistry {
     {
         let type_id = TypeId::of::<C>();
 
-        // Check if already registered
         if self.components.iter().any(|(id, _)| *id == type_id) {
             return;
         }
@@ -89,7 +86,6 @@ impl AppSceneTreeExt for App {
     where
         C: Component + Default,
     {
-        // Get or create the registry
         if !self
             .world()
             .contains_resource::<SceneTreeComponentRegistry>()
@@ -110,7 +106,6 @@ impl AppSceneTreeExt for App {
         C: Component,
         F: Fn(&mut EntityCommands, &mut GodotNode) + Send + Sync + 'static,
     {
-        // Get or create the registry
         if !self
             .world()
             .contains_resource::<SceneTreeComponentRegistry>()
@@ -178,10 +173,13 @@ where
     }
 }
 
-/// Observer that automatically frees Godot nodes when GodotNodeHandle components are removed
+// Mirror cleanup must not turn a Godot tree departure into node deletion.
+#[derive(Component)]
+pub(super) struct GodotNodeUnmirroring;
+
 fn on_godot_node_handle_removed(
     trigger: On<Remove, GodotNodeHandle>,
-    query: Query<&GodotNodeHandle>,
+    query: Query<&GodotNodeHandle, Without<GodotNodeUnmirroring>>,
     mut godot: GodotAccess,
 ) {
     if let Ok(handle) = query.get(trigger.event_target())
