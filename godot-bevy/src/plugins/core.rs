@@ -4,6 +4,7 @@ use bevy_ecs::event::EntityEvent;
 use bevy_ecs::lifecycle::Remove;
 use bevy_ecs::observer::On;
 use bevy_ecs::prelude::{Name, Resource};
+use bevy_ecs::query::Without;
 use bevy_ecs::schedule::IntoScheduleConfigs;
 use bevy_ecs::system::{Query, ResMut};
 use bevy_time::{Time, Virtual};
@@ -172,9 +173,13 @@ where
     }
 }
 
+// Mirror cleanup must not turn a Godot tree departure into node deletion.
+#[derive(Component)]
+pub(super) struct GodotNodeUnmirroring;
+
 fn on_godot_node_handle_removed(
     trigger: On<Remove, GodotNodeHandle>,
-    query: Query<&GodotNodeHandle>,
+    query: Query<&GodotNodeHandle, Without<GodotNodeUnmirroring>>,
     mut godot: GodotAccess,
 ) {
     if let Ok(handle) = query.get(trigger.event_target())

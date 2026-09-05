@@ -1,7 +1,8 @@
 use super::node_type_checking::{
     add_node_type_markers_from_string, remove_comprehensive_node_type_markers,
 };
-use crate::plugins::core::SceneTreeComponentRegistry;
+use super::relationship::{GodotChildOf, GodotChildren};
+use crate::plugins::core::{GodotNodeUnmirroring, SceneTreeComponentRegistry};
 use crate::prelude::GodotScene;
 use crate::watchers::scene_tree_watcher::is_excluded_from_mirror;
 use crate::{
@@ -133,13 +134,12 @@ impl NodeEntityIndex {
 /// This plugin is always included in the core plugins and provides
 /// complete scene tree integration out of the box.
 pub struct GodotSceneTreePlugin {
-    /// When true, despawning a parent entity will automatically despawn all children
-    /// via the GodotChildren on_despawn hook.
+    /// When true, despawning a parent entity also despawns its unprotected children
+    /// through the `GodotChildren` hook.
     ///
-    /// Set to false if you want to manually manage entity lifetimes independently
-    /// of the Godot scene tree (e.g., for object pooling or entities that outlive their nodes).
-    ///
-    /// `ProtectedNodeEntity` children are never despawned automatically.
+    /// This only controls the ECS cascade; nodes leaving the mirrored tree still
+    /// trigger cleanup of their entities.
+    /// Use `ProtectedNodeEntity` to retain entities after their nodes leave.
     pub auto_despawn_children: bool,
 }
 
@@ -155,13 +155,12 @@ impl Default for GodotSceneTreePlugin {
 #[derive(Resource, Reflect)]
 #[reflect(Resource)]
 pub struct SceneTreeConfig {
-    /// When true, despawning a parent entity will automatically despawn all children
-    /// via the GodotChildren on_despawn hook.
+    /// When true, despawning a parent entity also despawns its unprotected children
+    /// through the `GodotChildren` hook.
     ///
-    /// Set to false if you want to manually manage entity lifetimes independently
-    /// of the Godot scene tree (e.g., for object pooling or entities that outlive their nodes).
-    ///
-    /// `ProtectedNodeEntity` children are never despawned automatically.
+    /// This only controls the ECS cascade; nodes leaving the mirrored tree still
+    /// trigger cleanup of their entities.
+    /// Use `ProtectedNodeEntity` to retain entities after their nodes leave.
     pub auto_despawn_children: bool,
 }
 
@@ -600,10 +599,13 @@ fn write_scene_tree_messages(
     message_writer.write_batch(messages);
 }
 
-/// Marks an entity so it is not despawned when its corresponding Godot Node is freed, breaking
-/// the usual 1-to-1 lifetime between them. This allows game logic to keep running on entities
-/// that have no Node, such as simulating off-screen factory machines or NPCs in inactive scenes.
-/// A Godot Node can be re-associated later by adding a `GodotScene` component to the **entity.**
+/// Retains an entity when its Godot node is freed, detached, or moved into an excluded subtree.
+/// Cleanup removes its Godot components, index entry, and scene-tree relationships,
+/// preserving gameplay components. Detachment and exclusion do not free the node.
+///
+/// Reassociate a surviving node by inserting its `GodotNodeHandle` before re-entry,
+/// or add `GodotScene` to instantiate a replacement. Re-entry alone creates a fresh entity.
+/// Explicit entity despawn and explicit handle removal still queue the node for deletion.
 #[derive(Component)]
 pub struct ProtectedNodeEntity;
 
@@ -781,42 +783,19 @@ fn create_scene_tree_entity(
             }
             SceneTreeMessageType::NodeRemoved => {
                 if let Some(ent) = existing_entity {
-                    // During reparenting, the node is temporarily removed from old parent
-                    // but still exists in the scene tree (has a parent)
-                    // We need to try_get because the node handle might be invalid if freed
-                    let is_reparenting = godot
-                        .try_get::<Node>(node_handle)
-                        .map(|godot_node| godot_node.get_parent().is_some())
-                        .unwrap_or(false);
+                    let still_mirrored = godot.try_get::<Node>(node_handle).is_some_and(|node| {
+                        node.is_inside_tree() && !is_excluded_from_mirror(&node)
+                    });
 
-                    if is_reparenting {
-                        // A node reparented under an excluded subtree has its NodeAdded dropped
-                        // by the watcher, so preserving the entity here would strand it with a
-                        // stale parent and keep it syncing. Reconcile against exclusion: tear it
-                        // down instead. Otherwise it moved within the mirrored tree -- preserve it.
-                        let into_excluded = godot
-                            .try_get::<Node>(node_handle)
-                            .map(|n| is_excluded_from_mirror(&n))
-                            .unwrap_or(false);
-                        if into_excluded {
-                            commands.entity(ent).despawn();
-                            node_index.remove(instance_id);
-                        } else {
-                            trace!(target: "godot_scene_tree_events",
-                                "Node is being reparented, preserving entity");
-                        }
+                    if still_mirrored {
+                        trace!(target: "godot_scene_tree_events",
+                            "Node is being reparented, preserving entity");
                     } else {
-                        // Truly removed. Read protected from the world; same-batch
-                        // spawns aren't queryable yet but are never protected.
                         let protected = entities
                             .get(ent)
                             .map(|(_, _, prot, _)| prot.is_some())
                             .unwrap_or(false);
-                        if !protected {
-                            commands.entity(ent).despawn();
-                        } else {
-                            _strip_godot_components(commands, ent);
-                        }
+                        unmirror_node_entity(commands, ent, protected);
                         node_index.remove(instance_id);
                     }
                 } else {
@@ -1074,8 +1053,15 @@ fn warn_dead_contact_monitor(node: &Gd<Node>) {
          max_contacts_reported > 0 on this node to receive collision events.");
 }
 
-fn _strip_godot_components(commands: &mut Commands, ent: Entity) {
+fn unmirror_node_entity(commands: &mut Commands, ent: Entity, protected: bool) {
     let mut entity_commands = commands.entity(ent);
+    entity_commands.insert(GodotNodeUnmirroring);
+    // Unlink first so the parent's despawn hook cannot free live descendants.
+    entity_commands.remove::<(GodotChildOf, GodotChildren)>();
+    if !protected {
+        entity_commands.despawn();
+        return;
+    }
 
     entity_commands.remove::<GodotNodeHandle>();
     entity_commands.remove::<GodotScene>();
@@ -1084,6 +1070,7 @@ fn _strip_godot_components(commands: &mut Commands, ent: Entity) {
     entity_commands.remove::<SceneTreeDecorated>();
 
     remove_comprehensive_node_type_markers(&mut entity_commands);
+    entity_commands.remove::<GodotNodeUnmirroring>();
 }
 
 fn try_process_node_renamed_messages_fast_path(

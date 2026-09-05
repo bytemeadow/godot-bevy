@@ -34,6 +34,17 @@ After the initial parse, the library continues to listen for scene tree changes 
 
 This separation allows other systems to also react to `SceneTreeEvent`s if needed.
 
+Detaching a node with `remove_child()` preserves the node and its descendants. Once
+removal messages are processed, ordinary mirror entities are despawned.
+`ProtectedNodeEntity` entities keep their gameplay components but lose their Godot
+handles, index entries, and scene-tree relationships. The caller must eventually
+reattach or free detached nodes. Reattaching after cleanup creates fresh entities;
+it does not restore their former ECS state or reconnect protected survivors. To
+reuse a protected entity, attach its `GodotNodeHandle` before re-entry. A reparent
+completed within the mirrored tree before removal processing preserves the entity
+and its state. Explicit ECS despawn and explicit `GodotNodeHandle` removal still
+queue the node for deletion, including while detachment awaits processing.
+
 ## What Components Are Available?
 
 When the scene tree is parsed, each Godot node becomes a Bevy entity with these components:

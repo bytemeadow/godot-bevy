@@ -33,9 +33,10 @@ use bevy_reflect::Reflect;
 ///
 /// # Automatic Cleanup
 ///
-/// By default, when a parent entity is despawned, all children with `GodotChildOf` pointing
-/// to it will also be despawned. This can be configured via
-/// `GodotSceneTreePlugin::auto_despawn_children` or `SceneTreeConfig::auto_despawn_children`.
+/// By default, despawning a parent entity also despawns its unprotected children.
+/// Configure this ECS cascade with `GodotSceneTreePlugin::auto_despawn_children`
+/// or `SceneTreeConfig::auto_despawn_children`. Godot tree departures clean up each
+/// node's mirror independently and clear these relationships.
 #[derive(Component, Reflect, Clone, Copy, Debug, PartialEq, Eq)]
 #[reflect(Component)]
 #[relationship(relationship_target = GodotChildren)]
