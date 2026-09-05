@@ -17,6 +17,7 @@
   - [Excluding Nodes](./scene-tree/excluding-nodes.md)
   - [Custom Nodes](./scene-tree/custom-nodes/index.md)
     - [Automatic Markers](./scene-tree/custom-nodes/automatic-markers.md) 
+    - [Attachable Components](./scene-tree/custom-nodes/attachable-components.md)
     - [Property Mapping](./scene-tree/custom-nodes/property-mapping-with-bevy-bundle.md)
     - [Nodes from Components and Bundles](scene-tree/custom-nodes/nodes-from-components-and-bundles.md)
   - [Spawning Scenes](scene-tree/spawning-scenes.md)

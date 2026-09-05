@@ -223,3 +223,42 @@ mod bench {
         42
     }
 }
+
+mod attachable_component {
+    use bevy::prelude::{Component, Vec2};
+    use godot::classes::CharacterBody3D;
+    use godot::obj::OnEditor;
+    use godot::prelude::*;
+    use godot_bevy::prelude::*;
+
+    #[derive(AttachableComponent, GodotClass)]
+    #[class(init, base=Node)]
+    #[gdbevy(target = Movement)]
+    struct MovementComponent {
+        #[export]
+        max_speed: f32,
+        #[export]
+        jump_height: f32,
+        #[export]
+        character_body: OnEditor<Gd<CharacterBody3D>>,
+    }
+
+    #[derive(Component)]
+    struct Movement {
+        max_speed: f32,
+        jump_height: f32,
+        character_body_3d: GodotNodeHandle,
+        desired_direction: Vec2,
+    }
+
+    impl From<&MovementComponent> for Movement {
+        fn from(value: &MovementComponent) -> Movement {
+            Movement {
+                max_speed: value.max_speed,
+                jump_height: value.jump_height,
+                character_body_3d: GodotNodeHandle::new(value.character_body.clone()),
+                desired_direction: Vec2::ZERO,
+            }
+        }
+    }
+}

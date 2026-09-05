@@ -346,27 +346,44 @@ pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
         .into()
 }
 
-/// # Converts a pure Godot class into a Bevy component (editor-first)
+/// Attach a component to a parent entity from an editor-authored Godot node.
 ///
-/// Derive `AttachableComponent` alongside `GodotClass` when you author the Godot class
-/// yourself using standard `godot-rust` bindings, and want to automatically map it to a
-/// Bevy component when the node enters the scene tree.
+/// Derive `AttachableComponent` alongside `GodotClass`, set
+/// `#[gdbevy(target = YourComponent)]`, and implement `From<&YourGodotClass>`
+/// for that Bevy component. `GodotCorePlugins` registers the carrier automatically.
 ///
-/// ## How it works
+/// The carrier must be a leaf under a mirrored node. After ordinary scene-tree
+/// messages are processed, the conversion runs once against the carrier's live
+/// parent. The component is inserted on that parent's entity and the carrier is
+/// queued for deletion. The carrier never gets its own entity.
 ///
-/// 1. Annotate your Godot class with `#[derive(AttachableComponent)]`.
-/// 2. Specify the target Bevy component using `#[gdbevy(target = YourBevyComponent)]`.
-/// 3. Implement `From<&YourGodotClass> for YourBevyComponent` to define the conversion.
+/// This is one-shot configuration. Carrier nodes and their paths disappear.
+/// Removing and re-adding the surviving parent does not restore the component.
+/// Instantiate the saved scene again to get fresh carriers. Use `BevyComponents`
+/// when the authored node should survive and receive components on its own entity.
 ///
-/// When the node is added to the scene tree, `godot-bevy` will automatically:
-/// - Look up the registered target component for this Godot class.
-/// - Call your `From` implementation to convert the Godot node reference.
-/// - Insert the resulting component onto the parent Bevy entity.
-/// - Queue the original Godot node for `free()` to prevent state duplication.
+/// Children, including internal children, cause rejection before `From` runs.
+/// The parent cannot be another carrier, the root viewport, excluded, queued for
+/// deletion, or missing from the mirror. Rejected carriers stay alive and
+/// unmirrored. A warning gives the class, path, parent, and reason. Another
+/// `NodeAdded` is required for a new attempt; empty drains do not retry.
+/// Detached, freed, or queued carriers do not convert. Excluded subtrees normally
+/// produce no add messages.
 ///
-/// ## Example
+/// `From` may copy values, retain owned resources, and capture handles to nodes
+/// that survive independently. Do not capture the carrier, its descendants,
+/// other carriers, or paths through consumed nodes. Do not mutate the scene tree
+/// in `From`. Use `GodotAccess::try_get` when a captured node may have been freed.
 ///
+/// # Example
+///
+/// Assign `character_body` to a surviving parent or sibling in the Inspector.
+///
+/// <!-- qualification-doctest: scaffold=book-tests/src/doctest_scaffolds.rs#attachable_component -->
 /// ```rust,ignore
+/// use bevy::prelude::{Component, Vec2};
+/// use godot::classes::CharacterBody3D;
+/// use godot::obj::OnEditor;
 /// use godot::prelude::*;
 /// use godot_bevy::prelude::*;
 ///
@@ -382,7 +399,6 @@ pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
 ///     character_body: OnEditor<Gd<CharacterBody3D>>,
 /// }
 ///
-/// // The target Bevy component
 /// #[derive(Component)]
 /// struct Movement {
 ///     max_speed: f32,
@@ -391,7 +407,6 @@ pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
 ///     desired_direction: Vec2,
 /// }
 ///
-/// // Manual conversion from the Godot class to the Bevy component
 /// impl From<&MovementComponent> for Movement {
 ///     fn from(value: &MovementComponent) -> Movement {
 ///         Movement {
@@ -404,12 +419,10 @@ pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// ## Struct-level attributes
+/// # Struct-level attributes
 ///
-/// The only required key on the struct-level `#[gdbevy(...)]` attribute is:
-/// - `target = Comp` (**required**) — the Bevy component type to insert onto the parent entity.
-///
-/// *Note:* The target component type must implement `From<&YourGodotClass>`.
+/// `#[gdbevy(target = Comp)]` is required. `Comp` is the Bevy component to insert
+/// on the parent and must implement `From<&YourGodotClass>`.
 #[proc_macro_derive(AttachableComponent, attributes(gdbevy))]
 pub fn derive_attachable_component_entry(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

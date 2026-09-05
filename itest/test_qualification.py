@@ -173,7 +173,7 @@ def verify_doctests() -> None:
     actual = rustdoc_fences()
     expected = ledger["fences"]
     require(isinstance(expected, list), "doctest fence ledger must be an array")
-    require(len(actual) == len(expected) == 41, "doctest fence census")
+    require(len(actual) == len(expected) == 42, "doctest fence census")
     actual_by_key = {(item["source"], item["ordinal"]): item for item in actual}
     require(len(actual_by_key) == len(actual), "duplicate doctest fence identity")
     expected_keys = [(item.get("source"), item.get("ordinal")) for item in expected]
@@ -219,7 +219,7 @@ def verify_doctests() -> None:
             path_text, anchor = entry["scaffold"].split("#", 1)
             require(path_text == ledger["scaffold_path"], f"unexpected scaffold path {key}")
             require(f"mod {anchor} {{" in scaffold_text, f"missing scaffold anchor {anchor}")
-    require(ignored == 12, "doctest scaffold census")
+    require(ignored == 13, "doctest scaffold census")
     doctests = subprocess.run(
         [
             "cargo",

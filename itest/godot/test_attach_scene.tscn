@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[node name="AttachScene" type="Node"]
+
+[node name="PackedCarrier" type="AttachCarrier" parent="."]
+value = 1101

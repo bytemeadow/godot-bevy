@@ -3,6 +3,11 @@
 This section explains how to work with custom Godot nodes in godot-bevy and
 the important distinction between automatic markers for built-in Godot types versus custom nodes.
 
+[AttachableComponent](attachable-components.md) uses a leaf child node to configure
+its parent's Bevy entity. The child is consumed after conversion. Choose
+`BevyComponents` when the authored node should remain in the scene and receive
+components on its own entity.
+
 ## Summary
 
 - Built-in Godot types get automatic markers (e.g., `Sprite2DMarker`)

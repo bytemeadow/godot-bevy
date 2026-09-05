@@ -154,37 +154,11 @@ pub(crate) fn try_add_bundles_for_node(
     }
 }
 
-/// Attempt to attach a Bevy component to the given parent entity from a Godot node.
-///
-/// Looks up the node's `class_name` in the attach component registry. If a matching
-/// entry is found, it executes the registered `attach_component_fn` to convert the
-/// Godot node into a Bevy component and insert it into the parent entity.
-///
-/// Returns `true` if a component was successfully attached, `false` otherwise.
-pub(crate) fn try_attach_component_to_parent(
-    commands: &mut Commands,
-    parent: Entity,
-    godot: &mut GodotAccess,
-    node_handle: GodotNodeHandle,
-    class_name: &str,
-) -> bool {
-    let Some(registry) = ATTACH_COMPONENT_REGISTRY.get() else {
-        return false;
-    };
-
-    let Some(entry) = registry.get(class_name) else {
-        return false;
-    };
-
-    if (entry.attach_component_fn)(commands, parent, godot, node_handle) {
-        trace!(
-            "Attached component {} to entity {:?}",
-            entry.godot_class_name, parent
-        );
-        return true;
-    }
-
-    false
+pub(crate) fn attach_component_for_class(class_name: &str) -> Option<AttachComponentFn> {
+    ATTACH_COMPONENT_REGISTRY
+        .get()?
+        .get(class_name)
+        .map(|entry| entry.attach_component_fn)
 }
 
 #[cfg(test)]
