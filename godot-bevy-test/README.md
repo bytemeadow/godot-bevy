@@ -10,8 +10,8 @@ Keep tests in the game crate and gate them behind an `itest` feature. The game k
 [dependencies]
 bevy = { version = "0.19", default-features = false }
 godot = "0.5"
-godot-bevy = "0.11"
-godot-bevy-test = { version = "0.11", optional = true }
+godot-bevy = "0.12"
+godot-bevy-test = { version = "0.12", optional = true }
 
 [features]
 itest = ["dep:godot-bevy-test", "godot-bevy-test/test-frame-signal"]
@@ -61,7 +61,7 @@ Use `with_world` for read-only access. Queries require `with_world_mut`, because
 
 ## Running tests
 
-Run the game crate’s runner:
+Set up the game crate’s runner with [Cargo Run Godot](https://bytemeadow.github.io/godot-bevy-book?page=getting-started/gdenv.html), then run:
 
 ```bash
 cargo run --features itest

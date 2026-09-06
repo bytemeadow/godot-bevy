@@ -58,7 +58,7 @@ Enable the `register-docs` feature on your `godot-bevy` dependency to register
 property descriptions in Godot's editor:
 
 ```toml
-godot-bevy = { version = "0.11", features = ["register-docs"] }
+godot-bevy = { version = "0.12", features = ["register-docs"] }
 ```
 
 This feature is off by default and requires Godot API 4.3 or later. With it off,

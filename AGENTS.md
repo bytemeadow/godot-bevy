@@ -28,7 +28,7 @@ Everything runs inside `devenv shell -- <cmd>` (direnv usually activates the env
 
 `cargo fmt` is enforced by a pre-commit hook; clippy runs in CI (`ci.yml`: fmt, clippy, unit tests on three OSes, integration tests). Example builds and Godot exports run in `examples.yml`.
 
-Never use `--all-features`: the `api-4-2`..`api-4-5` features are mutually exclusive gdext API-level selectors, and `experimental-wasm` conflicts with `experimental-threads`.
+Never use `--all-features`: the `api-4-2`..`api-4-6` features are mutually exclusive gdext API-level selectors, and `experimental-wasm` conflicts with `experimental-threads`.
 
 ## Workspace Map
 
@@ -44,13 +44,14 @@ Never use `--all-features`: the `api-4-2`..`api-4-5` features are mutually exclu
 | `examples/` | example games, each `rust/` crate + `godot/` project; the `BevyAppSingleton` autoload is the ECS entry point |
 | `book/` | mdbook docs, published per-version by `book.yml` |
 
-Versions: workspace 0.11.0, Bevy 0.19 (the lib depends on `bevy_*` sub-crates; examples and itest use the umbrella crate), gdext (`godot`) 0.5.
+Versions: workspace 0.12.0, Bevy 0.19 (the lib depends on `bevy_*` sub-crates; examples and itest use the umbrella crate), gdext (`godot`) 0.5.
 
 ## Architecture
 
 **BevyApp** (`godot-bevy/src/app.rs`) is the Godot node that hosts the Bevy `App` and drives Bevy's standard `Main` schedule across Godot's two frame callbacks:
 
-- the prefix (`First`, `PreUpdate`, `StateTransition`) and `FixedMain` run during `_physics_process()` (fixed physics clock, default 60Hz)
+- the prefix (`First`, `PreUpdate`, `StateTransition`) runs once per render frame, in the first `_physics_process()` or in `_process()` if no physics step runs
+- `FixedMain` runs during each `_physics_process()` (fixed physics clock, default 60Hz)
 - the suffix (`Update`, `PostUpdate`, `Last`) runs during `_process()` at display framerate
 
 There is no `PhysicsUpdate` schedule -- fixed-rate logic goes in `FixedUpdate`.

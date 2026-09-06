@@ -33,7 +33,7 @@ The easiest way to get started is using the godot-bevy editor plugin, which auto
 1. Go to **Project > Tools > Setup godot-bevy Project**
 2. Configure your project settings:
    - **Project name**: Used for the Rust crate name
-   - **godot-bevy version**: Library version (default: 0.11.0)
+   - **godot-bevy version**: Library version (default: 0.12.0)
    - **Release build**: Whether to build in release mode initially
 3. Click **"Create Project"**
 
@@ -96,9 +96,9 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-godot-bevy = "0.11.0"
-bevy = { version = "0.18", default-features = false }
-godot = "0.4"
+godot-bevy = "0.12"
+bevy = { version = "0.19", default-features = false }
+godot = "0.5"
 ```
 
 godot-bevy supports Godot API levels 4.2 through 4.6 via the mutually exclusive Cargo features `api-4-2`, `api-4-3`, `api-4-4`, `api-4-5`, and `api-4-6`, with or without default features. Set `compatibility_minimum` in your `.gdextension` file to the level you build against; the example below assumes 4.3.

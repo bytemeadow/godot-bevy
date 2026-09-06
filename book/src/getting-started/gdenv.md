@@ -23,7 +23,7 @@ path = "run_godot.rs"
 [dependencies]
 gdenv-lib = { git = "https://github.com/bytemeadow/gdenv.git", tag = "v1.0.0" }
 # Add godot-bevy-test if you want to also set up integration tests
-godot-bevy-test = { version = "0.11", optional = true }
+godot-bevy-test = { version = "0.12", optional = true }
 
 # Update or add your features section with:
 [features]
