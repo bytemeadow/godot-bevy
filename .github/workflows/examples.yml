@@ -7,6 +7,7 @@ on:
       - "godot-bevy/**"
       - "godot-bevy-macros/**"
       - "examples/**"
+      - "xtask/**"
       - ".github/workflows/examples.yml"
       - "Cargo.toml"
   pull_request:
@@ -15,6 +16,7 @@ on:
       - "godot-bevy/**"
       - "godot-bevy-macros/**"
       - "examples/**"
+      - "xtask/**"
       - ".github/workflows/examples.yml"
       - "Cargo.toml"
 
@@ -46,24 +48,28 @@ jobs:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
               - 'examples/perf-test/**'
+              - 'xtask/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
             simple-node2d-movement:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
               - 'examples/simple-node2d-movement/**'
+              - 'xtask/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
             dodge-the-creeps-2d:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
               - 'examples/dodge-the-creeps-2d/**'
+              - 'xtask/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
             platformer-2d:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
               - 'examples/platformer-2d/**'
+              - 'xtask/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
 
@@ -136,6 +142,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+          key: xtask
+
       - name: Install Godot
         uses: bytemeadow/gdenv@v0.2.2
         with:
@@ -166,26 +181,8 @@ jobs:
           ls -la target/release/
 
       - name: Generate GDExtension descriptor
-        working-directory: examples/${{ matrix.example }}/godot
-        run: |
-          # The launcher generates this ignored file; CI exports without running it.
-          crate=$(python3 -c 'import tomllib; print(tomllib.load(open("../rust/Cargo.toml", "rb"))["package"]["name"].replace("-", "_"))')
-          cat > rust.gdextension <<EOF
-          [configuration]
-          entry_symbol = "gdext_rust_init"
-          compatibility_minimum = 4.1
-          reloadable = true
-
-          [libraries]
-          linux.release.x86_64 =   "res://../../../target/release/lib${crate}.so"
-          windows.release.x86_64 = "res://../../../target/release/${crate}.dll"
-          macos.release =          "res://../../../target/release/lib${crate}.dylib"
-          macos.release.arm64 =    "res://../../../target/release/lib${crate}.dylib"
-          linux.debug.x86_64 =     "res://../../../target/debug/lib${crate}.so"
-          windows.debug.x86_64 =   "res://../../../target/debug/${crate}.dll"
-          macos.debug =            "res://../../../target/debug/lib${crate}.dylib"
-          macos.debug.arm64 =      "res://../../../target/debug/lib${crate}.dylib"
-          EOF
+        # The launcher generates this ignored file; CI exports without running it.
+        run: cargo run -p xtask -- gdextension --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
 
       - name: Cache Godot imports
         uses: actions/cache@v4
