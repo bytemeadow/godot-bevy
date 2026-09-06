@@ -165,6 +165,28 @@ jobs:
           echo "Available libraries:"
           ls -la target/release/
 
+      - name: Generate GDExtension descriptor
+        working-directory: examples/${{ matrix.example }}/godot
+        run: |
+          # The launcher generates this ignored file; CI exports without running it.
+          crate=$(python3 -c 'import tomllib; print(tomllib.load(open("../rust/Cargo.toml", "rb"))["package"]["name"].replace("-", "_"))')
+          cat > rust.gdextension <<EOF
+          [configuration]
+          entry_symbol = "gdext_rust_init"
+          compatibility_minimum = 4.1
+          reloadable = true
+
+          [libraries]
+          linux.release.x86_64 =   "res://../../../target/release/lib${crate}.so"
+          windows.release.x86_64 = "res://../../../target/release/${crate}.dll"
+          macos.release =          "res://../../../target/release/lib${crate}.dylib"
+          macos.release.arm64 =    "res://../../../target/release/lib${crate}.dylib"
+          linux.debug.x86_64 =     "res://../../../target/debug/lib${crate}.so"
+          windows.debug.x86_64 =   "res://../../../target/debug/${crate}.dll"
+          macos.debug =            "res://../../../target/debug/lib${crate}.dylib"
+          macos.debug.arm64 =      "res://../../../target/debug/lib${crate}.dylib"
+          EOF
+
       - name: Cache Godot imports
         uses: actions/cache@v4
         with:
@@ -185,6 +207,18 @@ jobs:
           godot --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
           godot --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
 
+      - name: Smoke-launch macOS export
+        working-directory: examples/${{ matrix.example }}/godot
+        shell: bash
+        run: |
+          app=$(ls -d exports/${{ matrix.example }}-macos.app/Contents/MacOS/*)
+          chmod +x "$app"
+          "$app" --headless --fixed-fps 60 --quit-after 300 2>&1 | tee exports/macos-smoke.log
+          grep -q 'Initialize godot-rust' exports/macos-smoke.log
+          if grep -q 'Cannot get class' exports/macos-smoke.log; then
+            exit 1
+          fi
+
       - name: Upload game exports
         uses: actions/upload-artifact@v4
         with:
@@ -196,7 +230,7 @@ jobs:
     name: build simple-node2d-movement (wasm)
     runs-on: ubuntu-latest
     needs: changes
-    if: contains(needs.changes.outputs.examples, 'simple_node2d_movement_example')
+    if: contains(needs.changes.outputs.examples, 'simple-node2d-movement')
 
     steps:
       - name: Checkout code
