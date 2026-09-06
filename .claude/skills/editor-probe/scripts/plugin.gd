@@ -119,7 +119,12 @@ func _shot(name: String) -> void:
 	print("EDITOR_PROBE shot=", path)
 
 func _probe_node() -> Node:
-	return EditorInterface.get_edited_scene_root().get_node(cfg.get("node_name", "Probe"))
+	var root := EditorInterface.get_edited_scene_root()
+	var name: String = cfg.get("node_name", "Probe")
+	var node := root.get_node_or_null(name) if root else null
+	if node == null:
+		mismatches.append("node %s not found in the edited scene" % name)
+	return node
 
 func _check(key: String, actual: Variant, expected: Variant) -> void:
 	var numeric := (actual is int or actual is float) and (expected is int or expected is float)
@@ -203,6 +208,8 @@ func _probe() -> int:
 	await _settle()
 	var property: String = cfg["property"]
 	var edited := _probe_node()
+	if edited == null:
+		return 4
 	EditorInterface.edit_node(edited)
 	await _settle(10)
 	_shot("1-default")
@@ -219,6 +226,8 @@ func _probe() -> int:
 	EditorInterface.reload_scene_from_path(SCENE)
 	await _settle()
 	var reloaded := _probe_node()
+	if reloaded == null:
+		return 4
 	_check("reload", reloaded.get(property), cfg["value"])
 	EditorInterface.edit_node(reloaded)
 	await _settle(10)
