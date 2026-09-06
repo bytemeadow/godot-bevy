@@ -208,6 +208,7 @@ jobs:
         working-directory: examples/${{ matrix.example }}/godot
         shell: bash
         run: |
+          find exports/${{ matrix.example }}-macos.app -name '*.dylib' | grep -q . || { echo "no GDExtension library in the app bundle"; exit 1; }
           app=$(ls -d exports/${{ matrix.example }}-macos.app/Contents/MacOS/*)
           chmod +x "$app"
           "$app" --headless --fixed-fps 60 --quit-after 300 2>&1 | tee exports/macos-smoke.log
