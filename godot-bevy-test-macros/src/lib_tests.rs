@@ -57,4 +57,24 @@ mod tests {
             .to_string()
             .contains("async #[itest] functions must return ()"));
     }
+
+    #[test]
+    fn async_function_rejects_a_second_parameter() {
+        let input =
+            syn::parse2(quote! { async fn test_name(ctx: TestContext, extra: u32) {} }).unwrap();
+        let expanded = expand_itest(input, ITestOptions::default());
+
+        assert!(expanded
+            .to_string()
+            .contains("accept at most one TestContext parameter"));
+    }
+
+    #[test]
+    fn async_function_without_parameters_registers() {
+        let input = syn::parse2(quote! { async fn test_name() {} }).unwrap();
+        let expanded = expand_itest(input, ITestOptions::default()).to_string();
+
+        assert!(expanded.contains("AsyncRustTestCase"));
+        assert!(!expanded.contains("compile_error"));
+    }
 }
