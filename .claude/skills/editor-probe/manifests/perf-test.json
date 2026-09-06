@@ -1,0 +1,15 @@
+[
+  {
+    "project": "examples/perf-test/godot",
+    "class": "ParticleRain",
+    "property": "editor_description",
+    "value": "editor probe",
+    "expect": {
+      "type": "STRING",
+      "hint": "MULTILINE_TEXT",
+      "hint_string": "",
+      "default": ""
+    },
+    "shots": "/tmp/editor-probe/ParticleRain"
+  }
+]

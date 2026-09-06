@@ -1,25 +1,43 @@
 ---
-description: Verify an Inspector-facing change in the real Godot editor - instantiate a GDExtension class in a scene, edit an exported property, save, reload, and capture editor screenshots, all scripted
+name: editor-probe
+description: Verify editor-facing Godot classes in a real editor with property assertions, scene save/reload, Inspector screenshots, and optional help text checks
 ---
 
 # Editor probe
 
-The itest suite runs in a real headless Godot, so it covers runtime behaviour. It cannot show
-that a class appears in the editor, that its `#[export]` fields render in the Inspector, or that
-an edited value survives save and reload. This skill does that with a temporary `@tool`
-`EditorPlugin`, driven end to end with no clicking, and captures the editor's own viewport as
-PNGs (no OS screenshot permission needed).
+Use this after changing a class, exported field, Inspector hint, or property description that
+designers see in the editor. A temporary `@tool` plugin instantiates the class, checks its
+property metadata and default, edits a value, saves and reloads a scene, and captures the
+Inspector. Runtime itests do not cover the editor UI.
 
-Use it after adding or changing a `GodotClass` that designers touch in the editor: an
-`AttachableComponent` carrier, a `#[derive(GodotNode)]` class with exported fields, a new
-Inspector hint. It proves the class registers, the property shows with its default, an edit
-sticks, and the saved `.tscn` carries the value.
+## Prepare the project
 
-## Run
+Use Godot 4.6 with a display. On the hub, use a session attached to the GUI, not a bare SSH
+shell. Run commands through `devenv shell --`. Check `df -h "/Volumes/DS Vault"` before builds.
+The hub's `target/` is a shared symlink. Never run `cargo clean`.
 
-The class must already be compiled into the project's GDExtension; build it the way the project
-normally is built (for an example, `cargo run --features itest --manifest-path
-examples/<name>/rust/Cargo.toml` builds and imports it). Then:
+Build the classes into the project's GDExtension before probing. For the platformer:
+
+```bash
+devenv shell -- cargo run --features itest --manifest-path examples/platformer-2d/rust/Cargo.toml
+```
+
+For itest, the runner builds the library, generates `itest/godot/itest.gdextension`, imports the
+project, and runs the selected test:
+
+```bash
+devenv shell -- ./itest/run-tests.sh --filter inspector_metadata_roundtrip
+```
+
+It builds with `--features test-frame-signal,autosync-tests`. The itest crate already enables
+`godot-bevy/register-docs`. A manual build alone does not generate its `.gdextension`.
+
+Help assertions require `godot-bevy/register-docs` compiled into the extension. Enable that
+feature when preparing other crates whose probes check descriptions. Build and import
+perf-test with `devenv shell -- cargo run --manifest-path examples/perf-test/rust/Cargo.toml`,
+then close the running example before probing.
+
+## Run one probe
 
 ```bash
 devenv shell -- .claude/skills/editor-probe/scripts/run.sh examples/platformer-2d/godot probe.json
@@ -34,34 +52,83 @@ devenv shell -- .claude/skills/editor-probe/scripts/run.sh examples/platformer-2
   "root": "Node2D",
   "property": "multiplier",
   "value": 3.0,
-  "shots": "/tmp/editor-probe/shots"
+  "expect": {
+    "type": "FLOAT",
+    "hint": "NONE",
+    "hint_string": "",
+    "default": 1.5
+  },
+  "shots": "/tmp/editor-probe/JumpBoostCarrier"
 }
 ```
 
-The driver enables a temporary plugin in `project.godot`, launches `godot --editor` on the
-project, waits for it to finish, and prints the probe's output. Exit codes: 0 the reloaded
-value matched, 3 the class does not exist in the editor, 4 the value did not survive reload,
-5 the editor did not finish within the timeout. It restores `project.godot`, removes the plugin
-and the probe scene, and reverts `.import` files the editor rewrote, so `git status` is clean
-afterwards. Screenshots land in `shots/` as `1-default.png`, `2-edited.png`, `3-reloaded.png`;
-read them and look at the Inspector panel.
+`class`, `property`, `value`, and `shots` are required. `root` defaults to `Node2D` and
+`node_name` to `Probe`. Use an absolute `shots` path. Values and defaults must be representable
+in JSON, such as numbers, strings, and booleans.
 
-## What it does inside the editor
+All `expect` keys are optional. The plugin finds `property` in `get_property_list()` and checks
+`type`, `hint`, and `hint_string` against that entry. Use Variant.Type names such as `FLOAT`
+or `STRING`, and PropertyHint names such as `RANGE` or `ENUM`, without `TYPE_` or
+`PROPERTY_HINT_` prefixes. `default` is read from the fresh node before editing. Missing keys
+are not checked. Every mismatch appears in the probe's verdict line.
 
-Instantiates `root` with one child of `class`, saves it as `res://scenes/editor_probe.tscn`,
-opens it, selects the child so the Inspector shows it, captures, sets `property` to `value`,
-captures, saves, reloads the scene from disk, reads the property back, captures, and quits with
-the verdict.
+To check help text, add `"description": "Primary kind description"` inside `expect`.
+The plugin calls
+`EditorInterface.get_script_editor().goto_help("class_property:<class>:<property>")`, waits,
+and checks that the visible help label contains the description. This traversal is pinned to
+Godot 4.6: a visible `EditorHelp` below `ScriptEditor`, with a direct visible `RichTextLabel`
+child. It fails clearly if the version differs or the label is missing.
+The structure comes from [Godot 4.6's EditorHelp constructor](https://github.com/godotengine/godot/blob/4.6-stable/editor/doc/editor_help.cpp).
 
-## Traps
+## Run a manifest
 
-- The editor needs a display. On a headless box there is nothing to capture; on the hub run it
-  from a session attached to the GUI (the tmux session), not a bare SSH shell.
-- The editor only redraws on input. Captures use `RenderingServer.force_draw()`; waiting on
-  `frame_post_draw` hangs forever.
-- `EditorScript` cannot be run from the command line; that is why this is a plugin toggled in
-  `project.godot`.
-- Godot rewrites `.import` files on every editor start. The driver reverts them; if you adapt
-  it, keep that step or you will commit noise.
-- The Godot import step can crash on exit with a GDExtension loaded (godotengine/godot#111645).
-  The driver uses the verdict the probe prints, so a crash after it does not turn a pass into a failure.
+A manifest is a JSON list of probes. Each probe has the same fields as above plus `project`,
+a path relative to the repo root, such as `examples/platformer-2d/godot` or `itest/godot`.
+Give each probe its own `shots` directory.
+
+```bash
+devenv shell -- .claude/skills/editor-probe/scripts/run.sh --manifest .claude/skills/editor-probe/manifests/platformer-2d.json
+devenv shell -- .claude/skills/editor-probe/scripts/run.sh --manifest .claude/skills/editor-probe/manifests/itest.json
+devenv shell -- .claude/skills/editor-probe/scripts/run.sh --manifest .claude/skills/editor-probe/manifests/perf-test.json
+```
+
+The driver groups probes by project in first-seen order. It launches one editor per project,
+runs that project's probes inside the plugin, then cleans up before launching the next editor.
+A failed assertion does not stop the remaining probes. Each probe prints one
+`EDITOR_PROBE verdict=...` line with its class, property, and mismatches. Any failure makes the
+driver exit non-zero.
+
+The checked-in manifests cover:
+
+- `platformer-2d.json`: Player2D, Gem2D, Door2D, JumpBoostCarrier.
+- `perf-test.json`: ParticleRain.
+- `itest.json`: AutoSyncPlayerNode, InspectorPrimaryNode, InspectorTupleNode,
+  InspectorNativeNode, TestMovementComponent, AttachCarrier.
+
+Gem2D and ParticleRain have no exported fields of their own. Their probes edit the inherited
+`editor_description`. The itest manifest checks the RANGE hint on `speed`, ENUM hints, and
+the help description for `InspectorPrimaryNode.label`.
+
+## Results and cleanup
+
+Read the PNGs and inspect the Inspector panel. Each probe captures `1-default.png`,
+`2-edited.png`, and `3-reloaded.png`. Description probes also capture `4-help.png`.
+Captures use the editor viewport. `RenderingServer.force_draw()` is required because an idle
+editor does not redraw; waiting on `frame_post_draw` can hang.
+
+Exit codes: 0 all probes passed, 2 configuration or driver error, 3 missing class,
+4 assertion or capture failure, 5 timeout or incomplete editor run. Across projects the
+highest failure code wins. `EDITOR_PROBE_TIMEOUT` sets seconds per project, default 240.
+`EDITOR_PROBE_LOG` sets the combined editor log, default `/tmp/editor-probe.log`.
+
+The temporary scene is `res://scenes/editor_probe.tscn`. Cleanup restores `project.godot`
+from its backup and deletes the temporary plugin, scene, and scene's `.uid`. The driver
+refuses to overwrite those temporary paths if they already exist.
+
+Godot rewrites `*.import` files on editor startup. Cleanup checks `git status` under the
+project and runs `git checkout --` only for modified imports that were clean before the run.
+It restores pre-existing import edits from separate backups. Other project edits survive.
+After a run started from a clean project, verify `git status --short -- <project dir>` is empty.
+
+Godot can crash during GDExtension shutdown after printing results. Complete probe verdicts
+remain authoritative in that case. Missing verdicts or a timeout fail the run.

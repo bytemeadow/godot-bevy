@@ -1,0 +1,54 @@
+[
+  {
+    "project": "examples/platformer-2d/godot",
+    "class": "Player2D",
+    "property": "speed",
+    "value": 300.0,
+    "expect": {
+      "type": "FLOAT",
+      "hint": "NONE",
+      "hint_string": "",
+      "default": 250.0
+    },
+    "shots": "/tmp/editor-probe/Player2D"
+  },
+  {
+    "project": "examples/platformer-2d/godot",
+    "class": "Gem2D",
+    "property": "editor_description",
+    "value": "editor probe",
+    "expect": {
+      "type": "STRING",
+      "hint": "MULTILINE_TEXT",
+      "hint_string": "",
+      "default": ""
+    },
+    "shots": "/tmp/editor-probe/Gem2D"
+  },
+  {
+    "project": "examples/platformer-2d/godot",
+    "class": "Door2D",
+    "property": "level_id",
+    "value": "Level2",
+    "expect": {
+      "type": "STRING",
+      "hint": "ENUM",
+      "hint_string": "Level1,Level2,Level3",
+      "default": "Level1"
+    },
+    "shots": "/tmp/editor-probe/Door2D"
+  },
+  {
+    "project": "examples/platformer-2d/godot",
+    "class": "JumpBoostCarrier",
+    "property": "multiplier",
+    "value": 3.0,
+    "expect": {
+      "type": "FLOAT",
+      "hint": "NONE",
+      "hint_string": "",
+      "default": 1.5
+    },
+    "shots": "/tmp/editor-probe/JumpBoostCarrier"
+  }
+]
