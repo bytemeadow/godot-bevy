@@ -1,9 +1,13 @@
 use bevy::prelude::*;
-use godot::classes::Area2D;
-use godot_bevy::prelude::{GodotActionsPlugin, GodotCollisionsPlugin};
+use godot::classes::{Area2D, Node};
+use godot::obj::Gd;
+use godot_bevy::prelude::{
+    GodotActionsPlugin, GodotCollisionsPlugin, GodotNodeHandle, GodotPackedScenePlugin,
+    GodotResource, GodotScene,
+};
 use godot_bevy_test::prelude::*;
 
-use crate::components::{Door, Gem, Player};
+use crate::components::{Door, Gem, JumpBoost, Player};
 use crate::gameplay::door::DoorPlugin;
 use crate::gameplay::gem::{GemPlugin, GemsCollected};
 use crate::gameplay::player::{PlayerInputMessage, PlayerMovementMessage, PlayerPlugin};
@@ -52,6 +56,42 @@ async fn gem_collected(ctx: TestContext) {
     app.cleanup().await;
 }
 // ANCHOR_END: gem_collected
+
+#[itest]
+async fn jump_boost_attaches_to_scene_root(ctx: TestContext) {
+    let mut app = TestApp::new(&ctx, |app| {
+        app.add_plugins(GodotPackedScenePlugin);
+        app.init_resource::<Assets<GodotResource>>();
+    })
+    .await;
+
+    let entity_count = app.with_world(|world| world.entities().count_spawned());
+    let entity = app.with_world_mut(|world| {
+        world
+            .spawn(
+                GodotScene::from_path("res://scenes/attachable_probe.tscn")
+                    .with_parent(GodotNodeHandle::new(ctx.scene_tree.clone())),
+            )
+            .id()
+    });
+
+    app.updates(5).await;
+
+    let handle = app.with_world(|world| {
+        assert_eq!(
+            world.get::<JumpBoost>(entity),
+            Some(&JumpBoost { multiplier: 2.5 })
+        );
+        assert_eq!(world.entities().count_spawned(), entity_count + 1);
+        *world.get::<GodotNodeHandle>(entity).unwrap()
+    });
+    let root = Gd::<Node>::from_instance_id(handle.instance_id());
+    assert_eq!(app.entity_for_node(root.instance_id()), Some(entity));
+    assert!(!root.has_node("JumpBoost"));
+
+    app.cleanup().await;
+    root.free();
+}
 
 #[itest]
 async fn player_plugin_registers_messages(ctx: TestContext) {

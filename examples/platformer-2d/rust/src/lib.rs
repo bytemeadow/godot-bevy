@@ -3,6 +3,7 @@ use bevy_asset_loader::prelude::*;
 use gameplay::audio::GameAudio;
 use godot_bevy::prelude::{GodotDefaultPlugins, *};
 
+mod attachables;
 mod components;
 mod gameplay;
 mod level_manager;

@@ -24,6 +24,11 @@ impl Default for JumpVelocity {
     }
 }
 
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
+pub struct JumpBoost {
+    pub multiplier: f32,
+}
+
 /// Component representing gravity in pixels per second squared
 #[derive(Component, Debug, Clone, PartialEq, Reflect)]
 #[reflect(Component)]

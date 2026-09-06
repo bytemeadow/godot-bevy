@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[node name="AttachableProbe" type="Node2D"]
+
+[node name="JumpBoost" type="JumpBoostCarrier" parent="."]
+multiplier = 2.5
