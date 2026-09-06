@@ -14,6 +14,7 @@ members = [
   "godot-bevy-test",
   "godot-bevy-test-macros",
   "book-tests",
+  "xtask",
   "itest/rust",
   "examples/timing-test/rust",
   "examples/simple-node2d-movement/rust",

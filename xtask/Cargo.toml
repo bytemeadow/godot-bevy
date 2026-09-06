@@ -1,0 +1,9 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+cargo-godot-lib.workspace = true
+cargo_metadata = "0.23"

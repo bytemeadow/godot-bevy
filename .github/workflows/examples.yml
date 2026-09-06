@@ -7,6 +7,7 @@ on:
       - "godot-bevy/**"
       - "godot-bevy-macros/**"
       - "examples/**"
+      - "xtask/**"
       - ".github/workflows/examples.yml"
       - "Cargo.toml"
   pull_request:
@@ -15,6 +16,7 @@ on:
       - "godot-bevy/**"
       - "godot-bevy-macros/**"
       - "examples/**"
+      - "xtask/**"
       - ".github/workflows/examples.yml"
       - "Cargo.toml"
 
@@ -46,24 +48,28 @@ jobs:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
               - 'examples/perf-test/**'
+              - 'xtask/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
             simple-node2d-movement:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
               - 'examples/simple-node2d-movement/**'
+              - 'xtask/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
             dodge-the-creeps-2d:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
               - 'examples/dodge-the-creeps-2d/**'
+              - 'xtask/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
             platformer-2d:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
               - 'examples/platformer-2d/**'
+              - 'xtask/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
 
@@ -136,6 +142,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+          key: xtask
+
       - name: Install Godot
         uses: bytemeadow/gdenv@v0.2.2
         with:
@@ -165,6 +180,10 @@ jobs:
           echo "Available libraries:"
           ls -la target/release/
 
+      - name: Generate GDExtension descriptor
+        # The launcher generates this ignored file; CI exports without running it.
+        run: cargo run -p xtask -- gdextension --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
+
       - name: Cache Godot imports
         uses: actions/cache@v4
         with:
@@ -185,6 +204,18 @@ jobs:
           godot --headless --export-release "Windows Desktop" exports/${{ matrix.example }}-windows.exe
           godot --headless --export-release "macOS" exports/${{ matrix.example }}-macos.app
 
+      - name: Smoke-launch macOS export
+        working-directory: examples/${{ matrix.example }}/godot
+        shell: bash
+        run: |
+          app=$(ls -d exports/${{ matrix.example }}-macos.app/Contents/MacOS/*)
+          chmod +x "$app"
+          "$app" --headless --fixed-fps 60 --quit-after 300 2>&1 | tee exports/macos-smoke.log
+          grep -q 'Initialize godot-rust' exports/macos-smoke.log
+          if grep -q 'Cannot get class' exports/macos-smoke.log; then
+            exit 1
+          fi
+
       - name: Upload game exports
         uses: actions/upload-artifact@v4
         with:
@@ -196,7 +227,9 @@ jobs:
     name: build simple-node2d-movement (wasm)
     runs-on: ubuntu-latest
     needs: changes
-    if: contains(needs.changes.outputs.examples, 'simple_node2d_movement_example')
+    # Skipped until the web build works on nightly again, see #268. Drop the `false &&`
+    # to re-enable; the path filter is already correct.
+    if: false && contains(needs.changes.outputs.examples, 'simple-node2d-movement')
 
     steps:
       - name: Checkout code
