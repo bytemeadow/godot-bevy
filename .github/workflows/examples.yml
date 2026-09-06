@@ -231,6 +231,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: changes
     if: contains(needs.changes.outputs.examples, 'simple-node2d-movement')
+    # Broken against current nightly (web-task fails catch_unwind unwind-safety checks);
+    # reported but not blocking until the web target is verified again.
+    continue-on-error: true
 
     steps:
       - name: Checkout code

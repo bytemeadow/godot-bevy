@@ -110,7 +110,7 @@ WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WASM_DIR="$WORKSPACE_ROOT/target/wasm32-unknown-emscripten/$BUILD_MODE"
 
 echo "=== Building NON-THREADED version ==="
-RUSTFLAGS="-C link-args=-sSIDE_MODULE=2 -C link-args=-O0 -Zlink-native-libraries=no -Cllvm-args=-enable-emscripten-cxx-exceptions=0 -Zemscripten-wasm-eh=false" \
+RUSTFLAGS="-C link-args=-sSIDE_MODULE=2 -C link-args=-O0 -Zlink-native-libraries=no -Cllvm-args=-enable-emscripten-cxx-exceptions=0" \
     $CARGO_CMD build --no-default-features --features web-nothreads -Zbuild-std --target wasm32-unknown-emscripten $RELEASE_FLAG
 
 if [[ -f "$WASM_DIR/simple_node2d_movement_example.wasm" ]]; then
@@ -130,7 +130,7 @@ if [[ "$THREADED" == true ]] || [[ "$SERVE" == false ]]; then
     THREADED_WASM_DIR="$THREADED_TARGET_DIR/wasm32-unknown-emscripten/$BUILD_MODE"
 
     CARGO_TARGET_DIR="$THREADED_TARGET_DIR" \
-    RUSTFLAGS="-C link-args=-pthread -C target-feature=+atomics -C link-args=-sSIDE_MODULE=2 -C link-args=-O0 -Zlink-native-libraries=no -Cllvm-args=-enable-emscripten-cxx-exceptions=0 -Zemscripten-wasm-eh=false" \
+    RUSTFLAGS="-C link-args=-pthread -C target-feature=+atomics -C link-args=-sSIDE_MODULE=2 -C link-args=-O0 -Zlink-native-libraries=no -Cllvm-args=-enable-emscripten-cxx-exceptions=0" \
         $CARGO_CMD build --no-default-features --features web -Zbuild-std --target wasm32-unknown-emscripten $RELEASE_FLAG
 
     if [[ -f "$THREADED_WASM_DIR/simple_node2d_movement_example.wasm" ]]; then
