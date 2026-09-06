@@ -230,10 +230,9 @@ jobs:
     name: build simple-node2d-movement (wasm)
     runs-on: ubuntu-latest
     needs: changes
-    if: contains(needs.changes.outputs.examples, 'simple-node2d-movement')
-    # Broken against current nightly (web-task fails catch_unwind unwind-safety checks);
-    # reported but not blocking until the web target is verified again.
-    continue-on-error: true
+    # Skipped until the web build works on nightly again, see #268. Drop the `false &&`
+    # to re-enable; the path filter is already correct.
+    if: false && contains(needs.changes.outputs.examples, 'simple-node2d-movement')
 
     steps:
       - name: Checkout code
