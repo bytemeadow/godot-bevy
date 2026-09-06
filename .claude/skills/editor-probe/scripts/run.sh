@@ -137,14 +137,20 @@ def main():
             raise ValueError("manifest must be a non-empty JSON list of probes")
         probes = config
     else:
+        if not isinstance(config, dict):
+            raise ValueError("probe.json must be a JSON object")
         probes = [dict(config, project=str(Path(args[0]).resolve().relative_to(repo)))]
     projects = {}
     for probe in probes:
+        if not isinstance(probe, dict):
+            raise ValueError(f"probe must be a JSON object: {probe}")
         for key in ("project", "class", "property", "shots"):
             if not isinstance(probe.get(key), str) or not probe[key]:
                 raise ValueError(f"probe requires a non-empty {key}: {probe}")
         if "value" not in probe or not isinstance(probe.get("expect", {}), dict):
             raise ValueError(f"probe requires value and expect must be an object: {probe}")
+        if not Path(probe["shots"]).is_absolute():
+            raise ValueError(f"shots must be an absolute path: {probe['shots']}")
         project = (repo / probe["project"]).resolve()
         if Path(probe["project"]).is_absolute() or not project.is_relative_to(repo):
             raise ValueError(f"project must be relative to the repo root: {probe['project']}")
