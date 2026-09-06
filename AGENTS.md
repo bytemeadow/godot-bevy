@@ -78,6 +78,7 @@ Where things live:
 - Repeat and retain evidence: `devenv shell -- itest --filter test_name --repeat 3 --timeout-frames 600 --json ../target/itest.json`. Exit 0 means pass, 1 means a failed/flaky/timeout result, and 2 means a configuration or harness error.
 - `#[itest(focus)]` intersects with filters. CI sets `ITEST_DENY_FOCUS=1`, so committed focus markers fail before any test executes. `#[itest(skip)]` reports a selected test as skipped.
 - In async tests, `app.physics_update().await` guarantees a physics tick. Don't write exact single-frame assertions -- frame boundaries have ±1-frame slop.
+- For a change designers see in the editor (a new `GodotClass`, exported fields, Inspector hints), run the `editor-probe` skill (`.claude/skills/editor-probe`): it scripts a real editor session, saves and reloads a scene with the class, and captures the Inspector.
 
 ## Benchmarks
 
