@@ -1,0 +1,81 @@
+[
+  {
+    "project": "itest/godot",
+    "class": "AutoSyncPlayerNode",
+    "property": "speed",
+    "value": 500.0,
+    "expect": {
+      "type": "FLOAT",
+      "hint": "RANGE",
+      "hint_string": "0,1000,1",
+      "default": 250.0
+    },
+    "shots": "/tmp/editor-probe/AutoSyncPlayerNode"
+  },
+  {
+    "project": "itest/godot",
+    "class": "InspectorPrimaryNode",
+    "property": "label",
+    "value": "Knife",
+    "expect": {
+      "type": "STRING",
+      "hint": "ENUM",
+      "hint_string": "Hands,Knife",
+      "default": "Hands",
+      "description": "Primary kind description"
+    },
+    "shots": "/tmp/editor-probe/InspectorPrimaryNode"
+  },
+  {
+    "project": "itest/godot",
+    "class": "InspectorTupleNode",
+    "property": "value1",
+    "value": "Knife",
+    "expect": {
+      "type": "STRING",
+      "hint": "ENUM",
+      "hint_string": "Hands,Knife",
+      "default": "Hands"
+    },
+    "shots": "/tmp/editor-probe/InspectorTupleNode"
+  },
+  {
+    "project": "itest/godot",
+    "class": "InspectorNativeNode",
+    "property": "kind",
+    "value": "Knife",
+    "expect": {
+      "type": "STRING",
+      "hint": "ENUM",
+      "hint_string": "Hands,Knife",
+      "default": "Hands"
+    },
+    "shots": "/tmp/editor-probe/InspectorNativeNode"
+  },
+  {
+    "project": "itest/godot",
+    "class": "TestMovementComponent",
+    "property": "max_speed",
+    "value": 90.0,
+    "expect": {
+      "type": "FLOAT",
+      "hint": "NONE",
+      "hint_string": "",
+      "default": 0.0
+    },
+    "shots": "/tmp/editor-probe/TestMovementComponent"
+  },
+  {
+    "project": "itest/godot",
+    "class": "AttachCarrier",
+    "property": "value",
+    "value": 42,
+    "expect": {
+      "type": "INT",
+      "hint": "NONE",
+      "hint_string": "",
+      "default": 0
+    },
+    "shots": "/tmp/editor-probe/AttachCarrier"
+  }
+]
