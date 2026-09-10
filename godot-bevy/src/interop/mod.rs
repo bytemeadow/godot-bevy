@@ -12,5 +12,3 @@ pub use node_markers::*;
 
 pub mod signal_names;
 pub use signal_names::*;
-
-mod utils;

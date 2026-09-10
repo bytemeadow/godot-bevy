@@ -22,6 +22,7 @@ mod input_tests;
 mod macro_redesign_tests;
 mod pause_tests;
 mod real_frame_tests;
+mod resource_handle_tests;
 mod scene_tree_tests;
 mod scene_tree_watcher_init_tests;
 mod shutdown_tests;

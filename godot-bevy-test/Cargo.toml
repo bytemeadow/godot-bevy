@@ -20,7 +20,7 @@ profile-tracy = [
 ]
 
 [dependencies]
-godot = { workspace = true, features = ["__trace"] }
+godot = { workspace = true, features = ["__itest"] }
 godot-bevy = { workspace = true }
 godot-bevy-test-macros = { workspace = true }
 bevy = { version = "0.19", default-features = false, features = [
