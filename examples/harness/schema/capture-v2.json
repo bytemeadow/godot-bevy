@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Native example capture v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "example", "scenario", "scene", "frames", "seed", "viewport", "clocks", "settle", "checkpoints", "pacing", "extensions"],
+  "properties": {
+    "version": {"type": "integer", "const": 2},
+    "pacing": {"type": "string", "enum": ["fixed", "realtime"]},
+    "extensions": {"type": "object", "propertyNames": {"type": "string", "pattern": "^(?!rendering_2d$)[a-z0-9][a-z0-9_-]*$"}, "additionalProperties": true},
+    "example": {"$ref": "#/$defs/name"},
+    "scenario": {"$ref": "#/$defs/name"},
+    "scene": {"type": "string", "pattern": "^res://[^\\s]+\\.tscn$"},
+    "frames": {"type": "integer", "minimum": 1, "maximum": 1000000},
+    "seed": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+    "viewport": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer", "minimum": 1, "maximum": 8192}},
+    "clocks": {
+      "type": "object", "additionalProperties": false,
+      "required": ["physics_hz", "bevy_step_ns"],
+      "properties": {
+        "physics_hz": {"type": "integer", "const": 60},
+        "bevy_step_ns": {"type": "integer", "const": 16666667}
+      }
+    },
+    "settle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["stable_frames", "nodes", "classes"],
+      "properties": {
+        "stable_frames": {"type": "integer", "minimum": 2, "maximum": 600},
+        "nodes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/path"}},
+        "classes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"}}
+      }
+    },
+    "checkpoints": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/checkpoint"}}
+  },
+  "$defs": {
+    "name": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+    "path": {"type": "string", "minLength": 1, "pattern": "^(\\.|[^/\\s:]+(/[^/\\s:]+)*)$"},
+    "rgb": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "integer", "minimum": 0, "maximum": 255}},
+    "node": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "position", "tolerance", "visible"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "position": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}},
+        "tolerance": {"type": "number", "minimum": 0},
+        "visible": {"type": "boolean"}
+      }
+    },
+    "region": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "rect", "non_blank", "dominant_colour"],
+      "properties": {
+        "name": {"$ref": "#/$defs/name"},
+        "rect": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "integer", "minimum": 0}},
+        "non_blank": {
+          "type": "object", "additionalProperties": false,
+          "required": ["background", "tolerance", "min_fraction"],
+          "properties": {
+            "background": {"$ref": "#/$defs/rgb"},
+            "tolerance": {"type": "integer", "minimum": 0, "maximum": 255},
+            "min_fraction": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}
+          }
+        },
+        "dominant_colour": {
+          "type": "object", "additionalProperties": false,
+          "required": ["rgb", "tolerance"],
+          "properties": {
+            "rgb": {"$ref": "#/$defs/rgb"},
+            "tolerance": {"type": "integer", "minimum": 0, "maximum": 255}
+          }
+        }
+      }
+    },
+    "checkpoint": {
+      "type": "object", "additionalProperties": false,
+      "required": ["frame", "nodes", "regions"],
+      "properties": {
+        "frame": {"type": "integer", "minimum": 0},
+        "nodes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/node"}},
+        "regions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/region"}}
+      }
+    }
+  }
+}
