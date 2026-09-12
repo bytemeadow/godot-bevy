@@ -1,24 +1,17 @@
 # Simple Node2D Movement
 
-This example shows how to move a Sprite2D around the screen.
-
-It demonstrates how to:
-- Add systems to the _process loop.
-- Add components to entities that are Godot nodes.
-- Access _process delta time.
-- Modify the position of Node2Ds.
+This example moves a Sprite2D in a circle. Bevy systems attach components to the sprite's entity, read `Res<Time>` in `Update`, and change its `Transform`. `GodotTransformSyncPlugin` copies those changes to Godot.
 
 ![Final Product](final-product-screencast.gif)
 
+## Running this example
 
-## Running This Example
+From the repository root, with Godot on your `PATH`:
 
-1. **Build**: `cargo build`
-2. **Run**: You can either:
-    1. Open the Godot project and run the scene
-    1. Run: `cargo run`. NOTE: This requires the Godot binary, which we attempt
-       to locate either through your environment's path or by searching common
-       locations. If this doesn't work, update your path to include Godot. If
-       this fails for other reasons, it may be because your version of Godot
-       is different than the one the example was built with, in that case,
-       try opening the Godot project first.
+```bash
+cargo run --manifest-path examples/simple-node2d-movement/rust/Cargo.toml
+```
+
+The launcher builds the library, generates its GDExtension descriptor, and opens Godot.
+
+The web build is blocked on [#268](https://github.com/bytemeadow/godot-bevy/issues/268). The `web` and `web-nothreads` features remain available for development, but web CI is disabled.

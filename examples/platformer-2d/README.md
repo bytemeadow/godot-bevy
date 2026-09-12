@@ -1,15 +1,18 @@
 # Platformer 2D Example
 
-This example demonstrates a simple platformer game using the Godot game engine where all scenes are configured in editor. It showcases basic physics, collision detection, player movement, scene switching, audio playback and adding bundles to custom Godot nodes for tagging even when nodes are configured in editor.
+This platformer uses scenes configured in the Godot editor. Rust components define exported properties and tag nodes for Bevy systems. The game includes player movement, collisions, level changes, and audio.
 
-## Features
+## Running this example
 
-- Basic physics simulation
-- Collision detection and response
-- Player movement controls
-- Scene switching between levels
-- Audio playback for sound effects and music
-- Adding bundles to custom Godot nodes for tagging even when nodes are configured in editor
+From the repository root, with Godot on your `PATH`:
+
+```bash
+cargo run --manifest-path examples/platformer-2d/rust/Cargo.toml
+```
+
+The launcher builds the library, generates its GDExtension descriptor, and opens Godot.
+
+This example enables `godot-bevy/register-docs` for property help in the editor. That feature requires Godot 4.3 or later. The editor-probe help check uses Godot 4.6.
 
 ## Copying
 
