@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Browser qualification preparation",
+  "description": "No runtime extension data until godot-bevy#268 clears.",
+  "type": "object",
+  "maxProperties": 0,
+  "additionalProperties": false
+}
