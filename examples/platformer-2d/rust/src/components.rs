@@ -46,7 +46,12 @@ impl Default for Gravity {
 #[reflect(Component)]
 #[gdbevy(base = CharacterBody2D, class_name = Player2D)]
 #[gdbevy(
-    require(speed: Speed, as = f32, default = 250.0),
+    require(
+        speed: Speed,
+        as = f32,
+        default = 250.0,
+        description = "Movement speed in pixels per second",
+    ),
     require(jump_velocity: JumpVelocity, as = f32, default = -400.0),
     require(gravity: Gravity, as = f32, default = 980.0),
 )]

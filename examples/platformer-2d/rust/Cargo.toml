@@ -15,7 +15,7 @@ bevy = { version = "0.19", default-features = false, features = ["bevy_state", "
 bevy_asset_loader = "0.27"
 fastrand = { version = "2.3.0" }
 godot = "0.5"
-godot-bevy = { path = "../../../godot-bevy" }
+godot-bevy = { path = "../../../godot-bevy", features = ["register-docs"] }
 godot-bevy-test = { path = "../../../godot-bevy-test", optional = true }
 cargo-godot-lib.workspace = true
 

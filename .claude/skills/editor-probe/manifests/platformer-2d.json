@@ -8,7 +8,8 @@
       "type": "FLOAT",
       "hint": "NONE",
       "hint_string": "",
-      "default": 250.0
+      "default": 250.0,
+      "description": "Movement speed in pixels per second"
     },
     "shots": "/tmp/editor-probe/Player2D"
   },
