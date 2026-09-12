@@ -108,6 +108,9 @@ in
       done
       cargo clippy -p simple-node2d-movement-example -p two-way-sync-example -p dodge-the-creeps-example -p perf-test --all-targets --features capture -- -D warnings
       cargo clippy -p platformer-2d-example --all-targets --features capture-audio,capture-input -- -D warnings
+      cargo test -p godot-bevy-test --lib --features capture
+      cargo test -p simple-node2d-movement-example -p two-way-sync-example -p dodge-the-creeps-example -p perf-test --lib --features capture
+      cargo test -p platformer-2d-example --lib --features capture-audio,capture-input
     '';
 
     # native, needs local godot
