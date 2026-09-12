@@ -1,0 +1,116 @@
+[
+  {
+    "device": "mouse",
+    "expected": {
+      "event": "mouse_button",
+      "button": 1,
+      "state": "pressed",
+      "target": "start"
+    }
+  },
+  {
+    "device": "mouse",
+    "expected": {
+      "event": "mouse_button",
+      "button": 1,
+      "state": "released",
+      "target": "start"
+    }
+  },
+  {
+    "device": "keyboard",
+    "expected": {
+      "action": "move_left",
+      "state": "pressed"
+    }
+  },
+  {
+    "device": "keyboard",
+    "expected": {
+      "action": "move_left",
+      "state": "released"
+    }
+  },
+  {
+    "device": "keyboard",
+    "expected": {
+      "action": "move_right",
+      "state": "pressed"
+    }
+  },
+  {
+    "device": "keyboard",
+    "expected": {
+      "action": "move_right",
+      "state": "released"
+    }
+  },
+  {
+    "device": "keyboard",
+    "expected": {
+      "action": "jump",
+      "state": "pressed"
+    }
+  },
+  {
+    "device": "keyboard",
+    "expected": {
+      "action": "jump",
+      "state": "released"
+    }
+  },
+  {
+    "device": "controller",
+    "expected": {
+      "event": "joy_axis",
+      "axis": 0,
+      "direction": -1,
+      "threshold": 0.6,
+      "neutral_tolerance": 0.15
+    }
+  },
+  {
+    "device": "controller",
+    "expected": {
+      "event": "joy_axis",
+      "axis": 0,
+      "direction": 0,
+      "threshold": 0.6,
+      "neutral_tolerance": 0.15
+    }
+  },
+  {
+    "device": "controller",
+    "expected": {
+      "event": "joy_axis",
+      "axis": 0,
+      "direction": 1,
+      "threshold": 0.6,
+      "neutral_tolerance": 0.15
+    }
+  },
+  {
+    "device": "controller",
+    "expected": {
+      "event": "joy_axis",
+      "axis": 0,
+      "direction": 0,
+      "threshold": 0.6,
+      "neutral_tolerance": 0.15
+    }
+  },
+  {
+    "device": "controller",
+    "expected": {
+      "action": "jump",
+      "state": "pressed"
+    }
+  },
+  {
+    "device": "controller",
+    "expected": {
+      "action": "jump",
+      "state": "released"
+    }
+  }
+]

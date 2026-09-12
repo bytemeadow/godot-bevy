@@ -1,0 +1,187 @@
+{
+  "version": 2,
+  "example": "platformer-2d",
+  "scenario": "input-replay",
+  "scene": "res://scenes/levels/main_menu.tscn",
+  "pacing": "fixed",
+  "extensions": {
+    "synthetic_input": {
+      "version": 1,
+      "max_latency_frames": 2,
+      "actions": [
+        "move_left",
+        "move_right",
+        "jump",
+        "ui_accept"
+      ],
+      "trace": [
+        {
+          "frame": 5,
+          "action": "move_left",
+          "binding": "physical_keycode",
+          "code": 65,
+          "pressed": true
+        },
+        {
+          "frame": 13,
+          "action": "move_left",
+          "binding": "physical_keycode",
+          "code": 65,
+          "pressed": false
+        },
+        {
+          "frame": 35,
+          "action": "move_right",
+          "binding": "physical_keycode",
+          "code": 68,
+          "pressed": true
+        },
+        {
+          "frame": 43,
+          "action": "move_right",
+          "binding": "physical_keycode",
+          "code": 68,
+          "pressed": false
+        },
+        {
+          "frame": 65,
+          "action": "jump",
+          "binding": "physical_keycode",
+          "code": 32,
+          "pressed": true
+        },
+        {
+          "frame": 73,
+          "action": "jump",
+          "binding": "physical_keycode",
+          "code": 32,
+          "pressed": false
+        },
+        {
+          "frame": 95,
+          "action": "ui_accept",
+          "binding": "keycode",
+          "code": 4194309,
+          "pressed": true
+        },
+        {
+          "frame": 103,
+          "action": "ui_accept",
+          "binding": "keycode",
+          "code": 4194309,
+          "pressed": false
+        }
+      ]
+    }
+  },
+  "frames": 120,
+  "seed": 0,
+  "viewport": [
+    1152,
+    648
+  ],
+  "clocks": {
+    "physics_hz": 60,
+    "bevy_step_ns": 16666667
+  },
+  "settle": {
+    "stable_frames": 3,
+    "nodes": [
+      ".",
+      "Options/StartButton",
+      "InputOverlay/Prompt",
+      "InputOverlay/Panel",
+      "Level1/Player"
+    ],
+    "classes": [
+      "InputCaptureRecorder",
+      "Player2D"
+    ]
+  },
+  "checkpoints": [
+    {
+      "frame": 0,
+      "nodes": [
+        {
+          "path": "InputOverlay/Prompt",
+          "position": [
+            32,
+            32
+          ],
+          "tolerance": 0,
+          "visible": true
+        }
+      ],
+      "regions": [
+        {
+          "name": "input-panel",
+          "rect": [
+            8,
+            8,
+            16,
+            16
+          ],
+          "non_blank": {
+            "background": [
+              255,
+              255,
+              255
+            ],
+            "tolerance": 0,
+            "min_fraction": 1
+          },
+          "dominant_colour": {
+            "rgb": [
+              0,
+              0,
+              0
+            ],
+            "tolerance": 0
+          }
+        }
+      ]
+    },
+    {
+      "frame": 120,
+      "nodes": [
+        {
+          "path": "InputOverlay/Prompt",
+          "position": [
+            32,
+            32
+          ],
+          "tolerance": 0,
+          "visible": true
+        }
+      ],
+      "regions": [
+        {
+          "name": "input-panel",
+          "rect": [
+            8,
+            8,
+            16,
+            16
+          ],
+          "non_blank": {
+            "background": [
+              255,
+              255,
+              255
+            ],
+            "tolerance": 0,
+            "min_fraction": 1
+          },
+          "dominant_colour": {
+            "rgb": [
+              0,
+              0,
+              0
+            ],
+            "tolerance": 0
+          }
+        }
+      ]
+    }
+  ]
+}

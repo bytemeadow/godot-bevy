@@ -3747,6 +3747,8 @@ dependencies = [
  "godot",
  "godot-bevy",
  "godot-bevy-test",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
