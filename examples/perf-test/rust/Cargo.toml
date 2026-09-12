@@ -16,6 +16,7 @@ bevy = { version = "0.19", default-features = false, features = ["bevy_asset", "
 fastrand = "2.3.0"
 godot = "0.5"
 godot-bevy = { path = "../../../godot-bevy" }
+godot-bevy-test = { workspace = true, optional = true }
 tracing = "0.1"
 tracing-tracy = { version = "0.11.4", default-features = false, features = [
     "enable",
@@ -26,6 +27,7 @@ tracing-tracy = { version = "0.11.4", default-features = false, features = [
 cargo-godot-lib.workspace = true
 
 [features]
+capture = ["dep:godot-bevy-test", "godot-bevy-test/capture"]
 # You can also profile this example!
 # 1. Install [Tracy](https://github.com/wolfpld/tracy), see https://github.com/bevyengine/bevy/blob/main/docs/profiling.md
 #    for details on picking the correct version to install.

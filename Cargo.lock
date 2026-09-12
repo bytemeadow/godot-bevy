@@ -3682,6 +3682,7 @@ dependencies = [
  "fastrand",
  "godot",
  "godot-bevy",
+ "godot-bevy-test",
  "tracing",
  "tracing-tracy",
 ]
