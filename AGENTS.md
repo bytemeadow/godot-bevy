@@ -17,7 +17,7 @@ Everything runs inside `devenv shell -- <cmd>` (direnv usually activates the env
 
 | Script | What it does |
 |--------|--------------|
-| `ci-lint` | what CI enforces: `cargo fmt --check` + `clippy -D warnings` |
+| `ci-lint` | what CI enforces: `cargo fmt --check`, `clippy -D warnings`, the examples portfolio check, the capture harness Python suites and clippy with each example's capture features |
 | `itest` | integration tests, natively (needs local Godot) |
 | `bench` | benchmarks, natively (needs local Godot) |
 | `profile` | tracy span table for one benchmark, or samply flamegraph with `--native` |
@@ -80,6 +80,16 @@ Where things live:
 - `#[itest(focus)]` intersects with filters. CI sets `ITEST_DENY_FOCUS=1`, so committed focus markers fail before any test executes. `#[itest(skip)]` reports a selected test as skipped.
 - In async tests, `app.physics_update().await` guarantees a physics tick. Don't write exact single-frame assertions -- frame boundaries have ±1-frame slop.
 - For a change designers see in the editor (a new `GodotClass`, exported fields, Inspector hints), run the `editor-probe` skill (`.claude/skills/editor-probe`): it scripts a real editor session, saves and reloads a scene with the class, and captures the Inspector.
+
+## Capture harness
+
+For behaviour only a running example shows (what is drawn, played or read from input across real frames), the examples have capture scenarios: `examples/<example>/capture/<scenario>.json` is the oracle, `examples/harness/capture.py` runs the example in windowed Godot 4.6.2 with a seeded reset and compares node facts and viewport region statistics at declared frames. PNGs are evidence beside the facts, never goldens. The contract is `examples/harness/README.md`; the procedure is the `capture-scenario` skill (`.claude/skills/capture-scenario`), whose `scripts/run.sh` builds, imports, checks the library and prints one verdict line per scenario.
+
+- Each example has a `capture` Cargo feature; the platformer adds `capture-audio` and `capture-input`. Workspace clippy never enables them, so lint the crate with its capture features, as CI does.
+- Exit codes: 0 passed, 1 an assertion failed, 2 the run could not happen. Every example ships a negative scenario that must exit 1 on one named field.
+- Needs a display. Evidence lands in `target/example-evidence/<run>/`; the directory refuses to overwrite, so reruns need a new run name.
+- Godot rewrites `*.import` files on import; discard that churn. Keep generated `*.uid` files, which the repo tracks.
+- Two verdicts need a person: the audio reference WAV is approved by listening (`examples/harness/audio/README.md`), and the physical input session needs a controller. Both stay `untested` otherwise.
 
 ## Benchmarks
 
