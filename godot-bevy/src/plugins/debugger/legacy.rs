@@ -1,94 +1,16 @@
-//! Bevy Entity Debugger Plugin
-//!
-//! This plugin integrates with Godot's EditorDebuggerPlugin system to provide
-//! real-time inspection of Bevy entities and components in the Godot editor.
-
-use bevy_app::{App, Plugin, Update};
-use bevy_ecs::prelude::{Name, Resource, World};
-use bevy_ecs::world::EntityRef;
+use crate::{interop::GodotNodeHandle, plugins::scene_tree::GodotChildOf};
+use bevy_ecs::{
+    prelude::{Name, World},
+    reflect::AppTypeRegistry,
+    world::EntityRef,
+};
 use bevy_reflect::{PartialReflect, ReflectFromPtr, ReflectRef};
-use bevy_time::Time;
-use godot::classes::EngineDebugger;
-use godot::meta::ToGodot;
-use godot::prelude::{VarDictionary as Dictionary, *};
+use godot::{
+    meta::ToGodot,
+    prelude::{VarDictionary as Dictionary, *},
+};
 
-use crate::interop::GodotNodeHandle;
-use crate::plugins::scene_tree::GodotChildOf;
-use bevy_ecs::reflect::AppTypeRegistry;
-
-/// Configuration for the debugger plugin
-#[derive(Resource)]
-pub struct DebuggerConfig {
-    /// Whether the debugger is enabled
-    pub enabled: bool,
-    /// How often to send entity updates (in seconds)
-    pub update_interval: f32,
-}
-
-impl Default for DebuggerConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            update_interval: 0.5, // Update twice per second
-        }
-    }
-}
-
-#[derive(Resource, Default)]
-struct DebuggerTimer {
-    elapsed: f32,
-}
-
-/// Plugin that enables Bevy entity inspection in Godot's debugger
-#[derive(Default)]
-pub struct GodotDebuggerPlugin;
-
-impl Plugin for GodotDebuggerPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_resource::<DebuggerConfig>()
-            .init_resource::<DebuggerTimer>()
-            .add_systems(Update, debugger_exclusive_system);
-    }
-}
-
-fn debugger_exclusive_system(world: &mut World) {
-    let config = world.get_resource::<DebuggerConfig>();
-    let enabled = config.map(|c| c.enabled).unwrap_or(false);
-    let update_interval = config.map(|c| c.update_interval).unwrap_or(0.5);
-
-    if !enabled {
-        return;
-    }
-
-    let delta = world
-        .get_resource::<Time>()
-        .map(|t| t.delta_secs())
-        .unwrap_or(0.0);
-
-    let should_send = {
-        let mut timer = world.get_resource_mut::<DebuggerTimer>();
-        if let Some(ref mut timer) = timer {
-            timer.elapsed += delta;
-            if timer.elapsed < update_interval {
-                false
-            } else {
-                timer.elapsed = 0.0;
-                true
-            }
-        } else {
-            false
-        }
-    };
-
-    if !should_send {
-        return;
-    }
-
-    if !EngineDebugger::singleton().is_active() {
-        return;
-    }
-
-    // Clone registry so we can release the borrow on world
+pub(super) fn entities(world: &mut World) -> VarArray {
     let type_registry = world.get_resource::<AppTypeRegistry>().cloned();
 
     let mut entities = VarArray::new();
@@ -104,7 +26,7 @@ fn debugger_exclusive_system(world: &mut World) {
 
         let parent_bits: i64 = entity_ref
             .get::<GodotChildOf>()
-            .map(|child_of| child_of.get().to_bits() as i64)
+            .map(|child_of| i64::from_ne_bytes(child_of.get().to_bits().to_ne_bytes()))
             .unwrap_or(-1);
 
         let mut components = VarArray::new();
@@ -164,7 +86,9 @@ fn debugger_exclusive_system(world: &mut World) {
         }
 
         let mut entry = VarArray::new();
-        entry.push(&Variant::from(entity_ref.id().to_bits() as i64));
+        entry.push(&Variant::from(i64::from_ne_bytes(
+            entity_ref.id().to_bits().to_ne_bytes(),
+        )));
         entry.push(name.as_str());
         entry.push(&Variant::from(has_godot_node));
         entry.push(&Variant::from(parent_bits));
@@ -173,8 +97,7 @@ fn debugger_exclusive_system(world: &mut World) {
         entities.push(&entry.to_variant());
     }
 
-    let mut debugger = EngineDebugger::singleton();
-    debugger.send_message("bevy:entities", &entities);
+    entities
 }
 
 fn extract_short_name(full_name: String) -> (String, String) {
@@ -295,7 +218,10 @@ fn reflect_value_to_variant(value: &dyn PartialReflect) -> Variant {
         return Variant::from(*v as i64);
     }
     if let Some(v) = value.try_downcast_ref::<u64>() {
-        return Variant::from(*v as i64);
+        return match i64::try_from(*v) {
+            Ok(value) => value.to_variant(),
+            Err(_) => v.to_string().as_str().to_variant(),
+        };
     }
     if let Some(v) = value.try_downcast_ref::<bool>() {
         return Variant::from(*v);

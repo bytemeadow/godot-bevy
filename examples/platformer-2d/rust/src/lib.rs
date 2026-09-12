@@ -48,11 +48,7 @@ fn build_app(app: &mut App) {
             main_menu::MainMenuPlugin,
             level_manager::LevelManagerPlugin,
             gameplay::GameplayPlugin,
-        ))
-        .register_type::<components::Speed>()
-        .register_type::<components::JumpVelocity>()
-        .register_type::<components::Gravity>()
-        .register_type::<components::Player>();
+        ));
 
     #[cfg(feature = "capture")]
     capture::install(app);
@@ -66,4 +62,46 @@ enum GameState {
     Loading,
     MainMenu,
     InGame,
+}
+
+#[cfg(test)]
+mod debugger_registration_tests {
+    use super::*;
+    use godot_bevy::plugins::debugger::{
+        edit::read_component,
+        value::{Kind, Scalar, ValueLimits},
+    };
+
+    #[test]
+    fn debugger_registers_platformer_components_automatically() {
+        let mut app = App::new();
+        let entity = app
+            .world_mut()
+            .spawn((
+                components::Speed::default(),
+                components::JumpVelocity::default(),
+                components::Gravity::default(),
+                components::Player,
+            ))
+            .id();
+        for (type_path, expected) in [
+            (components::Speed::type_path(), 100.0),
+            (components::JumpVelocity::type_path(), -400.0),
+            (components::Gravity::type_path(), 980.0),
+        ] {
+            let value =
+                read_component(app.world(), entity, type_path, &ValueLimits::default()).unwrap();
+            assert!(
+                matches!(value.kind, Kind::TupleStruct(fields) if fields[0].kind == Kind::Scalar(Scalar::Float(expected)))
+            );
+        }
+        let player = read_component(
+            app.world(),
+            entity,
+            components::Player::type_path(),
+            &ValueLimits::default(),
+        )
+        .unwrap();
+        assert!(!matches!(player.kind, Kind::Unsupported(_)));
+    }
 }

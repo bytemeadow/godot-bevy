@@ -165,8 +165,11 @@ pub struct SceneTreeConfig {
     pub auto_despawn_children: bool,
 }
 
+/// Scene-tree messages and their deferred entity changes are applied in `First`.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) struct SceneTreeIngestion;
+pub enum SceneTreeSet {
+    Apply,
+}
 
 impl Plugin for GodotSceneTreePlugin {
     fn build(&self, app: &mut App) {
@@ -190,7 +193,7 @@ impl Plugin for GodotSceneTreePlugin {
                 (
                     write_scene_tree_messages.before(read_scene_tree_messages),
                     read_scene_tree_messages
-                        .in_set(SceneTreeIngestion)
+                        .in_set(SceneTreeSet::Apply)
                         .before(message_update_system),
                     mirror_tree_pause_to_virtual.before(TimeSystems),
                 ),
