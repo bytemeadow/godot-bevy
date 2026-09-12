@@ -97,6 +97,7 @@ in
     '';
 
     ci-lint.exec = ''
+      set -e
       echo "Running lint checks..."
       cargo fmt --all -- --check
       cargo clippy --all-targets -- -D warnings
