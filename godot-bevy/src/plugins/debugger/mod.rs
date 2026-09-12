@@ -1,7 +1,6 @@
 //! Runtime inspection over Godot's debugger channel.
 
 pub mod edit;
-mod legacy;
 mod service;
 pub mod value;
 mod wire;
@@ -14,12 +13,11 @@ use std::{
     sync::mpsc::{Receiver, Sender, channel},
 };
 
-use bevy_app::{App, First, Plugin, Update};
+use bevy_app::{App, First, Plugin};
 use bevy_ecs::{
     prelude::*,
     schedule::{IntoScheduleConfigs, SystemSet},
 };
-use bevy_time::Time;
 use godot::{
     classes::EngineDebugger,
     prelude::{VarDictionary as Dictionary, *},
@@ -34,7 +32,7 @@ use value::ValueLimits;
 pub struct DebuggerConfig {
     /// Whether the debugger is enabled.
     pub enabled: bool,
-    /// Legacy dock refresh interval, in seconds.
+    /// Default editor subscription interval, in seconds.
     pub update_interval: f32,
     /// Bounds on collection elements and nesting depth when reading values.
     pub value_limits: ValueLimits,
@@ -69,8 +67,6 @@ impl DebuggerEndpoint {
 #[derive(Resource)]
 pub struct DebuggerTransport {
     sink: Box<dyn Fn(Wire) + Send + Sync>,
-    legacy_sink: Box<dyn Fn(VarArray) + Send + Sync>,
-    debugger_attached: fn() -> bool,
 }
 
 impl DebuggerTransport {
@@ -78,22 +74,7 @@ impl DebuggerTransport {
     pub fn new(sink: impl Fn(Wire) + Send + Sync + 'static) -> Self {
         Self {
             sink: Box::new(sink),
-            legacy_sink: Box::new(|entities| {
-                EngineDebugger::singleton().send_message("bevy:entities", &entities)
-            }),
-            debugger_attached: || EngineDebugger::singleton().is_active(),
         }
-    }
-
-    /// Overrides the temporary legacy dock transport and its connection check.
-    pub fn with_legacy_sink(
-        mut self,
-        attached: fn() -> bool,
-        sink: impl Fn(VarArray) + Send + Sync + 'static,
-    ) -> Self {
-        self.debugger_attached = attached;
-        self.legacy_sink = Box::new(sink);
-        self
     }
 
     fn send(&self, frame: Wire) {
@@ -124,7 +105,6 @@ struct Runtime {
     receiver: Receiver<Dictionary>,
     subscription: Option<Subscription>,
     capture_registered: bool,
-    legacy_elapsed: f32,
 }
 
 impl Drop for Runtime {
@@ -141,11 +121,13 @@ pub struct GodotDebuggerPlugin;
 
 impl Plugin for GodotDebuggerPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<DebuggerConfig>()
+            .init_resource::<DebuggerTransport>();
         let (sender, receiver) = channel();
         let endpoint = DebuggerEndpoint(Rc::new(sender));
         let mut debugger = EngineDebugger::singleton();
-        let capture_registered = !debugger.has_capture("bevy");
-        if capture_registered {
+        let mut capture_registered = false;
+        if !debugger.has_capture("bevy") {
             let endpoint = endpoint.clone();
             let capture = Callable::from_fn("bevy_rpc", move |args: &[&Variant]| {
                 let Some(message) = args.first().and_then(|arg| arg.try_to::<GString>().ok())
@@ -170,20 +152,27 @@ impl Plugin for GodotDebuggerPlugin {
                 endpoint.submit(frame)
             });
             debugger.register_message_capture("bevy", &capture);
+            capture_registered = debugger.has_capture("bevy");
+            if capture_registered {
+                app.world()
+                    .resource::<DebuggerTransport>()
+                    .send(Wire::object([
+                        ("jsonrpc", Wire::String("2.0".into())),
+                        ("method", Wire::String("godot.ready".into())),
+                        ("params", service::debugger_config(app.world())),
+                    ]));
+            }
         } else {
             godot_warn!(
                 "godot-bevy: the bevy debugger capture is already registered; this app's endpoint will not receive editor requests"
             );
         }
-        app.init_resource::<DebuggerConfig>()
-            .init_resource::<DebuggerTransport>()
-            .init_resource::<SummaryChanges>()
+        app.init_resource::<SummaryChanges>()
             .insert_non_send(endpoint)
             .insert_non_send(Runtime {
                 receiver,
                 subscription: None,
                 capture_registered,
-                legacy_elapsed: 0.0,
             })
             .add_systems(
                 First,
@@ -191,8 +180,7 @@ impl Plugin for GodotDebuggerPlugin {
                     .chain()
                     .after(SceneTreeSet::Apply)
                     .in_set(DebuggerSet::Drain),
-            )
-            .add_systems(Update, legacy_update);
+            );
     }
 }
 
@@ -239,39 +227,6 @@ fn drain(world: &mut World) {
     world.insert_non_send(runtime);
 }
 
-fn legacy_update(world: &mut World) {
-    let config = world.resource::<DebuggerConfig>();
-    if !config.enabled || world.non_send::<Runtime>().subscription.is_some() {
-        return;
-    }
-    let interval = config.update_interval;
-    let delta = world.get_resource::<Time>().map_or(0.0, Time::delta_secs);
-    let mut runtime = world.non_send_mut::<Runtime>();
-    runtime.legacy_elapsed += delta;
-    if runtime.legacy_elapsed < interval {
-        return;
-    }
-    runtime.legacy_elapsed = 0.0;
-    if !(world.resource::<DebuggerTransport>().debugger_attached)() {
-        return;
-    }
-    let entities = legacy::entities(world);
-    (world.resource::<DebuggerTransport>().legacy_sink)(entities);
-}
-
 #[cfg(test)]
-mod tests {
-    #[test]
-    fn public_exports_keep_their_paths() {
-        let config: crate::prelude::DebuggerConfig = crate::plugins::DebuggerConfig::default();
-        let _: crate::prelude::GodotDebuggerPlugin = crate::plugins::GodotDebuggerPlugin;
-        let _: crate::prelude::InspectorReadOnly = crate::plugins::InspectorReadOnly;
-        let range: crate::prelude::InspectorRange = crate::plugins::InspectorRange::new(0.0, 10.0);
-        assert_eq!((range.min, range.max), (0.0, 10.0));
-        let _: crate::prelude::DebuggerSet = crate::plugins::DebuggerSet::Drain;
-        let _: crate::prelude::SceneTreeSet = crate::plugins::SceneTreeSet::Apply;
-        let _: crate::plugins::scene_tree::SceneTreeSet = crate::plugins::SceneTreeSet::Apply;
-        assert!(config.enabled);
-        assert_eq!(config.update_interval, 0.5);
-    }
-}
+#[path = "exports_tests.rs"]
+mod exports_tests;
