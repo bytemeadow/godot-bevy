@@ -7,7 +7,7 @@
   "properties": {
     "version": {"type": "integer", "const": 2},
     "pacing": {"type": "string", "enum": ["fixed", "realtime"]},
-    "extensions": {"type": "object", "propertyNames": {"type": "string", "pattern": "^(?!rendering_2d$)[a-z0-9][a-z0-9_-]*$"}, "additionalProperties": true},
+    "extensions": {"type": "object", "propertyNames": {"type": "string", "pattern": "^(?!(rendering_2d|facts|diff|request|png)$)[a-z0-9][a-z0-9_-]*$"}, "additionalProperties": true},
     "example": {"$ref": "#/$defs/name"},
     "scenario": {"$ref": "#/$defs/name"},
     "scene": {"type": "string", "pattern": "^res://[^\\s]+\\.tscn$"},

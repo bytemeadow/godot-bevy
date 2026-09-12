@@ -67,8 +67,8 @@ class ContractTests(unittest.TestCase):
         readme = (Path(capture.__file__).parent / 'README.md').read_text()
         for phrase in ('`bevy_step_ns` pins `Time<Virtual>`', 'motion advances on `Time<Fixed>`',
                        "Godot's physics delta", 'both clocks are pinned', 'not the same clock',
-                       'frame n\'s `_process`', 'queue has drained once',
-                       '`BevyAppSingleton` is mutably bound', 're-entering `BevyApp`', 'undefined'):
+                       'frame n\'s `_process`', 'returns false while the flag exists',
+                       '`BevyAppSingleton` is mutably bound', 'reaches `BevyAppSingleton` from a callback', 'undefined'):
             self.assertIn(phrase, readme)
 
 
@@ -102,7 +102,7 @@ class ExtensionTests(unittest.TestCase):
             path.unlink()
             self.assertTrue(validate_manifest(self.value))
             path.write_text(saved)
-        for name in ('../audio', 'audio/other', 'rendering_2d'):
+        for name in ('../audio', 'audio/other', 'rendering_2d', 'facts', 'diff', 'request', 'png'):
             self.value['extensions'] = {name: {}}
             self.assertTrue(validate_manifest(self.value))
 

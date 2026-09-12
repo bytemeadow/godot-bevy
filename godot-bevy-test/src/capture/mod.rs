@@ -176,7 +176,7 @@ fn start(adapters: Vec<CaptureAdapter>) -> Result<(), String> {
                 byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"_-".contains(&byte)
             })
             || !adapter.name.as_bytes()[0].is_ascii_alphanumeric()
-            || adapter.name == "rendering_2d"
+            || ["rendering_2d", "facts", "diff", "request", "png"].contains(&adapter.name)
             || !names.insert(adapter.name)
         {
             return Err("invalid or duplicate capture adapter name".into());
