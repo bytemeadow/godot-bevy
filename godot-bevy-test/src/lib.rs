@@ -10,8 +10,8 @@
 //! ```toml
 //! [dependencies]
 //! godot = "0.5"
-//! godot-bevy = "0.11"
-//! godot-bevy-test = { version = "0.11", optional = true }
+//! godot-bevy = "0.12"
+//! godot-bevy-test = { version = "0.12", optional = true }
 //! bevy = { version = "0.19", default-features = false }
 //!
 //! [features]
@@ -27,6 +27,10 @@
 //! mod itests;
 //! # fn main() {}
 //! ```
+//!
+//! Configure [Cargo Run Godot](https://bytemeadow.github.io/godot-bevy-book?page=getting-started/gdenv.html)
+//! to launch the runner with `cargo run --features itest`. It sets `GODOT_BEVY_ITEST=1`
+//! so the game autoload waits for the test runner.
 //!
 //! Write asynchronous tests with an owned [`TestContext`]:
 //! ```no_run

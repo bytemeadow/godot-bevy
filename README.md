@@ -44,9 +44,9 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-godot-bevy = "0.11.0"  # Latest with opt-in plugin system
-bevy = { version = "0.18", default-features = false }
-godot = "0.4"
+godot-bevy = "0.12"  # Latest with opt-in plugin system
+bevy = { version = "0.19", default-features = false }
+godot = "0.5"
 ```
 
 Basic example:
@@ -132,6 +132,7 @@ This library was inspired by and originally built upon the work of [bevy_godot](
 
 | `godot-bevy` | Bevy | Godot-Rust | Godot |
 |--------------|------|------------|-------|
+| 0.12.x       | 0.19 | 0.5        | 4.6.x |
 | 0.11.x       | 0.18 | 0.4        | 4.6.x |
 | 0.10.x       | 0.17 | 0.4        | 4.5.x |
 | 0.9.2        | 0.16 | 0.4        | 4.5.x |

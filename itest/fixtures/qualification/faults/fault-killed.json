@@ -2,7 +2,7 @@
   "$schema": "itest-report-v1.schema.json",
   "schema_version": 1,
   "run_id": "fault-killed-fixture",
-  "runner_version": "0.11.0",
+  "runner_version": "0.12.0",
   "complete": true,
   "outcome": "fail",
   "environment": {

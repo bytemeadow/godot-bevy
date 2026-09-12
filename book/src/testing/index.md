@@ -27,7 +27,7 @@ Install or symlink the addon into `godot/addons/godot-bevy`, and configure its `
 Add the optional test dependency and enable the frame signal used by the harness:
 
 ```toml
-godot-bevy-test = { version = "0.11", optional = true }
+godot-bevy-test = { version = "0.12", optional = true }
 ```
 
 ```toml

@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.11.0"
+version = "0.12.0"
 edition = "2024"
 authors = ["David Chavez <david@dcvz.io>"]
 repository = "https://github.com/bytemeadow/godot-bevy"
@@ -33,10 +33,10 @@ resolver = "2"
 
 [workspace.dependencies]
 godot = { version = "0.5.5" }
-godot-bevy = { version = "0.11.0", path = "godot-bevy" }
-godot-bevy-macros = { version = "0.11.0", path = "godot-bevy-macros" }
-godot-bevy-test = { version = "0.11.0", path = "godot-bevy-test" }
-godot-bevy-test-macros = { version = "0.11.0", path = "godot-bevy-test-macros" }
+godot-bevy = { version = "0.12.0", path = "godot-bevy" }
+godot-bevy-macros = { version = "0.12.0", path = "godot-bevy-macros" }
+godot-bevy-test = { version = "0.12.0", path = "godot-bevy-test" }
+godot-bevy-test-macros = { version = "0.12.0", path = "godot-bevy-test-macros" }
 cargo-godot-lib = "0.2.0"
 
 # Optimize dependencies in debug builds for faster iteration.

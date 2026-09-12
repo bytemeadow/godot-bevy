@@ -2295,7 +2295,7 @@ dependencies = [
 
 [[package]]
 name = "godot-bevy"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -2344,7 +2344,7 @@ dependencies = [
 
 [[package]]
 name = "godot-bevy-macros"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2353,7 +2353,7 @@ dependencies = [
 
 [[package]]
 name = "godot-bevy-test"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "bevy",
  "chrono",
@@ -2369,7 +2369,7 @@ dependencies = [
 
 [[package]]
 name = "godot-bevy-test-macros"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "inventory",
  "proc-macro2",
