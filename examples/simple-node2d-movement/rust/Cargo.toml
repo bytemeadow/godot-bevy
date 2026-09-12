@@ -15,9 +15,11 @@ godot-bevy = { path = "../../../godot-bevy", default-features = false }
 bevy = { version = "0.19", default-features = false }
 godot = "0.5"
 cargo-godot-lib.workspace = true
+godot-bevy-test = { workspace = true, optional = true, features = ["capture"] }
 
 [features]
 default = ["godot-bevy/default"]
+capture = ["dep:godot-bevy-test"]
 # Web build features - disable problematic dependencies
 web = ["godot-bevy/experimental-wasm"]
 web-nothreads = ["godot-bevy/experimental-wasm-nothreads"]
