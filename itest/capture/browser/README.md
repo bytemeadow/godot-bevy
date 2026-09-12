@@ -15,8 +15,8 @@ Before re-enabling that job, both the `Web` export (`web-nothreads`) and `Web Th
 Run from the repository root:
 
 ```bash
-python3 -m unittest discover -s examples/harness/browser/tests -v
-node --check examples/harness/browser/browser.mjs
+python3 -m unittest discover -s itest/capture/browser/tests -v
+node --check itest/capture/browser/browser.mjs
 bash -n examples/simple-node2d-movement/build-web.sh
 ```
 
@@ -54,11 +54,11 @@ devenv shell -- godot --headless --path examples/simple-node2d-movement/godot --
 Start these in two terminals and retain their logs if diagnosing an HTTP failure:
 
 ```bash
-python3 examples/harness/browser/serve.py target/browser-exports/web-nothreads --variant web-nothreads --port 8060
+python3 itest/capture/browser/serve.py target/browser-exports/web-nothreads --variant web-nothreads --port 8060
 ```
 
 ```bash
-python3 examples/harness/browser/serve.py target/browser-exports/web --variant web --port 8061
+python3 itest/capture/browser/serve.py target/browser-exports/web --variant web --port 8061
 ```
 
 The threaded server sends `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` on every response. The non-threaded server omits both. Both disable caching and serve WASM as `application/wasm`. The server binds to loopback by default; use localhost HTTP or a suitable HTTPS origin for browser isolation. These are the headers prescribed by [Godot's web serving documentation](https://docs.godotengine.org/en/4.6/tutorials/export/exporting_for_web.html#serving-the-files).
@@ -66,8 +66,8 @@ The threaded server sends `Cross-Origin-Opener-Policy: same-origin` and `Cross-O
 With a Node-resolvable `playwright` or `playwright-core` package and its Chromium executable already provisioned:
 
 ```bash
-node examples/harness/browser/browser.mjs --url http://127.0.0.1:8060 --variant web-nothreads --output target/example-evidence/browser-nothreads-1/simple-node2d-movement/browser-orbit
-node examples/harness/browser/browser.mjs --url http://127.0.0.1:8061 --variant web --output target/example-evidence/browser-threaded-1/simple-node2d-movement/browser-orbit
+node itest/capture/browser/browser.mjs --url http://127.0.0.1:8060 --variant web-nothreads --output target/example-evidence/browser-nothreads-1/simple-node2d-movement/browser-orbit
+node itest/capture/browser/browser.mjs --url http://127.0.0.1:8061 --variant web --output target/example-evidence/browser-threaded-1/simple-node2d-movement/browser-orbit
 ```
 
 Each output leaf must be new. No dependencies or browsers are downloaded. Missing Playwright returns 2 with a pointer to the manual path. A missing Chromium executable, startup error, timeout, wrong headers/variant, missing READY, missing screenshots or insufficient motion returns nonzero. `--timeout` is the whole probe budget in seconds (default 60, maximum 3600); browser cleanup may extend it. SIGINT/SIGTERM and failures close the owned Chromium and retain available evidence. Stop each separately started server with Ctrl+C when finished.
@@ -97,7 +97,7 @@ Files stay under `<leaf>/browser/`: `console.log`, `responses.json`, `frame-0000
 5. Measure the screenshots with the same function used by automation:
 
 ```bash
-python3 examples/harness/browser/verdict.py /absolute/leaf/browser/frame-000000.png /absolute/leaf/browser/frame-000060.png > /absolute/leaf/browser/motion.json
+python3 itest/capture/browser/verdict.py /absolute/leaf/browser/frame-000000.png /absolute/leaf/browser/frame-000060.png > /absolute/leaf/browser/motion.json
 ```
 
 That command returns 0 only when the pixel threshold is exceeded, 1 for insufficient motion or invalid evidence, and always emits `"browser":"untested"`. Repeat for the other export. Keep both records for review; manual observations do not re-enable CI or grant browser qualification.

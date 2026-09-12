@@ -8,7 +8,7 @@ const runFile = promisify(execFile);
 const adapter = path.dirname(fileURLToPath(import.meta.url));
 const scene = "res://browser/orbit.tscn";
 const readyLine = `CAPTURE_READY scenario=browser-orbit scene=${scene} frame=0`;
-const usage = "node examples/harness/browser/browser.mjs --url http://127.0.0.1:8060 --variant web-nothreads --output <fresh-evidence-leaf> [--timeout 60] [--threshold 0.001] [--python python3]";
+const usage = "node itest/capture/browser/browser.mjs --url http://127.0.0.1:8060 --variant web-nothreads --output <fresh-evidence-leaf> [--timeout 60] [--threshold 0.001] [--python python3]";
 
 async function main() {
   let options;
@@ -87,7 +87,7 @@ async function main() {
         playwright = await import("playwright-core");
       } catch {
         report.exit_code = 2;
-        throw new Error("Playwright is unavailable. Use the manual path in examples/harness/browser/README.md; browser remains untested.");
+        throw new Error("Playwright is unavailable. Use the manual path in itest/capture/browser/README.md; browser remains untested.");
       }
     }
 

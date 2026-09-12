@@ -12,7 +12,7 @@ Transport strings, environment names, filenames, versions, clock constants and e
 | `example`, `scenario` | Lowercase letters, digits, `_`, `-`; first character is a letter or digit. Default file: `examples/<example>/capture/<scenario>.json`. |
 | `scene` | Initial launch scene, a whitespace-free `res://...tscn` path without traversal. An adapter may traverse to another scene during warm-up. READY names the final scene. |
 | `pacing` | Exactly `"fixed"` or `"realtime"`. Audio scenarios use `"realtime"`. |
-| `extensions` | Object keyed by adapter name, using the same name syntax. `{}` is valid. Values are opaque JSON, including scalars, arrays and null. Reserved names: `rendering_2d`, `facts`, `diff`, `request`, `png`, because the core's per-frame files use those stems. Adapter names are global across examples and `examples/harness/<name>/` is shared. Naming an adapter after a baseline capability (`audio`, `physical_input`, `synthetic_input`, `browser`, `rendering_3d`, `window_presentation`) is how it sets that capability's verdict entry; any other name gets its own entry and leaves the baseline `untested`. |
+| `extensions` | Object keyed by adapter name, using the same name syntax. `{}` is valid. Values are opaque JSON, including scalars, arrays and null. Reserved names: `rendering_2d`, `facts`, `diff`, `request`, `png`, because the core's per-frame files use those stems. Adapter names are global across examples and `itest/capture/<name>/` is shared. Naming an adapter after a baseline capability (`audio`, `physical_input`, `synthetic_input`, `browser`, `rendering_3d`, `window_presentation`) is how it sets that capability's verdict entry; any other name gets its own entry and leaves the baseline `untested`. |
 | `frames` | Integer N in `[1,1000000]`. Frame 0 is reset state; 1 through N count subsequent process passes. Fixed pacing requires one physics tick per pass; realtime permits zero or several. |
 | `seed` | Integer in `[0,4294967295]`. The core seeds Godot immediately before reset; adapters reset their own RNGs from this value. |
 | `viewport` | `[width,height]`, each integer in `[1,8192]`, in image pixels. The root window uses viewport scaling at this size. |
@@ -30,7 +30,7 @@ Region rectangles use integer viewport pixels with the origin at the top left. W
 
 For each `extensions.<name>`, supply these adapter-owned files:
 
-| File under `examples/harness/<name>/` | Python interface |
+| File under `itest/capture/<name>/` | Python interface |
 | --- | --- |
 | `schema/extension.json` | The named adapter's schema for its extension value. The core requires the file and leaves its interpretation to the adapter validator. |
 | `schema/validate.py` | Required `validate(value) -> list[str]`. Read and enforce your schema here. Return `[]` on success and explanatory strings on failure. |
@@ -222,15 +222,15 @@ The movement consumer uses fixed pacing and `{}` extensions. Its predicate requi
 Caller commands from the repository root (these are not run by the author of round 2):
 
 ```bash
-python3 -m unittest discover -s examples/harness/tests -v
+python3 -m unittest discover -s itest/capture/tests -v
 devenv shell -- cargo test -p godot-bevy-test --features capture
 devenv shell -- ci-lint
 devenv shell -- cargo clippy -p godot-bevy-test -p simple-node2d-movement-example --all-targets --features godot-bevy-test/capture,simple-node2d-movement-example/capture -- -D warnings
 devenv shell -- cargo check -p godot-bevy --no-default-features --features api-4-2
 devenv shell -- cargo check -p godot-bevy-test --features capture,godot-bevy/api-4-2
-python3 examples/harness/capture_schema.py examples/simple-node2d-movement/capture/orbit.json
-python3 examples/harness/capture_schema.py examples/simple-node2d-movement/capture/orbit-empty-region.json
-python3 examples/harness/capture_schema.py examples/simple-node2d-movement/capture/orbit-frames-0-1-2.json
+python3 itest/capture/capture_schema.py examples/simple-node2d-movement/capture/orbit.json
+python3 itest/capture/capture_schema.py examples/simple-node2d-movement/capture/orbit-empty-region.json
+python3 itest/capture/capture_schema.py examples/simple-node2d-movement/capture/orbit-frames-0-1-2.json
 ```
 
 Prepare the default-API debug extension and import assets before display runs:
@@ -239,17 +239,17 @@ Prepare the default-API debug extension and import assets before display runs:
 devenv shell -- cargo build -p simple-node2d-movement-example --features capture
 devenv shell -- cargo run -p xtask -- gdextension --manifest-path examples/simple-node2d-movement/rust/Cargo.toml
 devenv shell -- godot --headless --path examples/simple-node2d-movement/godot --editor --import
-devenv shell -- python3 examples/harness/capture.py --example simple-node2d-movement --check-library
+devenv shell -- python3 itest/capture/capture.py --example simple-node2d-movement --check-library
 ```
 
 Run the following in the host's GUI-capable session. Each positive must return 0 with a complete verdict and ACK. The negative must return 1, still complete, with exactly the one frame-0 empty-corner difference. The probe must return 0 and match frame 1 itself; there is no frame offset allowance. Use fresh `--run` IDs when repeating this batch.
 
 ```bash
-devenv shell -- python3 examples/harness/capture.py --example simple-node2d-movement --scenario orbit --run core-round2-repeat-1
-devenv shell -- python3 examples/harness/capture.py --example simple-node2d-movement --scenario orbit --run core-round2-repeat-2
-devenv shell -- python3 examples/harness/capture.py --example simple-node2d-movement --scenario orbit --run core-round2-repeat-3
-devenv shell -- python3 examples/harness/capture.py --example simple-node2d-movement --scenario orbit-empty-region --run core-round2-negative
-devenv shell -- python3 examples/harness/capture.py --example simple-node2d-movement --scenario orbit --manifest examples/simple-node2d-movement/capture/orbit-frames-0-1-2.json --run core-round2-early
+devenv shell -- python3 itest/capture/capture.py --example simple-node2d-movement --scenario orbit --run core-round2-repeat-1
+devenv shell -- python3 itest/capture/capture.py --example simple-node2d-movement --scenario orbit --run core-round2-repeat-2
+devenv shell -- python3 itest/capture/capture.py --example simple-node2d-movement --scenario orbit --run core-round2-repeat-3
+devenv shell -- python3 itest/capture/capture.py --example simple-node2d-movement --scenario orbit-empty-region --run core-round2-negative
+devenv shell -- python3 itest/capture/capture.py --example simple-node2d-movement --scenario orbit --manifest examples/simple-node2d-movement/capture/orbit-frames-0-1-2.json --run core-round2-early
 ```
 
 To enter through the shared launcher after preparation:

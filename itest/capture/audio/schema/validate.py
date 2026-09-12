@@ -41,7 +41,7 @@ def _check(value, schema, path, errors):
             _check(item, schema["items"], f"{path}[{index}]", errors)
     elif kind == "string" and "pattern" in schema:
         if not re.fullmatch(schema["pattern"], value):
-            errors.append(f"{path}: expected examples/harness/audio/references/<example>/<scenario>.wav")
+            errors.append(f"{path}: expected itest/capture/audio/references/<example>/<scenario>.wav")
     elif kind in ("integer", "number"):
         if "minimum" in schema and value < schema["minimum"]:
             errors.append(f"{path}: below {schema['minimum']}")

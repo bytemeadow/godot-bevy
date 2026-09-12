@@ -73,7 +73,7 @@ fn extension(world: &mut World, manifest: &CaptureManifest, value: &Value) -> Re
     if !matches!(scenario.mixer_rate, 44100 | 48000)
         || scenario.reference
             != format!(
-                "examples/harness/audio/references/{}/{}.wav",
+                "itest/capture/audio/references/{}/{}.wav",
                 manifest.example, manifest.scenario
             )
         || scenario.cues.len() != 2

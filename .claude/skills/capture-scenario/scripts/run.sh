@@ -25,11 +25,11 @@ if [ ! -d "$project/.godot/imported" ]; then
   (cd "$project" && "$godot" --headless --import >/dev/null 2>&1) 2>/dev/null || true
   [ -d "$project/.godot/imported" ] || { echo "import failed for $project" >&2; exit 2; }
 fi
-python3 examples/harness/capture.py --example "$example" --scenario "$1" --check-library >/dev/null || exit 2
+python3 itest/capture/capture.py --example "$example" --scenario "$1" --check-library >/dev/null || exit 2
 
 worst=0
 for scenario in "$@"; do
-  python3 examples/harness/capture.py --example "$example" --scenario "$scenario" --run "$run-$scenario" --timeout "$timeout" >/dev/null 2>&1
+  python3 itest/capture/capture.py --example "$example" --scenario "$scenario" --run "$run-$scenario" --timeout "$timeout" >/dev/null 2>&1
   code=$?
   [ "$code" -gt "$worst" ] && worst=$code
   leaf="target/example-evidence/$run-$scenario/$example/$scenario"

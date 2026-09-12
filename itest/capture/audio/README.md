@@ -31,8 +31,8 @@ Headless is only for import. The capture driver launches windowed Godot with rea
 For a named evidence run after preparation:
 
 ```bash
-devenv shell -- python3 examples/harness/capture.py --example platformer-2d --check-library
-devenv shell -- python3 examples/harness/capture.py --example platformer-2d --scenario cues --run audio-candidate-1 --timeout 120
+devenv shell -- python3 itest/capture/capture.py --example platformer-2d --check-library
+devenv shell -- python3 itest/capture/capture.py --example platformer-2d --scenario cues --run audio-candidate-1 --timeout 120
 ```
 
 Use a fresh run ID each time. Until a reference has been approved, the second command must exit 1 and print `reviewed reference WAV is missing`. The error is also in `audio/audio-verdict.json`. The core owns process cleanup, the final instruction/ACK handshake and exit codes.
@@ -47,17 +47,17 @@ No reference WAV ships with this implementation. The adapter never generates or 
 4. Record the maintainer's approval, source run ID, Godot version, driver/device and WAV checksum in the review. Only then copy the candidate into the reference path:
 
    ```bash
-   mkdir -p examples/harness/audio/references/platformer-2d
-   cp -n target/example-evidence/audio-candidate-1/platformer-2d/cues/audio/capture.wav examples/harness/audio/references/platformer-2d/cues.wav
-   shasum -a 256 examples/harness/audio/references/platformer-2d/cues.wav
+   mkdir -p itest/capture/audio/references/platformer-2d
+   cp -n target/example-evidence/audio-candidate-1/platformer-2d/cues/audio/capture.wav itest/capture/audio/references/platformer-2d/cues.wav
+   shasum -a 256 itest/capture/audio/references/platformer-2d/cues.wav
    ```
 
 5. Run three fresh captures. Require exit 0, a complete acknowledged core verdict, and `capabilities.audio == "pass"` on each. Review reference replacements by the same procedure; no command automatically updates them.
 
 ```bash
-devenv shell -- python3 examples/harness/capture.py --example platformer-2d --scenario cues --run audio-repeat-1 --timeout 120
-devenv shell -- python3 examples/harness/capture.py --example platformer-2d --scenario cues --run audio-repeat-2 --timeout 120
-devenv shell -- python3 examples/harness/capture.py --example platformer-2d --scenario cues --run audio-repeat-3 --timeout 120
+devenv shell -- python3 itest/capture/capture.py --example platformer-2d --scenario cues --run audio-repeat-1 --timeout 120
+devenv shell -- python3 itest/capture/capture.py --example platformer-2d --scenario cues --run audio-repeat-2 --timeout 120
+devenv shell -- python3 itest/capture/capture.py --example platformer-2d --scenario cues --run audio-repeat-3 --timeout 120
 ```
 
 Mixer capture does not establish that speakers work. Listening acknowledgement belongs to the physical-device adapter and is not inferred from this verdict.
@@ -74,7 +74,7 @@ Each `PostUpdate` drain writes little-endian stereo float32 samples to `audio/mi
 
 Godot's [AudioEffectCapture](https://docs.godotengine.org/en/4.6/classes/class_audioeffectcapture.html) supplies stereo sample frames and a dropped-frame counter. The adapter requires an initially empty Master effect chain, sets Master to 0 dB and unmutes it. `get_driver_name` uses a dynamic call because it is newer than the generated API 4.2 surface; runtime capture remains pinned to Godot 4.6.2.
 
-Python verifies every drain, creates `audio/capture.wav` even when the reference is absent, and reads only `examples/harness/audio/references/<example>/<scenario>.wav` as the oracle. It compares each cue independently using normalized stereo cross-correlation and an FFT implemented with the standard library. Every integer sample lag within ±50 ms is considered. Both channels share one lag; the full comparison window remains the same length. Correlation must be at least 0.98 and aligned RMS level must be within 1 dB. A silent reference or muted cue fails. There is no loud-cue averaging that can hide a missing quiet cue.
+Python verifies every drain, creates `audio/capture.wav` even when the reference is absent, and reads only `itest/capture/audio/references/<example>/<scenario>.wav` as the oracle. It compares each cue independently using normalized stereo cross-correlation and an FFT implemented with the standard library. Every integer sample lag within ±50 ms is considered. Both channels share one lag; the full comparison window remains the same length. Correlation must be at least 0.98 and aligned RMS level must be within 1 dB. A silent reference or muted cue fails. There is no loud-cue averaging that can hide a missing quiet cue.
 
 Clipping, unexpected sound outside the cue windows plus alignment margins, incomplete recordings, missing silence samples and discarded samples fail. Post-stop silence uses peak amplitude strictly below −60 dBFS, which also rejects a brief click. A zero peak is represented as `post_stop_peak: 0` with a null dBFS value. Raw float samples are judged before PCM16 evidence conversion can clip them.
 
@@ -85,8 +85,8 @@ Clipping, unexpected sound outside the cue windows plus alignment margins, incom
 The required signal tests and initial schema tests were written before implementation. Evidence checks were added during source review. None have been run in the adapter worktree.
 
 ```bash
-python3 -m unittest discover -s examples/harness/audio/tests -v
-python3 examples/harness/capture_schema.py examples/platformer-2d/capture/cues.json
+python3 -m unittest discover -s itest/capture/audio/tests -v
+python3 itest/capture/capture_schema.py examples/platformer-2d/capture/cues.json
 devenv shell -- cargo check -p platformer-2d-example --features capture-audio
 devenv shell -- cargo check -p platformer-2d-example --features capture
 devenv shell -- cargo check -p platformer-2d-example

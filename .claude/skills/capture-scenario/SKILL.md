@@ -10,7 +10,7 @@ input: transform sync, visibility, scene traversal, audio cues, replayed input. 
 the example in windowed Godot 4.6.2, resets the scenario to a seeded state and compares node
 facts and viewport region statistics against a manifest at declared frames. The manifest is the
 oracle; PNGs are written as evidence and never compared. Behavioural assertions that do not need
-real frames still belong in itest. The full contract is `examples/harness/README.md`.
+real frames still belong in itest. The full contract is `itest/capture/README.md`.
 
 ## Prepare
 
@@ -74,7 +74,7 @@ you added; the repo tracks them.
 ## Add a scenario
 
 A scenario is `examples/<example>/capture/<scenario>.json` validated by
-`python3 examples/harness/capture_schema.py <manifest>`. Copy a neighbour, keep `version: 2`,
+`python3 itest/capture/capture_schema.py <manifest>`. Copy a neighbour, keep `version: 2`,
 `extensions: {}` and `pacing: "fixed"` unless the adapter needs real time, and put the
 scenario name in the adapter's `scenarios` list. Add the matching negative: the same manifest
 with one expectation deliberately wrong, so the comparator's exact difference is on record.
@@ -90,5 +90,5 @@ cues. Gate every system that moves scenario state on
 matching Bevy. When several adapters live in one crate, each must install only when the
 selected scenario is its own, because the core rejects a run where an installed adapter does
 not list the scenario. An adapter that sets a capability verdict (`audio`, `physical_input`,
-`synthetic_input`, `browser`) owns `examples/harness/<name>/` with `schema/extension.json`,
+`synthetic_input`, `browser`) owns `itest/capture/<name>/` with `schema/extension.json`,
 `schema/validate.py`, `verdict.py` and its unit tests; CI runs those tests from the lint job.

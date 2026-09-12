@@ -106,7 +106,7 @@ class ManifestTests(unittest.TestCase):
             loads_json('{"position": [1e999, 0]}')
 
     def test_negative_manifest_is_valid_but_rejects_the_empty_corner(self):
-        path = Path(__file__).resolve().parents[2] / "simple-node2d-movement/capture/orbit-empty-region.json"
+        path = Path(__file__).resolve().parents[3] / "examples/simple-node2d-movement/capture/orbit-empty-region.json"
         value = load_manifest(path)
         point = value["checkpoints"][0]
         actual = facts()
@@ -117,7 +117,7 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual([diff["path"] for diff in diffs], ["regions.empty-corner.non_blank_fraction"])
 
     def test_orbit_manifest_is_valid(self):
-        path = Path(__file__).resolve().parents[2] / "simple-node2d-movement/capture/orbit.json"
+        path = Path(__file__).resolve().parents[3] / "examples/simple-node2d-movement/capture/orbit.json"
         self.assertEqual(load_manifest(path)["scenario"], "orbit")
 
 

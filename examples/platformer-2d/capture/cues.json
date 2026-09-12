@@ -7,7 +7,7 @@
   "extensions": {
     "audio": {
       "mixer_rate": 44100,
-      "reference": "examples/harness/audio/references/platformer-2d/cues.wav",
+      "reference": "itest/capture/audio/references/platformer-2d/cues.wav",
       "cues": [
         {"name": "jump", "frame": 30, "window_ms": [450, 900]},
         {"name": "gem", "frame": 90, "window_ms": [1450, 1950]}

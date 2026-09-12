@@ -211,10 +211,10 @@ def evaluate(value, output, reference_root=REPOSITORY):
     reference_path = reference_root / value["reference"]
     reference = None
     if not reference_path.is_file():
-        errors.append(f"reviewed reference WAV is missing: {value['reference']}; record and approve it using examples/harness/audio/README.md")
+        errors.append(f"reviewed reference WAV is missing: {value['reference']}; record and approve it using itest/capture/audio/README.md")
     else:
         try:
-            if not reference_path.resolve().is_relative_to((reference_root / "examples/harness/audio/references").resolve()):
+            if not reference_path.resolve().is_relative_to((reference_root / "itest/capture/audio/references").resolve()):
                 raise ValueError("reference WAV escapes the audio references directory")
             reference = read_wav(reference_path, value["mixer_rate"])
         except (OSError, ValueError, wave.Error, EOFError) as error:

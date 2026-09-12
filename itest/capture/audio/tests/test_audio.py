@@ -161,7 +161,7 @@ class ExtensionTests(unittest.TestCase):
         self.validate = runpy.run_path(str(ROOT / "schema/validate.py"))["validate"]
         self.value = {
             "mixer_rate": 48000,
-            "reference": "examples/harness/audio/references/platformer-2d/cues.wav",
+            "reference": "itest/capture/audio/references/platformer-2d/cues.wav",
             "cues": [
                 {"name": "jump", "frame": 30, "window_ms": [450, 900]},
                 {"name": "gem", "frame": 90, "window_ms": [1450, 1950]},
@@ -178,7 +178,7 @@ class ExtensionTests(unittest.TestCase):
     def test_schema_rejects_weak_budgets_bad_order_and_paths(self):
         mutations = [
             ("mixer_rate", 22050),
-            ("reference", "examples/harness/audio/references/../cues.wav"),
+            ("reference", "itest/capture/audio/references/../cues.wav"),
             ("reference", "/tmp/cues.wav"),
             ("stop_frame", True),
             ("cues", list(reversed(self.value["cues"]))),

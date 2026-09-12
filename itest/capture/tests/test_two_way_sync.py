@@ -10,7 +10,7 @@ from capture_compare import compare_checkpoint
 from capture_schema import PROTOCOL, load_manifest
 
 
-EXAMPLE = Path(__file__).resolve().parents[2] / "two-way-sync-demo"
+EXAMPLE = Path(__file__).resolve().parents[3] / "examples/two-way-sync-demo"
 
 
 def formula(source, function, frame, drawn_frame_offset):

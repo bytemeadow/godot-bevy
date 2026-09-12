@@ -4,7 +4,7 @@ fn main() {
         let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .expect("example directory");
-        let driver = example.join("../harness/capture.py");
+        let driver = example.join("../../itest/capture/capture.py");
         let status = std::process::Command::new("python3")
             .arg(&driver)
             .arg("--example")

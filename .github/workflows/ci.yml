@@ -66,9 +66,9 @@ jobs:
         run: python3 itest/test_examples.py
       - name: Capture harness tests
         run: |
-          python3 -m unittest discover -s examples/harness/tests
+          python3 -m unittest discover -s itest/capture/tests
           for adapter in audio browser physical_input synthetic_input; do
-            python3 -m unittest discover -s examples/harness/$adapter/tests
+            python3 -m unittest discover -s itest/capture/$adapter/tests
           done
       - name: Clippy with the capture features
         run: |

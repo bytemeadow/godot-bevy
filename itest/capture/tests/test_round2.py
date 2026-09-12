@@ -44,7 +44,7 @@ class ContractTests(unittest.TestCase):
             self.assertTrue(validate_manifest(value))
 
     def test_positive_guards_frame_one_and_negative_has_one_difference(self):
-        root = Path(__file__).resolve().parents[2] / 'simple-node2d-movement/capture'
+        root = Path(__file__).resolve().parents[3] / 'examples/simple-node2d-movement/capture'
         positive = load_manifest(root / 'orbit.json')
         point = next(p for p in positive['checkpoints'] if p['frame'] == 1)
         actual = facts(1)
@@ -199,7 +199,7 @@ class FeatureGuardTests(unittest.TestCase):
                     capture.require_capture_library(project)
 
     def test_shared_launcher_checks_library_before_dispatch(self):
-        source = (Path(capture.__file__).parent.parent / 'run_godot.rs').read_text()
+        source = (Path(capture.__file__).resolve().parents[2] / 'examples/run_godot.rs').read_text()
         self.assertLess(source.index('--check-library'), source.index('command.exec()'))
 
 

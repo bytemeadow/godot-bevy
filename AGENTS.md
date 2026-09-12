@@ -37,7 +37,7 @@ Never use `--all-features`: the `api-4-2`..`api-4-6` features are mutually exclu
 | `godot-bevy/` | the library -- `src/interop/` (`GodotNodeHandle`, `GodotResourceHandle`, generated markers/signal names), `src/plugins/` (transforms, scene_tree, audio, input, signals, event_bridge, …) |
 | `godot-bevy-macros/` | the derives: `#[bevy_app]`, `#[derive(GodotNode)]`, `#[derive(BevyComponents)]`, `NodeTreeView` |
 | `godot-bevy-test/` + `-macros/` | published test harness: `TestApp`, `#[itest]`, `#[bench]` |
-| `itest/` | integration tests + benchmarks (`rust/src/*_tests.rs`, `benchmarks.rs`) |
+| `itest/` | integration tests + benchmarks (`rust/src/*_tests.rs`, `benchmarks.rs`); `capture/` is the example capture driver, schema and adapter verdicts |
 | `godot_bevy_codegen/` | Python generator for per-Godot-version files (see Codegen) |
 | `godot_extension_api/` | dumped Godot API JSONs (4.2–4.6) that feed codegen |
 | `addons/godot-bevy/` | GDScript runtime addon (watchers, bulk ops), symlinked into `itest/godot` |
@@ -83,13 +83,13 @@ Where things live:
 
 ## Capture harness
 
-For behaviour only a running example shows (what is drawn, played or read from input across real frames), the examples have capture scenarios: `examples/<example>/capture/<scenario>.json` is the oracle, `examples/harness/capture.py` runs the example in windowed Godot 4.6.2 with a seeded reset and compares node facts and viewport region statistics at declared frames. PNGs are evidence beside the facts, never goldens. The contract is `examples/harness/README.md`; the procedure is the `capture-scenario` skill (`.claude/skills/capture-scenario`), whose `scripts/run.sh` builds, imports, checks the library and prints one verdict line per scenario.
+For behaviour only a running example shows (what is drawn, played or read from input across real frames), the examples have capture scenarios: `examples/<example>/capture/<scenario>.json` is the oracle, `itest/capture/capture.py` runs the example in windowed Godot 4.6.2 with a seeded reset and compares node facts and viewport region statistics at declared frames. PNGs are evidence beside the facts, never goldens. The contract is `itest/capture/README.md`; the procedure is the `capture-scenario` skill (`.claude/skills/capture-scenario`), whose `scripts/run.sh` builds, imports, checks the library and prints one verdict line per scenario.
 
 - Each example has a `capture` Cargo feature; the platformer adds `capture-audio` and `capture-input`. Workspace clippy never enables them, so lint the crate with its capture features, as CI does.
 - Exit codes: 0 passed, 1 an assertion failed, 2 the run could not happen. Every example ships a negative scenario that must exit 1 on one named field.
 - Needs a display. Evidence lands in `target/example-evidence/<run>/`; the directory refuses to overwrite, so reruns need a new run name.
 - Godot rewrites `*.import` files on import; discard that churn. Keep generated `*.uid` files, which the repo tracks.
-- Two verdicts need a person: the audio reference WAV is approved by listening (`examples/harness/audio/README.md`), and the physical input session needs a controller. Both stay `untested` otherwise.
+- Two verdicts need a person: the audio reference WAV is approved by listening (`itest/capture/audio/README.md`), and the physical input session needs a controller. Both stay `untested` otherwise.
 
 ## Benchmarks
 

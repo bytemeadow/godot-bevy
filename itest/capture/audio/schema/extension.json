@@ -8,7 +8,7 @@
     "mixer_rate": {"type": "integer", "enum": [44100, 48000]},
     "reference": {
       "type": "string",
-      "pattern": "^examples/harness/audio/references/[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9_-]*\\.wav$"
+      "pattern": "^itest/capture/audio/references/[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9_-]*\\.wav$"
     },
     "cues": {
       "type": "array",

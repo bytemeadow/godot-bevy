@@ -3,7 +3,7 @@ from pathlib import Path
 import runpy
 
 
-GOLDEN = Path(__file__).resolve().parents[2] / "platformer-2d/capture/device-input.json"
+GOLDEN = Path(__file__).resolve().parents[3] / "examples/platformer-2d/capture/device-input.json"
 
 
 def matches(step, event):
