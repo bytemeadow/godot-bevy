@@ -54,6 +54,7 @@ impl Plugin for MobPlugin {
                 (spawn_mob, new_mob).run_if(in_state(GameState::InGame)),
             )
             .add_observer(on_mob_screen_exited)
+            .init_resource::<MobRng>()
             .insert_resource(MobSpawnTimer(Timer::from_seconds(
                 0.5,
                 TimerMode::Repeating,
@@ -67,12 +68,16 @@ pub struct Mob {
 }
 
 #[derive(Resource)]
-pub struct MobSpawnTimer(Timer);
+pub struct MobSpawnTimer(pub(crate) Timer);
+
+#[derive(Resource, Default)]
+pub(crate) struct MobRng(pub(crate) fastrand::Rng);
 
 fn spawn_mob(
     mut commands: Commands,
     time: Res<Time>,
     mut timer: ResMut<MobSpawnTimer>,
+    mut rng: ResMut<MobRng>,
     entities: Query<(&Name, &GodotNodeHandle)>,
     assets: Res<MobAssets>,
     mut godot: GodotAccess,
@@ -89,11 +94,11 @@ fn spawn_mob(
         .unwrap();
 
     let mut mob_spawn_location = godot.get::<PathFollow2D>(*mob_spawn_handle);
-    mob_spawn_location.set_progress_ratio(fastrand::f32());
+    mob_spawn_location.set_progress_ratio(rng.0.f32());
 
     let mut direction = mob_spawn_location.get_rotation() + PI / 2.0;
 
-    direction += fastrand::f32() * PI / 2.0 - PI / 4.0;
+    direction += rng.0.f32() * PI / 2.0 - PI / 4.0;
 
     let position = mob_spawn_location.get_position();
     let mut transform = Transform::default().with_translation(vec3(position.x, position.y, 0.));
@@ -130,12 +135,13 @@ fn new_mob(
     mut entities: Query<(&Mob, &Transform, &GodotNodeHandle, &mut AnimationState), Added<Mob>>,
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
     assets: Res<MobAssets>,
+    mut rng: ResMut<MobRng>,
     mut godot: GodotAccess,
 ) {
     for (mob_data, transform, mob_handle, mut anim_state) in entities.iter_mut() {
         let mut mob = godot.get::<RigidBody2D>(*mob_handle);
 
-        let velocity = Vector2::new(fastrand::f32() * 100.0 + 150.0, 0.0);
+        let velocity = Vector2::new(rng.0.f32() * 100.0 + 150.0, 0.0);
         mob.set_linear_velocity(velocity.rotated(mob_data.direction));
 
         let mob_nodes = MobNodes::from_node(mob).unwrap();
@@ -147,7 +153,7 @@ fn new_mob(
             .unwrap()
             .get_animation_names();
 
-        let mob_type_index = fastrand::usize(0..mob_types.len());
+        let mob_type_index = rng.0.usize(0..mob_types.len());
         let animation_name = &mob_types[mob_type_index].clone();
 
         anim_state.play(Some(animation_name.into()));
@@ -157,7 +163,7 @@ fn new_mob(
         sfx_channel
             .play_2d(assets.mob_pop.clone(), position)
             .volume(0.9)
-            .pitch(0.8 + fastrand::f32() * 0.4);
+            .pitch(0.8 + rng.0.f32() * 0.4);
 
         info!(
             "Mob spawned at position: {:?} with 2D positional audio and fade-in",

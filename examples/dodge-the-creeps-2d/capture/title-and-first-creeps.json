@@ -1,0 +1,57 @@
+{
+  "version": 2,
+  "example": "dodge-the-creeps-2d",
+  "scenario": "title-and-first-creeps",
+  "scene": "res://scenes/main.tscn",
+  "pacing": "fixed",
+  "extensions": {},
+  "frames": 180,
+  "seed": 5,
+  "viewport": [480, 720],
+  "clocks": {"physics_hz": 60, "bevy_step_ns": 16666667},
+  "settle": {
+    "stable_frames": 3,
+    "nodes": ["HUD", "HUD/Message", "HUD/StartButton", "HUD/ShowScoreButton", "Player", "Player/AnimatedSprite2D", "StartPosition", "MobPath/MobSpawnLocation"],
+    "classes": ["BevyApp", "Player", "Button", "RigidBody2D"]
+  },
+  "checkpoints": [
+    {
+      "frame": 0,
+      "nodes": [
+        {"path": "HUD/Message", "position": [0, 240], "tolerance": 1, "visible": true},
+        {"path": "HUD/StartButton", "position": [140, 580], "tolerance": 1, "visible": true},
+        {"path": "HUD/ShowScoreButton", "position": [120, 520], "tolerance": 1, "visible": true},
+        {"path": "Player", "position": [240, 450], "tolerance": 0.001, "visible": false}
+      ],
+      "regions": [
+        {"name": "title", "rect": [20, 270, 440, 140], "non_blank": {"background": [0, 0, 0], "tolerance": 2, "min_fraction": 0.03}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 0}}
+      ]
+    },
+    {
+      "frame": 60,
+      "nodes": [
+        {"path": "HUD/Message", "position": [0, 240], "tolerance": 1, "visible": false},
+        {"path": "HUD/StartButton", "position": [140, 580], "tolerance": 1, "visible": false},
+        {"path": "HUD/ShowScoreButton", "position": [120, 520], "tolerance": 1, "visible": false},
+        {"path": "Player", "position": [240, 450], "tolerance": 0.001, "visible": true}
+      ],
+      "regions": [
+        {"name": "title-red-zero", "rect": [20, 270, 440, 140], "non_blank": {"background": [255, 127, 127], "tolerance": 254, "min_fraction": 1}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 0}},
+        {"name": "title-green-zero", "rect": [20, 270, 440, 140], "non_blank": {"background": [127, 255, 127], "tolerance": 254, "min_fraction": 1}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 0}},
+        {"name": "title-blue-zero", "rect": [20, 270, 440, 140], "non_blank": {"background": [127, 127, 255], "tolerance": 254, "min_fraction": 1}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 0}}
+      ]
+    },
+    {
+      "frame": 180,
+      "nodes": [
+        {"path": "HUD/Message", "position": [0, 240], "tolerance": 1, "visible": false},
+        {"path": "HUD/ShowScoreButton", "position": [120, 520], "tolerance": 1, "visible": false},
+        {"path": "Player", "position": [240, 450], "tolerance": 0.001, "visible": true},
+        {"path": "CaptureCreep1", "position": [416.2791, 0], "tolerance": 0.01, "visible": true}
+      ],
+      "regions": [
+        {"name": "clear-centre", "rect": [200, 350, 80, 40], "non_blank": {"background": [255, 255, 255], "tolerance": 254, "min_fraction": 1}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 0}}
+      ]
+    }
+  ]
+}

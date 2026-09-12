@@ -10,6 +10,9 @@ mod gameplay;
 mod main_menu;
 mod nodes;
 
+#[cfg(feature = "capture")]
+mod capture;
+
 #[cfg(feature = "itest")]
 mod itests;
 
@@ -33,6 +36,9 @@ fn build_app(app: &mut App) {
         .add_plugins(commands::CommandSystemPlugin)
         .add_plugins(main_menu::MainMenuPlugin)
         .add_plugins(gameplay::GameplayPlugin);
+
+    #[cfg(feature = "capture")]
+    capture::install(app);
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, States)]
