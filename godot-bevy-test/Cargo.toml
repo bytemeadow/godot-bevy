@@ -10,6 +10,7 @@ categories.workspace = true
 license.workspace = true
 
 [features]
+capture = []
 test-frame-signal = ["godot-bevy/test-frame-signal"]
 profile-tracy = [
     "dep:tracing",
