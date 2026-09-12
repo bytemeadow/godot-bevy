@@ -4635,6 +4635,7 @@ dependencies = [
  "cargo-godot-lib",
  "godot",
  "godot-bevy",
+ "godot-bevy-test",
 ]
 
 [[package]]

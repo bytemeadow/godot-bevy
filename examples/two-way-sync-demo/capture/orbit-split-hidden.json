@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "example": "two-way-sync-demo",
+  "scenario": "orbit-split-hidden",
+  "scene": "res://capture/orbit_split.tscn",
+  "pacing": "fixed",
+  "extensions": {},
+  "frames": 1,
+  "seed": 3,
+  "viewport": [960, 640],
+  "clocks": {"physics_hz": 60, "bevy_step_ns": 16666667},
+  "settle": {
+    "stable_frames": 3,
+    "nodes": ["Quad", "Camera2D"],
+    "classes": ["BevyApp", "MeshInstance2D", "Camera2D"]
+  },
+  "checkpoints": [
+    {
+      "frame": 0,
+      "nodes": [{"path": "Quad", "position": [0, 100], "tolerance": 1, "visible": true}],
+      "regions": [{"name": "quad", "rect": [476, 416, 8, 8], "non_blank": {"background": [255, 255, 255], "tolerance": 2, "min_fraction": 1}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 2}}]
+    },
+    {
+      "frame": 1,
+      "nodes": [{"path": "Quad", "position": [1.999867, 99.980001], "tolerance": 1, "visible": true}],
+      "regions": [{"name": "quad", "rect": [478, 416, 8, 8], "non_blank": {"background": [0, 0, 0], "tolerance": 2, "min_fraction": 1}, "dominant_colour": {"rgb": [255, 255, 255], "tolerance": 2}}]
+    }
+  ]
+}
