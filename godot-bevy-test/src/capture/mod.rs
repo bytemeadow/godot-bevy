@@ -372,10 +372,11 @@ impl CaptureHook {
                     })?;
                 }
                 Ok(())
-            }) {
-                self.state = None;
-                fail(error);
-            }
+            })
+        {
+            self.state = None;
+            fail(error);
+        }
     }
 }
 
