@@ -62,6 +62,8 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy --all-targets -- -D warnings
+      - name: Check the examples portfolio matches the tree
+        run: python3 itest/test_examples.py
 
   test:
     name: test (${{ matrix.platform }})

@@ -7,18 +7,22 @@ on:
       - "godot-bevy/**"
       - "godot-bevy-macros/**"
       - "examples/**"
+      - "addons/**"
       - "xtask/**"
       - ".github/workflows/examples.yml"
       - "Cargo.toml"
+      - "Cargo.lock"
   pull_request:
     branches: [main, develop]
     paths:
       - "godot-bevy/**"
       - "godot-bevy-macros/**"
       - "examples/**"
+      - "addons/**"
       - "xtask/**"
       - ".github/workflows/examples.yml"
       - "Cargo.toml"
+      - "Cargo.lock"
 
 env:
   CARGO_TERM_COLOR: always
@@ -48,30 +52,52 @@ jobs:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
               - 'examples/perf-test/**'
+              - 'examples/run_godot.rs'
+              - 'addons/**'
               - 'xtask/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
+              - 'Cargo.lock'
             simple-node2d-movement:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
               - 'examples/simple-node2d-movement/**'
+              - 'examples/run_godot.rs'
+              - 'addons/**'
               - 'xtask/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
+              - 'Cargo.lock'
+            two-way-sync-demo:
+              - 'godot-bevy/**'
+              - 'godot-bevy-macros/**'
+              - 'examples/two-way-sync-demo/**'
+              - 'examples/run_godot.rs'
+              - 'addons/**'
+              - 'xtask/**'
+              - '.github/workflows/examples.yml'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
             dodge-the-creeps-2d:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
               - 'examples/dodge-the-creeps-2d/**'
+              - 'examples/run_godot.rs'
+              - 'addons/**'
               - 'xtask/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
+              - 'Cargo.lock'
             platformer-2d:
               - 'godot-bevy/**'
               - 'godot-bevy-macros/**'
               - 'examples/platformer-2d/**'
+              - 'examples/run_godot.rs'
+              - 'addons/**'
               - 'xtask/**'
               - '.github/workflows/examples.yml'
               - 'Cargo.toml'
+              - 'Cargo.lock'
 
   build:
     name: build ${{ matrix.example }} (${{ matrix.platform }})
