@@ -1,24 +1,19 @@
-# Two way transform syncing demo
+# Two-way transform sync
 
-This example demonstrates a Godot Node's x-position getting updated every frame
-in GDScript, while the same game object's Transform is accessed via godot-bevy
-where it's y-position is similarly updated every frame. While you wouldn't do
-this in a real game, this contrived example demonstrates that you have the
-flexibility to read and write the same game object's Transform either in Godot
-or Bevy.
+GDScript changes a quad's x position in `godot/quad.gd`. Bevy changes its y position in `rust/src/lib.rs`. Together they move the quad around a circle.
 
-## What You'll See
+The app enables `TransformSyncMode::TwoWay`. Godot and Bevy can write different translation axes without overwriting each other's changes. If both write the same axis, Bevy wins. A Godot write in `_process` reaches Bevy's physics-phase read on the next frame.
 
-A quad rotating in a circular motion on screen.
+See [Transform Sync Modes](https://bytemeadow.github.io/godot-bevy-book?page=transforms/sync-modes.html) for the read and write schedule.
 
-## Running This Example
+## Running this example
 
-1. **Build**: `cargo build`
-2. **Run**: You can either:
-   1. Open the Godot project and run the scene
-   1. Run: `cargo run`. NOTE: This requires the Godot binary, which we attempt
-      to locate either through your environment's path or by searching common
-      locations. If this doesn't work, update your path to include Godot. If
-      this fails for other reasons, it may be because your version of Godot
-      is different than the one the example was built with, in that case,
-      try opening the Godot project first.
+From the repository root, with Godot on your `PATH`:
+
+```bash
+cargo run --manifest-path examples/two-way-sync-demo/rust/Cargo.toml
+```
+
+The launcher builds the library, generates its GDExtension descriptor, and opens Godot.
+
+The optional `capture` feature adds the [capture harness](../../itest/capture/README.md). Its `orbit-split` scenario runs 120 frames with checkpoints at 0, 30, 60, 90 and 120; `orbit-split-hidden` has one deliberate frame-0 visibility failure. Capture inherits the demo scene and hands the reset-relative frame index to both writers, so the quad follows `(100 sin(n/50), 100 cos(n/50))` regardless of how many frames Godot has drawn. Bevy's y writer runs in `FixedUpdate`, whose clock the harness pins separately from `Time<Virtual>`, which is why the trajectory uses the explicit frame index instead of either clock.

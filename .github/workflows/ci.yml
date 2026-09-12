@@ -62,6 +62,23 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy --all-targets -- -D warnings
+      - name: Check the examples portfolio matches the tree
+        run: python3 itest/test_examples.py
+      - name: Capture harness tests
+        run: |
+          python3 -m unittest discover -s itest/capture/tests
+          for adapter in audio browser physical_input synthetic_input; do
+            python3 -m unittest discover -s itest/capture/$adapter/tests
+          done
+      - name: Clippy with the capture features
+        run: |
+          cargo clippy -p simple-node2d-movement-example -p two-way-sync-example -p dodge-the-creeps-example -p perf-test --all-targets --features capture -- -D warnings
+          cargo clippy -p platformer-2d-example --all-targets --features capture-audio,capture-input -- -D warnings
+      - name: Capture unit tests
+        run: |
+          cargo test -p godot-bevy-test --lib --features capture
+          cargo test -p simple-node2d-movement-example -p two-way-sync-example -p dodge-the-creeps-example -p perf-test --lib --features capture
+          cargo test -p platformer-2d-example --lib --features capture-audio,capture-input
 
   test:
     name: test (${{ matrix.platform }})
@@ -172,6 +189,7 @@ jobs:
             itest:
               - 'itest/**'
               - 'examples/platformer-2d/**'
+              - 'examples/dodge-the-creeps-2d/**'
               - '.github/workflows/ci.yml'
             qualification:
               - '.cargo/mutants.toml'
@@ -279,6 +297,14 @@ jobs:
         run: |
           CMD="cargo run ${{ matrix.profile == 'release' && '--release' || '' }} --features itest --manifest-path examples/platformer-2d/rust/Cargo.toml"
           $CMD || { test -d examples/platformer-2d/godot/.godot && $CMD; }
+
+      - name: Run dodge integration tests
+        env:
+          GODOT4_BIN: godot
+          GODOT: godot
+        run: |
+          CMD="cargo run ${{ matrix.profile == 'release' && '--release' || '' }} --features itest --manifest-path examples/dodge-the-creeps-2d/rust/Cargo.toml"
+          $CMD || { test -d examples/dodge-the-creeps-2d/godot/.godot && $CMD; }
 
       - name: Upload integration test report
         # skipped under act: no artifact service locally (ACTIONS_RUNTIME_TOKEN)

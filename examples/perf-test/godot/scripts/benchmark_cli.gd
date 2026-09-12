@@ -213,19 +213,17 @@ func _handle_warmup(delta: float):
 	if int(warmup_time) != int(warmup_time - delta):
 		print("⏳ Warmup: %d/%d particles spawned (%.1fs)" % [current_entity_count, entity_count, warmup_time])
 
-	# Check if we've reached target count or timeout
-	if current_entity_count >= entity_count:
+	if current_entity_count == entity_count:
 		print("✅ Target particle count reached! Starting measurement...")
 		warmup_complete = true
 		is_running = true
 		start_time = Time.get_ticks_msec() / 1000.0
 		frame_times.clear()
 	elif warmup_time > _get_warmup_timeout():
-		print("⚠️  Warmup timeout! Only spawned %d/%d particles. Starting measurement anyway..." % [current_entity_count, entity_count])
-		warmup_complete = true
-		is_running = true
-		start_time = Time.get_ticks_msec() / 1000.0
-		frame_times.clear()
+		push_error("Warmup timeout: spawned %d/%d particles" % [current_entity_count, entity_count])
+		is_running = false
+		set_process(false)
+		get_tree().quit(1)
 
 func _get_warmup_timeout() -> float:
 	# Scale timeout based on entity count - larger counts need more time

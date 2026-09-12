@@ -10,6 +10,15 @@ mod gameplay;
 mod main_menu;
 mod nodes;
 
+#[cfg(feature = "capture")]
+mod capture;
+
+#[cfg(feature = "itest")]
+mod itests;
+
+#[cfg(feature = "itest")]
+godot_bevy_test::declare_test_runner!();
+
 #[bevy_app]
 fn build_app(app: &mut App) {
     // This example uses most godot-bevy features, so we'll use the convenience bundle
@@ -27,6 +36,9 @@ fn build_app(app: &mut App) {
         .add_plugins(commands::CommandSystemPlugin)
         .add_plugins(main_menu::MainMenuPlugin)
         .add_plugins(gameplay::GameplayPlugin);
+
+    #[cfg(feature = "capture")]
+    capture::install(app);
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, States)]

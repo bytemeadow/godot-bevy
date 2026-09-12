@@ -4,11 +4,18 @@ use gameplay::audio::GameAudio;
 use godot_bevy::prelude::{GodotDefaultPlugins, *};
 
 mod attachables;
+#[cfg(feature = "capture-audio")]
+mod capture_audio;
 mod components;
 mod gameplay;
 mod level_manager;
 mod main_menu;
 mod scene_management;
+
+#[cfg(feature = "capture")]
+mod capture;
+#[cfg(feature = "capture-input")]
+mod capture_input;
 
 // ANCHOR: itest
 #[cfg(feature = "itest")]
@@ -20,6 +27,12 @@ godot_bevy_test::declare_test_runner!();
 
 #[bevy_app]
 fn build_app(app: &mut App) {
+    #[cfg(feature = "capture-input")]
+    if capture_input::is_selected() {
+        capture_input::build(app);
+        return;
+    }
+
     // This example uses most godot-bevy features
     app.add_plugins(GodotDefaultPlugins)
         .add_plugins(GodotActionsPlugin)
@@ -40,6 +53,11 @@ fn build_app(app: &mut App) {
         .register_type::<components::JumpVelocity>()
         .register_type::<components::Gravity>()
         .register_type::<components::Player>();
+
+    #[cfg(feature = "capture")]
+    capture::install(app);
+    #[cfg(feature = "capture-audio")]
+    capture_audio::install(app);
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, States)]

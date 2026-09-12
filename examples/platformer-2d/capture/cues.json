@@ -1,0 +1,57 @@
+{
+  "version": 2,
+  "example": "platformer-2d",
+  "scenario": "cues",
+  "scene": "res://scenes/levels/main_menu.tscn",
+  "pacing": "realtime",
+  "extensions": {
+    "audio": {
+      "mixer_rate": 44100,
+      "reference": "itest/capture/audio/references/platformer-2d/cues.wav",
+      "cues": [
+        {"name": "jump", "frame": 30, "window_ms": [450, 900]},
+        {"name": "gem", "frame": 90, "window_ms": [1450, 1950]}
+      ],
+      "stop_frame": 100,
+      "end_frame": 210,
+      "silence_window_ms": [2700, 3400],
+      "thresholds": {
+        "correlation": 0.98,
+        "alignment_ms": 50,
+        "level_db": 1,
+        "silence_dbfs": -60
+      }
+    }
+  },
+  "frames": 210,
+  "seed": 7,
+  "viewport": [1152, 648],
+  "clocks": {"physics_hz": 60, "bevy_step_ns": 16666667},
+  "settle": {
+    "stable_frames": 3,
+    "nodes": [".", "Options/StartButton"],
+    "classes": ["AudioEffectCapture", "AudioStreamPlayer"]
+  },
+  "checkpoints": [
+    {
+      "frame": 0,
+      "nodes": [{"path": ".", "position": [0, 0], "tolerance": 0, "visible": true}],
+      "regions": [{
+        "name": "menu-background",
+        "rect": [0, 0, 16, 16],
+        "non_blank": {"background": [255, 255, 255], "tolerance": 0, "min_fraction": 1},
+        "dominant_colour": {"rgb": [128, 128, 128], "tolerance": 128}
+      }]
+    },
+    {
+      "frame": 210,
+      "nodes": [{"path": ".", "position": [0, 0], "tolerance": 0, "visible": true}],
+      "regions": [{
+        "name": "menu-background",
+        "rect": [0, 0, 16, 16],
+        "non_blank": {"background": [255, 255, 255], "tolerance": 0, "min_fraction": 1},
+        "dominant_colour": {"rgb": [128, 128, 128], "tolerance": 128}
+      }]
+    }
+  ]
+}

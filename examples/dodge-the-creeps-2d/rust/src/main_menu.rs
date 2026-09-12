@@ -10,6 +10,7 @@ use bevy::{
     },
     state::state::{NextState, OnEnter, OnExit},
 };
+use godot::classes::CheckButton;
 use godot_bevy::interop::signal_names::BaseButtonSignals;
 use godot_bevy::prelude::*;
 
@@ -29,6 +30,9 @@ impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuAssets>()
             .add_plugins(GodotSignalsPlugin::<StartGameRequested>::default())
+            .add_godot_event::<ShowScoreChanged>("show_score_changed", |payload| {
+                Some(ShowScoreChanged(payload.try_to::<bool>().ok()?))
+            })
             .add_systems(
                 OnExit(GameState::Loading),
                 (
@@ -37,6 +41,7 @@ impl Plugin for MainMenuPlugin {
                 ),
             )
             .add_observer(on_start_game_requested)
+            .add_observer(on_show_score_changed)
             .add_systems(OnExit(GameState::MainMenu), hide_play_button)
             .add_systems(OnEnter(GameState::MainMenu), show_play_button);
     }
@@ -52,12 +57,16 @@ pub struct MenuUi {
 
     #[node("/root/Main/HUD/ScoreLabel")]
     pub score_label: GodotNodeHandle,
+
+    #[node("/root/Main/HUD/ShowScoreButton")]
+    pub show_score_button: GodotNodeHandle,
 }
 
 fn init_menu_assets(
     mut menu_assets: ResMut<MenuAssets>,
     mut ui_handles: ResMut<UIHandles>,
     mut scene_tree: SceneTreeRef,
+    mut godot: GodotAccess,
 ) {
     let menu_ui = MenuUi::from_node(scene_tree.get().get_root().unwrap()).unwrap();
 
@@ -68,6 +77,20 @@ fn init_menu_assets(
     ui_handles.start_button = Some(menu_ui.start_button);
     ui_handles.score_label = Some(menu_ui.score_label);
     ui_handles.message_label = Some(menu_ui.message_label);
+    ui_handles.show_score_button = Some(menu_ui.show_score_button);
+    godot
+        .get::<CheckButton>(menu_ui.show_score_button)
+        .set_disabled(false);
+}
+
+#[derive(Event, Clone)]
+struct ShowScoreChanged(bool);
+
+fn on_show_score_changed(event: On<ShowScoreChanged>, mut ui_commands: MessageWriter<UICommand>) {
+    ui_commands.write(UICommand::SetVisible {
+        target: UIElement::ScoreLabel,
+        visible: event.event().0,
+    });
 }
 
 #[derive(Event, Debug, Clone)]
@@ -99,11 +122,19 @@ fn hide_play_button(mut ui_commands: MessageWriter<UICommand>) {
         target: UIElement::StartButton,
         visible: false,
     });
+    ui_commands.write(UICommand::SetVisible {
+        target: UIElement::ShowScoreButton,
+        visible: false,
+    });
 }
 
 fn show_play_button(mut ui_commands: MessageWriter<UICommand>) {
     ui_commands.write(UICommand::SetVisible {
         target: UIElement::StartButton,
+        visible: true,
+    });
+    ui_commands.write(UICommand::SetVisible {
+        target: UIElement::ShowScoreButton,
         visible: true,
     });
 }

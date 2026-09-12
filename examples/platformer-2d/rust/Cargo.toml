@@ -15,9 +15,14 @@ bevy = { version = "0.19", default-features = false, features = ["bevy_state", "
 bevy_asset_loader = "0.27"
 fastrand = { version = "2.3.0" }
 godot = "0.5"
-godot-bevy = { path = "../../../godot-bevy" }
+godot-bevy = { path = "../../../godot-bevy", features = ["register-docs"] }
 godot-bevy-test = { path = "../../../godot-bevy-test", optional = true }
 cargo-godot-lib.workspace = true
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
 
 [features]
+capture = ["dep:godot-bevy-test", "godot-bevy-test/capture"]
+capture-audio = ["capture", "dep:serde", "dep:serde_json"]
+capture-input = ["capture", "dep:serde", "dep:serde_json"]
 itest = ["dep:godot-bevy-test", "godot-bevy-test/test-frame-signal"]

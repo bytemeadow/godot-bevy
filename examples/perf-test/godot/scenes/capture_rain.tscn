@@ -1,0 +1,18 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/main.tscn" id="1"]
+[ext_resource type="Script" path="res://scripts/capture_particles.gd" id="2"]
+
+[node name="Main" instance=ExtResource("1")]
+
+[node name="UI" parent="." index="0"]
+visible = false
+
+[node name="GodotParticlesContainer" parent="." index="1"]
+script = ExtResource("2")
+
+[node name="WorldBounds" parent="." index="2"]
+visible = false
+
+[node name="BevyParticlesContainer" parent="." index="3"]
+position = Vector2(240, 0)

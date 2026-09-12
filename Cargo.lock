@@ -1903,6 +1903,7 @@ dependencies = [
  "fastrand",
  "godot",
  "godot-bevy",
+ "godot-bevy-test",
 ]
 
 [[package]]
@@ -3681,6 +3682,7 @@ dependencies = [
  "fastrand",
  "godot",
  "godot-bevy",
+ "godot-bevy-test",
  "tracing",
  "tracing-tracy",
 ]
@@ -3745,6 +3747,8 @@ dependencies = [
  "godot",
  "godot-bevy",
  "godot-bevy-test",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -4241,6 +4245,7 @@ dependencies = [
  "cargo-godot-lib",
  "godot",
  "godot-bevy",
+ "godot-bevy-test",
 ]
 
 [[package]]
@@ -4444,17 +4449,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "timing-test"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "cargo-godot-lib",
- "fastrand",
- "godot",
- "godot-bevy",
-]
-
-[[package]]
 name = "tinystr"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4644,6 +4638,7 @@ dependencies = [
  "cargo-godot-lib",
  "godot",
  "godot-bevy",
+ "godot-bevy-test",
 ]
 
 [[package]]

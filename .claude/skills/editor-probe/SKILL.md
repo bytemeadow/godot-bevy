@@ -22,6 +22,9 @@ Build the classes into the project's GDExtension before probing. For the platfor
 devenv shell -- cargo run --features itest --manifest-path examples/platformer-2d/rust/Cargo.toml
 ```
 
+The platformer enables `godot-bevy/register-docs`, which requires Godot 4.3 or later.
+Its manifest checks the help text for `Player2D.speed` using Godot 4.6.
+
 For itest, the runner builds the library, generates `itest/godot/itest.gdextension`, imports the
 project, and runs the selected test:
 

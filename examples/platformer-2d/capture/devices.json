@@ -1,0 +1,272 @@
+{
+  "version": 2,
+  "example": "platformer-2d",
+  "scenario": "devices",
+  "scene": "res://scenes/levels/main_menu.tscn",
+  "pacing": "realtime",
+  "extensions": {
+    "physical_input": {
+      "version": 1,
+      "golden": "device-input.json",
+      "actions": [
+        "move_left",
+        "move_right",
+        "jump"
+      ],
+      "steps": [
+        {
+          "device": "mouse",
+          "prompt": "Hold the left mouse button on Start.",
+          "expected": {
+            "event": "mouse_button",
+            "button": 1,
+            "state": "pressed",
+            "target": "start"
+          },
+          "deadline_seconds": 5
+        },
+        {
+          "device": "mouse",
+          "prompt": "Release the left mouse button on Start.",
+          "expected": {
+            "event": "mouse_button",
+            "button": 1,
+            "state": "released",
+            "target": "start"
+          },
+          "deadline_seconds": 5
+        },
+        {
+          "device": "keyboard",
+          "prompt": "Press and hold A.",
+          "expected": {
+            "action": "move_left",
+            "state": "pressed"
+          },
+          "deadline_seconds": 5
+        },
+        {
+          "device": "keyboard",
+          "prompt": "Release A.",
+          "expected": {
+            "action": "move_left",
+            "state": "released"
+          },
+          "deadline_seconds": 5
+        },
+        {
+          "device": "keyboard",
+          "prompt": "Press and hold D.",
+          "expected": {
+            "action": "move_right",
+            "state": "pressed"
+          },
+          "deadline_seconds": 5
+        },
+        {
+          "device": "keyboard",
+          "prompt": "Release D.",
+          "expected": {
+            "action": "move_right",
+            "state": "released"
+          },
+          "deadline_seconds": 5
+        },
+        {
+          "device": "keyboard",
+          "prompt": "Press and hold Space.",
+          "expected": {
+            "action": "jump",
+            "state": "pressed"
+          },
+          "deadline_seconds": 5
+        },
+        {
+          "device": "keyboard",
+          "prompt": "Release Space.",
+          "expected": {
+            "action": "jump",
+            "state": "released"
+          },
+          "deadline_seconds": 5
+        },
+        {
+          "device": "controller",
+          "prompt": "Hold the left stick fully left.",
+          "expected": {
+            "event": "joy_axis",
+            "axis": 0,
+            "direction": -1,
+            "threshold": 0.6,
+            "neutral_tolerance": 0.15
+          },
+          "deadline_seconds": 5
+        },
+        {
+          "device": "controller",
+          "prompt": "Return the left stick to neutral.",
+          "expected": {
+            "event": "joy_axis",
+            "axis": 0,
+            "direction": 0,
+            "threshold": 0.6,
+            "neutral_tolerance": 0.15
+          },
+          "deadline_seconds": 5
+        },
+        {
+          "device": "controller",
+          "prompt": "Hold the left stick fully right.",
+          "expected": {
+            "event": "joy_axis",
+            "axis": 0,
+            "direction": 1,
+            "threshold": 0.6,
+            "neutral_tolerance": 0.15
+          },
+          "deadline_seconds": 5
+        },
+        {
+          "device": "controller",
+          "prompt": "Return the left stick to neutral.",
+          "expected": {
+            "event": "joy_axis",
+            "axis": 0,
+            "direction": 0,
+            "threshold": 0.6,
+            "neutral_tolerance": 0.15
+          },
+          "deadline_seconds": 5
+        },
+        {
+          "device": "controller",
+          "prompt": "Press and hold the bottom face button (A / Cross).",
+          "expected": {
+            "action": "jump",
+            "state": "pressed"
+          },
+          "deadline_seconds": 5
+        },
+        {
+          "device": "controller",
+          "prompt": "Release the bottom face button.",
+          "expected": {
+            "action": "jump",
+            "state": "released"
+          },
+          "deadline_seconds": 5
+        }
+      ]
+    }
+  },
+  "frames": 4800,
+  "seed": 0,
+  "viewport": [
+    1152,
+    648
+  ],
+  "clocks": {
+    "physics_hz": 60,
+    "bevy_step_ns": 16666667
+  },
+  "settle": {
+    "stable_frames": 3,
+    "nodes": [
+      ".",
+      "Options/StartButton",
+      "InputOverlay/Prompt",
+      "InputOverlay/Panel",
+      "Level1/Player"
+    ],
+    "classes": [
+      "InputCaptureRecorder",
+      "Player2D"
+    ]
+  },
+  "checkpoints": [
+    {
+      "frame": 0,
+      "nodes": [
+        {
+          "path": "InputOverlay/Prompt",
+          "position": [
+            32,
+            32
+          ],
+          "tolerance": 0,
+          "visible": true
+        }
+      ],
+      "regions": [
+        {
+          "name": "input-panel",
+          "rect": [
+            8,
+            8,
+            16,
+            16
+          ],
+          "non_blank": {
+            "background": [
+              255,
+              255,
+              255
+            ],
+            "tolerance": 0,
+            "min_fraction": 1
+          },
+          "dominant_colour": {
+            "rgb": [
+              0,
+              0,
+              0
+            ],
+            "tolerance": 0
+          }
+        }
+      ]
+    },
+    {
+      "frame": 4800,
+      "nodes": [
+        {
+          "path": "InputOverlay/Prompt",
+          "position": [
+            32,
+            32
+          ],
+          "tolerance": 0,
+          "visible": true
+        }
+      ],
+      "regions": [
+        {
+          "name": "input-panel",
+          "rect": [
+            8,
+            8,
+            16,
+            16
+          ],
+          "non_blank": {
+            "background": [
+              255,
+              255,
+              255
+            ],
+            "tolerance": 0,
+            "min_fraction": 1
+          },
+          "dominant_colour": {
+            "rgb": [
+              0,
+              0,
+              0
+            ],
+            "tolerance": 0
+          }
+        }
+      ]
+    }
+  ]
+}

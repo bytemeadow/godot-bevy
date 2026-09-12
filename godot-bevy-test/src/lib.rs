@@ -49,6 +49,8 @@
 //! godot::task::TaskHandle`, returning `godot::task::spawn(async move { ... })`.
 
 pub mod bencher;
+#[cfg(feature = "capture")]
+pub mod capture;
 mod config;
 pub mod exit_code;
 #[cfg(feature = "profile-tracy")]

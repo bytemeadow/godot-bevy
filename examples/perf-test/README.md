@@ -1,117 +1,27 @@
-# Transform Sync Performance Benchmark
+# Transform sync performance diagnostic
 
-This example benchmarks the overhead of **godot-bevy** transform synchronization at scale, comparing Rust + ECS to pure Godot (GDScript) with tens of thousands of entities.
+This tool compares rendered particle rain in GDScript and godot-bevy. It exercises entity creation and transform updates under load. It is separate from the learning examples.
 
-## What This Benchmark Tests
+## Running the diagnostic
 
-This benchmark focuses on measuring the overhead of transform synchronization between Bevy's ECS and Godot's scene tree by using a simple particle rain simulation that maximizes transform updates while minimizing computational complexity.
+From the repository root, with Godot on your `PATH`:
 
-### Pure Godot Implementation (GDScript)
-- **Language**: GDScript
-- **Architecture**: Traditional approach with Node2D instances stored in arrays
-- **Physics**: Simple gravity + velocity updates
-- **Transform Updates**: Direct Node2D.position assignments
-- **Characteristics**: Single-threaded, interpreted language, direct scene tree access
+```bash
+cargo run --manifest-path examples/perf-test/rust/Cargo.toml
+```
 
-### godot-bevy Implementation (Rust + ECS)
-- **Language**: Rust (compiled)
-- **Architecture**: Entity Component System with Bevy
-- **Physics**: Same gravity + velocity logic as GDScript version
-- **Transform Updates**: Transform2D → Transform sync → Godot scene tree
-- **Characteristics**: Compiled performance, but additional sync overhead
+The launcher builds the library, generates its GDExtension descriptor, and opens Godot.
 
-## Particle Rain Algorithm
+## Controls and readings
 
-Both implementations use identical physics simulation:
+Select Godot (GDScript) or godot-bevy (Rust + ECS). Set the particle count, then click Start Benchmark. Stop ends the run; Reset Metrics clears the readings.
 
-1. **Gravity**: Constant downward acceleration (200 px/s²)
-2. **Velocity Bounds**: Fall speed clamped between 50-300 px/s
-3. **Horizontal Drift**: Random horizontal movement (±50 px/s)
-4. **Wraparound**: Particles reset to top when they fall off bottom
-5. **Randomization**: New particles get random colors and positions
+The display reports current, average, minimum, and maximum FPS, plus the active particle count. Results depend on the build profile, renderer, hardware, and particle count. Treat these readings as diagnostics, with no expected FPS target.
 
-### Performance-Critical Operations
+Diagnostic capture: `capture/rain-2000.json` checks rendered load with 2,000 particles per implementation, side by side at 480×640. Both use seed 11, start above a black viewport, and wait for all particles and textures before frame 0. Three regions check the clear colour at frame 0 and at least 30% non-blank pixels at frames 60 and 120. FPS is outside the verdict. The `rain-2000-unspawned` negative scenario skips spawning and must fail the six later region checks. Capture hides the controls and uses white particles; the interactive diagnostic keeps its existing presentation. After the [capture harness preparation](../../itest/capture/README.md), run `devenv shell -- python3 itest/capture/capture.py --example perf-test --scenario rain-2000 --run perf-rain-1`. Build this example with `--features capture`; use fresh run IDs for repeats. A CLI spawn timeout exits 1 without starting measurement.
 
-- **Transform Synchronization**: Every particle needs position update every frame
-- **Entity Lifecycle**: Spawning/despawning particles dynamically
-- **Memory Access**: Iterating through thousands of entities
-- **Scene Tree Updates**: Updating Node2D positions in Godot
+## Implementation
 
-## Using the Benchmark
+`godot/scripts/godot_particles.gd` updates Node2D positions directly. `rust/src/particle_rain.rs` updates ECS components and sends transforms through godot-bevy's sync systems. Both simulate falling particles with gravity, horizontal drift, and wraparound.
 
-### UI Controls
-
-- **Implementation Selector**: Switch between "Godot (GDScript)" and "godot-bevy (Rust + ECS)"
-- **Particle Count Slider**: Adjust from 50 to 50,000+ particles
-- **Start/Stop**: Control benchmark execution
-- **Reset Metrics**: Clear performance measurements
-
-### Performance Metrics
-
-The benchmark tracks:
-- **Current FPS**: Real-time frame rate
-- **Average FPS**: Rolling average over 5 seconds
-- **Min/Max FPS**: Performance extremes
-- **Active Particles**: Current entity count
-
-## Expected Results
-
-### Performance Characteristics
-
-This benchmark specifically tests **transform synchronization overhead**. Expected results:
-
-| Particle Count | Godot (GDScript) | godot-bevy (Rust) | Analysis |
-|----------------|------------------|-------------------|----------|
-| 1,000         | ~145 FPS         | ~145 FPS          | Similar - low sync overhead |
-| 5,000         | ~145 FPS         | ~120 FPS          | Sync overhead becomes visible |
-| 10,000        | ~120 FPS         | ~95 FPS           | Sync overhead significant |
-| 20,000        | ~60 FPS          | ~45 FPS           | Both limited by transform updates |
-
-### Why This Test Is Important
-
-Unlike complex algorithms (like boids), this test isolates the **pure overhead** of using godot-bevy for simple tasks:
-
-1. **Transform Sync Cost**: Shows the price of the Transform2D → Transform → Godot pipeline
-2. **ECS Overhead**: Measures if ECS adds overhead for simple operations
-3. **Baseline Comparison**: Establishes when godot-bevy is worth the complexity
-
-## Benchmark Methodology
-
-### Fair Comparison Principles
-
-1. **Identical Logic**: Both implementations use exactly the same physics calculations
-2. **Same Visual Effects**: Both generate random colors and use identical scenes
-3. **Same Update Patterns**: Both spawn/despawn entities at the same rate
-4. **Same Memory Patterns**: Both use arrays for bulk operations
-5. **Clean Measurement**: No debug logging or unnecessary overhead
-
-### Key Difference: Transform Updates
-
-- **GDScript**: Direct `node.position = new_pos` assignment
-- **godot-bevy**: `Transform2D` → `Transform` sync → `node.position` update
-
-## Implementation Details
-
-### Godot Implementation (`scripts/godot_particles.gd`)
-- Uses `Node2D` instances with direct position updates
-- Arrays store positions and velocities for cache efficiency  
-- Simple physics loop with immediate visual updates
-- Spawns/despawns up to 50 particles per frame
-
-### godot-bevy Implementation (`rust/src/particle_rain.rs`)
-- ECS entities with `Particle`, `Velocity`, and `Transform2D` components
-- **No spatial data structures** - just simple physics
-- Transform synchronization through godot-bevy's sync systems
-- Same spawn/despawn logic as GDScript version
-
-## Conclusion
-
-This benchmark demonstrates the **baseline cost** of using godot-bevy for simple entity management tasks. It helps answer the question: "When is the complexity of godot-bevy worth it?"
-
-**Key Insights:**
-- **Simple Tasks**: GDScript may be faster for basic entity management
-- **Transform Overhead**: godot-bevy has measurable sync costs for high entity counts
-- **Complexity Threshold**: More complex logic (AI, physics, algorithms) will favor godot-bevy
-- **Design Decision**: Choose based on computational complexity, not just entity count
-
-This serves as a foundation for understanding godot-bevy performance characteristics and making informed architectural decisions.
+For library regression measurements, use the interleaved comparison described in [itest/BENCHMARKING.md](../../itest/BENCHMARKING.md).

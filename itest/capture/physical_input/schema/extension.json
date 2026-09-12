@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "golden": {
+      "const": "device-input.json"
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "device": {
+            "enum": [
+              "mouse",
+              "keyboard",
+              "controller"
+            ]
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "expected": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "state": {
+                    "enum": [
+                      "pressed",
+                      "released"
+                    ]
+                  }
+                },
+                "required": [
+                  "action",
+                  "state"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "event": {
+                    "const": "mouse_button"
+                  },
+                  "button": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9
+                  },
+                  "state": {
+                    "enum": [
+                      "pressed",
+                      "released"
+                    ]
+                  },
+                  "target": {
+                    "const": "start"
+                  }
+                },
+                "required": [
+                  "event",
+                  "button",
+                  "state"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "event": {
+                    "const": "key"
+                  },
+                  "binding": {
+                    "enum": [
+                      "keycode",
+                      "physical_keycode"
+                    ]
+                  },
+                  "code": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "state": {
+                    "enum": [
+                      "pressed",
+                      "released"
+                    ]
+                  }
+                },
+                "required": [
+                  "event",
+                  "binding",
+                  "code",
+                  "state"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "event": {
+                    "const": "joy_button"
+                  },
+                  "button": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 127
+                  },
+                  "state": {
+                    "enum": [
+                      "pressed",
+                      "released"
+                    ]
+                  }
+                },
+                "required": [
+                  "event",
+                  "button",
+                  "state"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "event": {
+                    "const": "joy_axis"
+                  },
+                  "axis": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9
+                  },
+                  "direction": {
+                    "enum": [
+                      -1,
+                      0,
+                      1
+                    ]
+                  },
+                  "threshold": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1
+                  },
+                  "neutral_tolerance": {
+                    "type": "number",
+                    "minimum": 0,
+                    "exclusiveMaximum": 1
+                  }
+                },
+                "required": [
+                  "event",
+                  "axis",
+                  "direction",
+                  "threshold",
+                  "neutral_tolerance"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "deadline_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 60
+          }
+        },
+        "required": [
+          "device",
+          "prompt",
+          "expected",
+          "deadline_seconds"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "version",
+    "golden",
+    "actions",
+    "steps"
+  ],
+  "additionalProperties": false
+}

@@ -120,25 +120,22 @@ else
     exit 1
 fi
 
-if [[ "$THREADED" == true ]] || [[ "$SERVE" == false ]]; then
-    echo ""
-    echo "=== Building THREADED version ==="
+echo ""
+echo "=== Building THREADED version ==="
 
-    # Use a separate target directory for threaded builds to avoid cargo caching issues
-    # (RUSTFLAGS changes don't trigger rebuilds with the same target dir)
-    THREADED_TARGET_DIR="$WORKSPACE_ROOT/target-threaded"
-    THREADED_WASM_DIR="$THREADED_TARGET_DIR/wasm32-unknown-emscripten/$BUILD_MODE"
+THREADED_TARGET_DIR="$WORKSPACE_ROOT/target-threaded"
+THREADED_WASM_DIR="$THREADED_TARGET_DIR/wasm32-unknown-emscripten/$BUILD_MODE"
 
-    CARGO_TARGET_DIR="$THREADED_TARGET_DIR" \
-    RUSTFLAGS="-C link-args=-pthread -C target-feature=+atomics -C link-args=-sSIDE_MODULE=2 -C link-args=-O0 -Zlink-native-libraries=no -Cllvm-args=-enable-emscripten-cxx-exceptions=0" \
-        $CARGO_CMD build --no-default-features --features web -Zbuild-std --target wasm32-unknown-emscripten $RELEASE_FLAG
+CARGO_TARGET_DIR="$THREADED_TARGET_DIR" \
+RUSTFLAGS="-C link-args=-pthread -C target-feature=+atomics -C link-args=-sSIDE_MODULE=2 -C link-args=-O0 -Zlink-native-libraries=no -Cllvm-args=-enable-emscripten-cxx-exceptions=0" \
+    $CARGO_CMD build --no-default-features --features web -Zbuild-std --target wasm32-unknown-emscripten $RELEASE_FLAG
 
-    if [[ -f "$THREADED_WASM_DIR/simple_node2d_movement_example.wasm" ]]; then
-        cp "$THREADED_WASM_DIR/simple_node2d_movement_example.wasm" "$WASM_DIR/simple_node2d_movement_example.threads.wasm"
-        echo "Created: $WASM_DIR/simple_node2d_movement_example.threads.wasm"
-    else
-        echo "WARNING: Threaded build failed - .wasm not found in $THREADED_WASM_DIR"
-    fi
+if [[ -f "$THREADED_WASM_DIR/simple_node2d_movement_example.wasm" ]]; then
+    cp "$THREADED_WASM_DIR/simple_node2d_movement_example.wasm" "$WASM_DIR/simple_node2d_movement_example.threads.wasm"
+    echo "Created: $WASM_DIR/simple_node2d_movement_example.threads.wasm"
+else
+    echo "ERROR: Threaded build failed - .wasm not found in $THREADED_WASM_DIR"
+    exit 1
 fi
 
 echo ""

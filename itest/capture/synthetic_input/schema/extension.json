@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "max_latency_frames": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "trace": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "frame": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "binding": {
+            "enum": [
+              "keycode",
+              "physical_keycode"
+            ]
+          },
+          "code": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "pressed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "frame",
+          "action",
+          "binding",
+          "code",
+          "pressed"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "version",
+    "max_latency_frames",
+    "actions",
+    "trace"
+  ],
+  "additionalProperties": false
+}

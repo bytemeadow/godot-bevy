@@ -1,0 +1,44 @@
+{
+  "version": 2,
+  "example": "two-way-sync-demo",
+  "scenario": "orbit-split",
+  "scene": "res://capture/orbit_split.tscn",
+  "pacing": "fixed",
+  "extensions": {},
+  "frames": 120,
+  "seed": 3,
+  "viewport": [960, 640],
+  "clocks": {"physics_hz": 60, "bevy_step_ns": 16666667},
+  "settle": {
+    "stable_frames": 3,
+    "nodes": ["Quad", "Camera2D"],
+    "classes": ["BevyApp", "MeshInstance2D", "Camera2D"]
+  },
+  "checkpoints": [
+    {
+      "frame": 0,
+      "nodes": [{"path": "Quad", "position": [0, 100], "tolerance": 1, "visible": true}],
+      "regions": [{"name": "quad", "rect": [476, 416, 8, 8], "non_blank": {"background": [0, 0, 0], "tolerance": 2, "min_fraction": 1}, "dominant_colour": {"rgb": [255, 255, 255], "tolerance": 2}}]
+    },
+    {
+      "frame": 30,
+      "nodes": [{"path": "Quad", "position": [56.464247, 82.533561], "tolerance": 1, "visible": true}],
+      "regions": [{"name": "quad", "rect": [532, 399, 8, 8], "non_blank": {"background": [0, 0, 0], "tolerance": 2, "min_fraction": 1}, "dominant_colour": {"rgb": [255, 255, 255], "tolerance": 2}}]
+    },
+    {
+      "frame": 60,
+      "nodes": [{"path": "Quad", "position": [93.203909, 36.235775], "tolerance": 1, "visible": true}],
+      "regions": [{"name": "quad", "rect": [569, 352, 8, 8], "non_blank": {"background": [0, 0, 0], "tolerance": 2, "min_fraction": 1}, "dominant_colour": {"rgb": [255, 255, 255], "tolerance": 2}}]
+    },
+    {
+      "frame": 90,
+      "nodes": [{"path": "Quad", "position": [97.384763, -22.720209], "tolerance": 1, "visible": true}],
+      "regions": [{"name": "quad", "rect": [573, 293, 8, 8], "non_blank": {"background": [0, 0, 0], "tolerance": 2, "min_fraction": 1}, "dominant_colour": {"rgb": [255, 255, 255], "tolerance": 2}}]
+    },
+    {
+      "frame": 120,
+      "nodes": [{"path": "Quad", "position": [67.546318, -73.739372], "tolerance": 1, "visible": true}],
+      "regions": [{"name": "quad", "rect": [544, 242, 8, 8], "non_blank": {"background": [0, 0, 0], "tolerance": 2, "min_fraction": 1}, "dominant_colour": {"rgb": [255, 255, 255], "tolerance": 2}}]
+    }
+  ]
+}

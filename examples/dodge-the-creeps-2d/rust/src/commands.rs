@@ -58,6 +58,7 @@ pub enum AnimationCommand {
 #[derive(Debug, Clone, PartialEq)]
 pub enum UIElement {
     StartButton,
+    ShowScoreButton,
     ScoreLabel,
     MessageLabel,
 }
@@ -66,6 +67,7 @@ pub enum UIElement {
 #[derive(Resource, Default)]
 pub struct UIHandles {
     pub start_button: Option<GodotNodeHandle>,
+    pub show_score_button: Option<GodotNodeHandle>,
     pub score_label: Option<GodotNodeHandle>,
     pub message_label: Option<GodotNodeHandle>,
 }
@@ -74,6 +76,7 @@ impl UIHandles {
     pub fn get_handle(&self, element: &UIElement) -> Option<GodotNodeHandle> {
         match element {
             UIElement::StartButton => self.start_button,
+            UIElement::ShowScoreButton => self.show_score_button,
             UIElement::ScoreLabel => self.score_label,
             UIElement::MessageLabel => self.message_label,
         }
@@ -169,7 +172,7 @@ fn process_ui_commands(
     ui_handles: Res<UIHandles>,
     mut godot: GodotAccess,
 ) {
-    use godot::classes::{Button, Label};
+    use godot::classes::{Control, Label};
 
     for command in ui_commands.read() {
         match command {
@@ -182,9 +185,9 @@ fn process_ui_commands(
             }
             UICommand::SetVisible { target, visible } => {
                 if let Some(handle) = ui_handles.get_handle(target)
-                    && let Some(mut button) = godot.try_get::<Button>(handle)
+                    && let Some(mut control) = godot.try_get::<Control>(handle)
                 {
-                    button.set_visible(*visible);
+                    control.set_visible(*visible);
                 }
             }
             UICommand::ShowMessage { text } => {

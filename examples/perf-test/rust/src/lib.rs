@@ -8,8 +8,8 @@ use crate::particle_rain::ParticleRainPlugin;
 mod container;
 mod particle_rain;
 
-/// Transform sync performance benchmark comparing pure Godot vs godot-bevy
-/// with tens of thousands of entities requiring position updates each frame.
+#[cfg(feature = "capture")]
+mod capture;
 
 #[bevy_app]
 fn build_app(app: &mut App) {
@@ -18,4 +18,9 @@ fn build_app(app: &mut App) {
         .add_plugins(GodotAssetsPlugin)
         .add_plugins(GodotTransformSyncPlugin::default().without_auto_sync())
         .add_plugins(ParticleRainPlugin);
+
+    #[cfg(feature = "capture")]
+    if godot_bevy_test::capture::is_enabled() {
+        capture::install(app);
+    }
 }

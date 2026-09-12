@@ -11,6 +11,9 @@ use godot_bevy::prelude::{
 };
 use std::f32::consts::PI;
 
+#[cfg(feature = "capture")]
+mod capture;
+
 #[bevy_app]
 fn build_app(app: &mut App) {
     godot_print!("Hello from Godot-Bevy!");
@@ -21,6 +24,11 @@ fn build_app(app: &mut App) {
     // Godot-Bevy synchronizes the Bevy 'Update' schedule parameter with the
     // Godot `_process` update cycle. The `FixedUpdate` schedule is driven from
     // Godot's `_physics_process` update cycle (its fixed physics clock).
+    #[cfg(feature = "capture")]
+    if godot_bevy_test::capture::is_enabled() {
+        capture::install(app);
+        return;
+    }
     app.add_systems(Update, (orbit_setup, orbit_system).chain());
 }
 

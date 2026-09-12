@@ -1,5 +1,45 @@
 #[cfg(not(feature = "itest"))]
 fn main() {
+    if std::env::var_os("GODOT_BEVY_CAPTURE").is_some() {
+        let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("example directory");
+        let driver = example.join("../../itest/capture/capture.py");
+        let status = std::process::Command::new("python3")
+            .arg(&driver)
+            .arg("--example")
+            .arg(example.file_name().expect("example name"))
+            .arg("--check-library")
+            .status();
+        match status {
+            Ok(status) if status.success() => {}
+            Ok(status) => std::process::exit(status.code().unwrap_or(2)),
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(2);
+            }
+        }
+        let mut command = std::process::Command::new("python3");
+        command
+            .arg(driver)
+            .arg("--example")
+            .arg(example.file_name().expect("example name"));
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            eprintln!("{}", command.exec());
+            std::process::exit(2);
+        }
+        #[cfg(not(unix))]
+        std::process::exit(match command.status() {
+            Ok(status) => status.code().unwrap_or(1),
+            Err(error) => {
+                eprintln!("{error}");
+                2
+            }
+        });
+    }
+
     let runner = cargo_godot_lib::GodotRunner::create(
         env!("CARGO_PKG_NAME"),
         &std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../godot"),

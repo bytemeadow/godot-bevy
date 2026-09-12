@@ -1,0 +1,55 @@
+{
+  "version": 2,
+  "example": "perf-test",
+  "scenario": "rain-2000-unspawned",
+  "scene": "res://scenes/capture_rain.tscn",
+  "pacing": "fixed",
+  "extensions": {},
+  "frames": 120,
+  "seed": 11,
+  "viewport": [480, 640],
+  "clocks": {"physics_hz": 60, "bevy_step_ns": 16666667},
+  "settle": {
+    "stable_frames": 3,
+    "nodes": ["GodotParticlesContainer", "BevyParticlesContainer"],
+    "classes": ["BevyApp", "ParticleRain", "Sprite2D"]
+  },
+  "checkpoints": [
+    {
+      "frame": 0,
+      "nodes": [
+        {"path": "GodotParticlesContainer", "position": [0, 0], "tolerance": 0, "visible": true},
+        {"path": "BevyParticlesContainer", "position": [240, 0], "tolerance": 0, "visible": true}
+      ],
+      "regions": [
+        {"name": "left", "rect": [24, 224, 80, 16], "non_blank": {"background": [255, 255, 255], "tolerance": 2, "min_fraction": 1}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 2}},
+        {"name": "middle", "rect": [200, 224, 80, 16], "non_blank": {"background": [255, 255, 255], "tolerance": 2, "min_fraction": 1}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 2}},
+        {"name": "right", "rect": [376, 224, 80, 16], "non_blank": {"background": [255, 255, 255], "tolerance": 2, "min_fraction": 1}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 2}}
+      ]
+    },
+    {
+      "frame": 60,
+      "nodes": [
+        {"path": "GodotParticlesContainer", "position": [0, 0], "tolerance": 0, "visible": true},
+        {"path": "BevyParticlesContainer", "position": [240, 0], "tolerance": 0, "visible": true}
+      ],
+      "regions": [
+        {"name": "left", "rect": [24, 224, 80, 16], "non_blank": {"background": [0, 0, 0], "tolerance": 2, "min_fraction": 0.3}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 255}},
+        {"name": "middle", "rect": [200, 224, 80, 16], "non_blank": {"background": [0, 0, 0], "tolerance": 2, "min_fraction": 0.3}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 255}},
+        {"name": "right", "rect": [376, 224, 80, 16], "non_blank": {"background": [0, 0, 0], "tolerance": 2, "min_fraction": 0.3}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 255}}
+      ]
+    },
+    {
+      "frame": 120,
+      "nodes": [
+        {"path": "GodotParticlesContainer", "position": [0, 0], "tolerance": 0, "visible": true},
+        {"path": "BevyParticlesContainer", "position": [240, 0], "tolerance": 0, "visible": true}
+      ],
+      "regions": [
+        {"name": "left", "rect": [24, 524, 80, 16], "non_blank": {"background": [0, 0, 0], "tolerance": 2, "min_fraction": 0.3}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 255}},
+        {"name": "middle", "rect": [200, 524, 80, 16], "non_blank": {"background": [0, 0, 0], "tolerance": 2, "min_fraction": 0.3}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 255}},
+        {"name": "right", "rect": [376, 524, 80, 16], "non_blank": {"background": [0, 0, 0], "tolerance": 2, "min_fraction": 0.3}, "dominant_colour": {"rgb": [0, 0, 0], "tolerance": 255}}
+      ]
+    }
+  ]
+}

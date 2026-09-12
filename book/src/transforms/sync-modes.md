@@ -39,6 +39,9 @@ Synchronizes transforms from ECS to Godot only.
 
 Full bidirectional synchronization between ECS and Godot.
 
+The [two-way-sync-demo](https://github.com/bytemeadow/godot-bevy/tree/main/examples/two-way-sync-demo)
+lets GDScript move a quad on x while Bevy moves it on y. Its README explains how to run it.
+
 **Characteristics:**
 - ✅ Changes in either system are reflected
 - ✅ Works with Godot animations

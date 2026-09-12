@@ -98,6 +98,22 @@ A `GodotActions` read inside either anchor sees the **process-clock** snapshot: 
 
 > **Note:** Bevy's default `FixedUpdate` rate (64 Hz) is **not used**. godot-bevy drives `FixedMain` directly from `_physics_process`, so the rate is always Godot's physics rate — whatever is set in Project Settings → Physics → Common → Physics Ticks Per Second.
 
+### Reading schedule counters
+
+To inspect the cadence, count calls to `First`, `Update`, and `FixedUpdate`, then read the counters in `Last`. `First` counts the prefix and `Update` counts the suffix. Both advance once per render frame. `PreUpdate`, `PostUpdate`, and `Last` also run once per render frame.
+
+The counter increments for one render frame depend on how many physics steps it contains:
+
+| Physics steps | `First` | `Update` | `FixedUpdate` |
+| --- | --- | --- | --- |
+| 0 | +1 | +1 | 0 |
+| 1 | +1 | +1 | +1 |
+| 2 | +1 | +1 | +2 |
+
+At a higher display rate than physics rate, some render frames have no fixed step. A slower display can have several fixed steps in one frame. Equal counters at 60 FPS and 60 physics ticks per second do not mean the schedules share a callback.
+
+Use `Update` for UI and visual-rate game logic. Use `FixedUpdate` for physics logic and read `Res<Time>::delta_secs()` there for Godot's physics delta. Schedule counters describe cadence; they do not measure rendering performance. The integration suite checks the ordering and once-per-render-frame prefix in [`real_frame_tests.rs`](https://github.com/bytemeadow/godot-bevy/blob/main/itest/rust/src/real_frame_tests.rs).
+
 ## Practical Example
 
 ```rust

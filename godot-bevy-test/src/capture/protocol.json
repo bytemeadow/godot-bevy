@@ -1,0 +1,55 @@
+{
+  "version": 2,
+  "ready": "CAPTURE_READY",
+  "facts": "CAPTURE_FACTS",
+  "error": "CAPTURE_ERROR",
+  "env": {
+    "scenario": "GODOT_BEVY_CAPTURE",
+    "manifest": "GODOT_BEVY_CAPTURE_MANIFEST",
+    "output": "GODOT_BEVY_CAPTURE_OUTPUT",
+    "timeout": "GODOT_BEVY_CAPTURE_TIMEOUT"
+  },
+  "exit": {
+    "pass": 0,
+    "fail": 1,
+    "error": 2
+  },
+  "fps": 60,
+  "step_ns": 16666667,
+  "evidence_root": "target/example-evidence",
+  "frame_prefix": "frame-",
+  "frame_digits": 6,
+  "png_suffix": ".png",
+  "facts_suffix": ".facts.json",
+  "diff_suffix": ".diff.json",
+  "request_suffix": ".request.json",
+  "manifest_file": "manifest.json",
+  "verdict_file": "verdict.json",
+  "stdout_file": "stdout.log",
+  "stderr_file": "stderr.log",
+  "untested": [
+    "audio",
+    "physical_input",
+    "synthetic_input",
+    "browser",
+    "rendering_3d",
+    "window_presentation"
+  ],
+  "schema": "schema/capture-v2.json",
+  "migration": "capture version 1 is unsupported; set version to 2 and add extensions: {} and pacing: \"fixed\"",
+  "extension": "CAPTURE_EXT",
+  "ack": "CAPTURE_ACK",
+  "instruction_file": "instruction.json",
+  "driver_pid_file": "driver.pid",
+  "godot_pid_file": "godot.pid",
+  "extension_schema": "schema/extension.json",
+  "extension_validator": "schema/validate.py",
+  "extension_verdict": "verdict.py",
+  "extension_suffix": ".json",
+  "capture_symbol": "godot_bevy_capture_version",
+  "fixed_step_ns": 16666668,
+  "pacing": [
+    "fixed",
+    "realtime"
+  ]
+}

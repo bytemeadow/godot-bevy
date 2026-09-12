@@ -1,0 +1,190 @@
+{
+ "version": 2,
+ "example": "simple-node2d-movement",
+ "scenario": "orbit-frames-0-1-2",
+ "scene": "res://main.tscn",
+ "pacing": "fixed",
+ "extensions": {},
+ "frames": 2,
+ "seed": 7,
+ "viewport": [
+  960,
+  640
+ ],
+ "clocks": {
+  "physics_hz": 60,
+  "bevy_step_ns": 16666667
+ },
+ "settle": {
+  "stable_frames": 3,
+  "nodes": [
+   "Icon",
+   "Icon/SubIcon",
+   "Icon/SubIcon/SubIcon2",
+   "Icon/SubIcon/SubIcon2/SubIcon3",
+   "Icon/SubIcon/SubIcon2/SubIcon3/SubIcon4",
+   "OtherIcon",
+   "Camera2D"
+  ],
+  "classes": [
+   "BevyApp",
+   "Sprite2D",
+   "Camera2D"
+  ]
+ },
+ "checkpoints": [
+  {
+   "frame": 0,
+   "nodes": [
+    {
+     "path": "Icon",
+     "position": [
+      100,
+      0
+     ],
+     "tolerance": 1,
+     "visible": true
+    },
+    {
+     "path": "OtherIcon",
+     "position": [
+      600,
+      1
+     ],
+     "tolerance": 1,
+     "visible": true
+    }
+   ],
+   "regions": [
+    {
+     "name": "other-icon",
+     "rect": [
+      804,
+      313,
+      4,
+      16
+     ],
+     "non_blank": {
+      "background": [
+       0,
+       0,
+       0
+      ],
+      "tolerance": 2,
+      "min_fraction": 0.95
+     },
+     "dominant_colour": {
+      "rgb": [
+       54,
+       61,
+       82
+      ],
+      "tolerance": 2
+     }
+    }
+   ]
+  },
+  {
+   "frame": 1,
+   "nodes": [
+    {
+     "path": "Icon",
+     "position": [
+      99.98611,
+      1.66659
+     ],
+     "tolerance": 0.001,
+     "visible": true
+    },
+    {
+     "path": "OtherIcon",
+     "position": [
+      599.98611,
+      2.66659
+     ],
+     "tolerance": 0.001,
+     "visible": true
+    }
+   ],
+   "regions": [
+    {
+     "name": "other-icon",
+     "rect": [
+      804,
+      314,
+      4,
+      16
+     ],
+     "non_blank": {
+      "background": [
+       0,
+       0,
+       0
+      ],
+      "tolerance": 2,
+      "min_fraction": 0.95
+     },
+     "dominant_colour": {
+      "rgb": [
+       54,
+       61,
+       82
+      ],
+      "tolerance": 2
+     }
+    }
+   ]
+  },
+  {
+   "frame": 2,
+   "nodes": [
+    {
+     "path": "Icon",
+     "position": [
+      99.94445,
+      3.33272
+     ],
+     "tolerance": 0.001,
+     "visible": true
+    },
+    {
+     "path": "OtherIcon",
+     "position": [
+      599.94445,
+      4.33272
+     ],
+     "tolerance": 0.001,
+     "visible": true
+    }
+   ],
+   "regions": [
+    {
+     "name": "other-icon",
+     "rect": [
+      804,
+      315,
+      4,
+      16
+     ],
+     "non_blank": {
+      "background": [
+       0,
+       0,
+       0
+      ],
+      "tolerance": 2,
+      "min_fraction": 0.95
+     },
+     "dominant_colour": {
+      "rgb": [
+       54,
+       61,
+       82
+      ],
+      "tolerance": 2
+     }
+    }
+   ]
+  }
+ ]
+}
