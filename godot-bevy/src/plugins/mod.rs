@@ -21,13 +21,15 @@ pub use assets::GodotAssetsPlugin;
 pub use audio::GodotAudioPlugin;
 pub use collisions::GodotCollisionsPlugin;
 pub use core::GodotBaseCorePlugin;
-pub use debugger::{DebuggerConfig, GodotDebuggerPlugin};
+pub use debugger::{
+    DebuggerConfig, DebuggerSet, GodotDebuggerPlugin, InspectorRange, InspectorReadOnly,
+};
 pub use event_bridge::{AddGodotEventAppExt, EventBridgeSet, GodotEventSender, send_event};
 #[cfg(feature = "godot_bevy_log")]
 pub use godot_bevy_logger::GodotBevyLogPlugin;
 pub use input::{BevyInputBridgePlugin, GodotInputEventPlugin};
 pub use packed_scene::GodotPackedScenePlugin;
-pub use scene_tree::GodotSceneTreePlugin;
+pub use scene_tree::{GodotSceneTreePlugin, SceneTreeSet};
 pub use transforms::GodotTransformSyncPlugin;
 
 #[deprecated(note = "Use GodotInputEventPlugin instead")]
