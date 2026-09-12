@@ -62,6 +62,11 @@ fn on_level_loaded_play_music(
     music_channel: Res<AudioChannel<GameMusicChannel>>,
     game_audio: Res<GameAudio>,
 ) {
+    #[cfg(feature = "capture-audio")]
+    if crate::capture_audio::is_active() {
+        return;
+    }
+
     let event = trigger.event();
 
     music_channel.stop();
@@ -85,6 +90,11 @@ fn on_play_sfx(
     sfx_channel: Res<AudioChannel<GameSfxChannel>>,
     game_audio: Res<GameAudio>,
 ) {
+    #[cfg(feature = "capture-audio")]
+    if crate::capture_audio::is_active() {
+        return;
+    }
+
     match trigger.event() {
         PlaySfxMessage::PlayerJump => {
             sfx_channel.play(game_audio.jump_sound.clone()).volume(0.8);
@@ -100,4 +110,34 @@ fn on_play_sfx(
 fn stop_background_music(music_channel: Res<AudioChannel<GameMusicChannel>>) {
     music_channel.stop();
     info!("Stopped background music");
+}
+
+#[cfg(feature = "capture-audio")]
+pub(crate) fn reset_capture_audio(world: &World) {
+    let music = world.resource::<AudioChannel<GameMusicChannel>>();
+    music.stop();
+    music.set_volume(0.0);
+    let sfx = world.resource::<AudioChannel<GameSfxChannel>>();
+    sfx.stop();
+    sfx.resume();
+    sfx.set_volume(1.0);
+    sfx.set_pitch(1.0);
+    sfx.set_panning(0.0);
+}
+
+#[cfg(feature = "capture-audio")]
+pub(crate) fn play_capture_cue(world: &World, name: &str) -> Result<(), String> {
+    let assets = world.resource::<GameAudio>();
+    let handle = match name {
+        "jump" => &assets.jump_sound,
+        "gem" => &assets.gem_sound,
+        _ => return Err(format!("unknown audio cue {name}")),
+    };
+    world
+        .resource::<AudioChannel<GameSfxChannel>>()
+        .play(handle.clone())
+        .volume(0.8)
+        .pitch(1.0)
+        .panning(0.0);
+    Ok(())
 }

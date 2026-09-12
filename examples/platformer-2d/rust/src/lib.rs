@@ -4,6 +4,8 @@ use gameplay::audio::GameAudio;
 use godot_bevy::prelude::{GodotDefaultPlugins, *};
 
 mod attachables;
+#[cfg(feature = "capture-audio")]
+mod capture_audio;
 mod components;
 mod gameplay;
 mod level_manager;
@@ -54,6 +56,8 @@ fn build_app(app: &mut App) {
 
     #[cfg(feature = "capture")]
     capture::install(app);
+    #[cfg(feature = "capture-audio")]
+    capture_audio::install(app);
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, States)]

@@ -23,5 +23,6 @@ serde_json = { version = "1", optional = true }
 
 [features]
 capture = ["dep:godot-bevy-test", "godot-bevy-test/capture"]
+capture-audio = ["capture", "dep:serde", "dep:serde_json"]
 capture-input = ["capture", "dep:serde", "dep:serde_json"]
 itest = ["dep:godot-bevy-test", "godot-bevy-test/test-frame-signal"]

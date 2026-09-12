@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Platformer audio cues",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mixer_rate", "reference", "cues", "stop_frame", "end_frame", "silence_window_ms", "thresholds"],
+  "properties": {
+    "mixer_rate": {"type": "integer", "enum": [44100, 48000]},
+    "reference": {
+      "type": "string",
+      "pattern": "^examples/harness/audio/references/[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9_-]*\\.wav$"
+    },
+    "cues": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "frame", "window_ms"],
+        "properties": {
+          "name": {"type": "string", "enum": ["jump", "gem"]},
+          "frame": {"type": "integer", "minimum": 1, "maximum": 600},
+          "window_ms": {"$ref": "#/$defs/window"}
+        }
+      }
+    },
+    "stop_frame": {"type": "integer", "minimum": 1, "maximum": 600},
+    "end_frame": {"type": "integer", "minimum": 1, "maximum": 600},
+    "silence_window_ms": {"$ref": "#/$defs/window"},
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correlation", "alignment_ms", "level_db", "silence_dbfs"],
+      "properties": {
+        "correlation": {"type": "number", "const": 0.98},
+        "alignment_ms": {"type": "number", "const": 50},
+        "level_db": {"type": "number", "const": 1},
+        "silence_dbfs": {"type": "number", "const": -60}
+      }
+    }
+  },
+  "$defs": {
+    "window": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"type": "number", "minimum": 0, "maximum": 10000}
+    }
+  }
+}

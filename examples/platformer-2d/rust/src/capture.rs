@@ -27,8 +27,12 @@ enum StartAction {
     Released,
 }
 
+const SCENARIOS: &[&str] = &["title", "level", "level-wrong-spawn"];
+
 pub(super) fn install(app: &mut App) {
-    if !capture::is_enabled() {
+    if !std::env::var("GODOT_BEVY_CAPTURE")
+        .is_ok_and(|scenario| SCENARIOS.contains(&scenario.as_str()))
+    {
         return;
     }
 
@@ -46,7 +50,7 @@ pub(super) fn install(app: &mut App) {
         CaptureAdapter {
             name: "platformer-render",
             extension: |_, _, _| Ok(()),
-            scenarios: &["title", "level", "level-wrong-spawn"],
+            scenarios: SCENARIOS,
             is_settled,
             reset,
             before_frame: |_, _, _| Ok(()),
