@@ -101,6 +101,13 @@ in
       echo "Running lint checks..."
       cargo fmt --all -- --check
       cargo clippy --all-targets -- -D warnings
+      python3 itest/test_examples.py
+      python3 -m unittest discover -s examples/harness/tests
+      for adapter in audio browser physical_input synthetic_input; do
+        python3 -m unittest discover -s examples/harness/$adapter/tests
+      done
+      cargo clippy -p simple-node2d-movement-example -p two-way-sync-example -p dodge-the-creeps-example -p perf-test --all-targets --features capture -- -D warnings
+      cargo clippy -p platformer-2d-example --all-targets --features capture-audio,capture-input -- -D warnings
     '';
 
     # native, needs local godot
