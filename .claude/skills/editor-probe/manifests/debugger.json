@@ -1,0 +1,7 @@
+[
+  {
+    "mode": "debugger",
+    "project": "examples/platformer-2d/godot",
+    "shots": "/tmp/editor-probe/debugger"
+  }
+]

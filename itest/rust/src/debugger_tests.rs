@@ -779,7 +779,9 @@ fn debugger_discovery_and_malformed_frame(ctx: &TestContext) -> godot::task::Tas
                 "godot.query",
                 "godot.get_components",
                 "godot.mutate_leaf",
-                "godot.resolve_node"
+                "godot.resolve_node",
+                "godot.entity_for_node",
+                "godot.debugger_config"
             ]
         );
         let mut malformed = request(112, "rpc.discover", Dictionary::new());
@@ -955,111 +957,6 @@ fn debugger_resolver_keeps_multiple_candidates(ctx: &TestContext) -> godot::task
 }
 
 #[itest(async)]
-fn debugger_legacy_dock_stream_until_subscription(ctx: &TestContext) -> godot::task::TaskHandle {
-    let ctx = ctx.clone();
-    godot::task::spawn(async move {
-        let (tx, rx) = channel();
-        let mut app = TestApp::new(&ctx, move |app| {
-            app.add_plugins(GodotDebuggerPlugin)
-                .register_type::<Speed>();
-            app.world_mut()
-                .resource_mut::<godot_bevy::plugins::debugger::DebuggerConfig>()
-                .update_interval = 0.0;
-            app.insert_resource(DebuggerTransport::new(|_| {}).with_legacy_sink(
-                || true,
-                move |data| {
-                    for value in data.iter_shared() {
-                        let row = value.to::<VarArray>();
-                        if row.get(1).unwrap().to::<GString>() != "Legacy" {
-                            continue;
-                        }
-                        let components = row.get(4).unwrap().to::<VarArray>();
-                        let speed = components
-                            .iter_shared()
-                            .map(|value| value.to::<Dictionary>())
-                            .find(|component| {
-                                component.get("short_name").unwrap().to::<GString>() == "Speed"
-                            })
-                            .unwrap();
-                        let fields = speed
-                            .get("value")
-                            .unwrap()
-                            .to::<Dictionary>()
-                            .get("fields")
-                            .unwrap()
-                            .to::<VarArray>();
-                        tx.send((row.len(), fields.get(0).unwrap().to::<f64>()))
-                            .unwrap();
-                    }
-                },
-            ));
-            app.world_mut().spawn((Name::new("Legacy"), Speed(1.0)));
-        })
-        .await;
-        let endpoint = app.with_world(|world| world.non_send::<DebuggerEndpoint>().clone());
-        let frames = rx.try_iter().collect::<Vec<_>>();
-        assert!(!frames.is_empty());
-        assert!(frames.iter().all(|frame| *frame == (5, 1.0)));
-        let mut params = Dictionary::new();
-        params.set("interval_s", 0.0);
-        endpoint.submit(request(141, "godot.subscribe", params));
-        app.updates(2).await;
-        assert!(rx.try_recv().is_err());
-        endpoint.submit(request(142, "godot.unsubscribe", Dictionary::new()));
-        app.update().await;
-        assert!(rx.try_recv().is_ok());
-        app.cleanup().await;
-    })
-}
-
-#[derive(Resource, Default)]
-struct LegacyStep(std::time::Duration);
-
-#[itest(async)]
-fn debugger_legacy_cadence_uses_bevy_time(ctx: &TestContext) -> godot::task::TaskHandle {
-    let ctx = ctx.clone();
-    godot::task::spawn(async move {
-        let (tx, rx) = channel();
-        let mut app = TestApp::new(&ctx, move |app| {
-            app.insert_resource(godot_bevy::prelude::DebuggerConfig {
-                update_interval: 1800.0,
-                ..default()
-            })
-            .add_plugins(GodotDebuggerPlugin)
-            .init_resource::<LegacyStep>()
-            .add_systems(
-                PreUpdate,
-                |step: Res<LegacyStep>,
-                 mut virtual_time: ResMut<Time<bevy::time::Virtual>>,
-                 mut time: ResMut<Time>| {
-                    virtual_time.advance_by(step.0);
-                    *time = virtual_time.as_generic();
-                },
-            )
-            .insert_resource(DebuggerTransport::new(|_| {}).with_legacy_sink(
-                || true,
-                move |_| {
-                    tx.send(()).unwrap();
-                },
-            ));
-        })
-        .await;
-        assert!(rx.try_recv().is_err());
-        app.with_world_mut(|world| {
-            world.resource_mut::<LegacyStep>().0 = std::time::Duration::from_secs(1800);
-        });
-        app.updates(2).await;
-        assert!(rx.try_iter().count() >= 1);
-        app.with_world_mut(|world| {
-            world.resource_mut::<LegacyStep>().0 = std::time::Duration::ZERO;
-        });
-        app.updates(3).await;
-        assert!(rx.try_recv().is_err());
-        app.cleanup().await;
-    })
-}
-
-#[itest(async)]
 fn debugger_resolves_relative_child_and_queries_runtime_path(
     ctx: &TestContext,
 ) -> godot::task::TaskHandle {
@@ -1141,6 +1038,120 @@ fn debugger_invalid_node_handle_is_reported(ctx: &TestContext) -> godot::task::T
                 .unwrap()
                 .get("valid"),
             Some(&Wire::Bool(false))
+        );
+        app.cleanup().await;
+    })
+}
+
+#[itest(async)]
+fn debugger_entity_for_node_and_freed_node(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx = ctx.clone();
+    godot::task::spawn(async move {
+        let (mut app, endpoint, rx, _) = setup(&ctx).await;
+        let singleton = ctx
+            .scene_tree
+            .get_tree()
+            .get_root()
+            .unwrap()
+            .get_node_as::<Node>("BevyAppSingleton");
+        let entity = app.entity_for_node(singleton.instance_id()).unwrap();
+        let mut params = Dictionary::new();
+        params.set("instance_id", singleton.instance_id().to_i64());
+        endpoint.submit(request(171, "godot.entity_for_node", params));
+        app.update().await;
+        let frame = response(&rx, 171);
+        let result = frame.get("result").unwrap();
+        assert_eq!(
+            result.get("bits"),
+            Some(&Wire::String(entity.to_bits().to_string()))
+        );
+        assert_eq!(
+            result.get("generation"),
+            Some(&Wire::Integer(i64::from(entity.generation().to_bits())))
+        );
+        let (node, _) = app.add_node::<Node>("DebuggerFreedLookup").await;
+        let mut params = Dictionary::new();
+        params.set(
+            "instance_id",
+            node.instance_id().to_i64().to_string().as_str(),
+        );
+        node.free();
+        endpoint.submit(request(172, "godot.entity_for_node", params));
+        app.update().await;
+        assert_eq!(
+            response(&rx, 172).get("error").unwrap().get("message"),
+            Some(&Wire::String("not found".into()))
+        );
+        app.cleanup().await;
+    })
+}
+
+#[itest(async)]
+fn debugger_config_exposes_subscription_default(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx = ctx.clone();
+    godot::task::spawn(async move {
+        let (mut app, endpoint, rx, _) = setup(&ctx).await;
+        app.with_world_mut(|world| {
+            world
+                .resource_mut::<godot_bevy::prelude::DebuggerConfig>()
+                .update_interval = 0.25;
+        });
+        endpoint.submit(request(181, "godot.debugger_config", Dictionary::new()));
+        app.update().await;
+        let frame = response(&rx, 181);
+        assert_eq!(
+            frame.get("result").unwrap().get("update_interval"),
+            Some(&Wire::Float(0.25))
+        );
+        assert_eq!(
+            frame.get("result").unwrap().get("enabled"),
+            Some(&Wire::Bool(true))
+        );
+        app.updates(3).await;
+        assert!(rx.try_recv().is_err());
+        app.cleanup().await;
+    })
+}
+
+#[itest(async)]
+fn debugger_ready_is_first_transport_frame_after_capture_registration(
+    ctx: &TestContext,
+) -> godot::task::TaskHandle {
+    let ctx = ctx.clone();
+    godot::task::spawn(async move {
+        let (tx, rx) = channel();
+        let mut app = TestApp::new(&ctx, move |app| {
+            app.insert_resource(godot_bevy::prelude::DebuggerConfig {
+                update_interval: 0.25,
+                ..default()
+            })
+            .insert_resource(DebuggerTransport::new(move |frame| {
+                assert!(godot::classes::EngineDebugger::singleton().has_capture("bevy"));
+                tx.send(frame).unwrap();
+            }))
+            .add_plugins(GodotDebuggerPlugin);
+        })
+        .await;
+        let frames = rx.try_iter().collect::<Vec<_>>();
+        assert_eq!(
+            frames,
+            vec![Wire::object([
+                ("jsonrpc", Wire::String("2.0".into())),
+                ("method", Wire::String("godot.ready".into())),
+                (
+                    "params",
+                    Wire::object([
+                        ("enabled", Wire::Bool(true)),
+                        ("update_interval", Wire::Float(0.25)),
+                    ]),
+                ),
+            ])],
+            "capture registration emits exactly one id-less ready before requests"
+        );
+        app.updates(3).await;
+        assert!(
+            rx.try_recv().is_err(),
+            "no further traffic without subscription"
         );
         app.cleanup().await;
     })

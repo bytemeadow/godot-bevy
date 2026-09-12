@@ -58,10 +58,21 @@ def run_project(project, probes, log):
     with tempfile.TemporaryDirectory(prefix="editor-probe-") as temporary:
         backup = Path(temporary) / "project.godot"
         shutil.copy2(project_file, backup)
+        # Godot restores dock placement by name from this file, which would override the
+        # addon's chosen slot and make dock assertions depend on earlier runs.
+        layout = project / ".godot" / "editor" / "editor_layout.cfg"
+        layout_backup = Path(temporary) / "editor_layout.cfg"
+        if layout.is_file():
+            shutil.copy2(layout, layout_backup)
+            layout.unlink()
         try:
             addon.mkdir(parents=True)
             scene.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(here / "plugin.gd", addon / "plugin.gd")
+            debugger_mode = probes[0].get("mode") == "debugger"
+            script = "debugger_plugin.gd" if debugger_mode else "plugin.gd"
+            shutil.copy2(here / script, addon / "plugin.gd")
+            if debugger_mode:
+                shutil.copy2(here / "debugger_runtime.gd", addon / "runtime.gd")
             (addon / "probe.json").write_text(json.dumps(probes))
             (addon / "plugin.cfg").write_text(
                 '[plugin]\nname="editor_probe"\ndescription="temporary editor probe"\n'
@@ -83,6 +94,14 @@ def run_project(project, probes, log):
                 text = text[:section.start(1)] + settings + text[section.end(1):]
             else:
                 text += f"\n[editor_plugins]\n\nenabled=PackedStringArray({entry})\n"
+            if debugger_mode:
+                autoload = 'EntityViewerProbe="*res://addons/editor_probe/runtime.gd"\n'
+                if "EntityViewerProbe=" in text:
+                    raise ValueError("temporary EntityViewerProbe autoload already exists")
+                if "[autoload]" in text:
+                    text = text.replace("[autoload]", "[autoload]\n" + autoload, 1)
+                else:
+                    text += "\n[autoload]\n\n" + autoload
             project_file.write_text(text)
             offset = log.tell()
             print(f"editor-probe: project={project.relative_to(repo)} probes={len(probes)}", flush=True)
@@ -113,6 +132,9 @@ def run_project(project, probes, log):
         finally:
             stop(editor)
             shutil.copy2(backup, project_file)
+            if layout_backup.is_file():
+                layout.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(layout_backup, layout)
             shutil.rmtree(addon, ignore_errors=True)
             scene.unlink(missing_ok=True)
             scene_uid.unlink(missing_ok=True)
@@ -144,6 +166,10 @@ def main():
     for probe in probes:
         if not isinstance(probe, dict):
             raise ValueError(f"probe must be a JSON object: {probe}")
+        if probe.get("mode", "class") not in ("class", "debugger"):
+            raise ValueError(f"unknown probe mode: {probe['mode']}")
+        if probe.get("mode") == "debugger":
+            probe = dict(probe, **{"class": "debugger", "property": "Entities", "value": None})
         for key in ("project", "class", "property", "shots"):
             if not isinstance(probe.get(key), str) or not probe[key]:
                 raise ValueError(f"probe requires a non-empty {key}: {probe}")
@@ -156,11 +182,14 @@ def main():
             raise ValueError(f"project must be relative to the repo root: {probe['project']}")
         if not (project / "project.godot").is_file():
             raise ValueError(f"missing project.godot: {project}")
-        projects.setdefault(project, []).append(probe)
+        key = (project, probe.get("mode", "class"))
+        if key[1] == "debugger" and key in projects:
+            raise ValueError("only one debugger probe per project is supported")
+        projects.setdefault(key, []).append(probe)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     result = 0
     with log_path.open("w+") as log:
-        for project, probes in projects.items():
+        for (project, _mode), probes in projects.items():
             result = max(result, run_project(project, probes, log))
     return result
 

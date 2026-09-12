@@ -6,7 +6,7 @@ use std::{
 use bevy_ecs::{prelude::*, reflect::AppTypeRegistry, world::EntityRef};
 use godot::{
     classes::{Engine, Node, SceneTree},
-    obj::{Gd, Singleton},
+    obj::{Gd, InstanceId, Singleton},
 };
 
 use super::{
@@ -20,7 +20,7 @@ use crate::{
     plugins::scene_tree::{GodotChildOf, NodeEntityIndex},
 };
 
-const METHODS: [&str; 7] = [
+const METHODS: [&str; 9] = [
     "rpc.discover",
     "godot.subscribe",
     "godot.unsubscribe",
@@ -28,6 +28,8 @@ const METHODS: [&str; 7] = [
     "godot.get_components",
     "godot.mutate_leaf",
     "godot.resolve_node",
+    "godot.entity_for_node",
+    "godot.debugger_config",
 ];
 
 #[derive(Debug)]
@@ -297,7 +299,9 @@ pub(super) fn dispatch(
         Some(params @ Wire::Object(_)) => params,
         _ => return Err(RpcError::params("params must be a Dictionary")),
     };
-    if !world.resource::<DebuggerConfig>().enabled && method != "godot.unsubscribe" {
+    if !world.resource::<DebuggerConfig>().enabled
+        && !matches!(method, "godot.unsubscribe" | "godot.debugger_config")
+    {
         return Err(InspectionError("debugger disabled").into());
     }
     match method {
@@ -337,11 +341,24 @@ pub(super) fn dispatch(
         "godot.get_components" => get_components(world, params),
         "godot.mutate_leaf" => mutate(world, params),
         "godot.resolve_node" => resolve(world, params),
+        "godot.entity_for_node" => entity_for_node(world, params),
+        "godot.debugger_config" => Ok(debugger_config(world)),
         _ => Err(RpcError {
             code: -32601,
             message: "method not found",
         }),
     }
+}
+
+pub(super) fn debugger_config(world: &World) -> Wire {
+    let config = world.resource::<DebuggerConfig>();
+    Wire::object([
+        ("enabled", Wire::Bool(config.enabled)),
+        (
+            "update_interval",
+            Wire::Float(f64::from(config.update_interval)),
+        ),
+    ])
 }
 
 fn string<'a>(params: &'a Wire, key: &str) -> Result<&'a str, RpcError> {
@@ -545,6 +562,38 @@ fn pending_deletion(node: Gd<Node>) -> bool {
     false
 }
 
+fn entity_for_node(world: &World, params: &Wire) -> Result<Wire, RpcError> {
+    let id = match params.get("instance_id") {
+        Some(Wire::Integer(id)) => *id,
+        Some(Wire::String(id)) => id
+            .parse::<i64>()
+            .map_err(|_| RpcError::params("invalid instance_id"))?,
+        _ => {
+            return Err(RpcError::params(
+                "instance_id must be an integer or decimal string",
+            ));
+        }
+    };
+    if id <= 0 {
+        return Err(InspectionError("not found").into());
+    }
+    let id = InstanceId::from_i64(id);
+    let node = Gd::<Node>::try_from_instance_id(id).map_err(|_| InspectionError("not found"))?;
+    if pending_deletion(node) {
+        return Err(InspectionError("not found").into());
+    }
+    let entity = world
+        .get_resource::<NodeEntityIndex>()
+        .and_then(|index| index.get(id))
+        .filter(|entity| {
+            world
+                .get::<GodotNodeHandle>(*entity)
+                .is_some_and(|handle| handle.instance_id() == id)
+        })
+        .ok_or(InspectionError("not found"))?;
+    Ok(reference(entity))
+}
+
 fn resolve(world: &World, params: &Wire) -> Result<Wire, RpcError> {
     let scene_path = string(params, "scene_path")?;
     let node_path = string(params, "node_path")?;
@@ -634,6 +683,7 @@ fn discover() -> Wire {
 fn method_params(name: &str) -> Wire {
     let params: &[(&str, &str, bool)] = match name {
         "godot.subscribe" => &[("interval_s", "number", true)],
+        "godot.entity_for_node" => &[("instance_id", "", true)],
         "godot.query" => &[
             ("name_contains", "string", false),
             ("component", "string", false),

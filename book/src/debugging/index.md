@@ -5,10 +5,18 @@ relationships in the Godot editor while your game runs.
 
 ## Entity inspector
 
-The **Entities** tab is in the editor's left dock, next to Scene/Import. Expand an
-entity to see its components and registered reflected values. Hover a component
-for its full type path. Node-backed entities show a Godot node icon; the hierarchy
-follows `GodotChildOf`/`GodotChildren`.
+The **Entities** pane is the map of the running ECS world; Godot's **Inspector** shows
+and edits the selected entity's components in a Bevy section below the node properties.
+Node-backed entities contain their pure-ECS children through `GodotChildOf`. The pane hides
+unnamed internal root entities by default, shows the hidden count, and has a toggle to reveal
+them. Search matches names, decimal entity IDs, component type paths or an exact runtime node
+path; matching entities keep their ancestors visible.
+
+Selecting a node-backed entity selects it in Godot's Remote tree, where native node properties
+remain editable. Remote selection also selects the entity in the pane. This adapter uses
+version-specific editor widgets on 4.2–4.6; missing widgets show “not available”. Pure-ECS
+entities use the same Bevy Inspector through a proxy object. Choose the running instance with
+the session selector; the newest started session is the default.
 
 ### Enabling the inspector
 
@@ -41,8 +49,7 @@ pub struct Speed(pub f32);
 ```
 
 The platformer example uses this automatic path for `Speed`, `JumpVelocity`,
-`Gravity` and `Player`. Registered values already appear in the dock; editing
-controls for the new service will arrive in a later editor update.
+`Gravity` and `Player`. Unregistered components display their unsupported reason.
 
 For web and static builds, keep explicit registration as a fallback when automatic
 registration has not been verified with your build and loader:
@@ -58,21 +65,17 @@ still be read when registered, but cannot be edited generically.
 `#[reflect(@InspectorReadOnly)]` shows a field without allowing edits;
 `#[reflect(@InspectorRange::new(min, max))]` bounds scalar edits (both are in the prelude).
 
-### Using the inspector
+### Editing and refresh
 
-1. Enable the godot-bevy addon in your Godot project.
-2. Open the Entities tab and run the game.
-3. Expand an entity to inspect its components and children.
+Expand a component in the Inspector to edit supported scalar leaves or select a unit enum
+variant. An edit displays the runtime's accepted value or an inline rejection reason; rejected
+edits leave the accepted value unchanged. Wide integers use exact decimal text. Entity and
+node references are navigation links. Game systems can overwrite accepted edits on later ticks.
 
-If an entity appears under the wrong parent, check that its Godot node was in the
-scene tree when the entity was created. After reparenting, allow a frame for the
-relationship update. This tree uses Godot's relationships, separate from Bevy's
-`ChildOf`/`Children`.
-
-### Configuration and cost
-
-The current dock receives a snapshot every 0.5 seconds while a debugger is attached.
-For larger worlds, increase its refresh interval or disable the service:
+The pane subscribes only while visible, starting with a snapshot and applying later additions,
+removals, renames and reparentings without rebuilding the tree. Only the inspected entity's
+values are fetched at the subscription interval. `DebuggerConfig.update_interval` supplies the
+default (0.5 seconds); configure it before connecting the editor:
 
 ```rust
 fn configure_debugger(mut config: ResMut<DebuggerConfig>) {
@@ -81,8 +84,10 @@ fn configure_debugger(mut config: ResMut<DebuggerConfig>) {
 }
 ```
 
-The request service sends summary notifications only after a subscription, with one
-initial snapshot followed by entity additions, removals, renames and reparentings.
-It reads full component values on request. `DebuggerConfig::value_limits` bounds
-collection elements and nesting depth, with explicit truncation markers. The legacy
-dock keeps its snapshot stream until it switches to subscriptions.
+`DebuggerConfig::value_limits` bounds collection elements and nesting depth, with explicit
+truncation markers. There is no unsolicited legacy entity stream.
+
+The runtime announces `godot.ready` once its debugger endpoint is registered. The editor then
+reads the debugger config and subscribes while the Entities pane is visible. If the readiness
+message is lost, it retries the config request every 500 ms for up to 20 seconds and reports
+an unanswered endpoint in the pane. Entity summaries remain subscription-only.

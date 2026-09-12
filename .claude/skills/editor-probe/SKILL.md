@@ -135,3 +135,37 @@ After a run started from a clean project, verify `git status --short -- <project
 
 Godot can crash during GDExtension shutdown after printing results. Complete probe verdicts
 remain authoritative in that case. Missing verdicts or a timeout fail the run.
+
+## Debugger mode
+
+`manifests/debugger.json` uses `"mode": "debugger"`. It needs only `project` and
+an absolute `shots` directory. Prepare the platformer's extension first, then run:
+
+```bash
+devenv shell -- .claude/skills/editor-probe/scripts/run.sh --manifest .claude/skills/editor-probe/manifests/debugger.json
+```
+
+This mode launches the game through `EditorInterface.play_main_scene`, drives the real
+Entities pane, checks default filtering and search, selects MainMenu in Remote, checks the
+Bevy Inspector section, and edits Player's Speed through its SpinBox. A stale path forces a
+runtime rejection through the same control. Both accepted and rejected values are checked.
+Local Scene selection must retain the local Inspector object while highlighting the runtime
+entity. Pane selection must keep Entities visible and subscribed. Shutdown must clear an
+inspected proxy before releasing it and preserve unrelated Inspector objects. Stopping must
+leave the pane disconnected. PNGs show these states, including an independent Remote-to-pane
+selection.
+
+Debugger checkpoint and watchdog timeouts log `EDITOR_PROBE timeout_diagnostics=` with the
+client's pending request frames and last five received frames, capture `timeout-<label>.png`
+with the dock visible, then finish with verdict 4. The optional `timeout_checkpoint` field
+forces a named checkpoint to time out so this evidence path can be checked. A driver timeout
+or incomplete editor process still exits 5.
+The temporary runtime autoload presses the main menu's real Start button with Enter; it is
+removed with the existing project backup cleanup. No test endpoint edits game values.
+
+The debugger script uses the Godot 4.2 API floor and the addon's version adapters. Run the
+same manifest with `GODOT4_BIN` selecting each prepared engine. The platformer's
+`register-docs` feature still requires 4.3+, so a 4.2 editor run needs a separate compatible
+extension build; this script does not build or change Cargo features. Missing widgets or
+selection signals fail with a visible adapter reason, not a skipped assertion. Existing
+class manifests keep their original script and exit codes.
