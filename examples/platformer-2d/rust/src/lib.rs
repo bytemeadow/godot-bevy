@@ -10,6 +10,9 @@ mod level_manager;
 mod main_menu;
 mod scene_management;
 
+#[cfg(feature = "capture")]
+mod capture;
+
 // ANCHOR: itest
 #[cfg(feature = "itest")]
 mod itests;
@@ -40,6 +43,9 @@ fn build_app(app: &mut App) {
         .register_type::<components::JumpVelocity>()
         .register_type::<components::Gravity>()
         .register_type::<components::Player>();
+
+    #[cfg(feature = "capture")]
+    capture::install(app);
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash, States)]

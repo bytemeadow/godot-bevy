@@ -20,4 +20,5 @@ godot-bevy-test = { path = "../../../godot-bevy-test", optional = true }
 cargo-godot-lib.workspace = true
 
 [features]
+capture = ["dep:godot-bevy-test", "godot-bevy-test/capture"]
 itest = ["dep:godot-bevy-test", "godot-bevy-test/test-frame-signal"]
