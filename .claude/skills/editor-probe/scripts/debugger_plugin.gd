@@ -228,6 +228,12 @@ func _run() -> void:
 	_check(not response[0].has("error") and proxy.get(name) == desired and leaf.input.value == desired, "acknowledged numeric value is shown")
 	_check(not proxy.states[name].pending and leaf.input.editable and _binding(leaf).status.text == "Accepted", "accepted field re-enables and displays acknowledgement")
 	await _shot("5-accepted-edit")
+	# An acknowledgement could echo a value the ECS never stored; re-read it from the game.
+	proxy.refresh()
+	if proxy._read_id == -1:
+		_check(false, "a fresh component read starts after an accepted edit")
+	elif await _wait(func(): return proxy._read_id == -1, "fresh component read after an accepted edit", 10.0):
+		_check(proxy.get(name) == desired and leaf.input.value == desired, "the game holds the edited value on a fresh read, not just in the acknowledgement")
 	var valid_path: Array = proxy.lookup[name].path.duplicate(true)
 	proxy.lookup[name].path = [{"index": 999999}]
 	leaf.input.value = desired + 1.0
