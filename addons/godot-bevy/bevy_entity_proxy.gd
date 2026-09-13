@@ -12,6 +12,9 @@ signal node_link(instance_id)
 var entity: Dictionary
 var session_id: int
 var incarnation := -1
+var target_kind := "entity"
+var target_type := ""
+var resource_present := true
 var client
 var components: Dictionary = {}
 var lookup: Dictionary = {}
@@ -28,10 +31,14 @@ var _read_id := -1
 var _revision := 0
 var _elapsed := 0.0
 var _stale := false
+var _resource_ready := true
+var _resource_epoch := 0
 
-func _init(reference: Dictionary = {}, session: int = -1) -> void:
+func _init(reference: Dictionary = {}, session: int = -1, kind: String = "entity", type_path: String = "") -> void:
 	entity = reference.duplicate(true)
 	session_id = session
+	target_kind = kind
+	target_type = type_path
 
 func configure(debugger) -> void:
 	client = debugger
@@ -67,7 +74,7 @@ func _set(property: StringName, candidate) -> bool:
 	if state.pending:
 		return true
 	if detached or entry.property.usage & PROPERTY_USAGE_READ_ONLY:
-		state.status = "Select an entity in this session" if detached else entry.reason
+		state.status = status if detached else entry.reason
 		state.rejected = true
 		field_changed.emit(name)
 		return true
@@ -81,19 +88,29 @@ func _set(property: StringName, candidate) -> bool:
 	var value = {"variant": candidate} if entry.model.kind == "enum" else candidate
 	state.request = client.request("godot.mutate_leaf", {"entity": entity.duplicate(true),
 		"component": entry.component, "path": entry.path.duplicate(true), "value": value},
-		_receive_edit.bind(name), session_id)
+		_receive_edit.bind(name, _resource_epoch), session_id)
 	return true
 
-func _receive_edit(frame: Dictionary, name: String) -> void:
+func _receive_edit(frame: Dictionary, name: String, resource_epoch: int) -> void:
 	if detached or not states.has(name):
 		return
 	var state: Dictionary = states[name]
 	state.pending = false
 	state.request = -1
+	if target_kind == "resource" and resource_epoch != _resource_epoch:
+		state.status = "Resource returned; fresh value retained" if _resource_ready else _resource_status()
+		state.rejected = false
+		state.candidate = str(lookup[name].accepted)
+		state.dirty = false
+		field_changed.emit(name)
+		refresh()
+		return
 	_revision += 1
 	if frame.has("error"):
 		state.status = frame.error.get("data", {}).get("reason", frame.error.message)
 		state.rejected = true
+		if target_kind == "resource" and state.status == "component absent":
+			set_resource_present(false)
 	else:
 		# The response is the accepted leaf, including enum payload/permission changes.
 		lookup[name].model.clear()
@@ -126,9 +143,14 @@ func restore_candidate(name: String) -> void:
 func refresh() -> void:
 	if _read_id != -1 or _stale or not valid_target() or entity.is_empty():
 		return
-	_read_id = client.request("godot.get_components", {"entity": entity}, _received.bind(_revision), session_id)
+	var params := {"entity": entity}
+	if target_kind == "resource":
+		params.components = [target_type]
+	_read_id = client.request("godot.get_components", params, _received.bind(_revision, _resource_epoch), session_id)
 
-func _received(frame: Dictionary, revision: int) -> void:
+func _received(frame: Dictionary, revision: int, resource_epoch: int) -> void:
+	if target_kind == "resource" and resource_epoch != _resource_epoch:
+		return
 	_read_id = -1
 	if not valid_target():
 		return
@@ -136,11 +158,51 @@ func _received(frame: Dictionary, revision: int) -> void:
 		refresh()
 		return
 	if frame.has("error"):
+		if target_kind == "resource":
+			if frame.error.message == "component absent":
+				set_resource_present(false)
+			else:
+				invalidate()
+				status = frame.error.message
+				status_changed.emit()
+			return
 		status = frame.error.message
 		_stale = true
 		status_changed.emit()
 		return
-	accept_components(frame.result)
+	if target_kind == "resource" and not frame.result.has(target_type):
+		set_resource_present(false)
+		return
+	var recovered := not _resource_ready
+	resource_present = true
+	_resource_ready = true
+	accept_components(frame.result, "", recovered)
+
+func set_resource_present(present: bool, request_read: bool = true) -> void:
+	if target_kind != "resource" or detached or resource_present == present:
+		return
+	resource_present = present
+	_resource_ready = false
+	_resource_epoch += 1
+	_revision += 1
+	if _read_id != -1:
+		client.cancel_request(_read_id)
+		_read_id = -1
+	for name in states:
+		states[name].candidate = str(lookup[name].accepted)
+		states[name].dirty = false
+		states[name].focused = false
+		if not states[name].pending:
+			states[name].status = ""
+			states[name].rejected = false
+	accept_components(components)
+	for name in states:
+		field_changed.emit(name)
+	if present and request_read:
+		refresh()
+
+func _resource_status() -> String:
+	return "Resource returned; waiting for fresh read" if resource_present else "Last observed; resource absent"
 
 func advance(delta: float) -> void:
 	if not valid_target():
@@ -156,13 +218,20 @@ func advance(delta: float) -> void:
 			refresh()
 			return
 
-func accept_components(values: Dictionary, acknowledged: String = "") -> void:
+func accept_components(values: Dictionary, acknowledged: String = "", recovered: bool = false) -> void:
 	var previous := lookup
 	components = values.duplicate(true)
+	if target_kind == "resource":
+		for component in components.keys():
+			if component != target_type:
+				components.erase(component)
 	lookup = {}
 	section_tooltips = {}
 	_properties = [{"name": "Bevy", "type": TYPE_NIL, "usage": PROPERTY_USAGE_CATEGORY}]
-	_add_notice("@entity", "Entity", "Entity " + str(entity.get("bits", "")), "", [], [], "identity")
+	if target_kind == "resource":
+		_add_notice("@entity", "Resource", target_type if _resource_ready else _resource_status(), "", [], [], "identity")
+	else:
+		_add_notice("@entity", "Entity", "Entity " + str(entity.get("bits", "")), "", [], [], "identity")
 	var types := components.keys()
 	types.sort()
 	var counts: Dictionary = {}
@@ -193,11 +262,11 @@ func accept_components(values: Dictionary, acknowledged: String = "") -> void:
 			states[name] = {"pending": false, "request": -1, "status": "", "rejected": false,
 				"candidate": "", "dirty": false, "focused": false, "caret": 0, "selection_from": 0, "selection_to": 0}
 		var state: Dictionary = states[name]
-		if previous.has(name) and name != acknowledged and (state.pending or state.focused or state.dirty) and entry.property.type == previous[name].property.type:
+		if not recovered and previous.has(name) and name != acknowledged and (state.pending or state.focused or state.dirty) and entry.property.type == previous[name].property.type:
 			entry.accepted = previous[name].accepted
 			if model.has("value"):
 				model.value = previous[name].accepted
-		if not state.dirty and not state.pending:
+		if recovered or (not state.dirty and not state.pending):
 			state.candidate = str(entry.accepted)
 	for name in states.keys():
 		if not lookup.has(name):
@@ -213,6 +282,8 @@ func accept_components(values: Dictionary, acknowledged: String = "") -> void:
 			if not previous.has(name) or previous[name].accepted != lookup[name].accepted:
 				_refresh_property(name)
 	status = "Entity " + str(entity.get("bits", ""))
+	if target_kind == "resource":
+		status = target_type if _resource_ready else _resource_status()
 	components_changed.emit()
 	status_changed.emit()
 
@@ -305,8 +376,12 @@ func _add_leaf(name: String, label: String, model: Dictionary, component: String
 	elif kind == "float":
 		type = TYPE_FLOAT
 	var writable: bool = model.writable.allowed and not readonly and kind in ["bool", "integer", "float", "string", "char", "enum"]
+	var unavailable := target_kind == "resource" and not _resource_ready and role == "value"
+	writable = writable and not unavailable
 	var property := {"name": name, "type": type, "usage": PROPERTY_USAGE_EDITOR | (0 if writable else PROPERTY_USAGE_READ_ONLY), "hint": PROPERTY_HINT_NONE, "hint_string": ""}
 	var reason: String = model.get("reason", model.writable.get("reason", ""))
+	if unavailable:
+		reason = _resource_status()
 	if readonly and reason.is_empty() and role == "value":
 		reason = "Collection entries are read-only"
 	if kind == "enum":
@@ -393,7 +468,7 @@ func invalidate() -> void:
 			if state.request != -1:
 				client.cancel_request(state.request)
 	_read_id = -1
-	status = "Select an entity in this session"
+	status = "Select a resource in this session" if target_kind == "resource" else "Select an entity in this session"
 	for name in states:
 		states[name].pending = false
 		states[name].request = -1

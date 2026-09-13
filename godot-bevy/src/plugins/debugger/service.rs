@@ -4,7 +4,10 @@ use std::{
     time::Instant,
 };
 
-use bevy_ecs::{archetype::ArchetypeId, prelude::*, reflect::AppTypeRegistry, world::EntityRef};
+use bevy_ecs::{
+    archetype::ArchetypeId, prelude::*, reflect::AppTypeRegistry, resource::IsResource,
+    world::EntityRef,
+};
 use godot::{
     classes::{Engine, Node, SceneTree},
     obj::{Gd, InstanceId, Singleton},
@@ -80,8 +83,24 @@ struct Summary {
     name: String,
     parent: Option<Entity>,
     has_node: bool,
+    resource: Option<ResourceDescriptor>,
     components: Vec<String>,
     unsupported_components: BTreeMap<String, Wire>,
+}
+
+#[derive(Clone, PartialEq)]
+struct ResourceDescriptor {
+    type_path: String,
+    present: bool,
+}
+
+impl ResourceDescriptor {
+    fn to_wire(&self) -> Wire {
+        Wire::object([
+            ("type_path", Wire::String(self.type_path.clone())),
+            ("present", Wire::Bool(self.present)),
+        ])
+    }
 }
 
 impl Summary {
@@ -91,6 +110,13 @@ impl Summary {
             ("name", Wire::String(self.name.clone())),
             ("parent", self.parent.map(reference).unwrap_or(Wire::Null)),
             ("has_node", Wire::Bool(self.has_node)),
+            (
+                "resource",
+                self.resource
+                    .as_ref()
+                    .map(ResourceDescriptor::to_wire)
+                    .unwrap_or(Wire::Null),
+            ),
             (
                 "components",
                 Wire::Array(self.components.iter().cloned().map(Wire::String).collect()),
@@ -164,6 +190,17 @@ fn summary(world: &World, entity: Entity) -> Option<Summary> {
         components.push(name);
     }
     components.sort();
+    let resource = entity.get::<IsResource>().and_then(|marker| {
+        let id = marker.resource_component_id();
+        let info = world.components().get_info(id)?;
+        let registration = info.type_id().and_then(|id| registry.as_ref()?.get(id));
+        Some(ResourceDescriptor {
+            type_path: registration
+                .map(|registration| registration.type_info().type_path().to_string())
+                .unwrap_or_else(|| info.name().to_string()),
+            present: entity.contains_id(id),
+        })
+    });
     Some(Summary {
         entity: entity.id(),
         archetype: entity.archetype().id(),
@@ -173,6 +210,7 @@ fn summary(world: &World, entity: Entity) -> Option<Summary> {
             .unwrap_or_default(),
         parent: entity.get::<GodotChildOf>().map(GodotChildOf::get),
         has_node: entity.contains::<GodotNodeHandle>(),
+        resource,
         components,
         unsupported_components,
     })
@@ -461,10 +499,23 @@ fn query(world: &mut World, params: &Wire) -> Result<Wire, RpcError> {
     let name = optional_string(params, "name_contains")?;
     let component = optional_string(params, "component")?;
     let path = optional_string(params, "node_path")?;
+    let resource = match params.get("resource") {
+        None => None,
+        Some(Wire::Bool(resource)) => Some(*resource),
+        _ => return Err(RpcError::params("resource must be a boolean")),
+    };
     let matches = summaries(world)
         .into_values()
         .filter(|summary| {
-            name.is_none_or(|name| summary.name.contains(name))
+            resource.is_none_or(|resource| summary.resource.is_some() == resource)
+                && name.is_none_or(|name| {
+                    summary.name.contains(name)
+                        || (resource == Some(true)
+                            && summary
+                                .resource
+                                .as_ref()
+                                .is_some_and(|descriptor| descriptor.type_path.contains(name)))
+                })
                 && component.is_none_or(|component| {
                     summary.components.iter().any(|value| value == component)
                 })
@@ -729,6 +780,7 @@ fn method_params(name: &str) -> Wire {
         "godot.query" => &[
             ("name_contains", "string", false),
             ("component", "string", false),
+            ("resource", "boolean", false),
             ("node_path", "string", false),
             ("page", "integer", true),
             ("page_size", "integer", true),

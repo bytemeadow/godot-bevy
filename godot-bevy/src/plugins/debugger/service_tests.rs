@@ -655,3 +655,271 @@ fn disabling_clears_subscription_and_dirty_state_without_a_request() {
     publish(&mut world, &mut subscription, &mut true);
     assert!(rx.try_recv().is_err());
 }
+
+#[derive(Resource, bevy_reflect::Reflect)]
+#[type_path = "game::resources"]
+struct Inventory;
+
+#[derive(Resource)]
+struct UnregisteredInventory;
+
+#[test]
+fn resource_descriptors_use_the_marker_and_keep_absent_identity_across_chunks() {
+    let (tx, rx) = channel();
+    let mut world = World::new();
+    world.insert_resource(DebuggerConfig {
+        snapshot_chunk_size: 1,
+        ..Default::default()
+    });
+    world.insert_resource(DebuggerTransport::new(move |frame| {
+        tx.send(frame).unwrap();
+    }));
+    world.init_resource::<SummaryChanges>();
+    world.init_resource::<AppTypeRegistry>();
+    world
+        .resource::<AppTypeRegistry>()
+        .write()
+        .register::<Inventory>();
+    world.insert_resource(Inventory);
+    let entity = world
+        .resource_entities()
+        .get(world.component_id::<Inventory>().unwrap())
+        .unwrap();
+    world
+        .entity_mut(entity)
+        .insert((Ordinary, Registered, Name::new("misleading name")));
+    let descriptor = |present| {
+        Wire::object([
+            (
+                "type_path",
+                Wire::String("game::resources::Inventory".into()),
+            ),
+            ("present", Wire::Bool(present)),
+        ])
+    };
+    assert_eq!(
+        summary(&world, entity).unwrap().to_wire().get("resource"),
+        Some(&descriptor(true))
+    );
+    let ordinary = world.spawn(Ordinary).id();
+    assert_eq!(
+        summary(&world, ordinary).unwrap().to_wire().get("resource"),
+        Some(&Wire::Null)
+    );
+    world.insert_resource(UnregisteredInventory);
+    let unregistered = world
+        .resource_entities()
+        .get(world.component_id::<UnregisteredInventory>().unwrap())
+        .unwrap();
+    let fallback = summary(&world, unregistered).unwrap().to_wire();
+    assert_eq!(
+        fallback.get("resource"),
+        Some(&Wire::object([
+            (
+                "type_path",
+                Wire::String(std::any::type_name::<UnregisteredInventory>().into())
+            ),
+            ("present", Wire::Bool(true)),
+        ]))
+    );
+    assert_eq!(
+        fallback
+            .get("unsupported_components")
+            .unwrap()
+            .get(std::any::type_name::<UnregisteredInventory>()),
+        Some(&Wire::String("component not registered".into()))
+    );
+    world.remove_resource::<UnregisteredInventory>();
+    assert_eq!(
+        summary(&world, unregistered)
+            .unwrap()
+            .to_wire()
+            .get("resource"),
+        Some(&Wire::object([
+            (
+                "type_path",
+                Wire::String(std::any::type_name::<UnregisteredInventory>().into())
+            ),
+            ("present", Wire::Bool(false)),
+        ]))
+    );
+    world.insert_resource(UnregisteredInventory);
+    let mut subscription = None;
+    subscribe(&mut world, &mut subscription, 0.0);
+    publish(&mut world, &mut subscription, &mut true);
+    world.remove_resource::<Inventory>();
+    assert!(world.get_entity(entity).is_ok());
+    assert_eq!(
+        world
+            .get::<bevy_ecs::resource::IsResource>(entity)
+            .unwrap()
+            .resource_component_id(),
+        world.component_id::<Inventory>().unwrap()
+    );
+    while subscription.as_ref().unwrap().snapshot.is_some() {
+        publish(&mut world, &mut subscription, &mut true);
+    }
+    let chunks = rx.try_iter().collect::<Vec<_>>();
+    let mut seen = Vec::new();
+    for (index, chunk) in chunks.iter().enumerate() {
+        let params = chunk.get("params").unwrap();
+        assert_eq!(
+            params.get("snapshot_index"),
+            Some(&Wire::Integer(index as i64))
+        );
+        assert_eq!(
+            params.get("snapshot_complete"),
+            Some(&Wire::Bool(index + 1 == chunks.len()))
+        );
+        let rows = params.get("added").unwrap().as_array().unwrap();
+        assert_eq!(rows.len(), 1);
+        seen.push(rows[0].get("entity").unwrap().clone());
+        if rows[0].get("entity") == Some(&reference(entity)) {
+            assert_eq!(
+                rows[0].get("resource"),
+                Some(&descriptor(true)),
+                "snapshot retains original presence"
+            );
+        }
+    }
+    assert_eq!(
+        seen.iter().filter(|id| **id == reference(entity)).count(),
+        1
+    );
+    for present in [false, true, false] {
+        if present {
+            world.insert_resource(Inventory);
+        } else {
+            world.remove_resource::<Inventory>();
+        }
+        publish(&mut world, &mut subscription, &mut true);
+        let frames = rx.try_iter().collect::<Vec<_>>();
+        assert_eq!(frames.len(), 1);
+        let params = frames[0].get("params").unwrap();
+        assert_eq!(params.get("added"), Some(&Wire::Array(vec![])));
+        assert_eq!(params.get("removed"), Some(&Wire::Array(vec![])));
+        let rows = params.get("updated").unwrap().as_array().unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].get("entity"), Some(&reference(entity)));
+        assert_eq!(rows[0].get("resource"), Some(&descriptor(present)));
+        publish(&mut world, &mut subscription, &mut true);
+        assert!(rx.try_recv().is_err());
+    }
+    // A resource's backing entity belongs to the world: despawning it by hand leaves
+    // `resource_entities` pointing at a dead id and the next resource command panics, so the
+    // ordinary-removal path is exercised with a plain entity instead.
+    let plain = world.spawn(Ordinary).id();
+    subscription.as_mut().unwrap().sent_at = Instant::now() - Duration::from_secs(61);
+    publish(&mut world, &mut subscription, &mut true);
+    rx.try_iter().for_each(drop);
+    world.despawn(plain);
+    subscription.as_mut().unwrap().sent_at = Instant::now() - Duration::from_secs(61);
+    publish(&mut world, &mut subscription, &mut true);
+    assert_eq!(
+        rx.try_recv().unwrap().get("params").unwrap().get("removed"),
+        Some(&Wire::Array(vec![reference(plain)]))
+    );
+}
+
+#[test]
+fn resource_query_filters_inventory_including_absent_rows_and_full_type_paths() {
+    let mut world = World::new();
+    world.init_resource::<AppTypeRegistry>();
+    world
+        .resource::<AppTypeRegistry>()
+        .write()
+        .register::<Inventory>();
+    world.insert_resource(Inventory);
+    let entity = world
+        .resource_entities()
+        .get(world.component_id::<Inventory>().unwrap())
+        .unwrap();
+    world.entity_mut(entity).insert(Ordinary);
+    let ordinary = world.spawn(Ordinary).id();
+    for present in [true, false] {
+        if !present {
+            world.remove_resource::<Inventory>();
+        }
+        let params = Wire::object([
+            ("resource", Wire::Bool(true)),
+            (
+                "name_contains",
+                Wire::String("game::resources::Inventory".into()),
+            ),
+            ("page", Wire::Integer(0)),
+            ("page_size", Wire::Integer(1)),
+        ]);
+        let result = query(&mut world, &params).unwrap();
+        assert_eq!(result.get("total"), Some(&Wire::Integer(1)));
+        let rows = result.get("entities").unwrap().as_array().unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].get("entity"), Some(&reference(entity)));
+        assert_eq!(
+            rows[0].get("resource").unwrap().get("present"),
+            Some(&Wire::Bool(present))
+        );
+        let mut next_page = params.clone();
+        let Wire::Object(fields) = &mut next_page else {
+            unreachable!()
+        };
+        fields.insert("page".into(), Wire::Integer(1));
+        let result = query(&mut world, &next_page).unwrap();
+        assert_eq!(result.get("total"), Some(&Wire::Integer(1)));
+        assert_eq!(result.get("entities"), Some(&Wire::Array(vec![])));
+    }
+    let result = query(
+        &mut world,
+        &Wire::object([
+            ("resource", Wire::Bool(false)),
+            ("page", Wire::Integer(0)),
+            ("page_size", Wire::Integer(256)),
+        ]),
+    )
+    .unwrap();
+    assert_eq!(result.get("total"), Some(&Wire::Integer(1)));
+    assert_eq!(
+        result.get("entities").unwrap().as_array().unwrap()[0].get("entity"),
+        Some(&reference(ordinary))
+    );
+    assert_eq!(
+        query(
+            &mut world,
+            &Wire::object([
+                ("resource", Wire::String("true".into())),
+                ("page", Wire::Integer(0)),
+                ("page_size", Wire::Integer(1)),
+            ])
+        )
+        .unwrap_err()
+        .code,
+        -32602
+    );
+    let discovery = discover();
+    let methods = discovery.get("methods").unwrap().as_array().unwrap();
+    assert!(methods.iter().all(|method| {
+        !method
+            .get("name")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .starts_with("world.")
+    }));
+    let query = methods
+        .iter()
+        .find(|method| method.get("name").unwrap().as_str() == Some("godot.query"))
+        .unwrap();
+    assert!(
+        query
+            .get("params")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(
+                |param| param.get("name").unwrap().as_str() == Some("resource")
+                    && param.get("required") == Some(&Wire::Bool(false))
+                    && param.get("schema").unwrap().get("type").unwrap().as_str()
+                        == Some("boolean")
+            )
+    );
+}

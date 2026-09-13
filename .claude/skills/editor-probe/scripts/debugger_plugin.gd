@@ -139,6 +139,9 @@ func _run() -> void:
 		if pane.internal(row):
 			_check(not pane.items[row.entity.bits].visible, "internal row stays hidden")
 	await _shot("1-connected-dock")
+	if not await _resource_checkpoint():
+		_finish(4)
+		return
 	var menu = _row("MainMenu")
 	pane.entity_tree.set_selected(pane.items[menu.entity.bits], 0)
 	if not await _wait(func(): return remote.tree != null and remote.tree.get_selected() != null and remote.tree.get_selected().get_text(0) == "MainMenu", "pane selects MainMenu in Remote"):
@@ -277,6 +280,60 @@ func _finish(code: int) -> void:
 	print("EDITOR_PROBE verdict=%d class=debugger property=Entities mismatches=%s" % [code, JSON.stringify(failures)])
 	print("EDITOR_PROBE complete")
 	get_tree().quit(code)
+
+func _resource_checkpoint() -> bool:
+	var type_path: String = cfg.get("resource_type", "bevy_time::time::Time<()>")
+	var resource: Dictionary = {}
+	# Summaries stream in; a single sample raced the first chunk and made this flake. GDScript
+	# lambdas capture by value, so the wait only tests and the assignment happens after it.
+	var present := func():
+		for row in pane.rows.values():
+			if row.get("resource") is Dictionary and row.resource.type_path == type_path and row.resource.present:
+				return true
+		return false
+	await _wait(present, "real resource descriptor arrives: " + type_path, 15.0)
+	for row in pane.rows.values():
+		if row.get("resource") is Dictionary and row.resource.type_path == type_path and row.resource.present:
+			resource = row
+	if resource.is_empty():
+		var seen: Array = []
+		for row in pane.rows.values():
+			if row.get("resource") is Dictionary and seen.size() < 10:
+				seen.append("%s present=%s" % [row.resource.get("type_path", "?"), row.resource.get("present", "?")])
+		print("EDITOR_PROBE resource_descriptors_seen=", JSON.stringify(seen), " total_rows=", pane.rows.size())
+		_check(false, "real resource descriptor present: " + type_path)
+		return false
+	var entity_selection: Dictionary = pane.selected_entity.duplicate()
+	var session: int = pane._subscribed_session
+	pane.view_selector.select(1)
+	pane.view_selector.item_selected.emit(1)
+	_check(pane.items[resource.entity.bits].visible and pane.items[resource.entity.bits].get_parent() == pane._root, "real resource appears in flat Resources view")
+	pane.entity_tree.set_selected(pane.items[resource.entity.bits], 0)
+	if not await _wait(func(): return pane._proxy != null and pane._proxy.components.has(type_path), "resource Inspector read"):
+		return false
+	var proxy = pane._proxy
+	var inspector := EditorInterface.get_inspector()
+	_check(inspector.get_edited_object() == proxy and proxy.target_kind == "resource" and proxy.target_type == type_path, "resource row inspects its configured proxy")
+	_check(proxy.components.keys() == [type_path], "real resource Inspector contains only its resource component")
+	_check(pane.selected_entity == entity_selection and pane._subscribed_session == session, "resource inspection preserves entity selection and summary subscription")
+	var property := ""
+	for name in proxy.lookup:
+		if proxy.lookup[name].component == type_path and proxy.lookup[name].path == [{"field": "elapsed_secs"}]:
+			property = name
+	if property.is_empty():
+		_check(false, "real Time resource exposes reflected elapsed_secs")
+		return false
+	if not await _wait(func(): return _property_row(inspector, property) != null, "resource native property row"):
+		return false
+	_unfold(inspector, proxy)
+	var row = _property_row(inspector, property)
+	await _reveal_inspector(row)
+	_check(_on_screen(row) and row.get_edited_object() == proxy and proxy.lookup[property].model.kind == "float", "real resource field is visible in the native Inspector")
+	await _shot("1-resource-inspector")
+	pane.view_selector.select(0)
+	pane.view_selector.item_selected.emit(0)
+	_check(pane._subscribed_session == session and pane.selected_entity == entity_selection, "return to Entities preserves session and selection")
+	return true
 
 func _property(proxy, suffix: String, role: String = "value") -> String:
 	for name in proxy.lookup:
