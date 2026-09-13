@@ -75,6 +75,9 @@ func run(host: Node) -> int:
 		await _run_test("intentional async abort", _intentional_async_abort.bind(host))
 	else:
 		await _run_test("tree", _tree.bind(host))
+		await _run_test("component groups", _component_groups.bind(host))
+		await _run_test("component search", _component_search.bind(host))
+		await _run_test("component selection", _component_selection.bind(host))
 		await _run_test("values", _values.bind(host))
 		await _run_test("proxy mapping", _proxy_mapping)
 		await _run_test("component presentation", _component_presentation)
@@ -199,6 +202,151 @@ func _tree(host: Node) -> void:
 	check(panel.items["90"] == empty_item and not empty_item.visible and not empty_item.get_tooltip_text(0).contains("game::Speed"), "last game component removal refreshes component list and hides entity in place")
 	panel.free()
 	completed.append("tree")
+
+func _components_group(item: TreeItem) -> TreeItem:
+	for child in item.get_children():
+		if child.get_text(0).begins_with("Components ("):
+			return child
+	return null
+
+func _component_item(group: TreeItem, type_path: String) -> TreeItem:
+	for child in group.get_children():
+		if child.get_tooltip_text(0).get_slice("\n", 0) == type_path:
+			return child
+	return null
+
+func _component_groups(host: Node) -> void:
+	var panel = PanelScene.instantiate()
+	host.add_child(panel)
+	var fake = FakeClient.new()
+	panel.client = fake
+	var parent := Fixtures.row("1", "Player", ["game::Speed", "left::Same", "right::Same", "a::Outer<b::Inner<c::Value>>", "game::Unreadable"])
+	parent.unsupported_components = {"game::Unreadable": "component not registered", "game::Speed": null}
+	var child := Fixtures.row("2", "Child", [], parent.entity)
+	panel.apply_summary({"snapshot": true, "added": [parent, child]})
+	var original: TreeItem = panel.items["1"]
+	var group := _components_group(original)
+	check(group != null, "each entity has a Components group")
+	if group != null:
+		check(group.get_text(0) == "Components (5)" and group.get_child_count() == 5, "group count includes every summary component")
+		check(group.collapsed and not group.is_selectable(0), "component group starts collapsed and is not an entity selection")
+		check(original.get_child_count() == 2 and panel.items["2"].get_parent() == original, "component group and child entity are separate direct children")
+		var empty := _components_group(panel.items["2"])
+		check(empty != null and empty.get_text(0) == "Components (0)" and empty.get_child_count() == 0, "empty entity retains its zero-count group")
+		var speed := _component_item(group, "game::Speed")
+		var same := _component_item(group, "left::Same")
+		check(speed != null and speed.get_text(0) == "Speed" and speed.get_tooltip_text(0) == "game::Speed", "component label shortens and null reason leaves the exact tooltip")
+		check(same != null and same.get_text(0) == "left::Same" and _component_item(group, "right::Same").get_text(0) == "right::Same", "colliding component labels retain full paths")
+		check(_component_item(group, "a::Outer<b::Inner<c::Value>>").get_text(0) == "Outer<Inner<Value>>", "component generic labels use Inspector shortening")
+		check(_component_item(group, "game::Unreadable").get_tooltip_text(0) == "game::Unreadable\ncomponent not registered", "unreadable component retains the summary reason")
+		group.collapsed = false
+		panel.apply_summary({"updated": [parent]})
+		check(_components_group(original) == group and not group.collapsed and _component_item(group, "game::Speed") == speed, "delta preserves group expansion and component row identity")
+		parent.components.append("game::Added")
+		panel.apply_summary({"updated": [parent]})
+		check(panel.items["1"] == original and _components_group(original) == group and group.get_text(0) == "Components (6)" and group.get_child_count() == 6, "component addition updates existing entity and group in place")
+		check(_component_item(group, "game::Added") != null and _component_item(group, "game::Speed") == speed and not group.collapsed, "component addition keeps surviving rows and expansion")
+		var removed := _component_item(group, "right::Same")
+		parent.components.erase("right::Same")
+		panel.apply_summary({"updated": [parent]})
+		check(panel.items["1"] == original and _components_group(original) == group and group.get_text(0) == "Components (5)" and group.get_child_count() == 5 and not is_instance_valid(removed), "component removal frees only the removed row")
+		check(_component_item(group, "left::Same") == same and same.get_text(0) == "Same" and not group.collapsed, "removing a collision updates the surviving label without losing expansion")
+		panel._choose_view(1)
+		panel._choose_view(2)
+		panel._choose_view(0)
+		check(not _components_group(original).collapsed, "returning to Entities restores component group expansion")
+		group = _components_group(original)
+		var child_item: TreeItem = panel.items["2"]
+		var child_group := _components_group(child_item)
+		child.parent = null
+		panel.apply_summary({"removed": [parent.entity], "updated": [child]})
+		check(not is_instance_valid(group) and panel.items["2"] == child_item and child_item.get_parent() == panel._root and _components_group(child_item) == child_group, "removing a parent frees its group but preserves the surviving child's group")
+		check(panel._root.get_child_count() == 1, "removed entity leaves no orphan component group at the root")
+	check(fake.frames.is_empty(), "building and reconciling component groups sends no runtime requests")
+	panel.shutdown()
+	panel.free()
+	completed.append("component groups")
+
+func _component_search(host: Node) -> void:
+	var panel = PanelScene.instantiate()
+	host.add_child(panel)
+	var parent := Fixtures.row("1", "Parent", ["game::Unrelated"])
+	var child := Fixtures.row("2", "Child", ["game::Alpha", "game::Beta"], parent.entity)
+	var other := Fixtures.row("3", "Other", ["game::Alpha", "game::Beta"])
+	panel.apply_summary({"snapshot": true, "added": [parent, child, other]})
+	var group := _components_group(panel.items["2"])
+	check(group != null, "component search has a group to reveal")
+	if group != null:
+		var other_group := _components_group(panel.items["3"])
+		other_group.collapsed = false
+		panel.items["3"].collapsed = false
+		panel.search_box.text = "aLpHa"
+		panel._search(panel.search_box.text)
+		check(panel.items["2"].visible and panel.items["1"].visible and not panel.items["1"].collapsed and not panel.items["2"].collapsed, "component search shows matching entity and expands its ancestors")
+		check(group.visible and not group.collapsed and _component_item(group, "game::Alpha").visible and not _component_item(group, "game::Beta").visible, "component search expands group and shows only matching types")
+		check(not _components_group(panel.items["1"]).visible, "search ancestor does not expose unrelated components")
+		child.components.append("game::AlphaAdded")
+		var added := Fixtures.row("4", "New arrival", ["game::Alpha", "game::Beta"])
+		panel.apply_summary({"updated": [child], "added": [added]})
+		check(_components_group(panel.items["2"]) == group and _component_item(group, "game::AlphaAdded").visible and not _component_item(group, "game::Beta").visible, "component membership delta reconciles an active search in place")
+		var added_group := _components_group(panel.items["4"])
+		check(added_group.visible and not added_group.collapsed and not panel.items["4"].collapsed, "entity arriving during search reveals its matching components")
+		panel.search_box.text = "Beta"
+		panel._search(panel.search_box.text)
+		check(not _component_item(group, "game::Alpha").visible and not _component_item(group, "game::AlphaAdded").visible and _component_item(group, "game::Beta").visible, "changing search replaces visible component matches")
+		panel.search_box.text = ""
+		panel._search("")
+		check(group.collapsed and not other_group.collapsed and added_group.collapsed, "clearing search restores prior group expansion including arrivals")
+		check(panel.items["1"].collapsed and panel.items["2"].collapsed and not panel.items["3"].collapsed and panel.items["4"].collapsed, "clearing component search restores entity expansion")
+		check(_component_item(group, "game::Alpha").visible and _component_item(group, "game::AlphaAdded").visible and _component_item(group, "game::Beta").visible, "clearing search restores all component rows")
+	panel.free()
+	panel = PanelScene.instantiate()
+	host.add_child(panel)
+	panel.search_box.text = "Alpha"
+	panel.apply_summary({"snapshot": true, "added": [other]})
+	group = _components_group(panel.items["3"])
+	if group != null:
+		check(not group.collapsed, "first snapshot honors search text retained from a previous session")
+		panel.search_box.text = ""
+		panel._search("")
+		check(group.collapsed and panel.items["3"].collapsed, "clearing retained search restores first-snapshot defaults")
+	panel.free()
+	completed.append("component search")
+
+func _component_selection(host: Node) -> void:
+	var panel = PanelScene.instantiate()
+	host.add_child(panel)
+	var fake = FakeClient.new()
+	panel.client = fake
+	var remote = FakeRemote.new()
+	panel.remote = remote
+	remote.selection_changed.connect(panel._remote_selected)
+	var pure := Fixtures.row("1", "Pure", ["game::Speed"])
+	var node := Fixtures.row("2", "Node", ["game::Speed", "godot_bevy::interop::GodotNodeHandle"], null, true)
+	panel.apply_summary({"snapshot": true, "added": [pure, node]})
+	var group := _components_group(panel.items["1"])
+	check(group != null, "component selection has a component row")
+	if group != null:
+		var selections: Array = []
+		panel.entity_selected.connect(func(reference): selections.append(reference))
+		panel.items["1"].collapsed = false
+		group.collapsed = false
+		panel.entity_tree.set_selected(_component_item(group, "game::Speed"), 0)
+		check(panel.selected_entity == pure.entity and selections == [pure.entity] and panel.entity_tree.get_selected() == panel.items["1"], "selecting a component selects its owning entity once")
+		check(panel._proxy != null and panel._proxy.entity == pure.entity and fake.frames.size() == 1 and fake.frames.back().params == {"entity": pure.entity}, "pure component selection uses the ordinary entity Inspector read")
+		var node_group := _components_group(panel.items["2"])
+		panel.items["2"].collapsed = false
+		node_group.collapsed = false
+		panel.entity_tree.set_selected(_component_item(node_group, "game::Speed"), 0)
+		check(panel.selected_entity == node.entity and selections == [pure.entity, node.entity] and fake.frames.back().params == {"entity": node.entity, "components": ["godot_bevy::interop::GodotNodeHandle"]}, "node component selection uses the ordinary Remote resolution request")
+		fake.reply(fake.frames.back().id, {"result": {"godot_bevy::interop::GodotNodeHandle": Fixtures.aggregate("node", {"instance_id": "101", "valid": true})}})
+		await host.get_tree().process_frame
+		await host.get_tree().process_frame
+		check(remote.requested == [["101", 0]] and panel.selected_entity == node.entity and panel.entity_tree.get_selected() == panel.items["2"] and fake.frames.size() == 2, "component selection reaches Remote and survives its echo without extra requests")
+	panel.shutdown()
+	panel.free()
+	remote.free()
+	completed.append("component selection")
 
 func _values(host: Node) -> void:
 	var scalar_kinds := ["integer", "float", "bool", "string", "char", "enum", "entity", "node",
@@ -992,6 +1140,8 @@ func _state_views(host: Node) -> void:
 	var right := _state_row("right::Mode", false)
 	fake.reply(fake.frames.back().id, {"result": {"states": [left, right], "reason": null}})
 	check(panel.state_items.size() == 2 and not panel.items["4294967298"].visible, "States shows catalogue rows separately from entity rows")
+	for item in panel.items.values() + panel.state_items.values():
+		check(_components_group(item) == null, "States has no component groups")
 	check(panel.state_items["left::Mode"].get_text(0) == "left::Mode" and panel.state_items["right::Mode"].get_text(0) == "right::Mode (Absent)", "colliding state labels retain full paths and availability")
 	panel.search_box.text = "right::Mode"
 	var sent: int = fake.frames.size()
@@ -1163,6 +1313,8 @@ func _resource_views(host: Node) -> void:
 	check(not panel.show_internal.visible and not panel.hidden_label.visible and panel.show_internal.button_pressed, "Resources hides and retains the Entities internal toggle")
 	check(not panel.items["1"].visible and panel.items["2"].visible and panel.items["3"].visible, "Resources filters by descriptor and retains absent rows")
 	check(panel.items["2"].get_parent() == panel._root, "Resources uses a flat listing without backing-entity parents")
+	for item in panel.items.values():
+		check(_components_group(item) == null, "Resources has no component groups")
 	check(panel.items["2"].get_text(0) == "left::Settings" and panel.items["3"].get_text(0) == "right::Settings (Absent)", "colliding resource names use full paths and show absence")
 	check(panel.items["4"].get_text(0) == "Outer<Inner<Value>>" and panel.items["4"].get_tooltip_text(0).contains(generic.resource.type_path), "generic labels shorten with full type paths in tooltips")
 	panel.search_box.text = "right::Settings"

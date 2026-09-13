@@ -29,9 +29,13 @@ var _state_serial := 0
 var _state_elapsed := 0.0
 var _view := 0
 var _entity_expansion: Dictionary = {}
+var _component_groups: Dictionary = {}
+var _component_items: Dictionary = {}
+var _component_expansion: Dictionary = {}
 var _root: TreeItem
 var _subscribed_session := -1
 var _search_expansion: Dictionary = {}
+var _search_component_expansion: Dictionary = {}
 var _searching := false
 var _candidates: OptionButton
 var _search_serial := 0
@@ -137,6 +141,8 @@ func _choose_view(index: int) -> void:
 	if _view == 0:
 		for bits in items:
 			_entity_expansion[bits] = items[bits].collapsed
+		for bits in _component_groups:
+			_component_expansion[bits] = _search_component_expansion.get(bits, _component_groups[bits].collapsed)
 	_view = index
 	view_selector.select(index)
 	show_internal.visible = index == 0
@@ -164,10 +170,12 @@ func _session_changed(_id: int) -> void:
 	state_rows.clear()
 	_state_reason = ""
 	_entity_expansion.clear()
+	_component_expansion.clear()
 	_remote_selection_echoes.clear()
 	_clear_proxy()
 	_clear_proxies()
 	_search_expansion.clear()
+	_search_component_expansion.clear()
 	_search_matches.clear()
 	_searching = false
 	_candidates.hide()
@@ -355,20 +363,30 @@ func _sync_items() -> void:
 	for bits in items.keys():
 		if not rows.has(bits):
 			for child in items[bits].get_children():
+				if child == _component_groups.get(bits):
+					continue
 				items[bits].remove_child(child)
 				_root.add_child(child)
+			_component_groups.erase(bits)
+			_component_items.erase(bits)
+			_component_expansion.erase(bits)
+			_search_component_expansion.erase(bits)
+			_search_expansion.erase(bits)
 			items[bits].free()
 			items.erase(bits)
 	for bits in rows:
 		if not items.has(bits):
 			items[bits] = entity_tree.create_item(_root)
 			items[bits].collapsed = true
+			if not search_box.text.is_empty():
+				_search_expansion[bits] = true
 		var item: TreeItem = items[bits]
 		var row: Dictionary = rows[bits]
 		item.set_metadata(0, bits)
 		item.set_text(0, row.name if not row.name.is_empty() else "Entity " + bits)
 		item.set_tooltip_text(0, bits + "\n" + "\n".join(row.components))
 		item.set_icon(0, _entity_icon(row))
+		_sync_component_items(bits, row)
 		if _view == 1 and row.get("resource") is Dictionary:
 			var label: String = Proxy.component_label(row.resource.type_path)
 			if resource_labels[label] > 1:
@@ -398,6 +416,46 @@ func _sync_items() -> void:
 	_restore_scroll.call_deferred(scroll)
 	_sync_state_items()
 	_filter()
+
+func _sync_component_items(bits: String, row: Dictionary) -> void:
+	if _view != 0:
+		if _component_groups.has(bits):
+			_component_groups[bits].free()
+			_component_groups.erase(bits)
+			_component_items.erase(bits)
+		return
+	if not _component_groups.has(bits):
+		var new_group := entity_tree.create_item(items[bits], 0)
+		new_group.set_selectable(0, false)
+		new_group.collapsed = _component_expansion.get(bits, true)
+		_component_groups[bits] = new_group
+		_component_items[bits] = {}
+		if not search_box.text.is_empty() and not _search_component_expansion.has(bits):
+			_search_component_expansion[bits] = new_group.collapsed
+	var group: TreeItem = _component_groups[bits]
+	var components: Dictionary = _component_items[bits]
+	var types: Array = row.components.duplicate()
+	types.sort()
+	group.set_text(0, "Components (%d)" % types.size())
+	var labels: Dictionary = {}
+	for component in types:
+		var label: String = Proxy.component_label(component)
+		labels[label] = labels.get(label, 0) + 1
+	for component in components.keys():
+		if component not in types:
+			components[component].free()
+			components.erase(component)
+	for index in types.size():
+		var component: String = types[index]
+		if not components.has(component):
+			components[component] = entity_tree.create_item(group, index)
+		var item: TreeItem = components[component]
+		var label: String = Proxy.component_label(component)
+		item.set_text(0, (component if labels[label] > 1 else label).replace("/", "∕"))
+		item.set_metadata(0, bits)
+		var reason = row.get("unsupported_components", {}).get(component)
+		item.set_tooltip_text(0, component if reason == null else component + "\n" + str(reason))
+		item.set_icon(0, _component_icon(label))
 
 func _sync_state_items() -> void:
 	var was_selecting := _selecting
@@ -480,6 +538,39 @@ func _entity_icon_name(row: Dictionary, theme: Theme) -> String:
 				return icon
 	return best
 
+func _component_icon(label: String) -> Texture2D:
+	if not Engine.is_editor_hint():
+		return null
+	var icon := "Object"
+	match label:
+		"Transform", "GlobalTransform", "Transform2D", "Transform3D":
+			icon = "Transform3D"
+		"GodotNodeHandle":
+			icon = "Godot"
+		"Visibility", "InheritedVisibility", "ViewVisibility":
+			icon = "GuiVisibilityVisible"
+		"Mesh", "Mesh2d", "Mesh3d", "Handle<Mesh>":
+			icon = "MeshInstance3D"
+		"Camera", "Camera2d", "Camera3d":
+			icon = "Camera3D"
+		"AudioPlayer", "AudioSink", "SpatialAudioSink":
+			icon = "AudioStreamPlayer"
+		"Name":
+			icon = "String"
+		"TransformSyncMetadata":
+			icon = "VisualShaderNodeComment"
+		"Groups":
+			icon = "Groups"
+		"TransformTreeChanged":
+			icon = "StatusWarning"
+		_:
+			if label.ends_with("Marker"):
+				icon = label.trim_suffix("Marker")
+	var theme := EditorInterface.get_editor_theme()
+	if not theme.has_icon(icon, "EditorIcons"):
+		icon = "Object"
+	return theme.get_icon(icon, "EditorIcons") if theme.has_icon(icon, "EditorIcons") else null
+
 func _cancel_queries() -> void:
 	_search_serial += 1
 	if client != null:
@@ -492,10 +583,19 @@ func _search(text: String) -> void:
 		for bits in _search_expansion:
 			if items.has(bits):
 				items[bits].collapsed = _search_expansion[bits]
+		for bits in _search_component_expansion:
+			if _component_groups.has(bits):
+				_component_groups[bits].collapsed = _search_component_expansion[bits]
+			_component_expansion[bits] = _search_component_expansion[bits]
 		_search_expansion.clear()
+		_search_component_expansion.clear()
 	elif not text.is_empty() and not _searching:
 		for bits in items:
-			_search_expansion[bits] = items[bits].collapsed
+			if not _search_expansion.has(bits):
+				_search_expansion[bits] = items[bits].collapsed
+		for bits in _component_groups:
+			if not _search_component_expansion.has(bits):
+				_search_component_expansion[bits] = _component_groups[bits].collapsed
 	_searching = not text.is_empty()
 	_cancel_queries()
 	_search_matches.clear()
@@ -563,9 +663,20 @@ func _filter() -> void:
 			if resource is Dictionary and (text.is_empty() or resource.type_path.to_lower().contains(text) or bits.contains(text) or _search_matches.has(bits)):
 				visible_bits[bits] = true
 			continue
+		var component_match := false
+		for component in _component_items[bits]:
+			var matches: bool = component.to_lower().contains(text)
+			_component_items[bits][component].visible = text.is_empty() or matches
+			component_match = component_match or matches
+		var group: TreeItem = _component_groups[bits]
+		group.visible = text.is_empty() or component_match
+		if not text.is_empty():
+			group.collapsed = false if component_match else _search_component_expansion.get(bits, true)
 		if internal(row) and not show_internal.button_pressed:
 			continue
-		if text.is_empty() or row.name.to_lower().contains(text) or _search_matches.has(bits):
+		if text.is_empty() or component_match or row.name.to_lower().contains(text) or _search_matches.has(bits):
+			if not text.is_empty() and component_match:
+				items[bits].collapsed = false
 			var current: String = bits
 			var seen: Dictionary = {}
 			while rows.has(current) and not seen.has(current):

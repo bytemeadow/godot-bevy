@@ -146,7 +146,31 @@ func _run() -> void:
 		_finish(4)
 		return
 	var menu = _row("MainMenu")
-	pane.entity_tree.set_selected(pane.items[menu.entity.bits], 0)
+	var menu_item: TreeItem = pane.items[menu.entity.bits]
+	var group: TreeItem = menu_item.get_first_child()
+	if group == null or group.get_text(0) != "Components (%d)" % menu.components.size():
+		failures.append("MainMenu component group missing or incorrect count")
+		_finish(4)
+		return
+	_check(group.collapsed and group.get_child_count() == menu.components.size(), "real entity components start collapsed with every summary type")
+	menu_item.uncollapse_tree()
+	menu_item.collapsed = false
+	group.collapsed = false
+	var handle_item: TreeItem
+	for item in group.get_children():
+		if item.get_tooltip_text(0).get_slice("\n", 0).ends_with("::GodotNodeHandle"):
+			handle_item = item
+	if handle_item == null:
+		failures.append("MainMenu GodotNodeHandle component row missing")
+		_finish(4)
+		return
+	_check(handle_item.get_text(0) == "GodotNodeHandle", "dock component uses shortened label")
+	var theme := EditorInterface.get_editor_theme()
+	if theme.has_icon("Godot", "EditorIcons"):
+		_check(handle_item.get_icon(0) == theme.get_icon("Godot", "EditorIcons"), "GodotNodeHandle uses the old dock's editor icon")
+	pane.entity_tree.scroll_to_item(group)
+	await _shot("2-components-expanded")
+	pane.entity_tree.set_selected(handle_item, 0)
 	if not await _wait(func(): return remote.tree != null and remote.tree.get_selected() != null and remote.tree.get_selected().get_text(0) == "MainMenu", "pane selects MainMenu in Remote"):
 		_finish(4)
 		return
