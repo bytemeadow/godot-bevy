@@ -73,9 +73,10 @@ edits leave the accepted value unchanged. Wide integers use exact decimal text. 
 node references are navigation links. Game systems can overwrite accepted edits on later ticks.
 
 The pane subscribes only while visible, starting with a snapshot and applying later additions,
-removals, renames and reparentings without rebuilding the tree. Only the inspected entity's
-values are fetched at the subscription interval. `DebuggerConfig.update_interval` supplies the
-default (0.5 seconds); configure it before connecting the editor:
+removals, renames, reparentings and component membership changes without rebuilding the tree.
+Only the inspected entity's values are fetched at the subscription interval.
+`DebuggerConfig.update_interval` supplies the default (0.5 seconds); configure it before
+connecting the editor:
 
 ```rust
 fn configure_debugger(mut config: ResMut<DebuggerConfig>) {
@@ -86,8 +87,25 @@ fn configure_debugger(mut config: ResMut<DebuggerConfig>) {
 
 `DebuggerConfig::value_limits` bounds collection elements and nesting depth, with explicit
 truncation markers. There is no unsolicited legacy entity stream.
+`DebuggerConfig::snapshot_chunk_size` limits the initial snapshot to 256 entity summaries per
+frame by default (zero uses one), sending one chunk per `First`; the pane shows a loading count
+and keeps its last complete tree until the final chunk arrives.
+The snapshot describes the world at subscription time; changes during loading follow in the
+next delta, after the configured update interval.
+Selections for entities still loading are retried after the final chunk. If the runtime
+disables the debugger or a chunk arrives out of sequence, the pane discards the unfinished
+snapshot and keeps its last complete tree; reopen the pane to subscribe again once the
+debugger is enabled.
 
 The runtime announces `godot.ready` once its debugger endpoint is registered. The editor then
 reads the debugger config and subscribes while the Entities pane is visible. If the readiness
 message is lost, it retries the config request every 500 ms for up to 20 seconds and reports
 an unanswered endpoint in the pane. Entity summaries remain subscription-only.
+
+### Limitations
+
+Arbitrary not-yet-applied Bevy despawns cannot be observed through the public command queue,
+which holds private erased commands without target metadata
+([Bevy command queue source](https://docs.rs/bevy_ecs/0.19.0/src/bevy_ecs/world/command_queue.rs.html)).
+Wide integers are edited as decimal text because a spin box value is a double and cannot
+represent every integer exactly.

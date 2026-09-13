@@ -1,9 +1,10 @@
 use std::{
     collections::{BTreeMap, HashSet},
+    ops::Bound,
     time::Instant,
 };
 
-use bevy_ecs::{prelude::*, reflect::AppTypeRegistry, world::EntityRef};
+use bevy_ecs::{archetype::ArchetypeId, prelude::*, reflect::AppTypeRegistry, world::EntityRef};
 use godot::{
     classes::{Engine, Node, SceneTree},
     obj::{Gd, InstanceId, Singleton},
@@ -72,9 +73,10 @@ impl From<InspectionError> for RpcError {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 struct Summary {
     entity: Entity,
+    archetype: ArchetypeId,
     name: String,
     parent: Option<Entity>,
     has_node: bool,
@@ -104,8 +106,14 @@ impl Summary {
 pub(super) struct Subscription {
     interval_s: f64,
     sent_at: Instant,
-    initial: bool,
+    snapshot: Option<Snapshot>,
     summaries: BTreeMap<Entity, Summary>,
+}
+
+struct Snapshot {
+    after: Option<Entity>,
+    index: usize,
+    chunk_size: usize,
 }
 
 #[derive(Resource, Default)]
@@ -158,6 +166,7 @@ fn summary(world: &World, entity: Entity) -> Option<Summary> {
     components.sort();
     Some(Summary {
         entity: entity.id(),
+        archetype: entity.archetype().id(),
         name: entity
             .get::<Name>()
             .map(|name| name.as_str().into())
@@ -181,52 +190,82 @@ fn summaries(world: &mut World) -> BTreeMap<Entity, Summary> {
         .collect()
 }
 
-pub(super) fn publish(world: &mut World, subscription: &mut Option<Subscription>) {
+pub(super) fn publish(
+    world: &mut World,
+    subscription: &mut Option<Subscription>,
+    snapshot_budget: &mut bool,
+) {
     if !world.resource::<DebuggerConfig>().enabled {
-        *subscription = None;
+        if subscription.take().is_some() {
+            notify(
+                world,
+                Wire::object([
+                    ("subscription_ended", Wire::Bool(true)),
+                    ("reason", Wire::String("debugger disabled".into())),
+                ]),
+            );
+        }
         *world.resource_mut::<SummaryChanges>() = SummaryChanges::default();
         return;
     }
     let Some(subscription) = subscription else {
         return;
     };
-    if subscription.initial {
-        subscription.initial = false;
+    if let Some(snapshot) = &mut subscription.snapshot {
+        if !*snapshot_budget {
+            return;
+        }
+        *snapshot_budget = false;
+        let mut remaining = subscription.summaries.range((
+            snapshot.after.map_or(Bound::Unbounded, Bound::Excluded),
+            Bound::Unbounded,
+        ));
+        let added = remaining
+            .by_ref()
+            .take(snapshot.chunk_size)
+            .map(|(entity, summary)| {
+                snapshot.after = Some(*entity);
+                summary.to_wire()
+            })
+            .collect();
+        let complete = remaining.next().is_none();
         subscription.sent_at = Instant::now();
         notify(
             world,
             Wire::object([
                 ("snapshot", Wire::Bool(true)),
-                (
-                    "added",
-                    Wire::Array(
-                        subscription
-                            .summaries
-                            .values()
-                            .map(Summary::to_wire)
-                            .collect(),
-                    ),
-                ),
+                ("snapshot_index", Wire::Integer(snapshot.index as i64)),
+                ("snapshot_complete", Wire::Bool(complete)),
+                ("added", Wire::Array(added)),
                 ("removed", Wire::Array(Vec::new())),
                 ("updated", Wire::Array(Vec::new())),
             ]),
         );
+        snapshot.index += 1;
+        if complete {
+            subscription.snapshot = None;
+        }
         return;
     }
     if subscription.sent_at.elapsed().as_secs_f64() < subscription.interval_s {
         return;
     }
+    let mut dirty = std::mem::take(&mut world.resource_mut::<SummaryChanges>().dirty);
     let live = world
         .query::<EntityRef>()
         .iter(world)
         .map(|entity| entity.id())
         .collect::<HashSet<_>>();
-    let known = subscription
-        .summaries
-        .keys()
-        .copied()
-        .collect::<HashSet<_>>();
-    let mut dirty = std::mem::take(&mut world.resource_mut::<SummaryChanges>().dirty);
+    let mut known = HashSet::with_capacity(subscription.summaries.len());
+    for (entity, previous) in &subscription.summaries {
+        known.insert(*entity);
+        if world
+            .get_entity(*entity)
+            .is_ok_and(|current| previous.archetype != current.archetype().id())
+        {
+            dirty.insert(*entity);
+        }
+    }
     dirty.extend(live.symmetric_difference(&known).copied());
     let mut dirty = dirty.into_iter().collect::<Vec<_>>();
     dirty.sort();
@@ -236,11 +275,7 @@ pub(super) fn publish(world: &mut World, subscription: &mut Option<Subscription>
             Some(current) => {
                 match subscription.summaries.get(&entity) {
                     None => added.push(current.to_wire()),
-                    Some(previous)
-                        if previous.name != current.name || previous.parent != current.parent =>
-                    {
-                        updated.push(current.to_wire())
-                    }
+                    Some(previous) if previous != &current => updated.push(current.to_wire()),
                     Some(_) => {}
                 }
                 subscription.summaries.insert(entity, current);
@@ -324,7 +359,14 @@ pub(super) fn dispatch(
             *subscription = Some(Subscription {
                 interval_s,
                 sent_at: Instant::now(),
-                initial: true,
+                snapshot: Some(Snapshot {
+                    after: None,
+                    index: 0,
+                    chunk_size: world
+                        .resource::<DebuggerConfig>()
+                        .snapshot_chunk_size
+                        .max(1),
+                }),
                 summaries: summaries(world),
             });
             let mut changes = world.resource_mut::<SummaryChanges>();

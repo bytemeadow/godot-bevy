@@ -30,6 +30,10 @@ var _selection_serial := 0
 var _selecting := false
 var _proxy: RefCounted
 var _remote_selection_echoes: Dictionary = {}
+var _snapshot_rows: Dictionary = {}
+var _snapshot_deltas: Array = []
+var _snapshot_index := 0
+var _pending_selection: Dictionary = {}
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(240, 220)
@@ -120,6 +124,7 @@ func _unsubscribe() -> void:
 	if client != null and _subscribed_session != -1 and client.is_session_active(_subscribed_session):
 		client.request("godot.unsubscribe", {}, Callable(), _subscribed_session)
 	_subscribed_session = -1
+	_reset_snapshot()
 
 func _interval_changed() -> void:
 	_unsubscribe()
@@ -153,23 +158,68 @@ func _summary(session_id: int, params: Dictionary) -> void:
 		apply_summary(params)
 
 func apply_summary(params: Dictionary) -> void:
+	if params.get("subscription_ended", false):
+		_subscribed_session = -1
+		_end_subscription(params.get("reason", "Subscription ended"))
+		return
+	var pending: Dictionary = {}
 	if params.get("snapshot", false):
-		var incoming: Dictionary = {}
+		var index: int = params.get("snapshot_index", 0)
+		if index == 0:
+			_reset_snapshot()
+			_cancel_queries()
+			if not params.get("snapshot_complete", true):
+				cancel_inspection()
+		if index != _snapshot_index:
+			_end_subscription("Snapshot interrupted: missing or out-of-order data")
+			return
 		for row in params.get("added", []):
-			incoming[row.entity.bits] = row
-		rows = incoming
+			_snapshot_rows[row.entity.bits] = row
+		_snapshot_index += 1
+		if not params.get("snapshot_complete", true):
+			status_label.text = "Loading snapshot (%d entities received)…" % _snapshot_rows.size()
+			return
+		for delta in _snapshot_deltas:
+			_apply_delta(_snapshot_rows, delta)
+		rows = _snapshot_rows
+		pending = _pending_selection
+		_reset_snapshot()
+	elif _snapshot_index > 0:
+		_snapshot_deltas.append(params)
+		return
 	else:
-		for reference in params.get("removed", []):
-			rows.erase(reference.bits)
-		for row in params.get("added", []) + params.get("updated", []):
-			rows[row.entity.bits] = row
+		_apply_delta(rows, params)
 	_sync_items()
 	_search(search_box.text)
 	status_label.text = "%d entities" % rows.size()
+	if not pending.is_empty() and client != null and pending.session == client.active_session_id:
+		_ensure_selection(pending.reference, pending.session, pending.inspect)
+
+func _end_subscription(reason: String) -> void:
+	_unsubscribe()
+	cancel_inspection()
+	_search(search_box.text)
+	status_label.text = "%s. Reopen the pane to retry." % reason
+
+func _reset_snapshot() -> void:
+	_snapshot_rows = {}
+	_snapshot_deltas.clear()
+	_snapshot_index = 0
+	_pending_selection = {}
+
+func _apply_delta(target: Dictionary, params: Dictionary) -> void:
+	for reference in params.get("removed", []):
+		target.erase(reference.bits)
+	for row in params.get("added", []) + params.get("updated", []):
+		target[row.entity.bits] = row
 
 func _sync_items() -> void:
 	var scroll := entity_tree.get_scroll()
 	var selected = entity_tree.get_selected()
+	# Freeing and reparenting items makes the Tree emit item_selected on its own; that is not a
+	# user selection and must not overwrite selected_entity.
+	var was_selecting := _selecting
+	_selecting = true
 	var selected_bits = selected.get_metadata(0) if selected != null else null
 	# Move surviving descendants before freeing a removed parent.
 	for bits in items.keys():
@@ -206,10 +256,9 @@ func _sync_items() -> void:
 			item.get_parent().remove_child(item)
 			parents[bits].add_child(item)
 	if selected_bits != null and items.has(selected_bits) and entity_tree.get_selected() != items[selected_bits]:
-		_selecting = true
 		items[selected_bits].deselect(0)
 		items[selected_bits].select(0)
-		_selecting = false
+	_selecting = was_selecting
 	_restore_scroll.call_deferred(scroll)
 	_filter()
 
@@ -278,7 +327,7 @@ func _search(text: String) -> void:
 	_cancel_queries()
 	_search_matches.clear()
 	_filter()
-	if text.is_empty() or client == null or client.active_session_id == -1:
+	if text.is_empty() or _snapshot_index > 0 or client == null or client.active_session_id == -1:
 		return
 	var filters: Array = []
 	if text.is_valid_int():
@@ -360,6 +409,7 @@ func _on_selected() -> void:
 
 func cancel_inspection() -> void:
 	_selection_serial += 1
+	_pending_selection = {}
 	if remote != null:
 		remote.cancel_selection()
 
@@ -383,6 +433,10 @@ func select_entity(reference: Dictionary, inspect: bool = true) -> void:
 		entity_tree.scroll_to_item(items[bits])
 	selected_entity = reference.duplicate()
 	_selecting = true
+	var ancestor: TreeItem = items[bits].get_parent()
+	while ancestor != null and ancestor != _root:
+		ancestor.collapsed = false
+		ancestor = ancestor.get_parent()
 	items[bits].select(0)
 	_selecting = false
 	entity_selected.emit(reference)
@@ -439,8 +493,7 @@ func _remote_selected(ids: Array, session: int) -> void:
 		_remote_selection_echoes.erase(key)
 		return
 	client.select_session(session)
-	remote.cancel_selection()
-	_selection_serial += 1
+	cancel_inspection()
 	var serial := _selection_serial
 	client.request("godot.entity_for_node", {"instance_id": ids[0]}, func(frame):
 		if session == client.active_session_id and serial == _selection_serial and not frame.has("error"):
@@ -455,6 +508,10 @@ func shutdown() -> void:
 	if remote != null:
 		remote.cancel_selection()
 	_clear_proxy()
+	selected_entity = {}
+	rows.clear()
+	_sync_items()
+	status_label.text = "no running session"
 
 func show_candidates(candidates: Array) -> void:
 	_candidates.clear()
@@ -469,8 +526,10 @@ func show_candidates(candidates: Array) -> void:
 func _ensure_selection(reference: Dictionary, session: int, inspect: bool) -> void:
 	if rows.has(reference.bits):
 		select_entity(reference, inspect)
-	else:
+	elif _snapshot_index == 0:
 		_query_selection(reference, session, inspect, 0, _selection_serial)
+	else:
+		_pending_selection = {"reference": reference.duplicate(), "session": session, "inspect": inspect}
 
 func _query_selection(reference: Dictionary, session: int, inspect: bool, page: int, serial: int) -> void:
 	client.request("godot.query", {"page": page, "page_size": 256}, func(frame):
