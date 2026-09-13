@@ -38,6 +38,7 @@ fn build_app(app: &mut App) {
         .add_plugins(GodotActionsPlugin)
         .add_plugins(StatesPlugin)
         .init_state::<GameState>()
+        .register_type_mutable_state::<GameState>()
         .add_loading_state(
             LoadingState::new(GameState::Loading)
                 .continue_to_state(GameState::MainMenu)
@@ -56,7 +57,7 @@ fn build_app(app: &mut App) {
     capture_audio::install(app);
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Hash, States)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Hash, States, Reflect)]
 enum GameState {
     #[default]
     Loading,

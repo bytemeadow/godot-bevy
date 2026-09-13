@@ -1171,7 +1171,6 @@ mod state_wrapper_paths {
         Active,
     }
 
-    // The existing dev dependency does not enable state reflection; pin the real paths separately.
     #[derive(Resource, Reflect)]
     #[reflect(Resource)]
     #[type_path = "bevy_state::state::resources"]

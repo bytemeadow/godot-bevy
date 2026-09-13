@@ -76,6 +76,36 @@ still be read when registered, but cannot be edited generically.
 `#[reflect(@InspectorReadOnly)]` shows a field without allowing edits;
 `#[reflect(@InspectorRange::new(min, max))]` bounds scalar edits (both are in the prelude).
 
+### States
+
+The **States** view shares the pane's session selector and search. Derive `Reflect`
+on your state and add Bevy's registration line:
+
+```rust
+app.register_type_mutable_state::<GameState>();
+```
+
+Use `register_type_state::<S>()` for read-only or computed states. Registration
+does not initialize a state. Godot-bevy depends on `bevy_state`, but adding
+`StatesPlugin` and initializing states remain the game's choice.
+
+The Inspector separates **Current**, the game's **Queued target**, and **Request**.
+For mutable registrations, Request offers fieldless enum variants and writes only
+`NextState<S>` at the next `First` drain. It refuses to overwrite a queued transition
+and reports “Already current” for the current value. Absent states stay listed;
+a read-only registration without queue reflection displays “Unavailable”.
+
+Receipts sample `State<S>` and `NextState<S>` when the Inspector reads a state:
+“Queued: X; current: Y”, “Request replaced by Y”, or “No longer pending; transition
+to X not observed”. “Transition to X observed” means a sample saw X as current;
+it does not establish that the request caused it, and a later departure keeps
+that receipt. A transition that enters and leaves the requested state between
+two samples is not seen, so the receipt will say it was not observed.
+
+Requesting a transition is not a gameplay action. For example, entering the
+platformer's `InGame` state alone does not load a level; its Start handler also
+requests level loading.
+
 ### Editing and refresh
 
 Expand a component in the Inspector to edit supported scalar leaves or select a unit enum

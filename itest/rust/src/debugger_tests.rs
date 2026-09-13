@@ -107,6 +107,438 @@ fn response(rx: &Receiver<Wire>, id: i64) -> Wire {
     frames.into_iter().next().unwrap()
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, States, Reflect)]
+enum DebuggerMode {
+    #[default]
+    Menu,
+    Playing,
+    Paused,
+}
+
+async fn state_setup(ctx: &TestContext) -> (TestApp, DebuggerEndpoint, Receiver<Wire>) {
+    let (tx, rx) = channel();
+    let app = TestApp::new(ctx, move |app| {
+        app.add_plugins((GodotDebuggerPlugin, bevy::state::app::StatesPlugin))
+            .init_state::<DebuggerMode>()
+            .register_type_mutable_state::<DebuggerMode>()
+            .insert_resource(DebuggerTransport::new(move |frame| {
+                tx.send(frame).unwrap();
+            }));
+    })
+    .await;
+    let endpoint = app.with_world(|world| world.non_send::<DebuggerEndpoint>().clone());
+    (app, endpoint, rx)
+}
+
+fn state_params(app: &mut TestApp) -> Dictionary {
+    app.with_world(|world| {
+        let reference = |id| {
+            let entity = world.resource_entities().get(id).unwrap();
+            Wire::object([
+                ("bits", Wire::String(entity.to_bits().to_string())),
+                (
+                    "generation",
+                    Wire::Integer(i64::from(entity.generation().to_bits())),
+                ),
+            ])
+        };
+        Wire::object([
+            ("type_path", Wire::String(DebuggerMode::type_path().into())),
+            (
+                "state_entity",
+                reference(world.component_id::<State<DebuggerMode>>().unwrap()),
+            ),
+            (
+                "next_state_entity",
+                reference(world.component_id::<NextState<DebuggerMode>>().unwrap()),
+            ),
+        ])
+        .to_variant()
+        .to::<Dictionary>()
+    })
+}
+
+#[itest(async)]
+fn debugger_state_reads_distinguish_game_queue_from_current(
+    ctx: &TestContext,
+) -> godot::task::TaskHandle {
+    let ctx = ctx.clone();
+    godot::task::spawn(async move {
+        let (mut app, endpoint, rx) = state_setup(&ctx).await;
+        endpoint.submit(request(301, "godot.list_states", Dictionary::new()));
+        assert!(rx.try_recv().is_err());
+        app.with_world_mut(|world| world.run_schedule(First));
+        let frame = response(&rx, 301);
+        let rows = frame
+            .get("result")
+            .unwrap()
+            .get("states")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].get("can_request"), Some(&Wire::Bool(true)));
+        assert!(rows[0].get("current").is_none());
+        app.with_world_mut(|world| {
+            world
+                .resource_mut::<NextState<DebuggerMode>>()
+                .set(DebuggerMode::Playing)
+        });
+        let params = state_params(&mut app);
+        endpoint.submit(request(302, "godot.get_state", params));
+        assert!(rx.try_recv().is_err());
+        app.with_world_mut(|world| world.run_schedule(First));
+        let frame = response(&rx, 302);
+        let result = frame.get("result").unwrap();
+        assert_eq!(
+            result
+                .get("current")
+                .unwrap()
+                .get("variant")
+                .and_then(Wire::as_str),
+            Some("Menu")
+        );
+        assert_eq!(
+            result
+                .get("queued")
+                .unwrap()
+                .get("variant")
+                .and_then(Wire::as_str),
+            Some("Playing")
+        );
+        assert_eq!(result.get("receipt"), Some(&Wire::Null));
+        app.with_world_mut(|world| {
+            assert_eq!(
+                world.resource::<State<DebuggerMode>>().get(),
+                &DebuggerMode::Menu
+            );
+            assert!(matches!(
+                world.resource::<NextState<DebuggerMode>>(),
+                NextState::Pending(DebuggerMode::Playing)
+            ));
+            world.run_schedule(StateTransition);
+            assert_eq!(
+                world.resource::<State<DebuggerMode>>().get(),
+                &DebuggerMode::Playing
+            );
+        });
+        let params = state_params(&mut app);
+        endpoint.submit(request(303, "godot.get_state", params));
+        app.with_world_mut(|world| world.run_schedule(First));
+        let frame = response(&rx, 303);
+        let result = frame.get("result").unwrap();
+        assert_eq!(
+            result
+                .get("current")
+                .unwrap()
+                .get("variant")
+                .and_then(Wire::as_str),
+            Some("Playing")
+        );
+        assert_eq!(result.get("queued"), Some(&Wire::Null));
+        assert_eq!(result.get("receipt"), Some(&Wire::Null));
+        app.cleanup().await;
+    })
+}
+
+#[itest(async)]
+fn debugger_state_request_rejects_at_first_without_touching_game_queue(
+    ctx: &TestContext,
+) -> godot::task::TaskHandle {
+    let ctx = ctx.clone();
+    godot::task::spawn(async move {
+        let (mut app, endpoint, rx) = state_setup(&ctx).await;
+        let mut params = state_params(&mut app);
+        params.set(
+            "value",
+            &Wire::object([("variant", Wire::String("Paused".into()))]).to_variant(),
+        );
+        endpoint.submit(request(311, "godot.request_state_transition", params));
+        assert!(rx.try_recv().is_err());
+        app.with_world_mut(|world| {
+            world
+                .resource_mut::<NextState<DebuggerMode>>()
+                .set(DebuggerMode::Playing);
+            assert_eq!(
+                world.resource::<State<DebuggerMode>>().get(),
+                &DebuggerMode::Menu
+            );
+            assert!(matches!(
+                world.resource::<NextState<DebuggerMode>>(),
+                NextState::Pending(DebuggerMode::Playing)
+            ));
+            world.run_schedule(First);
+            assert_eq!(
+                world.resource::<State<DebuggerMode>>().get(),
+                &DebuggerMode::Menu
+            );
+            assert!(matches!(
+                world.resource::<NextState<DebuggerMode>>(),
+                NextState::Pending(DebuggerMode::Playing)
+            ));
+        });
+        let frame = response(&rx, 311);
+        assert_eq!(
+            frame
+                .get("error")
+                .unwrap()
+                .get("message")
+                .and_then(Wire::as_str),
+            Some("a state transition is already queued")
+        );
+        app.cleanup().await;
+    })
+}
+
+#[itest(async)]
+fn debugger_state_request_writes_only_next_state_at_first_then_samples_transition(
+    ctx: &TestContext,
+) -> godot::task::TaskHandle {
+    let ctx = ctx.clone();
+    godot::task::spawn(async move {
+        let (mut app, endpoint, rx) = state_setup(&ctx).await;
+        let mut params = state_params(&mut app);
+        params.set(
+            "value",
+            &Wire::object([("variant", Wire::String("Playing".into()))]).to_variant(),
+        );
+        endpoint.submit(request(331, "godot.request_state_transition", params));
+        assert!(rx.try_recv().is_err());
+        app.with_world_mut(|world| {
+            assert_eq!(
+                world.resource::<State<DebuggerMode>>().get(),
+                &DebuggerMode::Menu
+            );
+            assert!(matches!(
+                world.resource::<NextState<DebuggerMode>>(),
+                NextState::Unchanged
+            ));
+            world.run_schedule(First);
+            assert_eq!(
+                world.resource::<State<DebuggerMode>>().get(),
+                &DebuggerMode::Menu
+            );
+            assert!(matches!(
+                world.resource::<NextState<DebuggerMode>>(),
+                NextState::Pending(DebuggerMode::Playing)
+            ));
+        });
+        let frame = response(&rx, 331);
+        let result = frame.get("result").unwrap();
+        assert_eq!(
+            result.get("receipt").and_then(Wire::as_str),
+            Some("Queued: Playing; current: Menu")
+        );
+        assert_eq!(
+            result
+                .get("current")
+                .unwrap()
+                .get("variant")
+                .and_then(Wire::as_str),
+            Some("Menu")
+        );
+        app.with_world_mut(|world| {
+            world.run_schedule(StateTransition);
+            assert_eq!(
+                world.resource::<State<DebuggerMode>>().get(),
+                &DebuggerMode::Playing
+            );
+        });
+        endpoint.submit(request(332, "godot.get_state", state_params(&mut app)));
+        app.with_world_mut(|world| world.run_schedule(First));
+        let frame = response(&rx, 332);
+        let result = frame.get("result").unwrap();
+        assert_eq!(
+            result.get("receipt").and_then(Wire::as_str),
+            Some("Transition to Playing observed")
+        );
+        assert_eq!(
+            result
+                .get("current")
+                .unwrap()
+                .get("variant")
+                .and_then(Wire::as_str),
+            Some("Playing")
+        );
+        assert_eq!(result.get("queued"), Some(&Wire::Null));
+        app.cleanup().await;
+    })
+}
+
+#[itest(async)]
+fn debugger_state_samples_competing_system_replacement_and_consumption(
+    ctx: &TestContext,
+) -> godot::task::TaskHandle {
+    let ctx = ctx.clone();
+    godot::task::spawn(async move {
+        for replacement in [true, false] {
+            let (mut app, endpoint, rx) = state_setup(&ctx).await;
+            let mut params = state_params(&mut app);
+            params.set(
+                "value",
+                &Wire::object([("variant", Wire::String("Playing".into()))]).to_variant(),
+            );
+            endpoint.submit(request(341, "godot.request_state_transition", params));
+            app.with_world_mut(|world| world.run_schedule(First));
+            assert!(response(&rx, 341).get("result").is_some());
+            app.with_world_mut(|world| {
+                let mut schedule = Schedule::default();
+                schedule.add_systems(move |mut next: ResMut<NextState<DebuggerMode>>| {
+                    if replacement {
+                        next.set(DebuggerMode::Paused);
+                    } else {
+                        next.reset();
+                    }
+                });
+                schedule.run(world);
+                assert_eq!(
+                    world.resource::<State<DebuggerMode>>().get(),
+                    &DebuggerMode::Menu
+                );
+            });
+            endpoint.submit(request(342, "godot.get_state", state_params(&mut app)));
+            app.with_world_mut(|world| world.run_schedule(First));
+            let frame = response(&rx, 342);
+            assert_eq!(
+                frame
+                    .get("result")
+                    .unwrap()
+                    .get("receipt")
+                    .and_then(Wire::as_str),
+                Some(if replacement {
+                    "Request replaced by Paused"
+                } else {
+                    "No longer pending; transition to Playing not observed"
+                })
+            );
+            app.cleanup().await;
+        }
+    })
+}
+
+#[itest(async)]
+fn debugger_state_already_current_refuses_without_changing_queue(
+    ctx: &TestContext,
+) -> godot::task::TaskHandle {
+    let ctx = ctx.clone();
+    godot::task::spawn(async move {
+        let (mut app, endpoint, rx) = state_setup(&ctx).await;
+        let mut params = state_params(&mut app);
+        params.set(
+            "value",
+            &Wire::object([("variant", Wire::String("Menu".into()))]).to_variant(),
+        );
+        endpoint.submit(request(351, "godot.request_state_transition", params));
+        assert!(rx.try_recv().is_err());
+        app.with_world_mut(|world| {
+            let changed = world
+                .get_resource_ref::<NextState<DebuggerMode>>()
+                .unwrap()
+                .last_changed();
+            assert!(matches!(
+                world.resource::<NextState<DebuggerMode>>(),
+                NextState::Unchanged
+            ));
+            world.run_schedule(First);
+            assert_eq!(
+                world.resource::<State<DebuggerMode>>().get(),
+                &DebuggerMode::Menu
+            );
+            assert!(matches!(
+                world.resource::<NextState<DebuggerMode>>(),
+                NextState::Unchanged
+            ));
+            assert_eq!(
+                world
+                    .get_resource_ref::<NextState<DebuggerMode>>()
+                    .unwrap()
+                    .last_changed(),
+                changed
+            );
+        });
+        let frame = response(&rx, 351);
+        assert_eq!(
+            frame
+                .get("error")
+                .unwrap()
+                .get("message")
+                .and_then(Wire::as_str),
+            Some("Already current")
+        );
+        endpoint.submit(request(352, "godot.get_state", state_params(&mut app)));
+        app.with_world_mut(|world| world.run_schedule(First));
+        let frame = response(&rx, 352);
+        assert_eq!(
+            frame
+                .get("result")
+                .unwrap()
+                .get("receipt")
+                .and_then(Wire::as_str),
+            Some("Already current")
+        );
+        app.cleanup().await;
+    })
+}
+
+#[itest(async)]
+fn debugger_state_requests_validate_identity_and_presence_at_drain(
+    ctx: &TestContext,
+) -> godot::task::TaskHandle {
+    let ctx = ctx.clone();
+    godot::task::spawn(async move {
+        let (mut app, endpoint, rx) = state_setup(&ctx).await;
+        let mut stale = state_params(&mut app);
+        stale.set(
+            "state_entity",
+            &Wire::object([
+                ("bits", Wire::String("1".into())),
+                ("generation", Wire::Integer(999)),
+            ])
+            .to_variant(),
+        );
+        stale.set(
+            "value",
+            &Wire::object([("variant", Wire::String("Playing".into()))]).to_variant(),
+        );
+        endpoint.submit(request(321, "godot.request_state_transition", stale));
+        app.with_world_mut(|world| world.run_schedule(First));
+        let frame = response(&rx, 321);
+        assert_eq!(
+            frame
+                .get("error")
+                .unwrap()
+                .get("message")
+                .and_then(Wire::as_str),
+            Some("stale state backing identity")
+        );
+        let mut params = state_params(&mut app);
+        params.set(
+            "value",
+            &Wire::object([("variant", Wire::String("Playing".into()))]).to_variant(),
+        );
+        endpoint.submit(request(322, "godot.request_state_transition", params));
+        app.with_world_mut(|world| {
+            world.remove_resource::<NextState<DebuggerMode>>();
+            world.run_schedule(First);
+            assert!(!world.contains_resource::<NextState<DebuggerMode>>());
+            assert_eq!(
+                world.resource::<State<DebuggerMode>>().get(),
+                &DebuggerMode::Menu
+            );
+        });
+        let frame = response(&rx, 322);
+        assert_eq!(
+            frame
+                .get("error")
+                .unwrap()
+                .get("message")
+                .and_then(Wire::as_str),
+            Some("NextState resource absent")
+        );
+        app.cleanup().await;
+    })
+}
+
 #[itest(async)]
 fn debugger_no_mutation_before_drain(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx = ctx.clone();
@@ -854,7 +1286,10 @@ fn debugger_discovery_and_malformed_frame(ctx: &TestContext) -> godot::task::Tas
                 "godot.mutate_leaf",
                 "godot.resolve_node",
                 "godot.entity_for_node",
-                "godot.debugger_config"
+                "godot.debugger_config",
+                "godot.list_states",
+                "godot.get_state",
+                "godot.request_state_transition"
             ]
         );
         let mut malformed = request(112, "rpc.discover", Dictionary::new());
