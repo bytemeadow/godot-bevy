@@ -20,6 +20,13 @@ var items: Dictionary = {}
 var hidden_count := 0
 var selected_entity: Dictionary = {}
 var selected_resource: Dictionary = {}
+var selected_state := ""
+var state_rows: Dictionary = {}
+var state_items: Dictionary = {}
+var _state_reason := ""
+var _state_read_id := -1
+var _state_serial := 0
+var _state_elapsed := 0.0
 var _view := 0
 var _entity_expansion: Dictionary = {}
 var _root: TreeItem
@@ -51,9 +58,11 @@ func _ready() -> void:
 	view_selector = OptionButton.new()
 	view_selector.add_item("Entities")
 	view_selector.add_item("Resources")
+	view_selector.add_item("States")
 	view_selector.item_selected.connect(_choose_view)
 	box.add_child(view_selector)
 	status_label = Label.new()
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_label.text = "no running session"
 	box.add_child(status_label)
 	_candidates = OptionButton.new()
@@ -124,6 +133,7 @@ func _choose_view(index: int) -> void:
 	if index == _view:
 		return
 	cancel_inspection()
+	_cancel_state_read()
 	if _view == 0:
 		for bits in items:
 			_entity_expansion[bits] = items[bits].collapsed
@@ -132,8 +142,8 @@ func _choose_view(index: int) -> void:
 	show_internal.visible = index == 0
 	hidden_label.visible = index == 0
 	_candidates.hide()
-	search_box.placeholder_text = "Filter resources" if index == 1 else "Filter entities"
-	search_box.tooltip_text = "Search resource type paths or decimal entity IDs" if index == 1 else "Search names, decimal entity IDs, component type paths or exact runtime node paths"
+	search_box.placeholder_text = ["Filter entities", "Filter resources", "Filter states"][index]
+	search_box.tooltip_text = ["Search names, decimal entity IDs, component type paths or exact runtime node paths", "Search resource type paths or decimal entity IDs", "Search state type paths"][index]
 	_sync_items()
 	if index == 0:
 		for bits in _entity_expansion:
@@ -141,6 +151,8 @@ func _choose_view(index: int) -> void:
 				items[bits].collapsed = _entity_expansion[bits]
 	_search(search_box.text)
 	_update_count()
+	if index == 2:
+		_request_states()
 
 func _session_changed(_id: int) -> void:
 	_unsubscribe()
@@ -148,6 +160,9 @@ func _session_changed(_id: int) -> void:
 	_cancel_queries()
 	selected_entity = {}
 	selected_resource = {}
+	selected_state = ""
+	state_rows.clear()
+	_state_reason = ""
 	_entity_expansion.clear()
 	_remote_selection_echoes.clear()
 	_clear_proxy()
@@ -164,6 +179,7 @@ func _session_changed(_id: int) -> void:
 	_subscription_visibility()
 
 func _unsubscribe() -> void:
+	_cancel_state_read()
 	if client != null and _subscribed_session != -1 and client.is_session_active(_subscribed_session):
 		client.request("godot.unsubscribe", {}, Callable(), _subscribed_session)
 	_subscribed_session = -1
@@ -194,6 +210,47 @@ func _subscription_visibility() -> void:
 		if session == _subscribed_session and frame.has("error"):
 			status_label.text = frame.error.message
 			_subscribed_session = -1
+	, session)
+	if _view == 2:
+		_request_states()
+
+func _cancel_state_read() -> void:
+	_state_serial += 1
+	if client != null and _state_read_id != -1:
+		client.cancel_request(_state_read_id)
+	_state_read_id = -1
+	_state_elapsed = 0.0
+
+func _request_states() -> void:
+	if _state_read_id != -1 or _view != 2 or client == null or _subscribed_session == -1:
+		return
+	var session: int = client.active_session_id
+	var incarnation: int = client.sessions.get(session, {}).get("order", -1)
+	var serial := _state_serial
+	_state_read_id = client.request("godot.list_states", {}, func(frame):
+		if serial != _state_serial or session != client.active_session_id or incarnation != client.sessions.get(session, {}).get("order", -1):
+			return
+		_state_read_id = -1
+		if frame.has("error"):
+			_state_reason = frame.error.message
+			_update_count()
+			return
+		state_rows.clear()
+		for row in frame.result.states:
+			state_rows[row.type_path] = row
+		_state_reason = str(frame.result.reason) if frame.result.get("reason") != null else ""
+		for key in proxies.keys():
+			var proxy = proxies[key]
+			if proxy.target_kind != "state":
+				continue
+			var row: Dictionary = state_rows.get(proxy.target_type, {})
+			if row.is_empty() or row.state_entity != proxy.state_descriptor.state_entity or row.next_state_entity != proxy.state_descriptor.next_state_entity:
+				proxy.invalidate()
+				proxies.erase(key)
+			else:
+				proxy.configure_state(row)
+		_sync_items()
+		_update_count()
 	, session)
 
 func _summary(session_id: int, params: Dictionary) -> void:
@@ -242,6 +299,8 @@ func apply_summary(params: Dictionary) -> void:
 func _update_count() -> void:
 	if _view == 0:
 		status_label.text = "%d entities" % rows.size()
+	elif _view == 2:
+		status_label.text = _state_reason if not _state_reason.is_empty() else "%d states" % state_rows.size()
 	else:
 		var count := 0
 		for row in rows.values():
@@ -337,7 +396,30 @@ func _sync_items() -> void:
 		items[selected_bits].select(0)
 	_selecting = was_selecting
 	_restore_scroll.call_deferred(scroll)
+	_sync_state_items()
 	_filter()
+
+func _sync_state_items() -> void:
+	var was_selecting := _selecting
+	_selecting = true
+	for type_path in state_items.keys():
+		if not state_rows.has(type_path):
+			state_items[type_path].free()
+			state_items.erase(type_path)
+	var labels: Dictionary = {}
+	for type_path in state_rows:
+		var label: String = Proxy.component_label(type_path)
+		labels[label] = labels.get(label, 0) + 1
+	for type_path in state_rows:
+		if not state_items.has(type_path):
+			state_items[type_path] = entity_tree.create_item(_root)
+		var item: TreeItem = state_items[type_path]
+		var row: Dictionary = state_rows[type_path]
+		var label: String = Proxy.component_label(type_path)
+		item.set_metadata(0, type_path)
+		item.set_text(0, (type_path if labels[label] > 1 else label) + ("" if row.present else " (Absent)"))
+		item.set_tooltip_text(0, type_path if row.get("reason") == null else type_path + "\n" + str(row.reason))
+	_selecting = was_selecting
 
 func _restore_scroll(scroll: Vector2) -> void:
 	for child in entity_tree.get_children(true):
@@ -418,7 +500,7 @@ func _search(text: String) -> void:
 	_cancel_queries()
 	_search_matches.clear()
 	_filter()
-	if text.is_empty() or _snapshot_index > 0 or client == null or client.active_session_id == -1:
+	if _view == 2 or text.is_empty() or _snapshot_index > 0 or client == null or client.active_session_id == -1:
 		return
 	var filters: Array = []
 	if _view == 1:
@@ -464,6 +546,16 @@ func _filter() -> void:
 	hidden_count = 0
 	var visible_bits: Dictionary = {}
 	var text := search_box.text.to_lower()
+	for type_path in state_items:
+		state_items[type_path].visible = _view == 2 and (text.is_empty() or type_path.to_lower().contains(text))
+	if _view == 2:
+		for item in items.values():
+			item.visible = false
+		if state_items.has(selected_state) and state_items[selected_state].visible:
+			_selecting = true
+			state_items[selected_state].select(0)
+			_selecting = false
+		return
 	for bits in rows:
 		var row: Dictionary = rows[bits]
 		if _view == 1:
@@ -503,6 +595,9 @@ func _on_selected() -> void:
 	if _selecting or entity_tree.get_selected() == null:
 		return
 	var bits = entity_tree.get_selected().get_metadata(0)
+	if _view == 2:
+		select_state(bits)
+		return
 	if rows.has(bits):
 		if _view == 1:
 			select_resource(rows[bits].entity)
@@ -521,6 +616,19 @@ func select_resource(reference: Dictionary) -> void:
 	_selecting = false
 	if client != null:
 		_inspect_proxy(reference, client.active_session_id, "resource", row.resource.type_path)
+
+func select_state(type_path: String) -> void:
+	cancel_inspection()
+	if not state_rows.has(type_path):
+		status_label.text = "State not available in this session"
+		return
+	selected_state = type_path
+	_selecting = true
+	state_items[type_path].select(0)
+	_selecting = false
+	var row: Dictionary = state_rows[type_path]
+	if client != null:
+		_inspect_proxy(row.state_entity if row.state_entity is Dictionary else {}, client.active_session_id, "state", type_path)
 
 func cancel_inspection() -> void:
 	_selection_serial += 1
@@ -602,7 +710,8 @@ func _inspect_proxy(reference: Dictionary, session: int, kind: String = "entity"
 
 func proxy_for(reference: Dictionary, session: int, kind: String = "entity", type_path: String = ""):
 	var incarnation: int = client.sessions.get(session, {}).get("order", -1)
-	var key := JSON.stringify([session, incarnation, reference.bits, reference.generation, kind, type_path])
+	var next = state_rows.get(type_path, {}).get("next_state_entity") if kind == "state" else null
+	var key := JSON.stringify([session, incarnation, reference.get("bits"), reference.get("generation"), kind, type_path, next])
 	for cached in proxies.keys():
 		if not proxies[cached].valid_target():
 			proxies[cached].invalidate()
@@ -610,7 +719,9 @@ func proxy_for(reference: Dictionary, session: int, kind: String = "entity", typ
 	if not proxies.has(key):
 		var proxy = Proxy.new(reference, session, kind, type_path)
 		proxy.configure(client)
-		var resource = rows.get(reference.bits, {}).get("resource")
+		if kind == "state":
+			proxy.configure_state(state_rows[type_path])
+		var resource = rows.get(reference.get("bits", ""), {}).get("resource")
 		if kind == "resource" and resource is Dictionary and resource.type_path == type_path:
 			proxy.set_resource_present(resource.present, false)
 		proxy.entity_link.connect(func(target): select_entity(target))
@@ -623,6 +734,11 @@ func proxy_for(reference: Dictionary, session: int, kind: String = "entity", typ
 func _process(delta: float) -> void:
 	for proxy in proxies.values():
 		proxy.advance(delta)
+	if _view == 2 and is_visible_in_tree() and client != null:
+		_state_elapsed += delta
+		if _state_elapsed >= client.update_interval:
+			_state_elapsed = 0.0
+			_request_states()
 
 func _clear_proxies() -> void:
 	for proxy in proxies.values():
@@ -660,6 +776,8 @@ func shutdown() -> void:
 	_clear_proxies()
 	selected_entity = {}
 	selected_resource = {}
+	selected_state = ""
+	state_rows.clear()
 	rows.clear()
 	_sync_items()
 	status_label.text = "no running session"

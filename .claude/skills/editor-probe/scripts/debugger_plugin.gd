@@ -142,6 +142,9 @@ func _run() -> void:
 	if not await _resource_checkpoint():
 		_finish(4)
 		return
+	if not await _state_checkpoint():
+		_finish(4)
+		return
 	var menu = _row("MainMenu")
 	pane.entity_tree.set_selected(pane.items[menu.entity.bits], 0)
 	if not await _wait(func(): return remote.tree != null and remote.tree.get_selected() != null and remote.tree.get_selected().get_text(0) == "MainMenu", "pane selects MainMenu in Remote"):
@@ -333,6 +336,43 @@ func _resource_checkpoint() -> bool:
 	pane.view_selector.select(0)
 	pane.view_selector.item_selected.emit(0)
 	_check(pane._subscribed_session == session and pane.selected_entity == entity_selection, "return to Entities preserves session and selection")
+	return true
+
+func _state_checkpoint() -> bool:
+	var type_path := "platformer_2d_example::GameState"
+	var entity_selection: Dictionary = pane.selected_entity.duplicate()
+	var session: int = pane._subscribed_session
+	pane.view_selector.select(2)
+	pane.view_selector.item_selected.emit(2)
+	if not await _wait(func(): return pane.state_rows.has(type_path) and pane.state_rows[type_path].present, "real GameState descriptor arrives"):
+		return false
+	var descriptor: Dictionary = pane.state_rows[type_path]
+	_check(descriptor.mutable and descriptor.state_entity is Dictionary and descriptor.next_state_entity is Dictionary, "GameState uses Bevy mutable-state registration with both backing identities")
+	_check(descriptor.can_request and descriptor.reason == null, "real mutable state allows transition requests")
+	pane.entity_tree.set_selected(pane.state_items[type_path], 0)
+	if not await _wait(func(): return pane._proxy != null and pane._proxy.target_kind == "state" and pane._proxy.lookup.has("state@current"), "state Inspector read"):
+		return false
+	var proxy = pane._proxy
+	var inspector := EditorInterface.get_inspector()
+	_check(inspector.get_edited_object() == proxy and proxy.target_type == type_path, "state row inspects the same proxy class")
+	_check(proxy.get("state@current") == "MainMenu", "Current shows the real platformer MainMenu state")
+	_check(proxy.lookup["state@current"].property.usage & PROPERTY_USAGE_READ_ONLY, "real Current is read-only")
+	_check(proxy.lookup["state@request"].property.hint_string == "Loading,MainMenu,InGame" and not proxy.lookup["state@request"].property.usage & PROPERTY_USAGE_READ_ONLY, "real Request offers the permitted state variants")
+	if not await _wait(func(): return _property_row(inspector, "state@current") != null and _property_row(inspector, "state@request") != null, "state native rows"):
+		return false
+	var current_row = _property_row(inspector, "state@current")
+	var request_row = _property_row(inspector, "state@request")
+	await _reveal_inspector(request_row)
+	_check(current_row != request_row and _on_screen(current_row) and _on_screen(request_row), "Current and Request are separate visible native rows")
+	proxy.refresh()
+	if not await _wait(func(): return proxy._read_id == -1, "state value refresh"):
+		return false
+	_check(_property_row(inspector, "state@current") == current_row and _property_row(inspector, "state@request") == request_row, "state value refresh retains native rows")
+	_check(pane.selected_entity == entity_selection and pane._subscribed_session == session, "state selection preserves entity selection and subscription")
+	await _shot("1-state-inspector")
+	pane.view_selector.select(0)
+	pane.view_selector.item_selected.emit(0)
+	_check(pane._subscribed_session == session, "leaving States preserves the summary subscription")
 	return true
 
 func _property(proxy, suffix: String, role: String = "value") -> String:

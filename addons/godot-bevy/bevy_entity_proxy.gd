@@ -14,6 +14,8 @@ var session_id: int
 var incarnation := -1
 var target_kind := "entity"
 var target_type := ""
+var state_descriptor: Dictionary = {}
+var state_snapshot: Dictionary = {}
 var resource_present := true
 var client
 var components: Dictionary = {}
@@ -39,6 +41,8 @@ func _init(reference: Dictionary = {}, session: int = -1, kind: String = "entity
 	session_id = session
 	target_kind = kind
 	target_type = type_path
+	if kind == "state":
+		status = "Loading state…"
 
 func configure(debugger) -> void:
 	client = debugger
@@ -86,10 +90,35 @@ func _set(property: StringName, candidate) -> bool:
 	_revision += 1
 	field_changed.emit(name)
 	var value = {"variant": candidate} if entry.model.kind == "enum" else candidate
+	if target_kind == "state":
+		state.request = client.request("godot.request_state_transition", {"type_path": target_type,
+			"state_entity": state_descriptor.state_entity, "next_state_entity": state_descriptor.next_state_entity,
+			"value": value}, _receive_state_request, session_id)
+		return true
 	state.request = client.request("godot.mutate_leaf", {"entity": entity.duplicate(true),
 		"component": entry.component, "path": entry.path.duplicate(true), "value": value},
 		_receive_edit.bind(name, _resource_epoch), session_id)
 	return true
+
+func _receive_state_request(frame: Dictionary) -> void:
+	if not valid_target() or not states.has("state@request"):
+		return
+	var state: Dictionary = states["state@request"]
+	state.pending = false
+	state.request = -1
+	_revision += 1
+	state.rejected = frame.has("error")
+	if state.rejected:
+		state.status = frame.error.get("data", {}).get("reason", frame.error.message)
+	else:
+		accept_state(frame.result)
+	state.candidate = str(lookup["state@request"].accepted)
+	state.dirty = false
+	field_changed.emit("state@request")
+	if _read_id != -1:
+		client.cancel_request(_read_id)
+		_read_id = -1
+	refresh()
 
 func _receive_edit(frame: Dictionary, name: String, resource_epoch: int) -> void:
 	if detached or not states.has(name):
@@ -141,7 +170,15 @@ func restore_candidate(name: String) -> void:
 	field_changed.emit(name)
 
 func refresh() -> void:
-	if _read_id != -1 or _stale or not valid_target() or entity.is_empty():
+	if _read_id != -1 or _stale or not valid_target():
+		return
+	if target_kind == "state":
+		if not state_descriptor.is_empty():
+			_read_id = client.request("godot.get_state", {"type_path": target_type,
+				"state_entity": state_descriptor.state_entity, "next_state_entity": state_descriptor.next_state_entity},
+				_received.bind(_revision, _resource_epoch), session_id)
+		return
+	if entity.is_empty():
 		return
 	var params := {"entity": entity}
 	if target_kind == "resource":
@@ -158,6 +195,11 @@ func _received(frame: Dictionary, revision: int, resource_epoch: int) -> void:
 		refresh()
 		return
 	if frame.has("error"):
+		if target_kind == "state":
+			invalidate()
+			status = frame.error.message
+			status_changed.emit()
+			return
 		if target_kind == "resource":
 			if frame.error.message == "component absent":
 				set_resource_present(false)
@@ -170,6 +212,9 @@ func _received(frame: Dictionary, revision: int, resource_epoch: int) -> void:
 		_stale = true
 		status_changed.emit()
 		return
+	if target_kind == "state":
+		accept_state(frame.result)
+		return
 	if target_kind == "resource" and not frame.result.has(target_type):
 		set_resource_present(false)
 		return
@@ -177,6 +222,62 @@ func _received(frame: Dictionary, revision: int, resource_epoch: int) -> void:
 	resource_present = true
 	_resource_ready = true
 	accept_components(frame.result, "", recovered)
+
+func configure_state(descriptor: Dictionary) -> void:
+	if detached or state_descriptor == descriptor:
+		return
+	state_descriptor = descriptor.duplicate(true)
+	_revision += 1
+	if _read_id != -1:
+		client.cancel_request(_read_id)
+		_read_id = -1
+	if not state_snapshot.is_empty():
+		state_snapshot.merge(descriptor, true)
+		if not descriptor.present:
+			state_snapshot.current = null
+		if not descriptor.next_present:
+			state_snapshot.queued = null
+		accept_state(state_snapshot)
+
+func accept_state(sample: Dictionary) -> void:
+	state_snapshot = sample.duplicate(true)
+	accept_components({})
+	var state: Dictionary = states["state@request"]
+	if not state.pending and not state.rejected:
+		var receipt = sample.get("receipt")
+		state.status = receipt if receipt is String else ""
+		field_changed.emit("state@request")
+
+func _map_state() -> void:
+	_add_notice("@entity", "State", target_type, target_type, [], [], "identity")
+	_add_state_value("state@current", "Current", state_snapshot.get("current"), "Absent")
+	if state_snapshot.get("queued_available", false):
+		_add_state_value("state@queued", "Queued target", state_snapshot.get("queued"), "None")
+	else:
+		_add_leaf("state@queued", "Queued target", {"kind": "string", "type_path": target_type, "value": "Unavailable",
+			"writable": {"allowed": false, "reason": state_snapshot.get("queued_reason", "NextState reflection not registered")}}, target_type, [], [], true)
+	var variants: Array = state_snapshot.get("unit_variants", [])
+	var current = state_snapshot.get("current")
+	var variant: String = current.get("variant", "") if current is Dictionary else ""
+	var reason = state_snapshot.get("reason")
+	var model := {"kind": "enum", "type_path": target_type, "variant": variant,
+		"fields": [], "unit_variants": variants, "writable": {"allowed": state_snapshot.get("can_request", false),
+			"reason": reason if reason is String else ""}}
+	_add_leaf("state@request", "Request", model, target_type, [], [], false)
+	var receipt = state_snapshot.get("receipt")
+	_add_notice("state@receipt", "Receipt", receipt if receipt is String else "None", target_type, [], [], "receipt")
+
+func _add_state_value(name: String, label: String, model, absent: String) -> void:
+	if not model is Dictionary:
+		_add_leaf(name, label, {"kind": "string", "type_path": target_type, "value": absent,
+			"writable": {"allowed": false, "reason": "state values are read-only"}}, target_type, [], [], true)
+	elif not _aggregate(model) or (model.kind == "enum" and model.fields.is_empty()):
+		_add_leaf(name, label, model, target_type, [], [], true)
+	else:
+		var prefix := name + "/"
+		_properties.append({"name": label, "type": TYPE_NIL, "usage": PROPERTY_USAGE_GROUP, "hint_string": prefix})
+		_map(model, target_type, [], [], prefix, [{"key": prefix, "label": label}], true)
+		_properties.append({"name": "", "type": TYPE_NIL, "usage": PROPERTY_USAGE_GROUP})
 
 func set_resource_present(present: bool, request_read: bool = true) -> void:
 	if target_kind != "resource" or detached or resource_present == present:
@@ -228,7 +329,9 @@ func accept_components(values: Dictionary, acknowledged: String = "", recovered:
 	lookup = {}
 	section_tooltips = {}
 	_properties = [{"name": "Bevy", "type": TYPE_NIL, "usage": PROPERTY_USAGE_CATEGORY}]
-	if target_kind == "resource":
+	if target_kind == "state":
+		_map_state()
+	elif target_kind == "resource":
 		_add_notice("@entity", "Resource", target_type if _resource_ready else _resource_status(), "", [], [], "identity")
 	else:
 		_add_notice("@entity", "Entity", "Entity " + str(entity.get("bits", "")), "", [], [], "identity")
@@ -257,12 +360,15 @@ func accept_components(values: Dictionary, acknowledged: String = "", recovered:
 	for name in lookup:
 		var entry: Dictionary = lookup[name]
 		var model: Dictionary = entry.model
-		signature.append([name, model.kind, model.type_path, model.writable, entry.reason, model.get("unit_variants", []), model.get("variant")])
+		var variant = model.get("variant")
+		if target_kind == "state" and model.kind == "enum" and model.fields.is_empty():
+			variant = null
+		signature.append([name, model.kind, model.type_path, model.writable, entry.reason, model.get("unit_variants", []), variant])
 		if not states.has(name):
 			states[name] = {"pending": false, "request": -1, "status": "", "rejected": false,
 				"candidate": "", "dirty": false, "focused": false, "caret": 0, "selection_from": 0, "selection_to": 0}
 		var state: Dictionary = states[name]
-		if not recovered and previous.has(name) and name != acknowledged and (state.pending or state.focused or state.dirty) and entry.property.type == previous[name].property.type:
+		if target_kind != "state" and not recovered and previous.has(name) and name != acknowledged and (state.pending or state.focused or state.dirty) and entry.property.type == previous[name].property.type:
 			entry.accepted = previous[name].accepted
 			if model.has("value"):
 				model.value = previous[name].accepted
@@ -284,6 +390,8 @@ func accept_components(values: Dictionary, acknowledged: String = "", recovered:
 	status = "Entity " + str(entity.get("bits", ""))
 	if target_kind == "resource":
 		status = target_type if _resource_ready else _resource_status()
+	elif target_kind == "state":
+		status = target_type + ("" if state_snapshot.get("present", false) else " (Absent)")
 	components_changed.emit()
 	status_changed.emit()
 
@@ -469,6 +577,8 @@ func invalidate() -> void:
 				client.cancel_request(state.request)
 	_read_id = -1
 	status = "Select a resource in this session" if target_kind == "resource" else "Select an entity in this session"
+	if target_kind == "state":
+		status = "Select a state in this session"
 	for name in states:
 		states[name].pending = false
 		states[name].request = -1

@@ -82,6 +82,10 @@ func run(host: Node) -> int:
 		await _run_test("proxy paths", _proxy_paths)
 		await _run_test("resource views", _resource_views.bind(host))
 		await _run_test("resource absence", _resource_absence)
+		await _run_test("state views", _state_views.bind(host))
+		await _run_test("state values", _state_values)
+		await _run_test("state requests", _state_requests)
+		await _run_test("state catalogue cancellation", _state_catalogue_cancellation.bind(host))
 		await _run_test("proxy ownership", _proxy_ownership.bind(host))
 		await _run_test("client", _client)
 		await _run_test("handshake", _handshake)
@@ -952,6 +956,190 @@ func _resource_row(bits: String, type_path: String, present: bool = true) -> Dic
 		row.components.append(type_path)
 	row.resource = {"type_path": type_path, "present": present}
 	return row
+
+func _state_row(type_path: String = "game::Mode", present: bool = true) -> Dictionary:
+	return {"type_path": type_path, "state_entity": Fixtures.entity_ref("2"),
+		"next_state_entity": Fixtures.entity_ref("3"), "present": present, "next_present": true,
+		"queued_available": true, "queued_reason": null,
+		"mutable": true, "can_request": present, "unit_variants": ["Menu", "Playing", "Paused"],
+		"reason": null if present else "State resource absent"}
+
+func _state_value(variant: String) -> Dictionary:
+	return {"type_path": "game::Mode", "kind": "enum", "variant": variant, "fields": [],
+		"unit_variants": ["Menu", "Playing", "Paused"], "writable": {"allowed": false, "reason": "state values are read-only"}}
+
+func _state_sample(current: String = "Menu", queued = null) -> Dictionary:
+	var sample := _state_row()
+	sample.current = _state_value(current)
+	sample.queued = null if queued == null else _state_value(queued)
+	sample.receipt = null
+	return sample
+
+func _state_views(host: Node) -> void:
+	var panel = PanelScene.instantiate()
+	host.add_child(panel)
+	var fake = FakeClient.new()
+	panel.client = fake
+	panel._subscribed_session = 0
+	panel.apply_summary(Fixtures.snapshot().params)
+	panel.select_entity(Fixtures.entity_ref("4294967298"), false)
+	var entity_selection: Dictionary = panel.selected_entity.duplicate()
+	panel.items["4294967297"].collapsed = false
+	panel._choose_view(2)
+	check(panel.view_selector.get_item_text(2) == "States" and panel._subscribed_session == 0, "States shares the dock and active subscription")
+	check(fake.frames.back().method == "godot.list_states" and fake.frames.back().params == {}, "States requests a catalogue without sampling values")
+	var left := _state_row("left::Mode")
+	var right := _state_row("right::Mode", false)
+	fake.reply(fake.frames.back().id, {"result": {"states": [left, right], "reason": null}})
+	check(panel.state_items.size() == 2 and not panel.items["4294967298"].visible, "States shows catalogue rows separately from entity rows")
+	check(panel.state_items["left::Mode"].get_text(0) == "left::Mode" and panel.state_items["right::Mode"].get_text(0) == "right::Mode (Absent)", "colliding state labels retain full paths and availability")
+	panel.search_box.text = "right::Mode"
+	var sent: int = fake.frames.size()
+	panel._search(panel.search_box.text)
+	check(panel.state_items["right::Mode"].visible and not panel.state_items["left::Mode"].visible and fake.frames.size() == sent, "shared search filters full state paths locally")
+	panel.search_box.text = ""
+	panel._search("")
+	panel.entity_tree.set_selected(panel.state_items["left::Mode"], 0)
+	var proxy = panel._proxy
+	check(proxy.target_kind == "state" and proxy.target_type == "left::Mode" and panel.selected_entity == entity_selection, "state selection configures the same proxy without selecting a backing entity")
+	check(fake.frames.back().method == "godot.get_state" and fake.frames.back().params == {"type_path": "left::Mode", "state_entity": left.state_entity, "next_state_entity": left.next_state_entity}, "state reads carry both exact backing identities")
+	var other = panel.proxy_for(left.state_entity, 0, "resource", "left::Mode")
+	check(other != proxy, "resource and state proxies at the same identity cannot share caches")
+	var item = panel.state_items["left::Mode"]
+	panel.apply_summary(Fixtures.delta().params)
+	check(panel.state_items["left::Mode"] == item and panel.entity_tree.get_selected() == item, "summary deltas preserve state row identity and selection")
+	panel._request_states()
+	var replacement := left.duplicate(true)
+	replacement.next_state_entity = Fixtures.entity_ref("4")
+	fake.reply(fake.frames.back().id, {"result": {"states": [replacement, right], "reason": null}})
+	check(proxy.detached, "changing only the NextState identity invalidates the old proxy")
+	panel.select_state("left::Mode")
+	check(panel._proxy != proxy and fake.frames.back().params.next_state_entity == replacement.next_state_entity, "state cache keys include the queue backing identity")
+	panel._choose_view(1)
+	panel._choose_view(0)
+	check(panel.selected_entity == entity_selection and panel.entity_tree.get_selected() == panel.items[entity_selection.bits] and not panel.items["4294967297"].collapsed, "returning from States restores entity selection and folds")
+	for frame in fake.frames:
+		check(not frame.method in ["godot.subscribe", "godot.unsubscribe"], "view switches never disturb the subscription")
+	panel.shutdown()
+	panel.free()
+	completed.append("state views")
+
+func _read_only_state_sample(current: String = "Menu", queued = null) -> Dictionary:
+	var sample := _state_sample(current, queued)
+	sample.mutable = false
+	sample.can_request = false
+	sample.reason = "state is registered read-only"
+	return sample
+
+func _state_values() -> void:
+	var fake = FakeClient.new()
+	var proxy = Proxy.new(Fixtures.entity_ref("2"), 0, "state", "game::Mode")
+	proxy.configure(fake)
+	proxy.configure_state(_state_row())
+	proxy.refresh()
+	fake.reply(fake.frames.back().id, {"result": _read_only_state_sample("Menu", "Playing")})
+	check(proxy.get("state@current") == "Menu" and proxy.get("state@queued") == "Playing", "queued targets never replace Current")
+	check(proxy.lookup["state@current"].label == "Current" and proxy.lookup["state@request"].label == "Request", "Current and Request are separate native properties")
+	check(proxy.lookup["state@current"].property.usage & PROPERTY_USAGE_READ_ONLY and proxy.lookup["state@request"].property.usage & PROPERTY_USAGE_READ_ONLY, "Current is read-only and read-only registration disables requests")
+	check(proxy.lookup["state@request"].property.hint == PROPERTY_HINT_ENUM and proxy.lookup["state@request"].property.hint_string == "Menu,Playing,Paused", "Request retains the permitted fieldless variants")
+	check(proxy.lookup["state@request"].reason == "state is registered read-only", "disabled Request explains the unavailable capability")
+	var sent: int = fake.frames.size()
+	proxy.set("state@current", "Paused")
+	proxy.set("state@request", "Playing")
+	check(fake.frames.size() == sent and not proxy.states["state@request"].pending and proxy.get("state@current") == "Menu", "unavailable requests send no generic mutation and claim no acceptance")
+	var shapes: Array = []
+	proxy.property_list_changed.connect(func(): shapes.append(true))
+	proxy.legacy_folds["state"] = false
+	proxy.states["state@current"].focused = true
+	proxy.accept_state(_read_only_state_sample("Paused", "Playing"))
+	check(proxy.get("state@current") == "Paused" and proxy.get("state@queued") == "Playing" and shapes.is_empty() and not proxy.legacy_folds.state, "fieldless state refreshes update Current without rebuilding rows or folds")
+	proxy.accept_state(_read_only_state_sample("Paused"))
+	check(proxy.get("state@queued") == "None" and not proxy.states["state@request"].pending, "a consumed game queue is shown without manufacturing a request receipt")
+	var unreadable := _read_only_state_sample()
+	unreadable.queued_available = false
+	unreadable.queued_reason = "NextState reflection not registered"
+	unreadable.next_present = null
+	proxy.accept_state(unreadable)
+	check(proxy.get("state@queued") == "Unavailable" and proxy.lookup["state@queued"].reason == "NextState reflection not registered", "an unreflected queue is unavailable rather than empty")
+	var absent := _read_only_state_sample()
+	absent.current = null
+	absent.present = false
+	absent.reason = "State resource absent"
+	proxy.accept_state(absent)
+	check(proxy.get("state@current") == "Absent" and proxy.lookup["state@request"].reason == "State resource absent", "absent Current is explicit and retains the unavailable Request reason")
+	check(proxy.lookup["state@current"].reason == "state values are read-only", "absent Current does not show a collection-editing explanation")
+	proxy.refresh()
+	var late: Callable = fake.callbacks[fake.frames.back().id]
+	proxy.invalidate()
+	late.call({"result": _read_only_state_sample("Playing")})
+	check(proxy.get("state@current") == "Absent" and proxy.detached, "a late state read cannot revive an invalidated proxy")
+	completed.append("state values")
+
+func _state_requests() -> void:
+	var fake = FakeClient.new()
+	var proxy = Proxy.new(Fixtures.entity_ref("2"), 0, "state", "game::Mode")
+	proxy.configure(fake)
+	proxy.configure_state(_state_row())
+	proxy.accept_state(_state_sample())
+	check(not proxy.lookup["state@request"].property.usage & PROPERTY_USAGE_READ_ONLY, "mutable registration enables Request")
+	var sent: int = fake.frames.size()
+	proxy.set("state@current", "Playing")
+	check(fake.frames.size() == sent, "Current cannot submit a transition")
+	var pending: Array = []
+	proxy.field_changed.connect(func(name):
+		if name == "state@request":
+			pending.append(proxy.states[name].pending))
+	proxy.set("state@request", "Playing")
+	var request: int = proxy.states["state@request"].request
+	check(proxy.states["state@request"].pending and pending[0] and proxy.get("state@current") == "Menu", "transition submission is pending immediately and leaves Current alone")
+	check(fake.frames.back().method == "godot.request_state_transition" and fake.frames.back().params == {"type_path": "game::Mode", "state_entity": Fixtures.entity_ref("2"), "next_state_entity": Fixtures.entity_ref("3"), "value": {"variant": "Playing"}}, "Request uses the state endpoint and exact backing identities")
+	sent = fake.frames.size()
+	proxy.set("state@request", "Paused")
+	check(fake.frames.size() == sent, "an in-flight transition request cannot be submitted twice")
+	var queued := _state_sample("Menu", "Playing")
+	queued.receipt = "Queued: Playing; current: Menu"
+	fake.reply(request, {"result": queued})
+	check(not proxy.states["state@request"].pending and proxy.get("state@current") == "Menu" and proxy.get("state@queued") == "Playing", "acknowledgement samples the queue without changing Current")
+	check(proxy.states["state@request"].status == queued.receipt and proxy.get("state@receipt") == queued.receipt, "request acknowledgement shows the sampled receipt instead of Accepted")
+	for receipt in ["Transition to Playing observed", "Request replaced by Paused", "No longer pending; transition to Playing not observed"]:
+		var sample := _state_sample("Playing" if receipt == "Transition to Playing observed" else "Menu")
+		sample.receipt = receipt
+		proxy.accept_state(sample)
+		check(proxy.get("state@receipt") == receipt and proxy.states["state@request"].status == receipt and not proxy.states["state@request"].pending, "later samples display the exact terminal receipt")
+	proxy.set("state@request", "Menu")
+	fake.reply(proxy.states["state@request"].request, {"error": {"message": "Already current"}})
+	check(proxy.states["state@request"].status == "Already current" and proxy.states["state@request"].rejected and proxy.get("state@current") == "Menu", "same-state rejection does not claim a transition")
+	proxy.set("state@request", "Playing")
+	var late: Callable = fake.callbacks[proxy.states["state@request"].request]
+	proxy.invalidate()
+	late.call({"result": queued})
+	check(proxy.detached and proxy.get("state@current") == "Menu", "late transition acknowledgements cannot revive detached state proxies")
+	for frame in fake.frames:
+		check(frame.method != "godot.mutate_leaf", "state requests never use generic leaf mutation")
+	completed.append("state requests")
+
+func _state_catalogue_cancellation(host: Node) -> void:
+	var panel = PanelScene.instantiate()
+	host.add_child(panel)
+	var fake = FakeClient.new()
+	panel.client = fake
+	panel._subscribed_session = 0
+	panel._choose_view(2)
+	var late: Callable = fake.callbacks[fake.frames.back().id]
+	panel._choose_view(0)
+	late.call({"result": {"states": [_state_row()], "reason": null}})
+	check(panel.state_rows.is_empty(), "late catalogue after view switch is ignored")
+	panel._choose_view(2)
+	fake.reply(fake.frames.back().id, {"result": {"states": [], "reason": "Register states with App::register_type_mutable_state::<S>() or App::register_type_state::<S>()"}})
+	check(panel.status_label.text.contains("register_type_mutable_state"), "empty States explains Bevy registration")
+	panel._request_states()
+	late = fake.callbacks[fake.frames.back().id]
+	panel.hide()
+	late.call({"result": {"states": [_state_row()], "reason": null}})
+	check(panel.state_rows.is_empty() and panel._subscribed_session == -1, "hide cancels catalogue and subscription, unlike a view switch")
+	panel.shutdown()
+	panel.free()
+	completed.append("state catalogue cancellation")
 
 func _resource_views(host: Node) -> void:
 	var panel = PanelScene.instantiate()

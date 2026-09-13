@@ -19,6 +19,7 @@ bevy_input = {version = "0.19", default-features = false, features = ["gestures"
 bevy_math = {version = "0.19", default-features = false, features = ["std"]}
 bevy_platform = {version = "0.19", default-features = false, features = ["alloc"]}
 bevy_reflect = {version = "0.19", default-features = false}
+bevy_state = {version = "0.19", default-features = false, features = ["bevy_app", "bevy_reflect"]}
 bevy_tasks = {version = "0.19", default-features = false, features = ["multi_threaded"]}
 bevy_time = {version = "0.19", default-features = false}
 bevy_transform = {version = "0.19", default-features = false, features = ["bevy-support"]}
@@ -75,5 +76,4 @@ experimental-wasm-nothreads = ["experimental-wasm", "godot/experimental-wasm-not
 test-frame-signal = []
 
 [dev-dependencies]
-bevy_state = {version = "0.19", default-features = false, features = ["bevy_app"]}
 criterion = {version = "0.5", features = ["html_reports"]}

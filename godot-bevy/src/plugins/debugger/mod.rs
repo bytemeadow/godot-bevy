@@ -2,6 +2,7 @@
 
 pub mod edit;
 mod service;
+mod states;
 pub mod value;
 mod wire;
 

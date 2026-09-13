@@ -16,6 +16,7 @@ use godot::{
 use super::{
     DebuggerConfig, DebuggerTransport, Wire,
     edit::{Edit, InspectionError, PathSegment, mutate_component, read_component},
+    states,
     value::{Kind, ReadOnlyReason, Scalar, Value, Writable},
     wire,
 };
@@ -24,7 +25,7 @@ use crate::{
     plugins::scene_tree::{GodotChildOf, NodeEntityIndex},
 };
 
-const METHODS: [&str; 9] = [
+const METHODS: [&str; 12] = [
     "rpc.discover",
     "godot.subscribe",
     "godot.unsubscribe",
@@ -34,6 +35,9 @@ const METHODS: [&str; 9] = [
     "godot.resolve_node",
     "godot.entity_for_node",
     "godot.debugger_config",
+    "godot.list_states",
+    "godot.get_state",
+    "godot.request_state_transition",
 ];
 
 #[derive(Debug)]
@@ -49,7 +53,7 @@ impl RpcError {
             message,
         }
     }
-    fn params(message: &'static str) -> Self {
+    pub(super) fn params(message: &'static str) -> Self {
         Self {
             code: -32602,
             message,
@@ -423,6 +427,9 @@ pub(super) fn dispatch(
         "godot.resolve_node" => resolve(world, params),
         "godot.entity_for_node" => entity_for_node(world, params),
         "godot.debugger_config" => Ok(debugger_config(world)),
+        "godot.list_states" => Ok(states::list(world)),
+        "godot.get_state" => states::access(world, params, false),
+        "godot.request_state_transition" => states::access(world, params, true),
         _ => Err(RpcError {
             code: -32601,
             message: "method not found",
@@ -786,6 +793,17 @@ fn method_params(name: &str) -> Wire {
             ("page_size", "integer", true),
         ],
         "godot.get_components" => &[("entity", "object", true), ("components", "array", false)],
+        "godot.get_state" => &[
+            ("type_path", "string", true),
+            ("state_entity", "", true),
+            ("next_state_entity", "", true),
+        ],
+        "godot.request_state_transition" => &[
+            ("type_path", "string", true),
+            ("state_entity", "", true),
+            ("next_state_entity", "", true),
+            ("value", "", true),
+        ],
         "godot.mutate_leaf" => &[
             ("entity", "object", true),
             ("component", "string", true),
