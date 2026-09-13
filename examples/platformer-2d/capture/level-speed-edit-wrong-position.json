@@ -1,0 +1,162 @@
+{
+  "version": 2,
+  "example": "platformer-2d",
+  "scenario": "level-speed-edit-wrong-position",
+  "scene": "res://scenes/levels/main_menu.tscn",
+  "pacing": "fixed",
+  "extensions": {},
+  "frames": 120,
+  "seed": 7,
+  "viewport": [
+    1152,
+    648
+  ],
+  "clocks": {
+    "physics_hz": 60,
+    "bevy_step_ns": 16666667
+  },
+  "settle": {
+    "stable_frames": 3,
+    "nodes": [
+      "TileMap",
+      "HUD",
+      "Player2D",
+      "Player2D/AnimatedSprite2D",
+      "Player2D/Camera2D",
+      "Player2D/CollisionShape2D"
+    ],
+    "classes": [
+      "Player2D",
+      "Gem2D",
+      "Door2D"
+    ]
+  },
+  "checkpoints": [
+    {
+      "frame": 0,
+      "nodes": [
+        {
+          "path": "Player2D",
+          "position": [
+            400,
+            184
+          ],
+          "tolerance": 1,
+          "visible": true
+        }
+      ],
+      "regions": [
+        {
+          "name": "player-sprite",
+          "rect": [
+            573,
+            314,
+            6,
+            2
+          ],
+          "non_blank": {
+            "background": [
+              77,
+              77,
+              77
+            ],
+            "tolerance": 4,
+            "min_fraction": 0.9
+          },
+          "dominant_colour": {
+            "rgb": [
+              255,
+              255,
+              255
+            ],
+            "tolerance": 4
+          }
+        }
+      ]
+    },
+    {
+      "frame": 30,
+      "nodes": [
+        {
+          "path": "Player2D",
+          "position": [
+            400,
+            188
+          ],
+          "tolerance": 1,
+          "visible": true
+        }
+      ],
+      "regions": [
+        {
+          "name": "player-sprite",
+          "rect": [
+            573,
+            314,
+            6,
+            2
+          ],
+          "non_blank": {
+            "background": [
+              77,
+              77,
+              77
+            ],
+            "tolerance": 4,
+            "min_fraction": 0.9
+          },
+          "dominant_colour": {
+            "rgb": [
+              255,
+              255,
+              255
+            ],
+            "tolerance": 4
+          }
+        }
+      ]
+    },
+    {
+      "frame": 120,
+      "nodes": [
+        {
+          "path": "Player2D",
+          "position": [
+            412.5,
+            188
+          ],
+          "tolerance": 1,
+          "visible": true
+        }
+      ],
+      "regions": [
+        {
+          "name": "player-sprite",
+          "rect": [
+            573,
+            314,
+            6,
+            2
+          ],
+          "non_blank": {
+            "background": [
+              77,
+              77,
+              77
+            ],
+            "tolerance": 4,
+            "min_fraction": 0.9
+          },
+          "dominant_colour": {
+            "rgb": [
+              255,
+              255,
+              255
+            ],
+            "tolerance": 4
+          }
+        }
+      ]
+    }
+  ]
+}

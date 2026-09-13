@@ -13,6 +13,7 @@ mod attachable_component_tests;
 mod autosync_match_tests;
 mod benchmarks;
 mod collision_tests;
+mod debugger_tests;
 mod event_bridge_tests;
 #[cfg(feature = "harness-probes")]
 mod harness_probe_tests;

@@ -1,5 +1,5 @@
 use crate::GameState;
-use crate::components::Player;
+use crate::components::{Player, Speed};
 use crate::gameplay::audio::GameAudio;
 use crate::gameplay::player::PlayerSystemSet;
 use crate::level_manager::{CurrentLevel, LevelId, PendingLevel};
@@ -12,8 +12,10 @@ use godot::classes::{
 };
 use godot::global::Key;
 use godot::prelude::*;
+use godot_bevy::plugins::debugger::{DebuggerEndpoint, DebuggerTransport, Wire};
 use godot_bevy::prelude::{GodotAccess, GodotNodeHandle, GodotResource, SceneTreeRef};
 use godot_bevy_test::capture::{self, CaptureAdapter, CaptureManifest, Phase};
+use std::sync::{Arc, Mutex};
 
 pub(super) const PLAYER_SPAWN_POSITION: [f32; 2] = [400.0, 184.0];
 const TITLE_SCENE: &str = "res://scenes/levels/main_menu.tscn";
@@ -27,7 +29,29 @@ enum StartAction {
     Released,
 }
 
-const SCENARIOS: &[&str] = &["title", "level", "level-wrong-spawn"];
+const SCENARIOS: &[&str] = &[
+    "title",
+    "level",
+    "level-wrong-spawn",
+    "level-speed-control",
+    "level-speed-edit",
+    "level-speed-edit-wrong-position",
+];
+const EDIT_ID: i64 = 2001;
+
+#[derive(Resource, Default)]
+struct SpeedEdit {
+    response: Arc<Mutex<Option<Wire>>>,
+    submitted: bool,
+    acknowledged: bool,
+}
+
+fn edits_speed(manifest: &CaptureManifest) -> bool {
+    matches!(
+        manifest.scenario.as_str(),
+        "level-speed-edit" | "level-speed-edit-wrong-position"
+    )
+}
 
 pub(super) fn install(app: &mut App) {
     if !std::env::var("GODOT_BEVY_CAPTURE")
@@ -36,6 +60,18 @@ pub(super) fn install(app: &mut App) {
         return;
     }
 
+    if std::env::var("GODOT_BEVY_CAPTURE")
+        .is_ok_and(|scenario| scenario.starts_with("level-speed-edit"))
+    {
+        let state = SpeedEdit::default();
+        let response = state.response.clone();
+        app.insert_resource(DebuggerTransport::new(move |frame| {
+            if frame.get("id") == Some(&Wire::Integer(EDIT_ID)) {
+                *response.lock().unwrap() = Some(frame);
+            }
+        }));
+        app.insert_resource(state);
+    }
     app.init_resource::<StartAction>().configure_sets(
         FixedUpdate,
         (
@@ -67,6 +103,34 @@ fn start_key(pressed: bool) -> Gd<InputEventKey> {
 }
 
 fn is_settled(world: &mut World, manifest: &CaptureManifest) -> Result<bool, String> {
+    if !level_is_settled(world, manifest)? {
+        return Ok(false);
+    }
+    if !edits_speed(manifest) {
+        return Ok(true);
+    }
+    let mut state = world.resource_mut::<SpeedEdit>();
+    if !state.submitted || state.acknowledged {
+        return Ok(true);
+    }
+    let response = state.response.lock().unwrap().take();
+    let Some(response) = response else {
+        return Ok(false);
+    };
+    if response.get("result").and_then(|value| value.get("value")) != Some(&Wire::Float(100.0)) {
+        return Err(format!("speed edit was not acknowledged: {response:?}"));
+    }
+    let directory = capture::evidence_dir().ok_or("capture evidence directory unavailable")?;
+    std::fs::write(
+        directory.join("speed-edit-ack.txt"),
+        format!("before_frame=0\n{response:#?}\n"),
+    )
+    .map_err(|error| error.to_string())?;
+    state.acknowledged = true;
+    Ok(true)
+}
+
+fn level_is_settled(world: &mut World, manifest: &CaptureManifest) -> Result<bool, String> {
     if manifest.scenario != "title" && *world.resource::<StartAction>() == StartAction::Pressed {
         Input::singleton().parse_input_event(&start_key(false));
         *world.resource_mut::<StartAction>() = StartAction::Released;
@@ -180,6 +244,57 @@ fn is_settled(world: &mut World, manifest: &CaptureManifest) -> Result<bool, Str
 }
 
 fn reset(world: &mut World, manifest: &CaptureManifest) -> Result<(), String> {
+    reset_level(world, manifest)?;
+    if !edits_speed(manifest) {
+        return Ok(());
+    }
+    let entity = world
+        .query_filtered::<Entity, With<Player>>()
+        .single(world)
+        .map_err(|error| error.to_string())?;
+    let request = Wire::object([
+        ("jsonrpc", Wire::String("2.0".into())),
+        ("id", Wire::Integer(EDIT_ID)),
+        ("method", Wire::String("godot.mutate_leaf".into())),
+        (
+            "params",
+            Wire::object([
+                (
+                    "entity",
+                    Wire::object([
+                        ("bits", Wire::String(entity.to_bits().to_string())),
+                        (
+                            "generation",
+                            Wire::Integer(i64::from(entity.generation().to_bits())),
+                        ),
+                    ]),
+                ),
+                ("component", Wire::String(Speed::type_path().into())),
+                (
+                    "path",
+                    Wire::Array(vec![Wire::object([("index", Wire::Integer(0))])]),
+                ),
+                ("value", Wire::Float(100.0)),
+            ]),
+        ),
+    ]);
+    let directory = capture::evidence_dir().ok_or("capture evidence directory unavailable")?;
+    std::fs::write(
+        directory.join("speed-edit-request.txt"),
+        format!("{request:#?}\n"),
+    )
+    .map_err(|error| error.to_string())?;
+    if !world
+        .non_send::<DebuggerEndpoint>()
+        .submit(request.to_variant().to::<VarDictionary>())
+    {
+        return Err("debugger endpoint closed".into());
+    }
+    world.resource_mut::<SpeedEdit>().submitted = true;
+    Ok(())
+}
+
+fn reset_level(world: &mut World, manifest: &CaptureManifest) -> Result<(), String> {
     fastrand::seed(manifest.seed);
     if manifest.scenario == "title" {
         return Ok(());
@@ -196,7 +311,11 @@ fn reset(world: &mut World, manifest: &CaptureManifest) -> Result<(), String> {
     transform.translation.y = position.y;
     let mut player = godot.get::<CharacterBody2D>(*handle);
     player.set_position(position);
-    player.set_velocity(Vector2::ZERO);
+    player.set_velocity(if manifest.scenario.starts_with("level-speed-") {
+        Vector2::new(300.0, 0.0)
+    } else {
+        Vector2::ZERO
+    });
     player.set_visible(true);
 
     let mut sprite = player.get_node_as::<AnimatedSprite2D>("AnimatedSprite2D");

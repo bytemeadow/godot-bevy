@@ -16,7 +16,9 @@ pub use crate::plugins::{
         CollisionEnded, CollisionStarted, Collisions, GodotCollisionsPlugin,
     },
     core::FindEntityByNameExt,
-    debugger::{DebuggerConfig, GodotDebuggerPlugin},
+    debugger::{
+        DebuggerConfig, DebuggerSet, GodotDebuggerPlugin, InspectorRange, InspectorReadOnly,
+    },
     event_bridge::{AddGodotEventAppExt, EventBridgeSet, GodotEventSender, send_event},
     input::{
         Action, ActionInput, BevyInputBridgePlugin, GodotActions, GodotActionsPlugin,
@@ -27,7 +29,7 @@ pub use crate::plugins::{
     scene_tree::{
         AttachComponentRegistry, AutoSyncBundleRegistry, GodotChildOf, GodotChildren,
         GodotRequiredComponents, GodotSceneTreePlugin, Groups, NodeEntityIndex, SceneTreeConfig,
-        SceneTreeRef,
+        SceneTreeRef, SceneTreeSet,
     },
     signals::{DeferredSignalConnections, GodotSignals, GodotSignalsPlugin},
     transforms::{

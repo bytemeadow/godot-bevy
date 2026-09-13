@@ -17,6 +17,24 @@ func _ready():
 
 	# Wait for physics to initialize to ensure extensions are loaded
 	await get_tree().physics_frame
+	if "--bevy-inspector-tests" in OS.get_cmdline_user_args():
+		var script = load("res://addons/godot-bevy/test/bevy_inspector_tests.gd")
+		if script == null or not script.can_instantiate():
+			push_error("bevy_inspector_tests.gd failed to load")
+			get_tree().quit(2)
+			return
+		var suite = script.new()
+		get_tree().create_timer(30.0).timeout.connect(func():
+			push_error("BEVY_INSPECTOR_TEST runner timed out")
+			get_tree().quit(2)
+		)
+		var result = await suite.run(self)
+		if not suite.finished:
+			push_error("BEVY_INSPECTOR_TEST suite aborted before completion")
+			get_tree().quit(1)
+			return
+		get_tree().quit(result)
+		return
 
 	print("Checking for %s class..." % test_class_name)
 
