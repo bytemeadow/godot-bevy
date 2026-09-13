@@ -29,6 +29,7 @@ var _query_ids: Array = []
 var _selection_serial := 0
 var _selecting := false
 var _proxy: RefCounted
+var proxies: Dictionary = {}
 var _remote_selection_echoes: Dictionary = {}
 var _snapshot_rows: Dictionary = {}
 var _snapshot_deltas: Array = []
@@ -51,7 +52,11 @@ func _ready() -> void:
 	_candidates.item_selected.connect(func(index): select_entity(_candidates.get_item_metadata(index)))
 	box.add_child(_candidates)
 	search_box = LineEdit.new()
-	search_box.placeholder_text = "Name, entity ID, component or node path"
+	search_box.placeholder_text = "Filter entities"
+	search_box.tooltip_text = "Search names, decimal entity IDs, component type paths or exact runtime node paths"
+	search_box.clear_button_enabled = true
+	if Engine.is_editor_hint():
+		search_box.right_icon = EditorInterface.get_editor_theme().get_icon("Search", "EditorIcons")
 	search_box.text_changed.connect(_search)
 	box.add_child(search_box)
 	var filters := HBoxContainer.new()
@@ -89,6 +94,10 @@ func setup(debugger, adapter) -> void:
 	_session_changed(client.active_session_id)
 
 func _sessions_changed() -> void:
+	for key in proxies.keys():
+		if not proxies[key].valid_target():
+			proxies[key].invalidate()
+			proxies.erase(key)
 	session_selector.clear()
 	for id in client.sessions:
 		if client.is_session_active(id):
@@ -109,6 +118,7 @@ func _session_changed(_id: int) -> void:
 	selected_entity = {}
 	_remote_selection_echoes.clear()
 	_clear_proxy()
+	_clear_proxies()
 	_search_expansion.clear()
 	_search_matches.clear()
 	_searching = false
@@ -296,16 +306,30 @@ static func internal(row: Dictionary) -> bool:
 func _entity_icon(row: Dictionary) -> Texture2D:
 	if not Engine.is_editor_hint():
 		return null
+	var theme := EditorInterface.get_editor_theme()
+	var icon := _entity_icon_name(row, theme)
+	return theme.get_icon(icon, "EditorIcons") if not icon.is_empty() else null
+
+func _entity_icon_name(row: Dictionary, theme: Theme) -> String:
+	if not row.has_node:
+		for icon in ["Object", "Resource", "Circle"]:
+			if theme.has_icon(icon, "EditorIcons"):
+				return icon
+		return ""
 	var best := ""
 	for component in row.components:
 		var short: String = component.get_slice("::", component.get_slice_count("::") - 1)
 		if short.ends_with("Marker"):
 			var type = short.trim_suffix("Marker")
+			if not ClassDB.class_exists(type) or not ClassDB.is_parent_class(type, "Node") or not theme.has_icon(type, "EditorIcons"):
+				continue
 			if best.is_empty() or ClassDB.is_parent_class(type, best):
 				best = type
 	if best.is_empty():
-		best = "Godot" if row.has_node else "Node"
-	return EditorInterface.get_editor_theme().get_icon(best, "EditorIcons")
+		for icon in ["Node", "Godot"]:
+			if theme.has_icon(icon, "EditorIcons"):
+				return icon
+	return best
 
 func _cancel_queries() -> void:
 	_search_serial += 1
@@ -391,7 +415,7 @@ func _filter() -> void:
 		items[bits].visible = visible_bits.has(bits)
 		if internal(rows[bits]) and not items[bits].visible and not show_internal.button_pressed:
 			hidden_count += 1
-	hidden_label.text = "%d hidden" % (0 if show_internal.button_pressed else hidden_count)
+	hidden_label.text = "%d internal hidden" % (0 if show_internal.button_pressed else hidden_count)
 	# Hiding a selected TreeItem clears the Tree's selection; restore it once visible again.
 	var selected_bits: String = selected_entity.get("bits", "")
 	if items.has(selected_bits) and items[selected_bits].visible and entity_tree.get_selected() != items[selected_bits]:
@@ -477,8 +501,34 @@ func _forget_remote_echo(key: String, serial: int) -> void:
 
 func _inspect_proxy(reference: Dictionary, session: int) -> void:
 	_clear_proxy()
-	_proxy = Proxy.new(reference, session)
+	_proxy = proxy_for(reference, session)
 	EditorInterface.inspect_object(_proxy)
+	_proxy.attach_inspector(EditorInterface.get_inspector())
+	_proxy.refresh()
+
+func proxy_for(reference: Dictionary, session: int):
+	var key := "%d:%s:%s" % [session, reference.bits, reference.generation]
+	if proxies.has(key) and not proxies[key].valid_target():
+		proxies[key].invalidate()
+		proxies.erase(key)
+	if not proxies.has(key):
+		var proxy = Proxy.new(reference, session)
+		proxy.configure(client)
+		proxy.entity_link.connect(func(target): select_entity(target))
+		proxy.node_link.connect(func(id):
+			if remote != null:
+				remote.select_node(id, session))
+		proxies[key] = proxy
+	return proxies[key]
+
+func _process(delta: float) -> void:
+	for proxy in proxies.values():
+		proxy.advance(delta)
+
+func _clear_proxies() -> void:
+	for proxy in proxies.values():
+		proxy.invalidate()
+	proxies.clear()
 
 func _clear_proxy() -> void:
 	if _proxy != null and Engine.is_editor_hint() and EditorInterface.get_inspector().get_edited_object() == _proxy:
@@ -508,6 +558,7 @@ func shutdown() -> void:
 	if remote != null:
 		remote.cancel_selection()
 	_clear_proxy()
+	_clear_proxies()
 	selected_entity = {}
 	rows.clear()
 	_sync_items()

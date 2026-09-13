@@ -3,23 +3,25 @@ extends EditorInspectorPlugin
 
 const Proxy = preload("res://addons/godot-bevy/bevy_entity_proxy.gd")
 const Section = preload("res://addons/godot-bevy/bevy_inspector_section.gd")
+const PropertyEditor = preload("res://addons/godot-bevy/bevy_property_editor.gd")
 
 var client
 var pane
 var remote
 var _section
 var current_section: WeakRef
+var _creating_editor := false
 
 func _can_handle(object: Object) -> bool:
-	return object is Proxy or (object != null and object.get_class() in [
-		"EditorDebuggerRemoteObject", "EditorDebuggerRemoteObjects"])
+	return not _creating_editor and (object is Proxy or (object != null and object.get_class() in [
+		"EditorDebuggerRemoteObject", "EditorDebuggerRemoteObjects"]))
 
 func _parse_begin(object: Object) -> void:
+	_section = null
+	if object is Proxy:
+		return
 	_section = Section.new()
 	current_section = weakref(_section)
-	if object is Proxy:
-		_section.configure(client, pane, remote, object.entity, object.session_id)
-		return
 	var instance_id := ""
 	var session: int = client.active_session_id
 	if ClassDB.class_exists("EditorDebuggerRemoteObjects"):
@@ -44,7 +46,20 @@ func _parse_begin(object: Object) -> void:
 	else:
 		_section.configure(client, pane, remote, {}, session, instance_id)
 
-func _parse_end(_object: Object) -> void:
+func _parse_property(object: Object, _type: Variant.Type, name: String, _hint: PropertyHint, _hint_string: String, _usage: int, _wide: bool) -> bool:
+	if object is Proxy and object.lookup.has(name):
+		# The stock factory searches Inspector plugins again.
+		_creating_editor = true
+		var editor := PropertyEditor.create(object, name)
+		_creating_editor = false
+		add_property_editor(name, editor)
+		return true
+	return object is Proxy and name == "script"
+
+func _parse_end(object: Object) -> void:
+	if object is Proxy:
+		object.repair_sections.call_deferred()
+		return
 	if _section != null:
 		add_custom_control(_section)
 		_section = null

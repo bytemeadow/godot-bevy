@@ -21,16 +21,30 @@ var pending := false
 var _request_id := -1
 var _label := ""
 var _shape := ""
+var proxy
+var property_name := ""
+var _fold_key := ""
 
 func configure(value: Dictionary, reference: Dictionary, type_path: String, leaf_path: Array,
-		debugger = null, session: int = -1, label: String = "") -> void:
+		debugger = null, session: int = -1, label: String = "", controller = null) -> void:
 	entity = reference.duplicate(true)
 	component = type_path
 	path = leaf_path.duplicate(true)
 	client = debugger
 	session_id = session
 	_label = label
+	proxy = controller
+	_fold_key = component + JSON.stringify(path)
+	if proxy != null:
+		for property in proxy.lookup:
+			var entry: Dictionary = proxy.lookup[property]
+			if entry.component == component and entry.path == path and entry.role == "value" and entry.model == value:
+				property_name = property
+				break
+		proxy.field_changed.connect(_proxy_changed)
 	update_value(value)
+	if not property_name.is_empty():
+		_proxy_changed(property_name)
 
 func _description(value: Dictionary) -> String:
 	var shape: Array = [value.kind, value.type_path, value.writable, value.get("range"), _exact_integer(value)]
@@ -68,6 +82,8 @@ func _has_edit_focus() -> bool:
 
 func _build() -> void:
 	var expanded := fold.button_pressed if is_instance_valid(fold) else false
+	if proxy != null:
+		expanded = proxy.legacy_folds.get(_fold_key, false)
 	for child in get_children():
 		remove_child(child)
 		child.queue_free()
@@ -94,11 +110,19 @@ func _build() -> void:
 		children_box.visible = expanded
 		children_box.add_theme_constant_override("separation", 4)
 		add_child(children_box)
-		fold.toggled.connect(func(open): children_box.visible = open)
+		fold.toggled.connect(func(open):
+			children_box.visible = open
+			if proxy != null:
+				proxy.legacy_folds[_fold_key] = open)
+		if not reason.is_empty():
+			var explanation := Label.new()
+			explanation.text = reason
+			explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			children_box.add_child(explanation)
 		for child in _children():
 			var control = load("res://addons/godot-bevy/bevy_value_editor.gd").new()
 			children_box.add_child(control)
-			control.configure(child.value, entity, component, child.path, client, session_id, child.label)
+			control.configure(child.value, entity, component, child.path, client, session_id, child.label, proxy)
 			control.entity_link.connect(func(reference): entity_link.emit(reference))
 			control.node_link.connect(func(id): node_link.emit(id))
 			children_editors.append(control)
@@ -132,6 +156,12 @@ func _build() -> void:
 	elif writable and (kind in ["string", "char"] or _exact_integer(model)):
 		editor = LineEdit.new()
 		editor.text_submitted.connect(submit_edit)
+		editor.gui_input.connect(func(event):
+			if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+				if proxy != null and not property_name.is_empty():
+					proxy.restore_candidate(property_name)
+				_display()
+				editor.accept_event())
 		if _exact_integer(model):
 			editor.tooltip_text = "Exact decimal integer; range checked by the runtime"
 	elif writable and kind == "enum" and not model.unit_variants.is_empty():
@@ -149,6 +179,13 @@ func _build() -> void:
 	if editor != null:
 		editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(editor)
+		if proxy != null and not property_name.is_empty() and (editor is SpinBox or editor is LineEdit):
+			var line: LineEdit = editor.get_line_edit() if editor is SpinBox else editor
+			line.text_changed.connect(func(text): proxy.set_candidate(property_name, text, line.caret_column))
+			line.focus_entered.connect(func():
+				proxy.states[property_name].focused = true
+				proxy.selected_property = property_name)
+			line.focus_exited.connect(func(): _focus_exited.call_deferred())
 	error_label = Label.new()
 	error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	error_label.visible = false
@@ -179,13 +216,21 @@ func _children() -> Array:
 func _display() -> void:
 	if not is_instance_valid(editor):
 		return
+	var state: Dictionary = proxy.states.get(property_name, {}) if proxy != null else {}
 	if editor is SpinBox:
-		editor.set_value_no_signal(float(model.value))
+		editor.editable = not pending and model.writable.allowed
+		if state.get("dirty", false):
+			editor.get_line_edit().text = state.candidate
+		else:
+			editor.set_value_no_signal(float(model.value))
 	elif editor is CheckBox:
+		editor.disabled = pending or not model.writable.allowed
 		editor.set_pressed_no_signal(model.value)
 	elif editor is LineEdit:
-		editor.text = str(model.value)
+		editor.editable = not pending and model.writable.allowed
+		editor.text = state.candidate if state.get("dirty", false) else str(model.value)
 	elif editor is OptionButton:
+		editor.disabled = pending or not model.writable.allowed
 		for i in editor.item_count:
 			if editor.get_item_text(i) == model.variant:
 				editor.select(i)
@@ -196,10 +241,14 @@ func submit_edit(value) -> void:
 	_display()
 	if pending:
 		return
+	if proxy != null and not property_name.is_empty():
+		proxy.set(property_name, value.variant if model.kind == "enum" else value)
+		return
 	if not model.writable.allowed:
 		_show_error(model.writable.get("reason", "read-only"))
 		return
 	pending = true
+	_display()
 	error_label.text = "Waiting for acknowledgement…"
 	error_label.show()
 	var params = {"entity": entity.duplicate(true), "component": component,
@@ -232,6 +281,36 @@ func _show_error(reason: String) -> void:
 	error_label.text = reason
 	error_label.show()
 
+func _proxy_changed(property: String) -> void:
+	if property != property_name or not proxy.lookup.has(property):
+		return
+	var state: Dictionary = proxy.states[property]
+	var was_pending := pending
+	pending = state.pending
+	model = proxy.lookup[property].model.duplicate(true)
+	if model.has("value"):
+		model.value = proxy.get(property)
+	var shape := _description(model)
+	if shape != _shape:
+		_shape = shape
+		_build()
+	_display()
+	error_label.text = state.status
+	error_label.visible = not state.status.is_empty()
+	if proxy.detached and editor != null:
+		if editor is SpinBox or editor is LineEdit:
+			editor.editable = false
+		elif editor is BaseButton:
+			editor.disabled = true
+	if was_pending and not pending:
+		edit_finished.emit(not state.rejected, state.status if state.rejected else "")
+
+func _focus_exited() -> void:
+	if proxy != null and proxy.states.has(property_name) and not _has_edit_focus():
+		proxy.states[property_name].focused = false
+
 func _exit_tree() -> void:
+	if proxy != null and proxy.field_changed.is_connected(_proxy_changed):
+		proxy.field_changed.disconnect(_proxy_changed)
 	if client != null and _request_id != -1:
 		client.cancel_request(_request_id)

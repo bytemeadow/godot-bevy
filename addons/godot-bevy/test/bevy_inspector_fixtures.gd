@@ -60,3 +60,30 @@ static func values() -> Dictionary:
 		"unsupported": aggregate("unsupported", {"reason": "component not registered"}),
 		"depth_limit": aggregate("depth_limit", {"reason": "maximum depth reached"}),
 	}
+
+static func presentation() -> Dictionary:
+	var deep := scalar("float", 0.125)
+	for field in ["five", "four", "three", "two", "one"]:
+		deep = aggregate("struct", {"fields": [{"name": field, "value": deep}]})
+	var wide := scalar("integer", "42")
+	wide.type_path = "u128"
+	wide.range = {"min": 0, "max": 100}
+	var ranged := scalar("float", 0.125)
+	ranged.range = {"min": 0, "max": 10}
+	return {
+		"game::Speed": aggregate("tuple_struct", {"fields": [scalar("float", 275.0)]}),
+		"bevy_state::state::resources::PreviousState<platformer_2d_example::GameState>": aggregate("struct", {"fields": [{"name": "previous", "value": scalar("string", "MainMenu")}]}),
+		"game::VeryLongComponentNameThatMustRemainReadableInANarrowInspector": deep,
+		"left::Same": aggregate("struct", {"fields": [{"name": "a/b", "value": scalar("string", "left")}]}),
+		"right::Same": aggregate("struct", {"fields": [{"name": "a/b", "value": scalar("string", "right")}]}),
+		"game::Wide": wide, "game::Range": ranged,
+		"game::ReadOnly": scalar("float", 7.0, false),
+		"game::Unsupported": aggregate("unsupported", {"reason": "component not registered"}),
+		"game::Text": scalar("string", "accepted text"),
+		"game::Bool": scalar("bool", true),
+		"game::UnitEnum": {"type_path": "game::UnitEnum", "kind": "enum", "variant": "Run",
+			"unit_variants": ["Run", "Idle"], "fields": [], "writable": {"allowed": true}},
+		"game::Payload": {"type_path": "game::Payload", "kind": "enum", "variant": "Moving",
+			"unit_variants": ["Idle"], "fields": [{"name": "speed", "value": scalar("float", 4.0)}],
+			"writable": {"allowed": true}},
+	}

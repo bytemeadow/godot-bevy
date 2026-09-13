@@ -54,6 +54,14 @@ def run_project(project, probes, log):
     project_file = project / "project.godot"
     imports = {path: path.read_bytes() if path.is_file() else None
                for path in import_status(project)}
+    # Playing a scene makes 4.6 re-save it with unique_id attributes; keep a copy of every
+    # tracked scene that was clean on entry so the run leaves no source churn behind.
+    scenes = {}
+    for path in project.rglob("*.tscn"):
+        status = subprocess.run(["git", "-C", str(repo), "status", "--porcelain=v1", "--", str(path)],
+                                capture_output=True, text=True).stdout
+        if not status.strip():
+            scenes[path] = path.read_bytes()
     editor = None
     with tempfile.TemporaryDirectory(prefix="editor-probe-") as temporary:
         backup = Path(temporary) / "project.godot"
@@ -128,6 +136,19 @@ def run_project(project, probes, log):
             if timed_out or len(verdicts) != len(probes) or "EDITOR_PROBE complete" not in output:
                 print(f"editor-probe: {reason}", file=sys.stderr)
                 return 5
+            evidence_errors = []
+            if debugger_mode:
+                for checkpoint in probes[0].get("layout_checkpoints", []):
+                    path = Path(probes[0]["shots"]) / f"{checkpoint}.png"
+                    if f"EDITOR_PROBE checkpoint={checkpoint}\n" not in output:
+                        evidence_errors.append(f"missing checkpoint: {checkpoint}")
+                    if not path.is_file() or path.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
+                        evidence_errors.append(f"missing PNG: {path}")
+            if "SCRIPT ERROR:" in output or "Parse Error:" in output:
+                evidence_errors.append("editor reported a script or parse error")
+            if evidence_errors:
+                print(f"editor-probe: {json.dumps(evidence_errors)}", file=sys.stderr)
+                return max(4, *map(int, verdicts))
             return max(map(int, verdicts))
         finally:
             stop(editor)
@@ -146,6 +167,9 @@ def run_project(project, probes, log):
                 if data is None:
                     path.unlink(missing_ok=True)
                 else:
+                    path.write_bytes(data)
+            for path, data in scenes.items():
+                if path.is_file() and path.read_bytes() != data:
                     path.write_bytes(data)
 
 
@@ -175,6 +199,11 @@ def main():
                 raise ValueError(f"probe requires a non-empty {key}: {probe}")
         if "value" not in probe or not isinstance(probe.get("expect", {}), dict):
             raise ValueError(f"probe requires value and expect must be an object: {probe}")
+        checkpoints = probe.get("layout_checkpoints", [])
+        if (not isinstance(checkpoints, list) or
+                any(not isinstance(name, str) or not re.fullmatch(r"[a-z0-9-]+", name)
+                    for name in checkpoints) or len(set(checkpoints)) != len(checkpoints)):
+            raise ValueError("layout_checkpoints must be unique screenshot names")
         if not Path(probe["shots"]).is_absolute():
             raise ValueError(f"shots must be an absolute path: {probe['shots']}")
         project = (repo / probe["project"]).resolve()

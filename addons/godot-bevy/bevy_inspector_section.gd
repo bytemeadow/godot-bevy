@@ -15,15 +15,32 @@ var _request_id := -1
 var _waiting := false
 var _stale := false
 var _session_detached := false
+var proxy
+var inspector: WeakRef
+var title: Label
+var _header: PanelContainer
+var _native := false
 
 func _init() -> void:
 	name = "BevySection"
-	var title := Label.new()
+	_native = Engine.is_editor_hint() and ClassDB.class_has_method("EditorInspector", "edit")
+	title = Label.new()
 	title.text = "Bevy"
-	add_child(title)
+	if not _native:
+		title.text += " (native Inspector requires Godot 4.4)"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_header = PanelContainer.new()
+	_header.add_child(title)
+	add_child(_header)
 	status = Label.new()
 	status.text = "Loading components…"
 	add_child(status)
+
+func _ready() -> void:
+	if Engine.is_editor_hint():
+		_header.add_theme_stylebox_override("panel", get_theme_stylebox("bg", "EditorInspectorCategory"))
+		title.add_theme_font_override("font", get_theme_font("bold", "EditorFonts"))
 
 func configure(debugger, panel, adapter, reference: Dictionary, session: int, instance_id: String = "") -> void:
 	client = debugger
@@ -59,6 +76,8 @@ func _process(delta: float) -> void:
 		for control in component_editors.values():
 			control.hide()
 		return
+	if _native:
+		return
 	_elapsed += delta
 	if is_visible_in_tree() and _elapsed >= client.update_interval:
 		_elapsed = 0.0
@@ -67,12 +86,37 @@ func _process(delta: float) -> void:
 func _session_changed(active: int) -> void:
 	if active != session_id:
 		_session_detached = true
+		if proxy != null:
+			proxy.invalidate()
 
 func refresh() -> void:
 	if _waiting or _stale or _session_detached or entity.is_empty():
 		return
+	if pane != null:
+		if proxy == null:
+			proxy = pane.proxy_for(entity, session_id)
+			proxy.status_changed.connect(_proxy_status)
+			if not _native:
+				proxy.components_changed.connect(_legacy_components)
+		if _native and inspector == null:
+			var embedded = load("res://addons/godot-bevy/bevy_native_inspector.gd").new()
+			embedded.proxy = proxy
+			inspector = weakref(embedded)
+			add_child(embedded)
+			_proxy_status()
+		elif not _native and not proxy.components.is_empty():
+			_legacy_components()
+		proxy.refresh()
+		return
 	_waiting = true
 	_request_id = client.request("godot.get_components", {"entity": entity}, _received, session_id)
+
+func _proxy_status() -> void:
+	status.text = proxy.status
+	status.visible = not _native or proxy.status != "Entity " + str(entity.get("bits", ""))
+
+func _legacy_components() -> void:
+	_received({"result": proxy.components})
 
 func _received(frame: Dictionary) -> void:
 	_waiting = false
@@ -94,11 +138,15 @@ func _received(frame: Dictionary) -> void:
 		else:
 			var control = ValueEditor.new()
 			add_child(control)
-			control.configure(frame.result[component], entity, component, [], client, session_id)
+			control.configure(frame.result[component], entity, component, [], client, session_id, "", proxy)
 			control.entity_link.connect(func(reference): pane.select_entity(reference))
 			control.node_link.connect(func(id): remote.select_node(id, session_id))
 			component_editors[component] = control
 
 func _exit_tree() -> void:
+	if proxy != null and proxy.status_changed.is_connected(_proxy_status):
+		proxy.status_changed.disconnect(_proxy_status)
+	if proxy != null and proxy.components_changed.is_connected(_legacy_components):
+		proxy.components_changed.disconnect(_legacy_components)
 	if client != null and _request_id != -1:
 		client.cancel_request(_request_id)
