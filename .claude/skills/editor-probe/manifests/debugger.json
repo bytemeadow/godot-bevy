@@ -6,6 +6,7 @@
     "layout_checkpoints": [
       "1-resource-inspector",
       "1-state-inspector",
+      "2-components-expanded",
       "8-node-backed-open",
       "8-node-backed-wide",
       "8-node-backed-narrow",
