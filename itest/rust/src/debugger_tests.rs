@@ -31,6 +31,11 @@ async fn setup(ctx: &TestContext) -> (TestApp, DebuggerEndpoint, Receiver<Wire>,
     let (tx, rx) = channel();
     let mut app = TestApp::new(ctx, move |app| {
         app.add_plugins(GodotDebuggerPlugin)
+            .insert_resource(godot_bevy::prelude::DebuggerConfig {
+                // Tests of deltas and requests consume the snapshot in one frame.
+                snapshot_chunk_size: usize::MAX,
+                ..Default::default()
+            })
             .register_type::<Speed>()
             .insert_resource(DebuggerTransport::new(move |frame| {
                 tx.send(frame).unwrap();
@@ -341,41 +346,109 @@ fn debugger_numeric_variants_coerce(ctx: &TestContext) -> godot::task::TaskHandl
 fn debugger_disabling_ends_subscription(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx = ctx.clone();
     godot::task::spawn(async move {
-        let (mut app, endpoint, rx, entity) = setup(&ctx).await;
-        let mut params = Dictionary::new();
-        params.set("interval_s", 0.0);
-        endpoint.submit(request(221, "godot.subscribe", params.clone()));
-        app.update().await;
-        assert_eq!(rx.try_iter().count(), 2);
-        app.with_world_mut(|world| {
-            world
-                .resource_mut::<godot_bevy::prelude::DebuggerConfig>()
-                .enabled = false;
-        });
-        app.update().await;
-        app.with_world_mut(|world| {
-            world.entity_mut(entity).insert(Name::new("disabled"));
-            world
-                .resource_mut::<godot_bevy::prelude::DebuggerConfig>()
-                .enabled = true;
-        });
-        app.updates(2).await;
-        assert!(rx.try_recv().is_err());
-        endpoint.submit(request(222, "godot.subscribe", params));
-        app.update().await;
-        assert_eq!(rx.try_iter().count(), 2);
-        app.with_world_mut(|world| {
-            world
-                .resource_mut::<godot_bevy::prelude::DebuggerConfig>()
-                .enabled = false;
-        });
-        endpoint.submit(request(223, "godot.unsubscribe", Dictionary::new()));
-        app.update().await;
-        assert_eq!(
-            response(&rx, 223).get("result").unwrap().get("subscribed"),
-            Some(&Wire::Bool(false))
-        );
-        app.cleanup().await;
+        for chunk_size in [1, usize::MAX] {
+            let (mut app, endpoint, rx, entity) = setup(&ctx).await;
+            app.with_world_mut(|world| {
+                world
+                    .resource_mut::<godot_bevy::prelude::DebuggerConfig>()
+                    .snapshot_chunk_size = chunk_size;
+            });
+            let mut params = Dictionary::new();
+            params.set("interval_s", 0.0);
+            endpoint.submit(request(221, "godot.subscribe", params.clone()));
+            app.update().await;
+            let frames = rx.try_iter().collect::<Vec<_>>();
+            assert_eq!(
+                frames
+                    .iter()
+                    .filter(|frame| frame.get("id") == Some(&Wire::Integer(221)))
+                    .count(),
+                1
+            );
+            let snapshots = frames
+                .iter()
+                .filter(|frame| frame.get("id").is_none())
+                .collect::<Vec<_>>();
+            assert!(!snapshots.is_empty());
+            assert!(
+                snapshots.iter().all(
+                    |frame| frame.get("params").unwrap().get("snapshot_complete")
+                        == Some(&Wire::Bool(chunk_size != 1))
+                ),
+                "fixture disables both unfinished and completed snapshots"
+            );
+            app.with_world_mut(|world| {
+                world
+                    .resource_mut::<godot_bevy::prelude::DebuggerConfig>()
+                    .enabled = false;
+            });
+            app.update().await;
+            let frames = rx.try_iter().collect::<Vec<_>>();
+            assert_eq!(
+                frames.len(),
+                1,
+                "disable sends exactly one terminal notification"
+            );
+            assert_eq!(
+                frames[0].get("method"),
+                Some(&Wire::String("godot.summary".into()))
+            );
+            assert!(frames[0].get("id").is_none());
+            assert_eq!(
+                frames[0].get("params"),
+                Some(&Wire::object([
+                    ("subscription_ended", Wire::Bool(true)),
+                    ("reason", Wire::String("debugger disabled".into())),
+                ]))
+            );
+            app.with_world_mut(|world| {
+                world.entity_mut(entity).insert(Name::new("disabled"));
+                world
+                    .resource_mut::<godot_bevy::prelude::DebuggerConfig>()
+                    .enabled = true;
+                world
+                    .resource_mut::<godot_bevy::prelude::DebuggerConfig>()
+                    .snapshot_chunk_size = usize::MAX;
+            });
+            app.updates(2).await;
+            assert!(rx.try_recv().is_err());
+            endpoint.submit(request(222, "godot.subscribe", params));
+            app.update().await;
+            let frames = rx.try_iter().collect::<Vec<_>>();
+            assert_eq!(frames.len(), 2);
+            let snapshot = frames
+                .iter()
+                .find(|frame| frame.get("id").is_none())
+                .unwrap()
+                .get("params")
+                .unwrap();
+            assert_eq!(snapshot.get("snapshot_index"), Some(&Wire::Integer(0)));
+            assert_eq!(snapshot.get("snapshot_complete"), Some(&Wire::Bool(true)));
+            assert!(
+                snapshot
+                    .get("added")
+                    .unwrap()
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|row| row.get("entity").unwrap().get("bits")
+                        == Some(&Wire::String(entity.to_bits().to_string()))
+                        && row.get("name") == Some(&Wire::String("disabled".into()))),
+                "resubscribe captures a fresh complete baseline"
+            );
+            app.with_world_mut(|world| {
+                world
+                    .resource_mut::<godot_bevy::prelude::DebuggerConfig>()
+                    .enabled = false;
+            });
+            endpoint.submit(request(223, "godot.unsubscribe", Dictionary::new()));
+            app.update().await;
+            assert_eq!(
+                response(&rx, 223).get("result").unwrap().get("subscribed"),
+                Some(&Wire::Bool(false))
+            );
+            app.cleanup().await;
+        }
     })
 }
 
@@ -801,6 +874,10 @@ fn debugger_discovery_and_malformed_frame(ctx: &TestContext) -> godot::task::Tas
 }
 
 fn summary_delta(rx: &Receiver<Wire>, kind: &str, entity: Entity) -> Wire {
+    summary_deltas(rx, kind, &[entity]).remove(0)
+}
+
+fn summary_deltas(rx: &Receiver<Wire>, kind: &str, entities: &[Entity]) -> Vec<Wire> {
     let frames = rx.try_iter().collect::<Vec<_>>();
     assert_eq!(frames.len(), 1);
     assert!(frames[0].get("id").is_none());
@@ -813,20 +890,245 @@ fn summary_delta(rx: &Receiver<Wire>, kind: &str, entity: Entity) -> Wire {
     for key in ["added", "removed", "updated"] {
         assert_eq!(
             params.get(key).unwrap().as_array().unwrap().len(),
-            usize::from(key == kind)
+            if key == kind { entities.len() } else { 0 }
         );
     }
-    let row = &params.get(kind).unwrap().as_array().unwrap()[0];
-    let reference = if kind == "removed" {
-        row
-    } else {
-        row.get("entity").unwrap()
-    };
-    assert_eq!(
-        reference.get("bits"),
-        Some(&Wire::String(entity.to_bits().to_string()))
-    );
-    row.clone()
+    let rows = params.get(kind).unwrap().as_array().unwrap();
+    entities
+        .iter()
+        .map(|entity| {
+            let matching = rows
+                .iter()
+                .filter(|row| {
+                    let reference = if kind == "removed" {
+                        *row
+                    } else {
+                        row.get("entity").unwrap()
+                    };
+                    reference.get("bits") == Some(&Wire::String(entity.to_bits().to_string()))
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                matching.len(),
+                1,
+                "each expected entity has exactly one delta row"
+            );
+            matching[0].clone()
+        })
+        .collect()
+}
+
+#[itest(async)]
+fn debugger_component_membership_deltas(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx = ctx.clone();
+    godot::task::spawn(async move {
+        let (mut app, endpoint, rx, _) = setup(&ctx).await;
+        let entity = app.with_world_mut(|world| world.spawn_empty().id());
+        let mut params = Dictionary::new();
+        params.set("interval_s", 0.0);
+        endpoint.submit(request(301, "godot.subscribe", params));
+        app.update().await;
+        assert_eq!(rx.try_iter().count(), 2);
+        for present in [true, false] {
+            app.with_world_mut(|world| {
+                if present {
+                    world.entity_mut(entity).insert(Speed(2.0));
+                } else {
+                    world.entity_mut(entity).remove::<Speed>();
+                }
+            });
+            app.updates(2).await;
+            let row = summary_delta(&rx, "updated", entity);
+            assert_eq!(row.get("name"), Some(&Wire::String(String::new())));
+            assert_eq!(row.get("parent"), Some(&Wire::Null));
+            let components = if present {
+                vec![Wire::String(Speed::type_path().into())]
+            } else {
+                vec![]
+            };
+            assert_eq!(row.get("components"), Some(&Wire::Array(components)));
+            assert_eq!(row.get("unsupported_components"), Some(&Wire::object([])));
+            app.updates(3).await;
+            assert!(
+                rx.try_recv().is_err(),
+                "unchanged membership interval has no notification"
+            );
+        }
+        app.cleanup().await;
+    })
+}
+
+#[itest(async)]
+fn debugger_chunked_snapshot_preserves_changes_until_deltas(
+    ctx: &TestContext,
+) -> godot::task::TaskHandle {
+    let ctx = ctx.clone();
+    godot::task::spawn(async move {
+        let (mut app, endpoint, rx, _) = setup(&ctx).await;
+        let (targets, expected) = app.with_world_mut(|world| {
+            world
+                .resource_mut::<godot_bevy::prelude::DebuggerConfig>()
+                .snapshot_chunk_size = 2;
+            let targets = (0..17)
+                .map(|_| world.spawn_empty().id())
+                .collect::<Vec<_>>();
+            world
+                .entity_mut(targets[1])
+                .insert(Name::new("before snapshot"));
+            let mut expected = world.query::<Entity>().iter(world).collect::<Vec<_>>();
+            expected.sort();
+            (targets, expected)
+        });
+        let expected_chunks = expected.len().div_ceil(2);
+        let mut params = Dictionary::new();
+        params.set("interval_s", 0.0);
+        endpoint.submit(request(311, "godot.subscribe", params));
+        app.update().await;
+        let mut frames = rx.try_iter().collect::<Vec<_>>();
+        assert_eq!(
+            frames
+                .iter()
+                .filter(|frame| frame.get("id") == Some(&Wire::Integer(311)))
+                .count(),
+            1
+        );
+        assert!(
+            frames.iter().any(|frame| frame
+                .get("params")
+                .and_then(|params| params.get("snapshot_complete"))
+                == Some(&Wire::Bool(false))),
+            "the endpoint starts a partial snapshot"
+        );
+        assert!(
+            !frames.iter().any(|frame| frame
+                .get("params")
+                .and_then(|params| params.get("snapshot_complete"))
+                == Some(&Wire::Bool(true))),
+            "gameplay changes happen before the final chunk"
+        );
+        let removed = targets[16];
+        let updated = targets[0];
+        let renamed = targets[1];
+        let added = app.with_world_mut(|world| {
+            world.entity_mut(updated).insert(Speed(3.0));
+            world
+                .entity_mut(renamed)
+                .insert(Name::new("renamed during snapshot"));
+            world.despawn(removed);
+            world.spawn(Name::new("during snapshot")).id()
+        });
+        for _ in 0..expected_chunks + 3 {
+            app.update().await;
+            frames.extend(rx.try_iter());
+        }
+        let notifications = frames
+            .iter()
+            .filter(|frame| frame.get("id").is_none())
+            .map(|frame| {
+                assert_eq!(
+                    frame.get("method"),
+                    Some(&Wire::String("godot.summary".into()))
+                );
+                frame.get("params").unwrap()
+            })
+            .collect::<Vec<_>>();
+        let snapshots = notifications
+            .iter()
+            .copied()
+            .filter(|params| params.get("snapshot") == Some(&Wire::Bool(true)))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            snapshots.len(),
+            expected_chunks,
+            "endpoint emits the configured number of snapshot chunks"
+        );
+        let mut received = Vec::new();
+        for (index, params) in snapshots.iter().enumerate() {
+            assert_eq!(
+                params.get("snapshot_index"),
+                Some(&Wire::Integer(index as i64))
+            );
+            assert_eq!(
+                params.get("snapshot_complete"),
+                Some(&Wire::Bool(index + 1 == expected_chunks))
+            );
+            assert_eq!(params.get("removed"), Some(&Wire::Array(vec![])));
+            assert_eq!(params.get("updated"), Some(&Wire::Array(vec![])));
+            let rows = params.get("added").unwrap().as_array().unwrap();
+            assert_eq!(rows.len(), (expected.len() - index * 2).min(2));
+            received.extend(
+                rows.iter()
+                    .map(|row| row.get("entity").unwrap().get("bits").unwrap().clone()),
+            );
+        }
+        assert_eq!(
+            received,
+            expected
+                .iter()
+                .map(|entity| Wire::String(entity.to_bits().to_string()))
+                .collect::<Vec<_>>(),
+            "snapshot contains its original world exactly once, including a subsequently despawned entity"
+        );
+        assert_eq!(
+            notifications.len(),
+            expected_chunks + 1,
+            "changes during snapshot coalesce into one subsequent delta"
+        );
+        let delta = notifications[expected_chunks];
+        assert_eq!(delta.get("snapshot"), Some(&Wire::Bool(false)));
+        for (kind, entity) in [("added", added), ("removed", removed)] {
+            let rows = delta.get(kind).unwrap().as_array().unwrap();
+            assert_eq!(
+                rows.len(),
+                1,
+                "one row for each change made during the snapshot"
+            );
+            let reference = if kind == "removed" {
+                &rows[0]
+            } else {
+                rows[0].get("entity").unwrap()
+            };
+            assert_eq!(
+                reference.get("bits"),
+                Some(&Wire::String(entity.to_bits().to_string()))
+            );
+        }
+        let rows = delta.get("updated").unwrap().as_array().unwrap();
+        assert_eq!(
+            rows.len(),
+            2,
+            "membership and name changes both survive snapshot transmission"
+        );
+        let row = rows
+            .iter()
+            .find(|row| {
+                row.get("entity").unwrap().get("bits")
+                    == Some(&Wire::String(updated.to_bits().to_string()))
+            })
+            .unwrap();
+        assert_eq!(
+            row.get("components"),
+            Some(&Wire::Array(vec![Wire::String(Speed::type_path().into())]))
+        );
+        assert_eq!(row.get("unsupported_components"), Some(&Wire::object([])));
+        let row = rows
+            .iter()
+            .find(|row| {
+                row.get("entity").unwrap().get("bits")
+                    == Some(&Wire::String(renamed.to_bits().to_string()))
+            })
+            .unwrap();
+        assert_eq!(
+            row.get("name"),
+            Some(&Wire::String("renamed during snapshot".into()))
+        );
+        app.updates(3).await;
+        assert!(
+            rx.try_recv().is_err(),
+            "completed chunk stream resumes silent unchanged intervals"
+        );
+        app.cleanup().await;
+    })
 }
 
 #[itest(async)]
@@ -865,12 +1167,21 @@ fn debugger_summary_deltas(ctx: &TestContext) -> godot::task::TaskHandle {
                 .insert(godot_bevy::plugins::scene_tree::GodotChildOf(ordinary));
         });
         app.update().await;
+        let rows = summary_deltas(&rx, "updated", &[entity, ordinary]);
         assert_eq!(
-            summary_delta(&rx, "updated", entity)
-                .get("parent")
-                .unwrap()
-                .get("bits"),
+            rows[0].get("parent").unwrap().get("bits"),
             Some(&Wire::String(ordinary.to_bits().to_string()))
+        );
+        assert!(
+            rows[1]
+                .get("components")
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .contains(&Wire::String(
+                    std::any::type_name::<godot_bevy::plugins::scene_tree::GodotChildren>().into()
+                )),
+            "link adds GodotChildren to the parent's summary"
         );
         app.with_world_mut(|world| {
             world
@@ -878,9 +1189,18 @@ fn debugger_summary_deltas(ctx: &TestContext) -> godot::task::TaskHandle {
                 .remove::<godot_bevy::plugins::scene_tree::GodotChildOf>();
         });
         app.update().await;
-        assert_eq!(
-            summary_delta(&rx, "updated", entity).get("parent"),
-            Some(&Wire::Null)
+        let rows = summary_deltas(&rx, "updated", &[entity, ordinary]);
+        assert_eq!(rows[0].get("parent"), Some(&Wire::Null));
+        assert!(
+            !rows[1]
+                .get("components")
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .contains(&Wire::String(
+                    std::any::type_name::<godot_bevy::plugins::scene_tree::GodotChildren>().into()
+                )),
+            "unlink removes GodotChildren from the parent's summary"
         );
         app.with_world_mut(|world| {
             world.entity_mut(entity).remove::<Name>();

@@ -72,6 +72,9 @@ func run(host: Node) -> int:
 		await _run_test("client", _client)
 		await _run_test("handshake", _handshake)
 		await _run_test("subscriptions", _subscriptions.bind(host))
+		await _run_test("chunked snapshots", _chunked_snapshots.bind(host))
+		await _run_test("snapshot recovery", _snapshot_recovery.bind(host))
+		await _run_test("snapshot selection", _snapshot_selection.bind(host))
 		await _run_test("selection echo", _selection_echo.bind(host))
 		await _run_test("local cancellation", _local_cancellation.bind(host))
 		await _run_test("dock tabs", _dock_tabs.bind(host))
@@ -160,6 +163,14 @@ func _tree(host: Node) -> void:
 	var child = panel.items["4294967304"]
 	panel.apply_summary({"updated": [Fixtures.row("4294967298", "Player", ["game::Speed"])]})
 	check(panel.entity_tree.get_selected() == child, "moving selected ancestor retains descendant selection")
+	panel.show_internal.button_pressed = false
+	panel.apply_summary({"added": [Fixtures.row("90", "", [])]})
+	check(not panel.items["90"].visible, "empty entity starts hidden")
+	var empty_item = panel.items["90"]
+	panel.apply_summary({"updated": [Fixtures.row("90", "", ["game::Speed"])]})
+	check(panel.items["90"] == empty_item and empty_item.visible and empty_item.get_tooltip_text(0).contains("game::Speed"), "membership addition refreshes component list and default filter in place")
+	panel.apply_summary({"updated": [Fixtures.row("90", "", [])]})
+	check(panel.items["90"] == empty_item and not empty_item.visible and not empty_item.get_tooltip_text(0).contains("game::Speed"), "last game component removal refreshes component list and hides entity in place")
 	panel.free()
 	completed.append("tree")
 
@@ -331,6 +342,215 @@ func _subscriptions(host: Node) -> void:
 	client.shutdown()
 	completed.append("subscriptions")
 
+func _chunked_snapshots(host: Node) -> void:
+	var panel = PanelScene.instantiate()
+	var single = PanelScene.instantiate()
+	host.add_child(panel)
+	host.add_child(single)
+	var client = RpcClient.new()
+	var session = FakeSession.new()
+	var adapter = FakeRemote.new()
+	host.add_child(adapter)
+	client.setup_session(0, session)
+	panel.setup(client, adapter)
+	session.started.emit()
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "method": "godot.ready", "params": {}}], 0)
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"update_interval": 0.5}}], 0)
+	var snapshot: Dictionary = Fixtures.snapshot().params
+	var all_rows: Array = snapshot.added.duplicate()
+	all_rows.reverse()
+	var chunks: Array = []
+	for index in 4:
+		chunks.append({"jsonrpc": "2.0", "method": "godot.summary", "params": {
+			"snapshot": true, "snapshot_index": index, "snapshot_complete": index == 3,
+			"added": all_rows.slice(index * 2, mini(index * 2 + 2, all_rows.size())), "removed": [], "updated": []}})
+	for index in 3:
+		client._capture("bevy:rpc", [chunks[index]], 0)
+		check(panel.rows.is_empty() and panel.items.is_empty(), "partial snapshot is not exposed as a complete world")
+		check(panel.status_label.text == "Loading snapshot (%d entities received)…" % ((index + 1) * 2), "partial snapshot reports received count and loading state")
+		if index == 0:
+			var before_selection: int = session.sent.size()
+			panel._ensure_selection(Fixtures.entity_ref("4294967298"), 0, false)
+			check(session.sent.size() == before_selection, "missing snapshot selection waits without querying")
+	client._capture("bevy:rpc", [chunks[3]], 0)
+	check(panel.selected_entity == Fixtures.entity_ref("4294967298"), "missing snapshot selection replays after the final chunk")
+	single.apply_summary(snapshot)
+	check(panel.rows == single.rows and panel.items.size() == single.items.size(), "chunked and single snapshot contain the same complete world")
+	for bits in single.items:
+		check(panel.items.has(bits), "chunked snapshot contains entity " + bits)
+		if not panel.items.has(bits):
+			continue
+		var item: TreeItem = panel.items[bits]
+		var expected: TreeItem = single.items[bits]
+		check(item.get_parent().get_metadata(0) == expected.get_parent().get_metadata(0) and item.get_text(0) == expected.get_text(0) and item.visible == expected.visible and item.get_tooltip_text(0) == expected.get_tooltip_text(0), "chunked snapshot has the same hierarchy, labels, components and filter for " + bits)
+	check(panel.hidden_count == single.hidden_count and panel.status_label.text == "7 entities", "final snapshot chunk commits the full counts")
+	panel.select_entity(Fixtures.entity_ref("4294967298"), false)
+	var original = panel.items["4294967298"]
+	panel.items["4294967297"].collapsed = false
+	client._capture("bevy:rpc", [chunks[0]], 0)
+	check(panel.items["4294967298"] == original and panel.rows == single.rows, "resnapshot keeps the last complete tree while loading")
+	panel.search_box.text = "game::Speed"
+	var sent: int = session.sent.size()
+	panel._search(panel.search_box.text)
+	check(session.sent.size() == sent, "nonempty query search is suppressed during snapshot loading")
+	client._capture("bevy:rpc", [Fixtures.delta()], 0)
+	check(panel.rows == single.rows, "interleaved delta waits for snapshot completion")
+	for index in range(1, 4):
+		client._capture("bevy:rpc", [chunks[index]], 0)
+		check(session.sent.size() == sent + (1 if index == 3 else 0), "query search resumes only on the final chunk")
+	check(session.sent.back()[1][0].method == "godot.query" and session.sent.back()[1][0].params.component == "game::Speed", "completed snapshot reissues the component search")
+	panel.search_box.text = ""
+	panel._search("")
+	single.apply_summary(Fixtures.delta().params)
+	check(panel.rows == single.rows and panel.items["4294967298"] == original and panel.entity_tree.get_selected() == original and not panel.items["4294967297"].collapsed, "snapshot commit replays interleaved deltas and preserves tree identity, selection and expansion")
+	client._capture("bevy:rpc", [chunks[0]], 0)
+	client._capture("bevy:rpc", [Fixtures.delta()], 0)
+	panel._ensure_selection(Fixtures.entity_ref("999"), 0, false)
+	check(not panel._snapshot_rows.is_empty() and not panel._snapshot_deltas.is_empty(), "stop fixture has both staged rows and deltas")
+	session.stopped.emit()
+	check(panel.status_label.text == "no running session" and panel.rows.is_empty() and panel.items.is_empty() and panel.selected_entity.is_empty(), "stop mid-snapshot leaves a disconnected pane with no half-built tree")
+	check(panel._snapshot_rows.is_empty() and panel._snapshot_deltas.is_empty() and panel._snapshot_index == 0, "stop discards every staged snapshot chunk and delta")
+	check(panel._pending_selection.is_empty(), "stop discards the pending snapshot selection")
+	client._capture("bevy:rpc", [chunks[3]], 0)
+	check(panel.rows.is_empty() and panel.items.is_empty() and panel.status_label.text == "no running session", "RPC client drops late chunks from a stopped session")
+	session.started.emit()
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "method": "godot.ready", "params": {}}], 0)
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"update_interval": 0.5}}], 0)
+	client._capture("bevy:rpc", [chunks[3]], 0)
+	check(panel.rows.is_empty() and panel.items.is_empty(), "restarted session rejects a continuation without its first chunk")
+	panel.hide()
+	panel.show()
+	client._capture("bevy:rpc", [chunks[0]], 0)
+	check(not panel._snapshot_rows.is_empty(), "client shutdown fixture has an unfinished snapshot")
+	client.shutdown()
+	check(panel.status_label.text == "no running session" and panel.rows.is_empty() and panel.items.is_empty() and panel._snapshot_rows.is_empty(), "client shutdown discards an unfinished snapshot")
+	panel.shutdown()
+	panel.free()
+	single.free()
+	adapter.free()
+	completed.append("chunked snapshots")
+
+func _snapshot_recovery(host: Node) -> void:
+	var panel = PanelScene.instantiate()
+	host.add_child(panel)
+	var client = RpcClient.new()
+	var session = FakeSession.new()
+	var adapter = FakeRemote.new()
+	host.add_child(adapter)
+	client.setup_session(0, session)
+	panel.setup(client, adapter)
+	session.started.emit()
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "method": "godot.ready", "params": {}}], 0)
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"update_interval": 0.5}}], 0)
+	client._capture("bevy:rpc", [Fixtures.snapshot()], 0)
+	panel.select_entity(Fixtures.entity_ref("4294967298"), false)
+	var complete: Dictionary = panel.rows.duplicate(true)
+	var selected: TreeItem = panel.entity_tree.get_selected()
+	var partial := {"jsonrpc": "2.0", "method": "godot.summary", "params": {
+		"snapshot": true, "snapshot_index": 0, "snapshot_complete": false,
+		"added": [Fixtures.row("999", "Partial", ["game::Speed"])]}}
+	for ending in [
+		{"subscription_ended": true, "reason": "debugger disabled"},
+		{"snapshot": true, "snapshot_index": 2, "snapshot_complete": true, "added": []},
+	]:
+		client._capture("bevy:rpc", [partial], 0)
+		client._capture("bevy:rpc", [Fixtures.delta()], 0)
+		panel.select_entity(Fixtures.entity_ref("999"), false)
+		check(not panel._snapshot_rows.is_empty() and not panel._snapshot_deltas.is_empty() and not panel._pending_selection.is_empty(), "recovery fixture has staged rows, deltas and selection")
+		client._capture("bevy:rpc", [{"jsonrpc": "2.0", "method": "godot.summary", "params": ending}], 0)
+		check(panel._subscribed_session == -1 and panel._snapshot_index == 0 and panel._snapshot_rows.is_empty() and panel._snapshot_deltas.is_empty() and panel._pending_selection.is_empty(), "terminal or gap discards the unfinished subscription")
+		check(panel.rows == complete and panel.entity_tree.get_selected() == selected and panel.selected_entity == Fixtures.entity_ref("4294967298") and not panel.items.has("999"), "terminal or gap retains the last complete tree and selection")
+		check(panel.status_label.text.contains("Reopen") and not panel.status_label.text.contains("Loading"), "interrupted snapshot explains how to retry")
+		if ending.has("snapshot_index"):
+			check(session.sent.back()[1][0].method == "godot.unsubscribe", "snapshot sequence gap cancels the runtime stream")
+		client._capture("bevy:rpc", [{"jsonrpc": "2.0", "method": "godot.summary", "params": {"snapshot": true, "snapshot_index": 3, "snapshot_complete": true, "added": []}}], 0)
+		check(panel.rows == complete and panel._snapshot_index == 0, "late continuation cannot commit an abandoned snapshot")
+		panel.search_box.text = "game::Speed"
+		var sent: int = session.sent.size()
+		panel._search(panel.search_box.text)
+		check(session.sent.size() == sent + 1 and session.sent.back()[1][0].method == "godot.query", "interruption restores query-backed search")
+		panel.search_box.text = ""
+		panel._search("")
+		sent = session.sent.size()
+		panel.select_entity(Fixtures.entity_ref("999"), false)
+		check(session.sent.size() == sent + 1 and session.sent.back()[1][0].method == "godot.query", "interruption restores missing-entity selection fetches")
+		client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"total": 0, "entities": []}}], 0)
+		check(panel.status_label.text == "Entity not available in this session", "recovered selection fetch reports an absent entity")
+		panel.hide()
+		panel.show()
+		check(panel._subscribed_session == 0 and session.sent.back()[1][0].method == "godot.subscribe", "reopening an interrupted pane requests a fresh subscription")
+		client._capture("bevy:rpc", [Fixtures.snapshot()], 0)
+		check(panel.rows == complete and panel.status_label.text == "7 entities", "fresh snapshot completes after interruption")
+	client._capture("bevy:rpc", [partial], 0)
+	panel.select_entity(Fixtures.entity_ref("999"), false)
+	panel.hide()
+	check(panel._pending_selection.is_empty() and panel._snapshot_rows.is_empty(), "hiding the pane discards staged selection and rows")
+	panel.shutdown()
+	client.shutdown()
+	panel.free()
+	adapter.free()
+	completed.append("snapshot recovery")
+
+func _snapshot_selection(host: Node) -> void:
+	var panel = PanelScene.instantiate()
+	host.add_child(panel)
+	var client = FakeClient.new()
+	var remote = FakeRemote.new()
+	host.add_child(remote)
+	panel.client = client
+	panel.remote = remote
+	var a = Fixtures.row("1", "A", ["game::GodotNodeHandle"], null, true)
+	var b = Fixtures.row("2", "B", ["game::Speed"])
+	var first := {"snapshot": true, "snapshot_index": 0, "snapshot_complete": false, "added": [a]}
+	var last := {"snapshot": true, "snapshot_index": 1, "snapshot_complete": true, "added": [b]}
+	for source in ["pane", "Remote", "local"]:
+		panel.apply_summary({"snapshot": true, "added": []})
+		panel.selected_entity = {}
+		panel.apply_summary(first)
+		var before_completion: int = client.frames.size()
+		if source == "Remote":
+			panel._remote_selected(["101"], 0)
+			check(client.frames.back().method == "godot.entity_for_node", "Remote selection resolves its runtime entity while loading")
+			client.reply(client.frames.back().id, {"result": a.entity})
+			before_completion += 1
+		else:
+			panel.select_entity(a.entity, source == "pane")
+		check(client.frames.size() == before_completion and panel.selected_entity.is_empty(), source + " selection waits for snapshot completion without querying")
+		panel.apply_summary(last)
+		check(panel.selected_entity == a.entity and panel._pending_selection.is_empty(), source + " selection replays after snapshot completion")
+		check(client.frames.size() == before_completion + (1 if source == "pane" else 0), source + " deferred selection preserves inspection intent")
+		if source == "pane":
+			check(client.frames.back().method == "godot.get_components" and client.frames.back().params.entity == a.entity, "deferred pane inspection targets the selected entity")
+	panel.apply_summary(first)
+	var sent: int = client.frames.size()
+	panel.select_entity(Fixtures.entity_ref("999"), false)
+	check(client.frames.size() == sent, "absent entity fetch waits for final chunk")
+	panel.apply_summary(last)
+	check(client.frames.size() == sent + 1 and client.frames.back().method == "godot.query", "still-absent selection is fetched after completion")
+	client.reply(client.frames.back().id, {"result": {"total": 0, "entities": []}})
+	check(panel.status_label.text == "Entity not available in this session", "still-absent deferred selection reports its result")
+	panel.apply_summary(first)
+	panel.select_entity(Fixtures.entity_ref("999"), false)
+	panel.select_entity(b.entity, false)
+	sent = client.frames.size()
+	panel.apply_summary(last)
+	check(panel.selected_entity == b.entity and client.frames.size() == sent, "newer visible selection cancels an older deferred request")
+	panel.apply_summary(first)
+	panel.select_entity(Fixtures.entity_ref("999"), false)
+	panel.cancel_inspection()
+	panel.apply_summary(last)
+	check(client.frames.size() == sent and panel._pending_selection.is_empty(), "local selection cancellation discards deferred work before resolution")
+	panel.apply_summary({"snapshot": true, "added": []})
+	panel.apply_summary(first)
+	panel.select_entity(a.entity, false)
+	panel.select_entity(b.entity, false)
+	panel.apply_summary(last)
+	check(panel.selected_entity == b.entity and client.frames.size() == sent, "latest of two deferred selections wins")
+	panel.shutdown()
+	panel.free()
+	remote.free()
+	completed.append("snapshot selection")
+
 func _detached_inspector(host: Node) -> void:
 	var section = load("res://addons/godot-bevy/bevy_inspector_section.gd").new()
 	host.add_child(section)
@@ -410,6 +630,7 @@ func _selection_echo(host: Node) -> void:
 	check(panel._selection_serial == serial and client.frames.size() == 2, "current pane echo does not start reverse lookup")
 	check(panel._remote_selection_echoes.is_empty(), "deferred echo guards expire after notification")
 	panel.shutdown()
+	check(panel.rows.is_empty() and panel.items.is_empty() and panel.selected_entity.is_empty() and panel.status_label.text == "no running session", "pane shutdown clears the populated tree, selection and status")
 	panel.free()
 	remote.free()
 	completed.append("selection echo")

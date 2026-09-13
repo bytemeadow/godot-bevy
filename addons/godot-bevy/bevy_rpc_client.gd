@@ -210,3 +210,5 @@ func shutdown() -> void:
 	sessions.clear()
 	active_session_id = -1
 	config_ready = false
+	active_session_changed.emit(-1)
+	sessions_changed.emit()

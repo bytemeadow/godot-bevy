@@ -38,6 +38,8 @@ pub struct DebuggerConfig {
     pub value_limits: ValueLimits,
     /// Maximum requests drained per run of `First`.
     pub max_requests_per_frame: usize,
+    /// Maximum entity summaries per snapshot chunk, one chunk per `First` (zero uses one).
+    pub snapshot_chunk_size: usize,
 }
 
 impl Default for DebuggerConfig {
@@ -47,6 +49,7 @@ impl Default for DebuggerConfig {
             update_interval: 0.5,
             value_limits: ValueLimits::default(),
             max_requests_per_frame: 64,
+            snapshot_chunk_size: 256,
         }
     }
 }
@@ -186,6 +189,7 @@ impl Plugin for GodotDebuggerPlugin {
 
 fn drain(world: &mut World) {
     let mut runtime = world.remove_non_send::<Runtime>().unwrap();
+    let mut snapshot_budget = true;
     let count = world
         .resource::<DebuggerConfig>()
         .max_requests_per_frame
@@ -205,7 +209,7 @@ fn drain(world: &mut World) {
         let result = request
             .and_then(|request| service::dispatch(world, &mut runtime.subscription, &request));
         if notification {
-            service::publish(world, &mut runtime.subscription);
+            service::publish(world, &mut runtime.subscription, &mut snapshot_budget);
             continue;
         }
         let response = match result {
@@ -221,9 +225,9 @@ fn drain(world: &mut World) {
             ]),
         };
         world.resource::<DebuggerTransport>().send(response);
-        service::publish(world, &mut runtime.subscription);
+        service::publish(world, &mut runtime.subscription, &mut snapshot_budget);
     }
-    service::publish(world, &mut runtime.subscription);
+    service::publish(world, &mut runtime.subscription, &mut snapshot_budget);
     world.insert_non_send(runtime);
 }
 
