@@ -12,12 +12,16 @@ var status_label: Label
 var hidden_label: Label
 var remote_status: Label
 var session_selector: OptionButton
+var view_selector: OptionButton
 var search_box: LineEdit
 var show_internal: CheckBox
 var rows: Dictionary = {}
 var items: Dictionary = {}
 var hidden_count := 0
 var selected_entity: Dictionary = {}
+var selected_resource: Dictionary = {}
+var _view := 0
+var _entity_expansion: Dictionary = {}
 var _root: TreeItem
 var _subscribed_session := -1
 var _search_expansion: Dictionary = {}
@@ -44,6 +48,11 @@ func _ready() -> void:
 	session_selector = OptionButton.new()
 	session_selector.item_selected.connect(_choose_session)
 	box.add_child(session_selector)
+	view_selector = OptionButton.new()
+	view_selector.add_item("Entities")
+	view_selector.add_item("Resources")
+	view_selector.item_selected.connect(_choose_view)
+	box.add_child(view_selector)
 	status_label = Label.new()
 	status_label.text = "no running session"
 	box.add_child(status_label)
@@ -111,11 +120,35 @@ func _sessions_changed() -> void:
 func _choose_session(index: int) -> void:
 	client.select_session(session_selector.get_item_id(index))
 
+func _choose_view(index: int) -> void:
+	if index == _view:
+		return
+	cancel_inspection()
+	if _view == 0:
+		for bits in items:
+			_entity_expansion[bits] = items[bits].collapsed
+	_view = index
+	view_selector.select(index)
+	show_internal.visible = index == 0
+	hidden_label.visible = index == 0
+	_candidates.hide()
+	search_box.placeholder_text = "Filter resources" if index == 1 else "Filter entities"
+	search_box.tooltip_text = "Search resource type paths or decimal entity IDs" if index == 1 else "Search names, decimal entity IDs, component type paths or exact runtime node paths"
+	_sync_items()
+	if index == 0:
+		for bits in _entity_expansion:
+			if items.has(bits):
+				items[bits].collapsed = _entity_expansion[bits]
+	_search(search_box.text)
+	_update_count()
+
 func _session_changed(_id: int) -> void:
 	_unsubscribe()
 	_selection_serial += 1
 	_cancel_queries()
 	selected_entity = {}
+	selected_resource = {}
+	_entity_expansion.clear()
 	_remote_selection_echoes.clear()
 	_clear_proxy()
 	_clear_proxies()
@@ -199,11 +232,34 @@ func apply_summary(params: Dictionary) -> void:
 		return
 	else:
 		_apply_delta(rows, params)
+	_sync_resource_proxies()
 	_sync_items()
 	_search(search_box.text)
-	status_label.text = "%d entities" % rows.size()
+	_update_count()
 	if not pending.is_empty() and client != null and pending.session == client.active_session_id:
 		_ensure_selection(pending.reference, pending.session, pending.inspect)
+
+func _update_count() -> void:
+	if _view == 0:
+		status_label.text = "%d entities" % rows.size()
+	else:
+		var count := 0
+		for row in rows.values():
+			if row.get("resource") is Dictionary:
+				count += 1
+		status_label.text = "%d resources" % count
+
+func _sync_resource_proxies() -> void:
+	for key in proxies.keys():
+		var proxy = proxies[key]
+		if proxy.target_kind != "resource":
+			continue
+		var row: Dictionary = rows.get(proxy.entity.bits, {})
+		if row.get("entity") != proxy.entity or not row.get("resource") is Dictionary or row.resource.type_path != proxy.target_type:
+			proxy.invalidate()
+			proxies.erase(key)
+		else:
+			proxy.set_resource_present(row.resource.present, false)
 
 func _end_subscription(reason: String) -> void:
 	_unsubscribe()
@@ -231,6 +287,11 @@ func _sync_items() -> void:
 	var was_selecting := _selecting
 	_selecting = true
 	var selected_bits = selected.get_metadata(0) if selected != null else null
+	var resource_labels: Dictionary = {}
+	for row in rows.values():
+		if row.get("resource") is Dictionary:
+			var label: String = Proxy.component_label(row.resource.type_path)
+			resource_labels[label] = resource_labels.get(label, 0) + 1
 	# Move surviving descendants before freeing a removed parent.
 	for bits in items.keys():
 		if not rows.has(bits):
@@ -249,11 +310,17 @@ func _sync_items() -> void:
 		item.set_text(0, row.name if not row.name.is_empty() else "Entity " + bits)
 		item.set_tooltip_text(0, bits + "\n" + "\n".join(row.components))
 		item.set_icon(0, _entity_icon(row))
+		if _view == 1 and row.get("resource") is Dictionary:
+			var label: String = Proxy.component_label(row.resource.type_path)
+			if resource_labels[label] > 1:
+				label = row.resource.type_path
+			item.set_text(0, label + ("" if row.resource.present else " (Absent)"))
+			item.set_tooltip_text(0, row.resource.type_path + "\nEntity " + bits)
 	var parents: Dictionary = {}
 	for bits in rows:
 		var parent = rows[bits].get("parent")
 		var parent_item = _root
-		if parent is Dictionary and items.has(parent.bits) and not _has_cycle(bits):
+		if _view == 0 and parent is Dictionary and items.has(parent.bits) and not _has_cycle(bits):
 			parent_item = items[parent.bits]
 		parents[bits] = parent_item
 		var item: TreeItem = items[bits]
@@ -354,7 +421,9 @@ func _search(text: String) -> void:
 	if text.is_empty() or _snapshot_index > 0 or client == null or client.active_session_id == -1:
 		return
 	var filters: Array = []
-	if text.is_valid_int():
+	if _view == 1:
+		filters.append({"resource": true} if text.is_valid_int() else {"resource": true, "name_contains": text})
+	elif text.is_valid_int():
 		filters.append({})
 	elif text.contains("/"):
 		filters.append({"node_path": text})
@@ -397,6 +466,11 @@ func _filter() -> void:
 	var text := search_box.text.to_lower()
 	for bits in rows:
 		var row: Dictionary = rows[bits]
+		if _view == 1:
+			var resource = row.get("resource")
+			if resource is Dictionary and (text.is_empty() or resource.type_path.to_lower().contains(text) or bits.contains(text) or _search_matches.has(bits)):
+				visible_bits[bits] = true
+			continue
 		if internal(row) and not show_internal.button_pressed:
 			continue
 		if text.is_empty() or row.name.to_lower().contains(text) or _search_matches.has(bits):
@@ -417,7 +491,8 @@ func _filter() -> void:
 			hidden_count += 1
 	hidden_label.text = "%d internal hidden" % (0 if show_internal.button_pressed else hidden_count)
 	# Hiding a selected TreeItem clears the Tree's selection; restore it once visible again.
-	var selected_bits: String = selected_entity.get("bits", "")
+	var selection: Dictionary = selected_resource.get("entity", {}) if _view == 1 else selected_entity
+	var selected_bits: String = selection.get("bits", "")
 	if items.has(selected_bits) and items[selected_bits].visible and entity_tree.get_selected() != items[selected_bits]:
 		_selecting = true
 		items[selected_bits].deselect(0)
@@ -429,7 +504,23 @@ func _on_selected() -> void:
 		return
 	var bits = entity_tree.get_selected().get_metadata(0)
 	if rows.has(bits):
-		select_entity(rows[bits].entity)
+		if _view == 1:
+			select_resource(rows[bits].entity)
+		else:
+			select_entity(rows[bits].entity)
+
+func select_resource(reference: Dictionary) -> void:
+	cancel_inspection()
+	var row: Dictionary = rows.get(reference.bits, {})
+	if row.get("entity") != reference or not row.get("resource") is Dictionary:
+		status_label.text = "Resource not available in this session"
+		return
+	selected_resource = {"entity": reference.duplicate(), "type_path": row.resource.type_path}
+	_selecting = true
+	items[reference.bits].select(0)
+	_selecting = false
+	if client != null:
+		_inspect_proxy(reference, client.active_session_id, "resource", row.resource.type_path)
 
 func cancel_inspection() -> void:
 	_selection_serial += 1
@@ -439,6 +530,8 @@ func cancel_inspection() -> void:
 
 func select_entity(reference: Dictionary, inspect: bool = true) -> void:
 	cancel_inspection()
+	if _view != 0:
+		_choose_view(0)
 	var bits: String = reference.bits
 	if not rows.has(bits):
 		if client != null:
@@ -499,21 +592,27 @@ func _forget_remote_echo(key: String, serial: int) -> void:
 	if _remote_selection_echoes.get(key) == serial:
 		_remote_selection_echoes.erase(key)
 
-func _inspect_proxy(reference: Dictionary, session: int) -> void:
+func _inspect_proxy(reference: Dictionary, session: int, kind: String = "entity", type_path: String = "") -> void:
 	_clear_proxy()
-	_proxy = proxy_for(reference, session)
-	EditorInterface.inspect_object(_proxy)
-	_proxy.attach_inspector(EditorInterface.get_inspector())
+	_proxy = proxy_for(reference, session, kind, type_path)
+	if Engine.is_editor_hint():
+		EditorInterface.inspect_object(_proxy)
+		_proxy.attach_inspector(EditorInterface.get_inspector())
 	_proxy.refresh()
 
-func proxy_for(reference: Dictionary, session: int):
-	var key := "%d:%s:%s" % [session, reference.bits, reference.generation]
-	if proxies.has(key) and not proxies[key].valid_target():
-		proxies[key].invalidate()
-		proxies.erase(key)
+func proxy_for(reference: Dictionary, session: int, kind: String = "entity", type_path: String = ""):
+	var incarnation: int = client.sessions.get(session, {}).get("order", -1)
+	var key := JSON.stringify([session, incarnation, reference.bits, reference.generation, kind, type_path])
+	for cached in proxies.keys():
+		if not proxies[cached].valid_target():
+			proxies[cached].invalidate()
+			proxies.erase(cached)
 	if not proxies.has(key):
-		var proxy = Proxy.new(reference, session)
+		var proxy = Proxy.new(reference, session, kind, type_path)
 		proxy.configure(client)
+		var resource = rows.get(reference.bits, {}).get("resource")
+		if kind == "resource" and resource is Dictionary and resource.type_path == type_path:
+			proxy.set_resource_present(resource.present, false)
 		proxy.entity_link.connect(func(target): select_entity(target))
 		proxy.node_link.connect(func(id):
 			if remote != null:
@@ -560,6 +659,7 @@ func shutdown() -> void:
 	_clear_proxy()
 	_clear_proxies()
 	selected_entity = {}
+	selected_resource = {}
 	rows.clear()
 	_sync_items()
 	status_label.text = "no running session"

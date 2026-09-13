@@ -4,6 +4,7 @@
     "project": "examples/platformer-2d/godot",
     "shots": "/tmp/editor-probe/debugger",
     "layout_checkpoints": [
+      "1-resource-inspector",
       "8-node-backed-open",
       "8-node-backed-wide",
       "8-node-backed-narrow",

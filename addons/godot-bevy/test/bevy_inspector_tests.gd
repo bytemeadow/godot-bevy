@@ -80,6 +80,8 @@ func run(host: Node) -> int:
 		await _run_test("component presentation", _component_presentation)
 		await _run_test("proxy edits", _proxy_edits)
 		await _run_test("proxy paths", _proxy_paths)
+		await _run_test("resource views", _resource_views.bind(host))
+		await _run_test("resource absence", _resource_absence)
 		await _run_test("proxy ownership", _proxy_ownership.bind(host))
 		await _run_test("client", _client)
 		await _run_test("handshake", _handshake)
@@ -342,6 +344,11 @@ func _subscriptions(host: Node) -> void:
 	check(session.sent.back()[1][0].method == "godot.subscribe" and session.sent.back()[1][0].params.interval_s == 0.25, "visible pane subscribes at configured interval")
 	client._capture("bevy:rpc", [Fixtures.snapshot()], 0)
 	check(panel.items.size() == 7, "id-less summary routed to subscribed pane")
+	var sent: int = session.sent.size()
+	for view in [1, 0]:
+		panel.view_selector.select(view)
+		panel.view_selector.item_selected.emit(view)
+		check(panel.is_visible_in_tree() and panel._subscribed_session == 0 and session.sent.size() == sent, "view selector retains the real client's subscription")
 	panel.hide()
 	check(session.sent.back()[1][0].method == "godot.unsubscribe", "hidden pane unsubscribes")
 	panel.show()
@@ -938,3 +945,139 @@ func _proxy_paths() -> void:
 	check(proxy.get(leaf) == 8.5, "guarded leaf displays the response value instead of the candidate")
 	proxy.invalidate()
 	completed.append("proxy paths")
+
+func _resource_row(bits: String, type_path: String, present: bool = true) -> Dictionary:
+	var row := Fixtures.row(bits, "misleading entity name", ["bevy_ecs::resource::IsResource", "game::Unrelated"], Fixtures.entity_ref("1"))
+	if present:
+		row.components.append(type_path)
+	row.resource = {"type_path": type_path, "present": present}
+	return row
+
+func _resource_views(host: Node) -> void:
+	var panel = PanelScene.instantiate()
+	host.add_child(panel)
+	var fake = FakeClient.new()
+	panel.client = fake
+	panel._subscribed_session = 0
+	var parent := Fixtures.row("1", "Player", ["game::Player"])
+	var a := _resource_row("2", "left::Settings")
+	var b := _resource_row("3", "right::Settings", false)
+	var generic := _resource_row("4", "a::Outer<b::Inner<c::Value>>")
+	panel.apply_summary({"snapshot": true, "added": [parent, a, b, generic]})
+	panel.select_entity(parent.entity, false)
+	panel.items["1"].collapsed = false
+	panel.show_internal.button_pressed = true
+	var selections: Array = []
+	panel.entity_selected.connect(func(reference): selections.append(reference))
+	panel._choose_view(1)
+	check(panel.view_selector.get_item_text(0) == "Entities" and panel.view_selector.get_item_text(1) == "Resources", "dock exposes Entities and Resources views")
+	check(panel._subscribed_session == 0 and fake.frames.is_empty(), "switching views retains subscription without RPC")
+	check(not panel.show_internal.visible and not panel.hidden_label.visible and panel.show_internal.button_pressed, "Resources hides and retains the Entities internal toggle")
+	check(not panel.items["1"].visible and panel.items["2"].visible and panel.items["3"].visible, "Resources filters by descriptor and retains absent rows")
+	check(panel.items["2"].get_parent() == panel._root, "Resources uses a flat listing without backing-entity parents")
+	check(panel.items["2"].get_text(0) == "left::Settings" and panel.items["3"].get_text(0) == "right::Settings (Absent)", "colliding resource names use full paths and show absence")
+	check(panel.items["4"].get_text(0) == "Outer<Inner<Value>>" and panel.items["4"].get_tooltip_text(0).contains(generic.resource.type_path), "generic labels shorten with full type paths in tooltips")
+	panel.search_box.text = "right::Settings"
+	panel._search(panel.search_box.text)
+	check(panel.items["3"].visible and not panel.items["2"].visible, "resource search matches full names even while absent")
+	check(fake.frames.back().method == "godot.query" and fake.frames.back().params == {"resource": true, "name_contains": "right::Settings", "page": 0, "page_size": 256}, "resource search uses resource-filtered query")
+	fake.reply(fake.frames.back().id, {"result": {"total": 257, "entities": [b]}})
+	check(fake.frames.back().params.resource and fake.frames.back().params.page == 1, "resource pagination retains filter")
+	panel.search_box.text = ""
+	panel._search("")
+	panel.entity_tree.set_selected(panel.items["2"], 0)
+	var proxy = panel._proxy
+	check(proxy != null and proxy.target_kind == "resource" and proxy.target_type == "left::Settings", "selecting resource inspects its configured proxy")
+	check(panel.selected_entity == parent.entity and selections.is_empty(), "resource selection never becomes the user's entity selection")
+	check(fake.frames.back().method == "godot.get_components" and fake.frames.back().params == {"entity": a.entity, "components": ["left::Settings"]}, "resource proxy requests only its own component")
+	fake.reply(fake.frames.back().id, {"result": {"left::Settings": Fixtures.scalar("string", "initial"), "game::Unrelated": Fixtures.scalar("bool", true)}})
+	check(proxy.components.keys() == ["left::Settings"] and proxy.lookup.size() == 2, "resource proxy isolates properties even from extra response components")
+	var name := _property(proxy, "left::Settings", [])
+	proxy.set_candidate(name, "draft", 2)
+	proxy.legacy_folds["resource"] = false
+	var shapes: Array = []
+	proxy.property_list_changed.connect(func(): shapes.append(true))
+	proxy.accept_components({"left::Settings": Fixtures.scalar("string", "new sample")})
+	check(shapes.is_empty() and proxy.states[name].candidate == "draft" and proxy.get(name) == "initial", "resource value refresh preserves native shape and unsent candidate")
+	var entity_proxy = panel.proxy_for(a.entity, 0)
+	entity_proxy.refresh()
+	check(fake.frames.back().params == {"entity": a.entity}, "entity proxy keeps its unrestricted component request")
+	var other_type = panel.proxy_for(a.entity, 0, "resource", "right::Settings")
+	check(entity_proxy != proxy and other_type != proxy and entity_proxy != other_type, "proxy cache separates target kind and full type at the same identity")
+	panel.apply_summary({"updated": [_resource_row("2", "left::Settings", false)]})
+	check(panel._proxy == proxy and panel.items["2"].get_text(0).ends_with("(Absent)") and proxy.status == "Last observed; resource absent", "summary absence disables selected resource without losing its row or proxy")
+	panel._choose_view(0)
+	check(panel.selected_entity == parent.entity and panel.entity_tree.get_selected() == panel.items["1"], "Entities restores entity selection after resource browsing")
+	check(panel.items["2"].get_parent() == panel.items["1"] and not panel.items["1"].collapsed and panel.show_internal.visible and panel.show_internal.button_pressed, "Entities restores hierarchy, expansion and internal toggle")
+	panel._choose_view(1)
+	check(panel.entity_tree.get_selected() == panel.items["2"] and panel.proxy_for(a.entity, 0, "resource", "left::Settings") == proxy and not proxy.legacy_folds.resource, "Resources restores selection and cached folds")
+	check(fake.frames.all(func(frame): return frame.method != "godot.unsubscribe") and panel._subscribed_session == 0, "view switches never unsubscribe")
+	fake.sessions[0].order = 2
+	var replacement = panel.proxy_for(a.entity, 0, "resource", "left::Settings")
+	check(replacement != proxy and proxy.detached, "resource cache includes session incarnation")
+	panel.apply_summary({"removed": [a.entity]})
+	check(replacement.detached and not panel.items.has("2"), "destroying backing identity invalidates its resource proxy")
+	panel.shutdown()
+	panel.free()
+	completed.append("resource views")
+
+func _resource_absence() -> void:
+	for outcome in ["accepted", "rejected", "after recovery"]:
+		var fake = FakeClient.new()
+		var proxy = Proxy.new(Fixtures.entity_ref("1"), 0, "resource", "game::Settings")
+		proxy.configure(fake)
+		proxy.accept_components({"game::Settings": Fixtures.scalar("string", "observed")})
+		var name := _property(proxy, "game::Settings", [])
+		proxy.states[name].focused = true
+		proxy.set_candidate(name, "unsent draft", 4)
+		proxy.refresh()
+		var old_read: int = proxy._read_id
+		var late_read: Callable = fake.callbacks[old_read]
+		proxy.set(name, "submitted")
+		var edit: int = proxy.states[name].request
+		check(proxy.states[name].pending and proxy.states[name].status == "Waiting for acknowledgement…", "resource submission reports pending immediately")
+		check(fake.frames.back().method == "godot.mutate_leaf" and fake.frames.back().params == {"entity": Fixtures.entity_ref("1"), "component": "game::Settings", "path": [], "value": "submitted"}, "resource mutation retains the component endpoint and exact target")
+		proxy.set_candidate(name, "another draft")
+		proxy.set_resource_present(false)
+		check(proxy.get(name) == "observed" and proxy.status == "Last observed; resource absent" and proxy.lookup[name].property.usage & PROPERTY_USAGE_READ_ONLY, "absence retains labelled values with disabled fields")
+		check(not proxy.states[name].dirty and not proxy.states[name].focused and proxy.states[name].candidate == "observed" and proxy.states[name].pending, "absence discards candidates while retaining the in-flight request")
+		check(not fake.callbacks.has(old_read), "absence cancels older reads")
+		late_read.call({"result": {"game::Settings": Fixtures.scalar("string", "late read")}})
+		check(proxy.get(name) == "observed" and proxy.lookup[name].property.usage & PROPERTY_USAGE_READ_ONLY, "late read cannot resurrect absent values")
+		var sent: int = fake.frames.size()
+		proxy.set(name, "forbidden")
+		check(fake.frames.size() == sent, "absent target sends no edits")
+		if outcome == "after recovery":
+			proxy.set_resource_present(true)
+			check(proxy.lookup[name].property.usage & PROPERTY_USAGE_READ_ONLY, "reinsertion stays disabled until a fresh read")
+			var recovery_read: int = proxy._read_id
+			late_read.call({"result": {"game::Settings": Fixtures.scalar("string", "late read")}})
+			check(proxy._read_id == recovery_read and proxy.get(name) == "observed", "older read cannot consume or replace the recovery read")
+			fake.reply(proxy._read_id, {"result": {"game::Settings": Fixtures.scalar("string", "returned")}})
+		var frame := {"error": {"message": "component absent"}} if outcome == "rejected" else {"result": Fixtures.scalar("string", "late accepted")}
+		fake.reply(edit, frame)
+		check(proxy.get(name) == ("returned" if outcome == "after recovery" else "observed") and not proxy.states[name].pending, "late acknowledgement never replaces absent or freshly recovered values")
+		if outcome != "after recovery":
+			check(proxy.status == "Last observed; resource absent" and proxy.lookup[name].property.usage & PROPERTY_USAGE_READ_ONLY, "acknowledgement cannot re-enable absent display")
+			proxy.set_resource_present(true)
+			check(proxy.lookup[name].property.usage & PROPERTY_USAGE_READ_ONLY, "presence alone does not restore editing")
+			fake.reply(proxy._read_id, {"error": {"message": "component absent"}})
+			check(proxy.status == "Last observed; resource absent", "failed recovery read returns to absence")
+			proxy.set_resource_present(true)
+			fake.reply(proxy._read_id, {"result": {"game::Settings": Fixtures.scalar("string", "returned")}})
+		check(proxy.get(name) == "returned" and not proxy.lookup[name].property.usage & PROPERTY_USAGE_READ_ONLY and not proxy.states[name].dirty, "successful fresh read restores the same resource proxy")
+		proxy.invalidate()
+	var fake = FakeClient.new()
+	var proxy = Proxy.new(Fixtures.entity_ref("1"), 0, "resource", "game::Settings")
+	proxy.configure(fake)
+	proxy.accept_components({"game::Settings": Fixtures.scalar("string", "initial")})
+	var name := _property(proxy, "game::Settings", [])
+	proxy.refresh()
+	fake.reply(proxy._read_id, {"error": {"message": "component absent"}})
+	check(proxy.status == "Last observed; resource absent", "a read can detect absence before the summary")
+	proxy.refresh()
+	check(proxy._read_id != -1 and proxy.lookup[name].property.usage & PROPERTY_USAGE_READ_ONLY, "selected resource can retry without a presence delta while fields stay disabled")
+	fake.reply(proxy._read_id, {"result": {"game::Settings": Fixtures.scalar("string", "coalesced reinsertion")}})
+	check(proxy.resource_present and proxy.get(name) == "coalesced reinsertion" and not proxy.lookup[name].property.usage & PROPERTY_USAGE_READ_ONLY, "fresh read recovers removal and reinsertion coalesced between summaries")
+	proxy.invalidate()
+	completed.append("resource absence")

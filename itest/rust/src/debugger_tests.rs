@@ -1476,3 +1476,214 @@ fn debugger_ready_is_first_transport_frame_after_capture_registration(
         app.cleanup().await;
     })
 }
+
+#[derive(Resource, Reflect)]
+#[reflect(Resource)]
+#[type_path = "debugger_test::resources"]
+struct ResourceCount(u128);
+
+fn resource_count_edit(id: i64, entity: Entity, value: &str) -> Dictionary {
+    let mut params = entity_param(entity);
+    params.set("component", ResourceCount::type_path());
+    let mut segment = Dictionary::new();
+    segment.set("index", 0);
+    let mut path = VarArray::new();
+    path.push(&segment.to_variant());
+    params.set("path", &path);
+    params.set("value", value);
+    request(id, "godot.mutate_leaf", params)
+}
+
+fn resource_summary(frames: &[Wire], kind: &str, entity: Entity, present: bool) {
+    let rows = frames
+        .iter()
+        .filter_map(|frame| frame.get("params"))
+        .filter_map(|params| params.get(kind).and_then(Wire::as_array))
+        .flatten()
+        .filter(|row| {
+            row.get("entity").and_then(|id| id.get("bits"))
+                == Some(&Wire::String(entity.to_bits().to_string()))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        rows[0].get("entity"),
+        Some(&Wire::object([
+            ("bits", Wire::String(entity.to_bits().to_string())),
+            (
+                "generation",
+                Wire::Integer(i64::from(entity.generation().to_bits()))
+            ),
+        ]))
+    );
+    assert_eq!(
+        rows[0].get("resource"),
+        Some(&Wire::object([
+            ("type_path", Wire::String(ResourceCount::type_path().into())),
+            ("present", Wire::Bool(present)),
+        ]))
+    );
+    assert!(
+        frames
+            .iter()
+            .filter_map(|frame| frame.get("params"))
+            .filter_map(|params| params.get("removed").and_then(Wire::as_array))
+            .flatten()
+            .all(|id| id.get("bits") != Some(&Wire::String(entity.to_bits().to_string())))
+    );
+}
+
+#[itest(async)]
+fn debugger_resources_descriptors_query_and_removal_during_edit(
+    ctx: &TestContext,
+) -> godot::task::TaskHandle {
+    let ctx = ctx.clone();
+    godot::task::spawn(async move {
+        let (mut app, endpoint, rx, _) = setup(&ctx).await;
+        let entity = app.with_world_mut(|world| {
+            world
+                .resource::<AppTypeRegistry>()
+                .write()
+                .register::<ResourceCount>();
+            world.insert_resource(ResourceCount(u128::MAX));
+            let entity = world
+                .resource_entities()
+                .get(world.component_id::<ResourceCount>().unwrap())
+                .unwrap();
+            world
+                .entity_mut(entity)
+                .insert((Speed(2.0), Name::new("another component")));
+            entity
+        });
+        let mut params = Dictionary::new();
+        params.set("interval_s", 0.0);
+        endpoint.submit(request(401, "godot.subscribe", params));
+        app.updates(2).await;
+        let frames = rx.try_iter().collect::<Vec<_>>();
+        resource_summary(&frames, "added", entity, true);
+        assert_eq!(
+            frames
+                .iter()
+                .filter(|frame| frame.get("id") == Some(&Wire::Integer(401)))
+                .count(),
+            1
+        );
+        let mut params = entity_param(entity);
+        let mut components = VarArray::new();
+        components.push(&ResourceCount::type_path().to_variant());
+        params.set("components", &components);
+        endpoint.submit(request(402, "godot.get_components", params));
+        app.update().await;
+        let read = response(&rx, 402);
+        let Wire::Object(values) = read.get("result").unwrap() else {
+            panic!("component dictionary expected")
+        };
+        assert_eq!(
+            values.len(),
+            1,
+            "restricted read keeps its existing response shape"
+        );
+        let value = values[ResourceCount::type_path()]
+            .get("fields")
+            .unwrap()
+            .as_array()
+            .unwrap()[0]
+            .get("value")
+            .unwrap();
+        assert_eq!(value, &Wire::String(u128::MAX.to_string()));
+
+        endpoint.submit(resource_count_edit(403, entity, "7"));
+        assert_eq!(
+            app.with_world(|world| world.resource::<ResourceCount>().0),
+            u128::MAX
+        );
+        assert!(rx.try_recv().is_err(), "submission only queues");
+        app.with_world_mut(|world| {
+            world.remove_resource::<ResourceCount>();
+        });
+        app.updates(2).await;
+        let frames = rx.try_iter().collect::<Vec<_>>();
+        let replies = frames
+            .iter()
+            .filter(|frame| frame.get("id") == Some(&Wire::Integer(403)))
+            .collect::<Vec<_>>();
+        assert_eq!(replies.len(), 1);
+        assert!(
+            replies[0].get("result").is_none(),
+            "no accepted leaf can revive an absent display"
+        );
+        assert_eq!(
+            replies[0]
+                .get("error")
+                .unwrap()
+                .get("data")
+                .unwrap()
+                .get("reason"),
+            Some(&Wire::String("component absent".into()))
+        );
+        resource_summary(&frames, "updated", entity, false);
+        assert!(
+            app.with_world(|world| !world.contains_resource::<ResourceCount>()
+                && world.get_entity(entity).is_ok())
+        );
+
+        let mut params = Dictionary::new();
+        params.set("resource", true);
+        params.set("name_contains", ResourceCount::type_path());
+        params.set("page", 0);
+        params.set("page_size", 1);
+        endpoint.submit(request(404, "godot.query", params));
+        app.update().await;
+        let query = response(&rx, 404);
+        let result = query.get("result").unwrap();
+        assert_eq!(result.get("total"), Some(&Wire::Integer(1)));
+        let rows = result.get("entities").unwrap().as_array().unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            rows[0].get("entity").unwrap().get("bits"),
+            Some(&Wire::String(entity.to_bits().to_string()))
+        );
+        assert_eq!(
+            rows[0].get("resource").unwrap().get("present"),
+            Some(&Wire::Bool(false))
+        );
+
+        endpoint.submit(resource_count_edit(
+            405,
+            entity,
+            "340282366920938463463374607431768211454",
+        ));
+        assert!(!app.with_world(|world| world.contains_resource::<ResourceCount>()));
+        app.with_world_mut(|world| {
+            world.insert_resource(ResourceCount(3));
+        });
+        app.updates(2).await;
+        let frames = rx.try_iter().collect::<Vec<_>>();
+        let replies = frames
+            .iter()
+            .filter(|frame| frame.get("id") == Some(&Wire::Integer(405)))
+            .collect::<Vec<_>>();
+        assert_eq!(replies.len(), 1);
+        let accepted = replies[0].get("result").unwrap();
+        assert_eq!(accepted.get("kind"), Some(&Wire::String("integer".into())));
+        assert_eq!(
+            accepted.get("value"),
+            Some(&Wire::String((u128::MAX - 1).to_string()))
+        );
+        resource_summary(&frames, "updated", entity, true);
+        app.with_world(|world| {
+            assert_eq!(
+                world.resource::<ResourceCount>().0,
+                u128::MAX - 1,
+                "world at the drain decides the edit"
+            );
+            assert_eq!(
+                world
+                    .resource_entities()
+                    .get(world.component_id::<ResourceCount>().unwrap()),
+                Some(entity)
+            );
+        });
+        app.cleanup().await;
+    })
+}

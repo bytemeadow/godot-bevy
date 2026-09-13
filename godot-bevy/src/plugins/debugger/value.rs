@@ -98,6 +98,7 @@ pub enum ReadOnlyReason {
     Relationship,
     DepthLimit,
     InspectorReadOnly,
+    StateTransitionRequired,
 }
 
 impl ReadOnlyReason {
@@ -112,6 +113,7 @@ impl ReadOnlyReason {
             Self::Relationship => "relationship is read-only",
             Self::DepthLimit => "maximum depth reached",
             Self::InspectorReadOnly => "field is marked InspectorReadOnly",
+            Self::StateTransitionRequired => "state wrapper requires a transition request",
         }
     }
 }

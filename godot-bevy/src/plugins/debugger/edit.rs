@@ -62,6 +62,18 @@ fn permission(info: &ComponentInfo, registry: &TypeRegistry) -> Writable {
     let Some(registration) = info.type_id().and_then(|id| registry.get(id)) else {
         return Writable::No(ReadOnlyReason::ComponentNotRegistered);
     };
+    if [
+        "bevy_state::state::resources::State<",
+        "bevy_state::state::resources::NextState<",
+        "bevy_state::state::resources::PreviousState<",
+    ]
+    .iter()
+    .any(|prefix| {
+        registration.type_info().type_path().starts_with(prefix)
+            || info.name().to_string().starts_with(prefix)
+    }) {
+        return Writable::No(ReadOnlyReason::StateTransitionRequired);
+    }
     if !info.mutable() {
         return Writable::No(ReadOnlyReason::ComponentImmutable);
     }

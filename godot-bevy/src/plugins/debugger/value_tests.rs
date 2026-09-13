@@ -929,3 +929,312 @@ fn set_members_and_nested_depth_marker_are_explicit() {
         matches!(value.kind, Kind::List { items, .. } if items[0].kind == Kind::DepthLimit && items[0].writable == Writable::No(ReadOnlyReason::DepthLimit))
     );
 }
+
+#[derive(Resource, Reflect, Debug, PartialEq)]
+#[reflect(Resource)]
+struct ResourceSample {
+    exact: u128,
+    signed: i128,
+    #[reflect(@InspectorReadOnly)]
+    locked: i32,
+    #[reflect(@InspectorRange::new(0.0, 10.0))]
+    bounded: i32,
+    values: Vec<i32>,
+}
+
+fn resource_entity<R: Resource>(world: &World) -> Entity {
+    world
+        .resource_entities()
+        .get(world.component_id::<R>().unwrap())
+        .unwrap()
+}
+
+#[test]
+fn reflected_resources_reuse_component_reads_edits_and_exact_integers() {
+    let mut world = World::new();
+    let registry = AppTypeRegistry::default();
+    registry.write().register::<ResourceSample>();
+    assert!(
+        registry
+            .read()
+            .get_type_data::<bevy_ecs::reflect::ReflectComponent>(std::any::TypeId::of::<
+                ResourceSample,
+            >())
+            .is_some(),
+        "reflect(Resource) must supply ReflectComponent"
+    );
+    world.insert_resource(registry);
+    world.insert_resource(ResourceSample {
+        exact: u128::MAX,
+        signed: i128::MIN,
+        locked: 3,
+        bounded: 5,
+        values: vec![1, 2],
+    });
+    let entity = resource_entity::<ResourceSample>(&world);
+    let limits = ValueLimits::default();
+    let value = read_component(&world, entity, ResourceSample::type_path(), &limits).unwrap();
+    let Kind::Struct(fields) = value.kind else {
+        panic!("resource struct expected")
+    };
+    assert_eq!(
+        fields[0].value.kind,
+        Kind::Scalar(Scalar::Decimal(u128::MAX.to_string()))
+    );
+    assert_eq!(
+        fields[1].value.kind,
+        Kind::Scalar(Scalar::Decimal(i128::MIN.to_string()))
+    );
+    assert_eq!(fields[0].value.writable, Writable::Yes);
+    assert_eq!(
+        fields[2].value.writable,
+        Writable::No(ReadOnlyReason::InspectorReadOnly)
+    );
+    assert_eq!(fields[3].value.range, Some(InspectorRange::new(0.0, 10.0)));
+    world.clear_trackers();
+    for (field, input, reason) in [
+        (
+            "exact",
+            Scalar::Decimal("340282366920938463463374607431768211456".into()),
+            "decode failure",
+        ),
+        (
+            "locked",
+            Scalar::Integer(9),
+            "field is marked InspectorReadOnly",
+        ),
+        (
+            "bounded",
+            Scalar::Integer(11),
+            "value outside InspectorRange",
+        ),
+    ] {
+        assert_eq!(
+            mutate_component(
+                &mut world,
+                entity,
+                ResourceSample::type_path(),
+                &[PathSegment::Field(field.into())],
+                &Edit::Scalar(input),
+                &limits
+            )
+            .unwrap_err()
+            .0,
+            reason
+        );
+        assert!(!world.is_resource_changed::<ResourceSample>());
+    }
+    for (field, text) in [
+        ("exact", (u128::MAX - 1).to_string()),
+        ("signed", i128::MAX.to_string()),
+    ] {
+        let accepted = mutate_component(
+            &mut world,
+            entity,
+            ResourceSample::type_path(),
+            &[PathSegment::Field(field.into())],
+            &Edit::Scalar(Scalar::Decimal(text.clone())),
+            &limits,
+        )
+        .unwrap();
+        assert_eq!(accepted.kind, Kind::Scalar(Scalar::Decimal(text)));
+    }
+    assert!(world.is_resource_changed::<ResourceSample>());
+    assert_eq!(world.resource::<ResourceSample>().exact, u128::MAX - 1);
+    assert_eq!(world.resource::<ResourceSample>().signed, i128::MAX);
+    assert_eq!(world.resource::<ResourceSample>().locked, 3);
+    assert_eq!(world.resource::<ResourceSample>().bounded, 5);
+    let limited = read_component(
+        &world,
+        entity,
+        ResourceSample::type_path(),
+        &ValueLimits {
+            max_depth: 2,
+            max_elements: 1,
+        },
+    )
+    .unwrap();
+    let Kind::Struct(fields) = limited.kind else {
+        panic!("resource struct expected")
+    };
+    assert!(
+        matches!(&fields[4].value.kind, Kind::List { items, truncated: 1 } if items.len() == 1)
+    );
+    assert_eq!(
+        mutate_component(
+            &mut world,
+            entity,
+            ResourceSample::type_path(),
+            &[PathSegment::Field("values".into()), PathSegment::Index(0)],
+            &Edit::Scalar(Scalar::Integer(9)),
+            &ValueLimits {
+                max_depth: 1,
+                max_elements: 1
+            }
+        )
+        .unwrap_err()
+        .0,
+        "maximum depth reached"
+    );
+    assert_eq!(world.resource::<ResourceSample>().values, [1, 2]);
+}
+
+#[derive(Resource, Reflect)]
+struct UnadaptedResource(i32);
+
+#[derive(Resource, Reflect)]
+#[reflect(Resource)]
+#[component(immutable)]
+struct ImmutableResource(i32);
+
+#[test]
+fn resources_keep_registration_adapter_and_storage_permissions() {
+    let mut world = World::new();
+    world.init_resource::<AppTypeRegistry>();
+    world.insert_resource(UnadaptedResource(3));
+    let entity = resource_entity::<UnadaptedResource>(&world);
+    for registered in [false, true] {
+        if registered {
+            world
+                .resource::<AppTypeRegistry>()
+                .write()
+                .register::<UnadaptedResource>();
+        }
+        let reason = if registered {
+            ReadOnlyReason::NoReflectComponent
+        } else {
+            ReadOnlyReason::ComponentNotRegistered
+        };
+        let value = read_component(
+            &world,
+            entity,
+            UnadaptedResource::type_path(),
+            &ValueLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(value.writable, Writable::No(reason.clone()));
+        world.clear_trackers();
+        assert_eq!(
+            mutate_component(
+                &mut world,
+                entity,
+                UnadaptedResource::type_path(),
+                &[PathSegment::Index(0)],
+                &Edit::Scalar(Scalar::Integer(9)),
+                &ValueLimits::default()
+            )
+            .unwrap_err()
+            .0,
+            reason.as_str()
+        );
+        assert_eq!(world.resource::<UnadaptedResource>().0, 3);
+        assert!(!world.is_resource_changed::<UnadaptedResource>());
+    }
+    world
+        .resource::<AppTypeRegistry>()
+        .write()
+        .register::<ImmutableResource>();
+    world.insert_resource(ImmutableResource(4));
+    let entity = resource_entity::<ImmutableResource>(&world);
+    let value = read_component(
+        &world,
+        entity,
+        ImmutableResource::type_path(),
+        &ValueLimits::default(),
+    )
+    .unwrap();
+    assert!(
+        matches!(value.kind, Kind::TupleStruct(fields) if fields[0].writable == Writable::No(ReadOnlyReason::ComponentImmutable))
+    );
+    assert_eq!(
+        mutate_component(
+            &mut world,
+            entity,
+            ImmutableResource::type_path(),
+            &[PathSegment::Index(0)],
+            &Edit::Scalar(Scalar::Integer(9)),
+            &ValueLimits::default()
+        )
+        .unwrap_err()
+        .0,
+        "component immutable"
+    );
+    assert_eq!(world.resource::<ImmutableResource>().0, 4);
+}
+
+mod state_wrapper_paths {
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, Hash, Reflect, bevy_state::prelude::States)]
+    enum Mode {
+        Idle,
+        Active,
+    }
+
+    // The existing dev dependency does not enable state reflection; pin the real paths separately.
+    #[derive(Resource, Reflect)]
+    #[reflect(Resource)]
+    #[type_path = "bevy_state::state::resources"]
+    struct State<T: Send + Sync + 'static>(T);
+
+    #[derive(Resource, Reflect)]
+    #[reflect(Resource)]
+    #[type_path = "bevy_state::state::resources"]
+    struct NextState<T: Send + Sync + 'static>(T);
+
+    #[derive(Resource, Reflect)]
+    #[reflect(Resource)]
+    #[type_path = "bevy_state::state::resources"]
+    struct PreviousState<T: Send + Sync + 'static>(T);
+
+    #[test]
+    fn state_wrapper_paths_are_read_only_without_state_adapters() {
+        let mut world = World::new();
+        let registry = AppTypeRegistry::default();
+        registry.write().register::<State<Mode>>();
+        registry.write().register::<NextState<Mode>>();
+        registry.write().register::<PreviousState<Mode>>();
+        world.insert_resource(registry);
+        let fixtures = [
+            (
+                world.spawn(State(Mode::Idle)).id(),
+                State::<Mode>::type_path(),
+                std::any::type_name::<bevy_state::prelude::State<Mode>>(),
+            ),
+            (
+                world.spawn(NextState(Mode::Idle)).id(),
+                NextState::<Mode>::type_path(),
+                std::any::type_name::<bevy_state::prelude::NextState<Mode>>(),
+            ),
+            (
+                world.spawn(PreviousState(Mode::Idle)).id(),
+                PreviousState::<Mode>::type_path(),
+                std::any::type_name::<bevy_state::prelude::PreviousState<Mode>>(),
+            ),
+        ];
+        for (entity, path, actual) in fixtures {
+            assert_eq!(path, actual);
+            let value = read_component(&world, entity, path, &ValueLimits::default()).unwrap();
+            assert!(
+                matches!(value.kind, Kind::TupleStruct(fields) if matches!(&fields[0].writable,
+                    Writable::No(reason) if reason.as_str() == "state wrapper requires a transition request"))
+            );
+            assert_eq!(
+                mutate_component(
+                    &mut world,
+                    entity,
+                    path,
+                    &[PathSegment::Index(0)],
+                    &Edit::Variant("Active".into()),
+                    &ValueLimits::default()
+                )
+                .unwrap_err()
+                .0,
+                "state wrapper requires a transition request"
+            );
+        }
+        assert_eq!(world.resource::<State<Mode>>().0, Mode::Idle);
+        assert_eq!(world.resource::<NextState<Mode>>().0, Mode::Idle);
+        assert_eq!(world.resource::<PreviousState<Mode>>().0, Mode::Idle);
+    }
+}
