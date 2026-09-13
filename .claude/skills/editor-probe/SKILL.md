@@ -147,7 +147,7 @@ devenv shell -- .claude/skills/editor-probe/scripts/run.sh --manifest .claude/sk
 
 This mode launches the game through `EditorInterface.play_main_scene`, drives the real
 Entities pane, checks default filtering and search, selects MainMenu in Remote, checks the
-Bevy Inspector section, and edits Player's Speed through its SpinBox. A stale path forces a
+Bevy Inspector section, and edits Player's Speed through its numeric property editor. A stale path forces a
 runtime rejection through the same control. Both accepted and rejected values are checked.
 Local Scene selection must retain the local Inspector object while highlighting the runtime
 entity. Pane selection must keep Entities visible and subscribed. Shutdown must clear an
@@ -163,9 +163,35 @@ or incomplete editor process still exits 5.
 The temporary runtime autoload presses the main menu's real Start button with Enter; it is
 removed with the existing project backup cleanup. No test endpoint edits game values.
 
-The debugger script uses the Godot 4.2 API floor and the addon's version adapters. Run the
-same manifest with `GODOT4_BIN` selecting each prepared engine. The platformer's
-`register-docs` feature still requires 4.3+, so a 4.2 editor run needs a separate compatible
-extension build; this script does not build or change Cargo features. Missing widgets or
-selection signals fail with a visible adapter reason, not a skipped assertion. Existing
-class manifests keep their original script and exit codes.
+The debugger layout manifest requires the native section's Godot 4.4 API and is intended
+for the prepared 4.6 editor. The 4.2/4.4 runtime matrix is not verified by these scripts;
+it needs separately prepared binaries and extensions. Missing widgets or selection signals
+fail with a visible adapter reason. Existing class manifests keep their original script
+and exit codes.
+
+`layout_checkpoints` lists required PNG names. The runner checks both checkpoint log entries
+and PNG signatures, and rejects script errors even if the plugin printed a passing verdict.
+Node-backed selection, a real pure-ECS entity, and a real Speed edit use the running game.
+The pending screenshot holds editor-side delivery of that edit's response until capture;
+it does not change the runtime request or result. Long names, deep nesting, read-only and
+unsupported values, stock leaf editors and text input use the labelled presentation fixture
+from `bevy_inspector_fixtures.gd` in the same Inspector renderer.
+
+Assertions compare the Bevy value column with a native row on the same screen, measure
+consistent non-zero nesting insets, read fold visibility before and after refresh, find
+rejection text in the tree, and check that pending fields disable immediately. Text probes
+check Enter, Escape, focus and candidate retention across value and permission refreshes.
+The column reference is the first laid-out, unfolded property owned by the outer Inspector
+without a Bevy binding. Its property name is logged and included in failures. Vertical scrolling
+may clip the native row while the Bevy row is shown; both must belong to the same outer Inspector
+and viewport, and their actual value controls must have equal global x within one pixel.
+The probe waits for scrolling to settle before requiring the Bevy identity to be on screen.
+It checks identity and Speed at the default width, widens the live dock by at least 100 pixels,
+then restores its original width, retaining wide and narrow PNGs. The embedded Inspector and
+identity row must survive resizing. Folding the native reference's group must switch to a visible
+native row; unfolding it must restore the original column. `EDITOR_PROBE column_geometry=` records
+the control paths, widths, row ratios, calculated splits, panel margins, container insets and
+measured value offset. An eight-pixel offset checks that the comparison can reject a misaligned
+value control. Fixture mutation checks select the last `godot.mutate_leaf` frame and match its
+request ID and complete parameters.
+The runner restores scenes that the editor re-saves, in addition to its other backups.

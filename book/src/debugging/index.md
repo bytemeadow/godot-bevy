@@ -18,6 +18,17 @@ version-specific editor widgets on 4.2–4.6; missing widgets show “not availa
 entities use the same Bevy Inspector through a proxy object. Choose the running instance with
 the session selector; the newest started session is the default.
 
+The native Bevy section for node-backed entities requires Godot 4.4 or later. Godot 4.2
+and 4.3 retain the previous component rows and identify that fallback in the section header;
+the Entities pane remains available. The native section has one Bevy heading. Scalars and
+tuples with one scalar field appear as one row named for the component, such as `Speed`. Components
+with named fields or several values have foldable groups. Full Rust types are in tooltips;
+generic labels preserve their arguments, such as `PreviousState<GameState>`, and expand to
+full paths when short names collide. Runtime fields have no default-value revert.
+Nested fields use Inspector sections; after three levels, field labels
+show the remaining path as a breadcrumb with a copy action. Collection sizes are fixed,
+and maps, sets, unsupported values and read-only fields retain their explanations.
+
 ### Enabling the inspector
 
 `GodotDefaultPlugins` includes the inspector. To add it individually:
@@ -71,6 +82,14 @@ Expand a component in the Inspector to edit supported scalar leaves or select a 
 variant. An edit displays the runtime's accepted value or an inline rejection reason; rejected
 edits leave the accepted value unchanged. Wide integers use exact decimal text. Entity and
 node references are navigation links. Game systems can overwrite accepted edits on later ticks.
+
+Text and exact decimal integers commit on Enter; Escape restores the accepted value.
+Submitting an edit disables its field and shows “Waiting for acknowledgement…”. The runtime
+response supplies the accepted value; a rejection shows its reason beside a warning icon.
+Value refreshes retain folds and unfinished input. Component shape or permission changes
+rebuild the property rows while the proxy retains edit state and section folds.
+The embedded section has its own property selection; the outer Inspector's property filter
+does not filter its rows. Runtime edits do not enter the scene's undo history.
 
 The pane subscribes only while visible, starting with a snapshot and applying later additions,
 removals, renames, reparentings and component membership changes without rebuilding the tree.

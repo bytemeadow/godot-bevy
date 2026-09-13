@@ -5,6 +5,7 @@ const PanelScene = preload("res://addons/godot-bevy/bevy_inspector_panel.tscn")
 const ValueEditor = preload("res://addons/godot-bevy/bevy_value_editor.gd")
 const RemoteTree = preload("res://addons/godot-bevy/bevy_remote_tree.gd")
 const RpcClient = preload("res://addons/godot-bevy/bevy_rpc_client.gd")
+const Proxy = preload("res://addons/godot-bevy/bevy_entity_proxy.gd")
 
 class FakeClient extends RefCounted:
 	signal active_session_changed(session)
@@ -12,6 +13,7 @@ class FakeClient extends RefCounted:
 	var callbacks: Dictionary = {}
 	var active_session_id := 0
 	var update_interval := 0.5
+	var sessions := {0: {"order": 1}}
 	func is_session_active(session: int) -> bool:
 		return session == active_session_id and session != -1
 	func select_session(session: int) -> void:
@@ -23,6 +25,11 @@ class FakeClient extends RefCounted:
 		return id
 	func cancel_request(id: int) -> void:
 		callbacks.erase(id)
+	func last_frame(method: String) -> Dictionary:
+		for i in range(frames.size() - 1, -1, -1):
+			if frames[i].method == method:
+				return frames[i]
+		return {}
 	func reply(id: int, frame: Dictionary) -> void:
 		var callback: Callable = callbacks[id]
 		callbacks.erase(id)
@@ -69,6 +76,11 @@ func run(host: Node) -> int:
 	else:
 		await _run_test("tree", _tree.bind(host))
 		await _run_test("values", _values.bind(host))
+		await _run_test("proxy mapping", _proxy_mapping)
+		await _run_test("component presentation", _component_presentation)
+		await _run_test("proxy edits", _proxy_edits)
+		await _run_test("proxy paths", _proxy_paths)
+		await _run_test("proxy ownership", _proxy_ownership.bind(host))
 		await _run_test("client", _client)
 		await _run_test("handshake", _handshake)
 		await _run_test("subscriptions", _subscriptions.bind(host))
@@ -107,7 +119,15 @@ func _tree(host: Node) -> void:
 	panel.apply_summary(Fixtures.snapshot().params)
 	check(panel.items.size() == 7, "snapshot creates seven entity items")
 	check(panel.items["4294967298"].get_parent() == panel.items["4294967297"], "snapshot nests Player under MainMenu")
-	check(panel.hidden_count == 3 and panel.hidden_label.text == "3 hidden", "default internal filter counts observer, resource and empty entity")
+	check(panel.search_box.placeholder_text == "Filter entities" and panel.search_box.clear_button_enabled and panel.search_box.tooltip_text.contains("component"), "search has concise placeholder, clear button and supported-search tooltip")
+	var theme := Theme.new()
+	for icon in ["Object", "Node", "Node2D"]:
+		theme.set_icon(icon, "EditorIcons", GradientTexture2D.new())
+	var node := Fixtures.row("1", "", ["game::MissingClassMarker", "godot_bevy::NodeMarker", "godot_bevy::Node2DMarker", "godot_bevy::CharacterBody2DMarker"], null, true)
+	check(panel._entity_icon_name(node, theme) == "Node2D", "icon keeps the most specific class with an available theme icon")
+	check(panel._entity_icon_name(Fixtures.row("2", "", ["game::MissingClassMarker"], null, true), theme) == "Node", "invalid marker class uses node fallback")
+	check(panel._entity_icon_name(Fixtures.row("3", "", ["game::Node2DMarker"]), theme) == "Object", "pure-ECS icon remains distinct even with a node-like marker")
+	check(panel.hidden_count == 3 and panel.hidden_label.text == "3 internal hidden", "default internal filter counts observer, resource and empty entity")
 	check(not panel.items["4294967299"].visible and panel.items["4294967303"].visible, "internal observer hidden but empty Name retained")
 	check(not panel.items["4294967300"].visible, "resource with its own component type is hidden")
 	for marker in ["bevy_ecs::observer::Observer", "bevy_ecs::resource::IsResource"]:
@@ -133,7 +153,7 @@ func _tree(host: Node) -> void:
 	panel._search("")
 	check(panel.items["4294967298"].collapsed, "clearing search restores expansion")
 	panel.show_internal.button_pressed = true
-	check(panel.items["4294967299"].visible and panel.hidden_label.text == "0 hidden", "toggle reveals internal set")
+	check(panel.items["4294967299"].visible and panel.hidden_label.text == "0 internal hidden", "toggle reveals internal set")
 	var fake = FakeClient.new()
 	panel.client = fake
 	panel.search_box.text = "game::Speed"
@@ -175,19 +195,18 @@ func _tree(host: Node) -> void:
 	completed.append("tree")
 
 func _values(host: Node) -> void:
-	var expected = {"integer": SpinBox, "float": SpinBox, "bool": CheckBox, "string": LineEdit,
-		"char": LineEdit, "enum": OptionButton, "entity": LinkButton, "node": LinkButton,
-		"asset": Label, "opaque": Label, "unsupported": Label, "depth_limit": Label}
+	var scalar_kinds := ["integer", "float", "bool", "string", "char", "enum", "entity", "node",
+		"asset", "opaque", "unsupported", "depth_limit"]
 	for kind in Fixtures.values():
 		var fake = FakeClient.new()
 		var control = ValueEditor.new()
 		host.add_child(control)
 		var value: Dictionary = Fixtures.values()[kind]
 		control.configure(value, Fixtures.entity_ref("4294967298"), "game::Speed", [], fake, 0)
-		if expected.has(kind):
-			check(is_instance_of(control.editor, expected[kind]), kind + " renders its control")
+		if kind in scalar_kinds:
+			check(control.editor != null, kind + " exposes its scalar value or navigation")
 		else:
-			check(control.fold != null and control.children_editors.size() > 0, kind + " renders collapsible children")
+			check(control.fold != null and control.children_editors.size() > 0, kind + " exposes its nested values")
 		if kind in ["integer", "float", "bool", "string", "char", "enum"]:
 			var edit = {"integer": 9, "float": 8.5, "bool": false, "string": "edited", "char": "a", "enum": {"variant": "Idle"}}[kind]
 			if control.editor is SpinBox:
@@ -222,7 +241,7 @@ func _values(host: Node) -> void:
 			control.editor.pressed.emit()
 			check(links == [value.entity if kind == "entity" else value.instance_id], kind + " link preserves exact reference")
 		elif kind in ["map", "set"]:
-			check(control.children_editors[0].editor is Label and fake.frames.is_empty(), kind + " is read-only")
+			check(not control.children_editors[0].model.writable.allowed and fake.frames.is_empty(), kind + " is read-only")
 		control.free()
 	var wide = Fixtures.scalar("integer", "340282366920938463463374607431768211455")
 	wide.type_path = "u128"
@@ -249,7 +268,7 @@ func _values(host: Node) -> void:
 	control = ValueEditor.new()
 	host.add_child(control)
 	control.configure(ranged, Fixtures.entity_ref("4294967298"), "game::Range", [])
-	check(control.editor.min_value == 1.0 and control.editor.max_value == 10.0 and control.editor.step == 1.0, "SpinBox honors InspectorRange and integer step")
+	check(control.editor.min_value == 1.0 and control.editor.max_value == 10.0 and control.editor.step == 1.0, "numeric input honors InspectorRange and integer step")
 	control.free()
 	var off_grid = Fixtures.scalar("float", 0.125)
 	control = ValueEditor.new()
@@ -685,3 +704,237 @@ func _dock_tabs(host: Node) -> void:
 	tabs.free()
 	pane.free()
 	completed.append("dock tabs")
+
+func _property(proxy, component: String, path: Array, role: String = "value") -> String:
+	for property in proxy.lookup:
+		var entry: Dictionary = proxy.lookup[property]
+		if entry.component == component and entry.path == path and entry.role == role:
+			return property
+	check(false, "mapped property exists: %s %s %s" % [component, path, role])
+	return ""
+
+func _proxy_mapping() -> void:
+	var proxy = Proxy.new(Fixtures.entity_ref("1"), 0)
+	proxy.accept_components(Fixtures.values())
+	var categories := 0
+	var groups := 0
+	for property in proxy.get_property_list():
+		if property.usage & PROPERTY_USAGE_CATEGORY and property.name == "Bevy":
+			categories += 1
+		if property.usage & PROPERTY_USAGE_GROUP and not property.name.is_empty():
+			groups += 1
+		if proxy.lookup.has(property.name):
+			check(property.usage & PROPERTY_USAGE_EDITOR and not property.usage & PROPERTY_USAGE_STORAGE, "runtime properties are editor-only observations")
+			check(not property.name.get_slice("/", property.name.get_slice_count("/") - 1).is_valid_int(), "mapped leaf names cannot acquire Godot's synthetic index default")
+	check(categories == 1 and groups == 6, "one Bevy category; named and multi-value components keep groups")
+	var types := {"bool": TYPE_BOOL, "integer": TYPE_INT, "float": TYPE_FLOAT,
+		"string": TYPE_STRING, "char": TYPE_STRING, "enum": TYPE_STRING,
+		"entity": TYPE_STRING, "node": TYPE_STRING, "asset": TYPE_STRING,
+		"opaque": TYPE_STRING, "unsupported": TYPE_STRING, "depth_limit": TYPE_STRING}
+	for kind in types:
+		var entry: Dictionary = proxy.lookup[_property(proxy, kind, [])]
+		check(entry.property.type == types[kind], kind + " maps to its specified Variant type")
+		if kind in ["unsupported", "depth_limit"]:
+			check(proxy.get(entry.property.name) == Fixtures.values()[kind].reason, kind + " displays its supplied reason")
+	for kind in ["struct", "tuple_struct", "tuple", "list", "array"]:
+		var path: Array = [{"field": "speed"}] if kind == "struct" else [{"index": 0}]
+		var property := _property(proxy, kind, path)
+		check(not proxy.lookup[property].property.usage & PROPERTY_USAGE_READ_ONLY, kind + " aggregate reason does not disable writable children")
+	check(proxy.get(_property(proxy, "list", [], "truncated")) == "2 more (read limit)", "list truncation is visible")
+	for kind in ["map", "set"]:
+		for entry in proxy.lookup.values():
+			if entry.component == kind:
+				check(entry.property.usage & PROPERTY_USAGE_READ_ONLY, kind + " entries and descendants stay read-only")
+	var values := Fixtures.presentation()
+	proxy.accept_components(values)
+	var component := "game::VeryLongComponentNameThatMustRemainReadableInANarrowInspector"
+	var path: Array = [{"field": "one"}, {"field": "two"}, {"field": "three"}, {"field": "four"}, {"field": "five"}]
+	var deep := _property(proxy, component, path)
+	check(proxy.lookup[deep].sections.size() == 4 and proxy.lookup[deep].label == "four › five", "deep paths stop at three sections below component and use breadcrumb labels")
+	check(proxy.lookup[deep].copy_path == JSON.stringify(path), "breadcrumb retains the complete exact path for copying")
+	var names: Dictionary = {}
+	for entry in proxy.lookup.values():
+		check(not names.has(entry.property.name), "property names are globally unique")
+		names[entry.property.name] = true
+	var left := _property(proxy, "left::Same", [{"field": "a/b"}])
+	var right := _property(proxy, "right::Same", [{"field": "a/b"}])
+	check(left != right and proxy.lookup[left].sections[0].label != proxy.lookup[right].sections[0].label, "colliding component names get distinct properties and group labels")
+	var wide := _property(proxy, "game::Wide", [])
+	check(proxy.lookup[wide].property.type == TYPE_STRING and proxy.get(wide) == values["game::Wide"].value, "wide integer stays exact decimal text")
+	check(proxy.lookup[wide].reason.contains("0") and proxy.lookup[wide].reason.contains("100"), "wide integer bounds remain visible")
+	var ranged := _property(proxy, "game::Range", [])
+	check(proxy.lookup[ranged].property.hint == PROPERTY_HINT_RANGE and proxy.lookup[ranged].property.hint_string == "0,10,0.01", "float range metadata uses adjustment increment without zero step")
+	var variant := _property(proxy, "game::Payload", [])
+	check(proxy.get(variant) == "Moving" and proxy.lookup[variant].model.unit_variants == ["Idle"], "payload enum retains current variant outside permitted switches")
+	check(proxy.lookup[_property(proxy, "game::Payload", [{"variant": "Moving"}, {"field": "speed"}])].path == [{"variant": "Moving"}, {"field": "speed"}], "mapping preserves enum variant guard")
+	var collision := Fixtures.aggregate("struct", {"fields": [
+		{"name": "a › b", "value": Fixtures.scalar("bool", true)},
+		{"name": "a", "value": Fixtures.aggregate("struct", {"fields": [{"name": "b", "value": Fixtures.scalar("bool", false)}]})}]})
+	for field in ["three", "two", "one"]:
+		collision = Fixtures.aggregate("struct", {"fields": [{"name": field, "value": collision}]})
+	proxy.accept_components({"game::Collision": collision})
+	var base: Array = [{"field": "one"}, {"field": "two"}, {"field": "three"}]
+	var flat := _property(proxy, "game::Collision", base + [{"field": "a › b"}])
+	var nested := _property(proxy, "game::Collision", base + [{"field": "a"}, {"field": "b"}])
+	check(flat != nested and proxy.get(flat) and not proxy.get(nested), "breadcrumb text cannot collide with a literal field name")
+	proxy.invalidate()
+	completed.append("proxy mapping")
+
+func _component_presentation() -> void:
+	var fake = FakeClient.new()
+	var proxy = Proxy.new(Fixtures.entity_ref("1"), 0)
+	proxy.configure(fake)
+	var generic := "bevy_state::state::resources::PreviousState<platformer_2d_example::GameState>"
+	var values := Fixtures.presentation()
+	values["game::Named"] = Fixtures.aggregate("struct", {"fields": [{"name": "speed", "value": Fixtures.scalar("float", 5.0)}]})
+	values["game::Named"].writable.reason = "aggregate replacement denied"
+	values["game::Pair"] = Fixtures.aggregate("tuple_struct", {"fields": [Fixtures.scalar("float", 1.0), Fixtures.scalar("float", 2.0)]})
+	values["game::NestedTuple"] = Fixtures.aggregate("tuple_struct", {"fields": [values["game::Named"]]})
+	values["game::Empty"] = Fixtures.aggregate("struct", {"fields": []})
+	values["game::Restricted"] = Fixtures.aggregate("struct", {"fields": [{"name": "speed", "value": Fixtures.scalar("float", 5.0, false)}]})
+	values["game::Restricted"].writable.reason = "component is immutable"
+	values["game::DuplicateReason"] = values["game::Restricted"].duplicate(true)
+	values["game::DuplicateReason"].writable.reason = "InspectorReadOnly"
+	proxy.accept_components(values)
+	var speed := _property(proxy, "game::Speed", [{"index": 0}])
+	var entry: Dictionary = proxy.lookup[speed]
+	check(entry.label == "Speed" and entry.sections.is_empty() and not speed.contains("/") and proxy.get(speed) == 275.0, "singleton unnamed leaf is one Speed row with no generated group")
+	check(proxy.lookup[_property(proxy, "game::Text", [])].label == "Text" and proxy.lookup[_property(proxy, "game::Text", [])].sections.is_empty(), "scalar component uses its component name directly")
+	var rows := 0
+	for item in proxy.lookup.values():
+		if item.component == "game::Speed":
+			rows += 1
+		check(not item.role in ["type", "reason"] and not item.label in ["Type", "Whole value"], "type and aggregate reason never consume property rows")
+	check(rows == 1, "Speed has exactly one row")
+	for component in ["game::Named", "game::Pair", "game::NestedTuple", "game::Empty"]:
+		var found := false
+		for item in proxy.lookup.values():
+			if item.component == component:
+				found = not item.sections.is_empty()
+		check(found, component + " remains visible as a group")
+	var previous := _property(proxy, generic, [{"field": "previous"}])
+	check(proxy.lookup[previous].sections[0].label == "PreviousState<GameState>", "qualified generic type retains outer type and argument in label")
+	check(proxy.component_label("game::Speed") == "Speed", "plain qualified type label is Speed")
+	check(proxy.component_label("a::Outer<b::Inner<c::Value>, (d::Left, e::Right)>") == "Outer<Inner<Value>, (Left, Right)>", "nested generics and tuple arguments retain their structure")
+	check(proxy.section_tooltips[proxy.lookup[previous].sections[0].key] == generic, "component tooltip retains the exact full generic type")
+	var named := _property(proxy, "game::Named", [{"field": "speed"}])
+	check(proxy.section_tooltips[proxy.lookup[named].sections[0].key] == "game::Named", "fully editable leaves suppress the aggregate reason")
+	var restricted := _property(proxy, "game::Restricted", [{"field": "speed"}])
+	check(proxy.section_tooltips[proxy.lookup[restricted].sections[0].key].contains("component is immutable"), "distinct aggregate restriction is available on its group tooltip")
+	check(proxy.lookup[restricted].reason == "InspectorReadOnly", "leaf restriction remains on its property")
+	var duplicate := _property(proxy, "game::DuplicateReason", [{"field": "speed"}])
+	check(proxy.section_tooltips[proxy.lookup[duplicate].sections[0].key] == "game::DuplicateReason", "group does not repeat a restriction already visible on its leaf")
+	check(proxy.has_method("_property_can_revert"), "proxy explicitly disables undefined runtime reverts")
+	for property in proxy.lookup:
+		check(not proxy.property_can_revert(property), "runtime property cannot revert: " + property)
+	proxy.set(speed, 300.0)
+	check(fake.frames[0].method == "godot.mutate_leaf" and fake.frames[0].params == {"entity": Fixtures.entity_ref("1"), "component": "game::Speed", "path": [{"index": 0}], "value": 300.0}, "flattened Speed retains the exact indexed mutation path")
+	fake.request("godot.get_components", {"entity": Fixtures.entity_ref("1")})
+	check(fake.last_frame("godot.mutate_leaf") == fake.frames[0] and fake.last_frame("missing").is_empty(), "probe frame lookup skips later reads and reports absent methods")
+	proxy.invalidate()
+	proxy = Proxy.new()
+	proxy.accept_components({"a::State<a::Game>": values["game::Named"], "b::State<b::Game>": values["game::Named"]})
+	var a := _property(proxy, "a::State<a::Game>", [{"field": "speed"}])
+	var b := _property(proxy, "b::State<b::Game>", [{"field": "speed"}])
+	check(proxy.lookup[a].sections[0].label == "a::State<a::Game>" and proxy.lookup[b].sections[0].label == "b::State<b::Game>", "colliding generic labels expand to full paths")
+	proxy.invalidate()
+	completed.append("component presentation")
+
+func _proxy_edits() -> void:
+	var fake = FakeClient.new()
+	var proxy = Proxy.new(Fixtures.entity_ref("1"), 0)
+	proxy.configure(fake)
+	proxy.accept_components({"game::Speed": Fixtures.scalar("float", 0.125), "game::Text": Fixtures.scalar("string", "accepted")})
+	var number := _property(proxy, "game::Speed", [])
+	var text := _property(proxy, "game::Text", [])
+	var shapes: Array = []
+	proxy.property_list_changed.connect(func(): shapes.append(true))
+	for i in 10:
+		check(proxy.get(number) == 0.125, "getter reads accepted cache")
+	check(fake.frames.is_empty(), "getter performs no RPC")
+	var states: Array = []
+	proxy.field_changed.connect(func(name): states.append([name, proxy.states[name].pending]))
+	check(proxy._set(number, 0.001), "set returns handled locally")
+	check(proxy.states[number].pending and states == [[number, true]] and proxy.get(number) == 0.125, "submission publishes pending in the same frame and preserves accepted cache")
+	check(fake.frames[0].params == {"entity": Fixtures.entity_ref("1"), "component": "game::Speed", "path": [], "value": 0.001}, "proxy sends exact unquantized mutation frame")
+	proxy.set(number, 9.0)
+	check(fake.frames.size() == 1, "pending field cannot submit twice")
+	fake.reply(1, {"result": Fixtures.scalar("float", 0.0625)})
+	check(proxy.get(number) == 0.0625 and proxy.states[number].status == "Accepted" and not proxy.states[number].pending, "acknowledgement value replaces candidate exactly")
+	check(fake.frames.back().method == "godot.get_components", "acknowledgement requests a fresh sample")
+	var old_read: int = proxy._read_id
+	proxy.set(number, 0.125)
+	fake.reply(proxy.states[number].request, {"error": {"message": "rejected", "data": {"reason": "path shape changed"}}})
+	check(proxy.get(number) == 0.0625 and proxy.states[number].status == "path shape changed" and proxy.states[number].rejected, "rejection retains accepted value and exact reason")
+	check(not fake.callbacks.has(old_read), "acknowledgement discards a read begun before it")
+	proxy.states[text].focused = true
+	proxy.set_candidate(text, "half typed", 4, 1, 4)
+	proxy.accept_components({"game::Speed": Fixtures.scalar("float", 0.25), "game::Text": Fixtures.scalar("string", "sample")})
+	check(proxy.get(number) == 0.25 and proxy.get(text) == "accepted" and proxy.states[text].candidate == "half typed", "refresh updates other values while retaining focused accepted value and candidate")
+	check(shapes.is_empty(), "value changes never notify the property list")
+	proxy.restore_candidate(text)
+	check(proxy.states[text].candidate == "accepted", "Escape restores accepted text without a mutation")
+	proxy.states[text].focused = false
+	proxy.accept_components({"game::Speed": Fixtures.scalar("float", 0.25, false), "game::Text": Fixtures.scalar("string", "sample")})
+	check(shapes.size() == 1, "permission changes rebuild the property list")
+	var sent: int = fake.frames.size()
+	proxy.set(number, 1.0)
+	check(fake.frames.size() == sent and proxy.states[number].status == "InspectorReadOnly", "read-only attempts keep reason and send nothing")
+	proxy.invalidate()
+	check(fake.callbacks.is_empty(), "invalidating proxy cancels owned requests")
+	completed.append("proxy edits")
+
+func _proxy_ownership(host: Node) -> void:
+	var panel = PanelScene.instantiate()
+	host.add_child(panel)
+	panel.client = FakeClient.new()
+	var reference := Fixtures.entity_ref("1")
+	var proxy = panel.proxy_for(reference, 0)
+	proxy.accept_components({"game::Text": Fixtures.scalar("string", "accepted")})
+	var name := _property(proxy, "game::Text", [])
+	proxy.set_candidate(name, "candidate", 3, 0, 3)
+	proxy.selected_property = name
+	panel._proxy = proxy
+	panel._clear_proxy()
+	check(panel.proxy_for(reference, 0) == proxy and proxy.states[name].candidate == "candidate" and proxy.selected_property == name, "pane retains cache, text and selection after disposable inspection is cleared")
+	var control = ValueEditor.new()
+	host.add_child(control)
+	control.configure(proxy.components["game::Text"], reference, "game::Text", [], panel.client, 0, "", proxy)
+	control.editor.text_submitted.emit("submitted")
+	check(proxy.states[name].pending and not control.editor.editable, "fallback field disables immediately through the shared proxy")
+	var request: int = proxy.states[name].request
+	control.free()
+	panel.client.reply(request, {"result": Fixtures.scalar("string", "accepted after teardown")})
+	check(proxy.get(name) == "accepted after teardown" and not proxy.states[name].pending, "freeing a fallback row does not cancel or lose its mutation acknowledgement")
+	panel.client.sessions[0].order = 2
+	var replacement = panel.proxy_for(reference, 0)
+	check(replacement != proxy and proxy.detached, "new session incarnation cannot reuse old proxy state")
+	panel.shutdown()
+	check(replacement.detached and panel.proxies.is_empty(), "shutdown invalidates all pane-owned proxies")
+	panel.free()
+	completed.append("proxy ownership")
+
+func _proxy_paths() -> void:
+	var fake = FakeClient.new()
+	var proxy = Proxy.new(Fixtures.entity_ref("1"), 0)
+	proxy.configure(fake)
+	var values := Fixtures.presentation()
+	values["game::Wide"].value = "340282366920938463463374607431768211455"
+	values["game::Wide"].erase("range")
+	proxy.accept_components(values)
+	var wide := _property(proxy, "game::Wide", [])
+	proxy.set(wide, values["game::Wide"].value)
+	var mutation: Dictionary = fake.last_frame("godot.mutate_leaf")
+	check(mutation.get("id", -1) == proxy.states[wide].request and mutation.get("params", {}).get("value") == values["game::Wide"].value and mutation.get("params", {}).get("value") is String, "proxy sends the full u128 decimal string without conversion")
+	fake.reply(proxy.states[wide].request, {"result": values["game::Wide"]})
+	check(proxy.get(wide) == values["game::Wide"].value, "proxy accepts the full u128 decimal string exactly")
+	var path: Array = [{"variant": "Moving"}, {"field": "speed"}]
+	var leaf := _property(proxy, "game::Payload", path)
+	proxy.lookup[leaf].label = "Renamed display"
+	proxy.set(leaf, 9.0)
+	mutation = fake.last_frame("godot.mutate_leaf")
+	check(mutation.get("id", -1) == proxy.states[leaf].request and mutation.get("params", {}) == {"entity": Fixtures.entity_ref("1"), "component": "game::Payload", "path": path, "value": 9.0}, "display names never reconstruct guarded mutation paths")
+	fake.reply(proxy.states[leaf].request, {"result": Fixtures.scalar("float", 8.5)})
+	check(proxy.get(leaf) == 8.5, "guarded leaf displays the response value instead of the candidate")
+	proxy.invalidate()
+	completed.append("proxy paths")

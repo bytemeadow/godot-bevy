@@ -2,6 +2,19 @@
   {
     "mode": "debugger",
     "project": "examples/platformer-2d/godot",
-    "shots": "/tmp/editor-probe/debugger"
+    "shots": "/tmp/editor-probe/debugger",
+    "layout_checkpoints": [
+      "8-node-backed-open",
+      "8-node-backed-wide",
+      "8-node-backed-narrow",
+      "9-pure-ecs",
+      "10-nesting-two-levels-long-name",
+      "11-read-only",
+      "11-unsupported",
+      "5-pending-edit",
+      "5-accepted-edit",
+      "6-rejected-edit",
+      "12-text-candidate"
+    ]
   }
 ]
