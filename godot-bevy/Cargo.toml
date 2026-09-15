@@ -11,7 +11,7 @@ version.workspace = true
 
 [dependencies]
 # Core Bevy sub-crates (required)
-bevy_app = {version = "0.19", default-features = false}
+bevy_app = {version = "0.19", default-features = false, features = ["bevy_reflect"]}
 bevy_asset = {version = "0.19", default-features = false}
 bevy_diagnostic = {version = "0.19", default-features = false}
 bevy_ecs = {version = "0.19", default-features = false, features = ["multi_threaded", "bevy_reflect"]}
