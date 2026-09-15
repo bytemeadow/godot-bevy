@@ -10,6 +10,6 @@ pub use autosync::{
 };
 pub use plugin::{
     GodotSceneTreePlugin, Groups, NodeEntityIndex, ProtectedNodeEntity, SceneTreeConfig,
-    SceneTreeMessage, SceneTreeMessageReader, SceneTreeMessageType, SceneTreeRef,
+    SceneTreeMessage, SceneTreeMessageReader, SceneTreeMessageType, SceneTreeRef, SceneTreeSet,
 };
 pub use relationship::{GodotChildOf, GodotChildren};
