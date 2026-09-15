@@ -78,6 +78,8 @@ func run(host: Node) -> int:
 		await _run_test("component groups", _component_groups.bind(host))
 		await _run_test("component search", _component_search.bind(host))
 		await _run_test("component selection", _component_selection.bind(host))
+		await _run_test("invalid node selection", _invalid_node_selection.bind(host))
+		await _run_test("removed entity proxies", _removed_entity_proxies.bind(host))
 		await _run_test("values", _values.bind(host))
 		await _run_test("proxy mapping", _proxy_mapping)
 		await _run_test("component presentation", _component_presentation)
@@ -93,6 +95,7 @@ func run(host: Node) -> int:
 		await _run_test("client", _client)
 		await _run_test("handshake", _handshake)
 		await _run_test("subscriptions", _subscriptions.bind(host))
+		await _run_test("resubscribe snapshots", _resubscribe_snapshots.bind(host))
 		await _run_test("chunked snapshots", _chunked_snapshots.bind(host))
 		await _run_test("snapshot recovery", _snapshot_recovery.bind(host))
 		await _run_test("snapshot selection", _snapshot_selection.bind(host))
@@ -348,6 +351,70 @@ func _component_selection(host: Node) -> void:
 	remote.free()
 	completed.append("component selection")
 
+func _invalid_node_selection(host: Node) -> void:
+	for values in [{"game::GodotNodeHandle": Fixtures.aggregate("node", {"instance_id": "101", "valid": false})}, {}]:
+		var panel = PanelScene.instantiate()
+		host.add_child(panel)
+		var client = FakeClient.new()
+		var remote = FakeRemote.new()
+		panel.client = client
+		panel.remote = remote
+		var pure := Fixtures.row("1", "Pure", ["game::Speed"])
+		var node := Fixtures.row("2", "Freed", ["game::GodotNodeHandle"], null, true)
+		panel.apply_summary({"snapshot": true, "added": [pure, node]})
+		panel.select_entity(pure.entity)
+		var previous = panel._proxy
+		panel.select_entity(node.entity)
+		client.reply(client.frames.back().id, {"result": values})
+		check(panel._proxy != null and panel._proxy != previous and panel._proxy.entity == node.entity, "invalid or missing node handle replaces the previous Inspector proxy")
+		check(remote.requested.is_empty(), "invalid or missing node handle never selects a Remote node")
+		check(client.frames.size() == 3 and client.frames.back().params == {"entity": node.entity}, "invalid or missing node handle starts one proxy read")
+		if panel._proxy != null and panel._proxy != previous:
+			client.reply(client.frames.back().id, {"result": values})
+			if not values.is_empty():
+				var name := _property(panel._proxy, "game::GodotNodeHandle", [])
+				check(panel._proxy.get(name) == "Freed node 101", "fallback proxy displays the freed node identity")
+		panel.shutdown()
+		panel.free()
+		remote.free()
+	completed.append("invalid node selection")
+
+func _removed_entity_proxies(host: Node) -> void:
+	for chunked in [false, true]:
+		var panel = PanelScene.instantiate()
+		host.add_child(panel)
+		var client = FakeClient.new()
+		panel.client = client
+		var selected := Fixtures.row("1", "Selected", ["game::Speed"])
+		var cached := Fixtures.row("2", "Cached", ["game::Speed"])
+		var survivor := Fixtures.row("3", "Survivor", ["game::Speed"])
+		panel.apply_summary({"snapshot": true, "added": [selected, cached, survivor]})
+		panel.select_entity(selected.entity)
+		var proxy = panel._proxy
+		client.reply(client.frames.back().id, {"result": {"game::Speed": Fixtures.scalar("float", 4.0)}})
+		var name := _property(proxy, "game::Speed", [])
+		proxy.refresh()
+		var read_id: int = proxy._read_id
+		var cached_proxy = panel.proxy_for(cached.entity, 0)
+		var survivor_proxy = panel.proxy_for(survivor.entity, 0)
+		var remote_proxy = panel.proxy_for(Fixtures.entity_ref("4"), 0)
+		if chunked:
+			panel.apply_summary({"snapshot": true, "snapshot_index": 0, "snapshot_complete": false, "added": [selected, cached]})
+		panel.apply_summary({"removed": [selected.entity, cached.entity]})
+		if chunked:
+			check(not proxy.detached and panel._proxy == proxy, "buffered removal retains the last complete Inspector until snapshot commit")
+			panel.apply_summary({"snapshot": true, "snapshot_index": 1, "snapshot_complete": true, "added": [survivor]})
+		check(proxy.detached and cached_proxy.detached and not panel.proxies.values().has(proxy) and not panel.proxies.values().has(cached_proxy), "removal invalidates and erases selected and cached entity proxies")
+		check(panel._proxy == null and panel.selected_entity.is_empty() and panel.status_label.text == "Entity not available in this session", "selected entity removal clears inspection and reports unavailability")
+		check(not panel.items.has("1") and not panel.items.has("2") and not client.callbacks.has(read_id), "removed entity rows and pending proxy reads are discarded")
+		check(not survivor_proxy.detached and not remote_proxy.detached and panel.proxies.values().has(remote_proxy), "removal preserves surviving and Remote-resolved proxies absent from the summary")
+		var sent: int = client.frames.size()
+		proxy.set(name, 8.0)
+		check(client.frames.size() == sent, "detached entity proxy cannot submit edits")
+		panel.shutdown()
+		panel.free()
+	completed.append("removed entity proxies")
+
 func _values(host: Node) -> void:
 	var scalar_kinds := ["integer", "float", "bool", "string", "char", "enum", "entity", "node",
 		"asset", "opaque", "unsupported", "depth_limit"]
@@ -494,6 +561,7 @@ func _subscriptions(host: Node) -> void:
 	var config_id = session.sent[0][1][0].id
 	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": config_id, "result": {"enabled": true, "update_interval": 0.25}}], 0)
 	check(session.sent.back()[1][0].method == "godot.subscribe" and session.sent.back()[1][0].params.interval_s == 0.25, "visible pane subscribes at configured interval")
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"subscribed": true}}], 0)
 	client._capture("bevy:rpc", [Fixtures.snapshot()], 0)
 	check(panel.items.size() == 7, "id-less summary routed to subscribed pane")
 	var sent: int = session.sent.size()
@@ -520,6 +588,60 @@ func _subscriptions(host: Node) -> void:
 	client.shutdown()
 	completed.append("subscriptions")
 
+func _resubscribe_snapshots(host: Node) -> void:
+	var panel = PanelScene.instantiate()
+	host.add_child(panel)
+	var client = RpcClient.new()
+	var session = FakeSession.new()
+	var adapter = FakeRemote.new()
+	host.add_child(adapter)
+	client.setup_session(0, session)
+	panel.setup(client, adapter)
+	session.started.emit()
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "method": "godot.ready", "params": {}}], 0)
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"update_interval": 0.5}}], 0)
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"subscribed": true}}], 0)
+	var first := {"jsonrpc": "2.0", "method": "godot.summary", "params": {
+		"snapshot": true, "snapshot_index": 0, "snapshot_complete": false,
+		"added": [Fixtures.row("1", "Old first", ["game::Speed"])]}}
+	var stale := {"jsonrpc": "2.0", "method": "godot.summary", "params": {
+		"snapshot": true, "snapshot_index": 1, "snapshot_complete": true,
+		"added": [Fixtures.row("2", "Old last", ["game::Speed"])]}}
+	client._capture("bevy:rpc", [first], 0)
+	check(panel._snapshot_index == 1 and panel._snapshot_rows.has("1"), "resubscribe fixture starts with an acknowledged partial snapshot")
+	panel.hide()
+	panel.show()
+	var subscribe_id: int = session.sent.back()[1][0].id
+	var sent: int = session.sent.size()
+	for chunk in [stale, first]:
+		client._capture("bevy:rpc", [chunk], 0)
+		check(panel._subscribed_session == 0 and panel.status_label.text == "Connecting…" and session.sent.size() == sent, "stale chunk before subscribe acknowledgement cannot interrupt the new subscription")
+		check(panel._snapshot_index == 0 and panel._snapshot_rows.is_empty() and panel.rows.is_empty(), "stale continuation and chunk zero cannot stage or commit abandoned rows")
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": subscribe_id, "result": {"subscribed": true}}], 0)
+	first.params.added = [Fixtures.row("3", "New first", ["game::Speed"])]
+	stale.params.added = [Fixtures.row("4", "New last", ["game::Speed"])]
+	client._capture("bevy:rpc", [first], 0)
+	check(panel._snapshot_index == 1 and panel._snapshot_rows.keys() == ["3"] and panel.rows.is_empty(), "acknowledged subscription stages only its new first chunk")
+	client._capture("bevy:rpc", [stale], 0)
+	check(panel.rows.keys() == ["3", "4"] and panel.items.size() == 2 and panel.status_label.text == "2 entities", "new snapshot commits normally after stale chunks are ignored")
+	panel.hide()
+	panel.show()
+	var abandoned_id: int = session.sent.back()[1][0].id
+	panel.hide()
+	panel.show()
+	subscribe_id = session.sent.back()[1][0].id
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": abandoned_id, "result": {"subscribed": true}}], 0)
+	client._capture("bevy:rpc", [first], 0)
+	check(panel._snapshot_rows.is_empty() and panel.status_label.text == "Connecting…", "an abandoned subscribe acknowledgement cannot open the current subscription")
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": subscribe_id, "error": {"code": -32602, "message": "debugger disabled"}}], 0)
+	client._capture("bevy:rpc", [first], 0)
+	check(panel._subscribed_session == -1 and panel._snapshot_rows.is_empty() and panel.status_label.text == "debugger disabled", "rejected subscribe leaves summary delivery closed")
+	panel.shutdown()
+	client.shutdown()
+	panel.free()
+	adapter.free()
+	completed.append("resubscribe snapshots")
+
 func _chunked_snapshots(host: Node) -> void:
 	var panel = PanelScene.instantiate()
 	var single = PanelScene.instantiate()
@@ -534,6 +656,7 @@ func _chunked_snapshots(host: Node) -> void:
 	session.started.emit()
 	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "method": "godot.ready", "params": {}}], 0)
 	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"update_interval": 0.5}}], 0)
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"subscribed": true}}], 0)
 	var snapshot: Dictionary = Fixtures.snapshot().params
 	var all_rows: Array = snapshot.added.duplicate()
 	all_rows.reverse()
@@ -594,10 +717,12 @@ func _chunked_snapshots(host: Node) -> void:
 	session.started.emit()
 	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "method": "godot.ready", "params": {}}], 0)
 	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"update_interval": 0.5}}], 0)
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"subscribed": true}}], 0)
 	client._capture("bevy:rpc", [chunks[3]], 0)
 	check(panel.rows.is_empty() and panel.items.is_empty(), "restarted session rejects a continuation without its first chunk")
 	panel.hide()
 	panel.show()
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"subscribed": true}}], 0)
 	client._capture("bevy:rpc", [chunks[0]], 0)
 	check(not panel._snapshot_rows.is_empty(), "client shutdown fixture has an unfinished snapshot")
 	client.shutdown()
@@ -620,6 +745,7 @@ func _snapshot_recovery(host: Node) -> void:
 	session.started.emit()
 	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "method": "godot.ready", "params": {}}], 0)
 	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"update_interval": 0.5}}], 0)
+	client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"subscribed": true}}], 0)
 	client._capture("bevy:rpc", [Fixtures.snapshot()], 0)
 	panel.select_entity(Fixtures.entity_ref("4294967298"), false)
 	var complete: Dictionary = panel.rows.duplicate(true)
@@ -657,6 +783,7 @@ func _snapshot_recovery(host: Node) -> void:
 		panel.hide()
 		panel.show()
 		check(panel._subscribed_session == 0 and session.sent.back()[1][0].method == "godot.subscribe", "reopening an interrupted pane requests a fresh subscription")
+		client._capture("bevy:rpc", [{"jsonrpc": "2.0", "id": session.sent.back()[1][0].id, "result": {"subscribed": true}}], 0)
 		client._capture("bevy:rpc", [Fixtures.snapshot()], 0)
 		check(panel.rows == complete and panel.status_label.text == "7 entities", "fresh snapshot completes after interruption")
 	client._capture("bevy:rpc", [partial], 0)

@@ -34,6 +34,8 @@ var _component_items: Dictionary = {}
 var _component_expansion: Dictionary = {}
 var _root: TreeItem
 var _subscribed_session := -1
+var _subscription_ready := false
+var _subscription_serial := 0
 var _search_expansion: Dictionary = {}
 var _search_component_expansion: Dictionary = {}
 var _searching := false
@@ -188,6 +190,8 @@ func _session_changed(_id: int) -> void:
 
 func _unsubscribe() -> void:
 	_cancel_state_read()
+	_subscription_ready = false
+	_subscription_serial += 1
 	if client != null and _subscribed_session != -1 and client.is_session_active(_subscribed_session):
 		client.request("godot.unsubscribe", {}, Callable(), _subscribed_session)
 	_subscribed_session = -1
@@ -213,11 +217,16 @@ func _subscription_visibility() -> void:
 		return
 	_subscribed_session = client.active_session_id
 	var session := _subscribed_session
+	var serial := _subscription_serial
 	status_label.text = "Connecting…"
 	client.request("godot.subscribe", {"interval_s": client.update_interval}, func(frame):
-		if session == _subscribed_session and frame.has("error"):
+		if session != _subscribed_session or serial != _subscription_serial:
+			return
+		if frame.has("error"):
 			status_label.text = frame.error.message
 			_subscribed_session = -1
+		else:
+			_subscription_ready = true
 	, session)
 	if _view == 2:
 		_request_states()
@@ -262,7 +271,7 @@ func _request_states() -> void:
 	, session)
 
 func _summary(session_id: int, params: Dictionary) -> void:
-	if session_id == _subscribed_session:
+	if session_id == _subscribed_session and _subscription_ready:
 		apply_summary(params)
 
 func apply_summary(params: Dictionary) -> void:
@@ -271,6 +280,7 @@ func apply_summary(params: Dictionary) -> void:
 		_end_subscription(params.get("reason", "Subscription ended"))
 		return
 	var pending: Dictionary = {}
+	var removed: Array = params.get("removed", []).duplicate()
 	if params.get("snapshot", false):
 		var index: int = params.get("snapshot_index", 0)
 		if index == 0:
@@ -289,6 +299,7 @@ func apply_summary(params: Dictionary) -> void:
 			return
 		for delta in _snapshot_deltas:
 			_apply_delta(_snapshot_rows, delta)
+			removed.append_array(delta.get("removed", []))
 		rows = _snapshot_rows
 		pending = _pending_selection
 		_reset_snapshot()
@@ -301,6 +312,7 @@ func apply_summary(params: Dictionary) -> void:
 	_sync_items()
 	_search(search_box.text)
 	_update_count()
+	_sync_entity_proxies(removed)
 	if not pending.is_empty() and client != null and pending.session == client.active_session_id:
 		_ensure_selection(pending.reference, pending.session, pending.inspect)
 
@@ -327,6 +339,20 @@ func _sync_resource_proxies() -> void:
 			proxies.erase(key)
 		else:
 			proxy.set_resource_present(row.resource.present, false)
+
+func _sync_entity_proxies(removed: Array) -> void:
+	for reference in removed:
+		for key in proxies.keys():
+			var proxy = proxies[key]
+			if proxy.target_kind == "entity" and proxy.entity.bits == reference.bits:
+				proxy.invalidate()
+				proxies.erase(key)
+				if _proxy == proxy:
+					_clear_proxy()
+		if selected_entity.get("bits") == reference.bits:
+			cancel_inspection()
+			selected_entity = {}
+			status_label.text = "Entity not available in this session"
 
 func _end_subscription(reason: String) -> void:
 	_unsubscribe()
@@ -791,8 +817,10 @@ func select_entity(reference: Dictionary, inspect: bool = true) -> void:
 			if frame.has("error"):
 				status_label.text = frame.error.message
 				return
+			var handled := false
 			for value in frame.result.values():
 				if value.kind == "node" and value.valid:
+					handled = true
 					var key := "%d:%s" % [session, value.instance_id]
 					_remote_selection_echoes[key] = serial
 					var selected: bool = await remote.select_node(value.instance_id, session)
@@ -803,6 +831,8 @@ func select_entity(reference: Dictionary, inspect: bool = true) -> void:
 						_forget_remote_echo(key, serial)
 					if not selected and serial == _selection_serial and session == client.active_session_id:
 						_inspect_proxy(reference, session)
+			if not handled and serial == _selection_serial and session == client.active_session_id:
+				_inspect_proxy(reference, session)
 		)
 	else:
 		_inspect_proxy(reference, session)
