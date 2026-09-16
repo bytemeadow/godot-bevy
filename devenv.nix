@@ -119,6 +119,11 @@ in
       cd itest && ./run-tests.sh "$@"
     '';
 
+    inspector-tests.exec = ''
+      exec "''${GODOT4_BIN:-godot}" --headless --path itest/godot \
+        --scene res://addons/godot-bevy/test/TestRunner.tscn -- --bevy-inspector-tests
+    '';
+
     mutants.exec = ''
       python3 itest/qualification_mutants.py "$@"
     '';
