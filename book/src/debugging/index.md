@@ -134,8 +134,12 @@ fn configure_debugger(mut config: ResMut<DebuggerConfig>) {
 }
 ```
 
-`DebuggerConfig::value_limits` bounds collection elements and nesting depth, with explicit
-truncation markers. There is no unsolicited legacy entity stream.
+`DebuggerConfig::value_limits` bounds collection elements, nesting depth, and the total number
+of values in one inspection. The total budget (`max_values`) defaults to 16,384, including
+containers and read-limit notices; zero uses one so a single leaf can still be read.
+Omitted collection entries appear as "N more (read limit)". A struct, tuple, or enum whose
+fields cannot fit appears as a non-editable "maximum value count reached" notice.
+There is no unsolicited legacy entity stream.
 `DebuggerConfig::snapshot_chunk_size` limits the initial snapshot to 256 entity summaries per
 frame by default (zero uses one), sending one chunk per `First`; the pane shows a loading count
 and keeps its last complete tree until the final chunk arrives.

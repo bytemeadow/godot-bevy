@@ -243,6 +243,10 @@ impl From<&Value> for Wire {
                 set("reason", Self::String("maximum depth reached".into()));
                 "depth_limit"
             }
+            Kind::ValueLimit => {
+                set("reason", Self::String("maximum value count reached".into()));
+                "value_limit"
+            }
         };
         fields.insert("kind".into(), Self::String(kind.into()));
         Self::Object(fields)

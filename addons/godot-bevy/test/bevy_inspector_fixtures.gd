@@ -59,6 +59,7 @@ static func values() -> Dictionary:
 		"opaque": aggregate("opaque", {"debug": "Opaque(7)"}),
 		"unsupported": aggregate("unsupported", {"reason": "component not registered"}),
 		"depth_limit": aggregate("depth_limit", {"reason": "maximum depth reached"}),
+		"value_limit": aggregate("value_limit", {"reason": "maximum value count reached"}),
 	}
 
 static func presentation() -> Dictionary:
