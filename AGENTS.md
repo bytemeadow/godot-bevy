@@ -19,6 +19,7 @@ Everything runs inside `devenv shell -- <cmd>` (direnv usually activates the env
 |--------|--------------|
 | `ci-lint` | what CI enforces: `cargo fmt --check`, `clippy -D warnings`, the examples portfolio check, the capture harness Python suites and clippy with each example's capture features |
 | `itest` | integration tests, natively (needs local Godot) |
+| `inspector-tests` | GDScript inspector suite, natively (needs local Godot and an imported `itest/godot` project; honours `GODOT4_BIN`) |
 | `bench` | benchmarks, natively (needs local Godot) |
 | `profile` | tracy span table for one benchmark, or samply flamegraph with `--native` |
 | `profile-compare` | interleaved span comparison vs a base ref (diagnostic-only) |
