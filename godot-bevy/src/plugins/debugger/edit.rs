@@ -239,7 +239,8 @@ fn leaf<'a>(
             Writable::Yes,
             &ValueLimits {
                 max_depth: 0,
-                max_elements: 0
+                max_elements: 0,
+                max_values: 1,
             }
         )
         .kind,

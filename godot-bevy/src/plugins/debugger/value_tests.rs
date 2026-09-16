@@ -45,6 +45,256 @@ fn view(value: &dyn PartialReflect) -> Value {
     )
 }
 
+fn value_count(value: &Value) -> usize {
+    1 + match &value.kind {
+        Kind::Struct(fields) | Kind::Enum { fields, .. } => fields
+            .iter()
+            .map(|field| value_count(&field.value))
+            .sum::<usize>(),
+        Kind::TupleStruct(items)
+        | Kind::Tuple(items)
+        | Kind::List { items, .. }
+        | Kind::Array { items, .. }
+        | Kind::Set { members: items, .. } => items.iter().map(value_count).sum::<usize>(),
+        Kind::Map { entries, .. } => entries
+            .iter()
+            .map(|(key, value)| value_count(key) + value_count(value))
+            .sum::<usize>(),
+        _ => 0,
+    }
+}
+
+#[test]
+fn nested_collections_share_a_total_value_budget() {
+    let source = vec![vec![(0..100_i32).collect::<Vec<_>>(); 100]; 100];
+    let value = view(&source);
+    assert!(value_count(&value) <= 16_384);
+    let Kind::List { items, truncated } = &value.kind else {
+        panic!("outer list expected")
+    };
+    assert_eq!(items.len() + truncated, 100);
+    let mut omitted = *truncated;
+    let mut leaves = 0;
+    for middle in items {
+        let Kind::List { items, truncated } = &middle.kind else {
+            panic!("middle list expected")
+        };
+        assert_eq!(items.len() + truncated, 100);
+        omitted += truncated;
+        for inner in items {
+            let Kind::List { items, truncated } = &inner.kind else {
+                panic!("inner list expected")
+            };
+            assert_eq!(items.len() + truncated, 100);
+            omitted += truncated;
+            for (index, leaf) in items.iter().enumerate() {
+                assert_eq!(leaf.kind, Kind::Scalar(Scalar::Integer(index as i64)));
+                assert_eq!(leaf.writable, Writable::Yes);
+                leaves += 1;
+            }
+        }
+    }
+    assert!(leaves > 0);
+    assert!(omitted > 0);
+}
+
+#[test]
+fn collection_budget_counts_containers_keys_and_values() {
+    let limits = ValueLimits {
+        max_values: 4,
+        ..Default::default()
+    };
+    let list = vec![10_i32, 20, 30, 40, 50];
+    let array = [10_i32, 20, 30, 40, 50];
+    let registry = TypeRegistry::default();
+    for source in [&list as &dyn PartialReflect, &array] {
+        let value = inspect(source, &registry, Writable::Yes, &limits);
+        assert_eq!(value_count(&value), 4);
+        let (Kind::List { items, truncated } | Kind::Array { items, truncated }) = value.kind
+        else {
+            panic!("list or array expected")
+        };
+        assert_eq!(truncated, 2);
+        assert_eq!(items.len(), 3);
+        for (item, number) in items.iter().zip([10, 20, 30]) {
+            assert_eq!(item.kind, Kind::Scalar(Scalar::Integer(number)));
+        }
+    }
+    let map =
+        bevy_platform::collections::HashMap::<i32, i32>::from_iter([(1, 10), (2, 20), (3, 30)]);
+    let value = inspect(&map, &registry, Writable::Yes, &limits);
+    assert_eq!(value_count(&value), 3);
+    let Kind::Map { entries, truncated } = value.kind else {
+        panic!("map expected")
+    };
+    assert_eq!(entries.len(), 1);
+    assert_eq!(truncated, 2);
+    assert!(matches!((&entries[0].0.kind, &entries[0].1.kind),
+        (Kind::Scalar(Scalar::Integer(key)), Kind::Scalar(Scalar::Integer(value)))
+        if *value == *key * 10));
+
+    let set = bevy_platform::collections::HashSet::<i32>::from_iter([1, 2, 3, 4, 5]);
+    let value = inspect(&set, &registry, Writable::Yes, &limits);
+    assert_eq!(value_count(&value), 4);
+    let Kind::Set { members, truncated } = value.kind else {
+        panic!("set expected")
+    };
+    assert_eq!(members.len(), 3);
+    assert_eq!(truncated, 2);
+    for member in members {
+        assert!(matches!(member.kind, Kind::Scalar(Scalar::Integer(1..=5))));
+        assert_eq!(
+            member.writable,
+            Writable::No(ReadOnlyReason::KindNotEditable)
+        );
+    }
+}
+
+#[test]
+fn nested_map_entries_reserve_both_key_and_value() {
+    let source = bevy_platform::collections::HashMap::<Vec<i32>, Vec<i32>>::from_iter([
+        (vec![1, 2, 3], vec![10, 20, 30, 40]),
+        (vec![4, 5, 6], vec![50, 60, 70, 80]),
+    ]);
+    let value = inspect(
+        &source,
+        &TypeRegistry::default(),
+        Writable::Yes,
+        &ValueLimits {
+            max_values: 6,
+            ..Default::default()
+        },
+    );
+    assert_eq!(value_count(&value), 6);
+    let Kind::Map { entries, truncated } = value.kind else {
+        panic!("map expected")
+    };
+    assert_eq!(entries.len(), 2);
+    assert_eq!(truncated, 0);
+    for (key, value) in entries {
+        for (value, len) in [(key, 3), (value, 4)] {
+            let Kind::List { items, truncated } = value.kind else {
+                panic!("list expected")
+            };
+            assert_eq!(items.len() + truncated, len);
+            assert!(truncated > 0);
+        }
+    }
+}
+
+#[test]
+fn non_collection_elision_has_an_honest_read_only_notice() {
+    use crate::plugins::debugger::wire::Wire;
+
+    let mut source = bevy_reflect::structs::DynamicStruct::default();
+    source.insert("items", vec![7_i32; 100]);
+    source.insert("mode", Mode::Walking { speed: 2.0 });
+    let value = inspect(
+        &source,
+        &TypeRegistry::default(),
+        Writable::Yes,
+        &ValueLimits {
+            max_values: 5,
+            ..Default::default()
+        },
+    );
+    assert_eq!(value_count(&value), 5);
+    let Kind::Struct(fields) = value.kind else {
+        panic!("struct expected")
+    };
+    assert_eq!(fields[0].name, "items");
+    assert!(
+        matches!(&fields[0].value.kind, Kind::List { items, truncated: 98 }
+        if items.len() == 2 && items.iter().all(|item| item.kind == Kind::Scalar(Scalar::Integer(7))))
+    );
+    assert_eq!(fields[1].name, "mode");
+    let notice = &fields[1].value;
+    assert_eq!(notice.type_path, Mode::type_path());
+    assert_eq!(notice.kind, Kind::ValueLimit);
+    assert_eq!(notice.writable, Writable::No(ReadOnlyReason::ValueLimit));
+    let Wire::Object(wire) = Wire::from(notice) else {
+        panic!("wire object expected")
+    };
+    assert_eq!(wire["kind"], Wire::String("value_limit".into()));
+    assert_eq!(
+        wire["reason"],
+        Wire::String("maximum value count reached".into())
+    );
+}
+
+#[test]
+fn fixed_fields_cannot_emit_notices_beyond_the_budget() {
+    let mut wide = bevy_reflect::structs::DynamicStruct::default();
+    for index in 0..1000 {
+        wide.insert(format!("field_{index}"), index);
+    }
+    let pair = (1_i32, 2_i32);
+    let wrapped = Readable(3);
+    let mode = Mode::Walking { speed: 4.0 };
+    for source in [&wide as &dyn PartialReflect, &pair, &wrapped, &mode] {
+        let value = inspect(
+            source,
+            &TypeRegistry::default(),
+            Writable::Yes,
+            &ValueLimits {
+                max_values: 1,
+                ..Default::default()
+            },
+        );
+        assert_eq!(value_count(&value), 1);
+        assert_eq!(value.kind, Kind::ValueLimit);
+        assert_eq!(value.writable, Writable::No(ReadOnlyReason::ValueLimit));
+    }
+}
+
+#[test]
+fn ordinary_components_and_leaf_edits_fit_the_budget() {
+    let (mut world, entity) = sample_world();
+    let default =
+        read_component(&world, entity, Sample::type_path(), &ValueLimits::default()).unwrap();
+    assert_eq!(value_count(&default), 9);
+    let exact = read_component(
+        &world,
+        entity,
+        Sample::type_path(),
+        &ValueLimits {
+            max_values: 9,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(exact, default);
+    for max_values in [0, 1] {
+        let limits = ValueLimits {
+            max_values,
+            ..Default::default()
+        };
+        assert_eq!(
+            inspect(&42_i32, &TypeRegistry::default(), Writable::Yes, &limits),
+            view(&42_i32)
+        );
+        let accepted = mutate_component(
+            &mut world,
+            entity,
+            Sample::type_path(),
+            &[
+                PathSegment::Field("mode".into()),
+                PathSegment::Variant("Walking".into()),
+                PathSegment::Field("speed".into()),
+            ],
+            &Edit::Scalar(Scalar::Float(3.0)),
+            &limits,
+        )
+        .unwrap();
+        assert_eq!(accepted.kind, Kind::Scalar(Scalar::Float(3.0)));
+        assert_eq!(accepted.writable, Writable::Yes);
+    }
+    assert_eq!(
+        world.get::<Sample>(entity).unwrap().mode,
+        Mode::Walking { speed: 3.0 }
+    );
+}
+
 #[test]
 fn integer_identity() {
     assert_eq!(
@@ -239,6 +489,7 @@ fn maps_sets_and_truncation() {
         &ValueLimits {
             max_depth: 8,
             max_elements: 2,
+            ..Default::default()
         },
     );
     let Kind::Map { entries, truncated } = value.kind else {
@@ -254,10 +505,10 @@ fn maps_sets_and_truncation() {
     );
     let set = bevy_platform::collections::HashSet::<i32>::from_iter([1_i32, 2, 3]);
     assert!(
-        matches!(inspect(&set, &TypeRegistry::default(), Writable::Yes, &ValueLimits { max_depth: 8, max_elements: 2 }).kind, Kind::Set { members, truncated: 1 } if members.len() == 2)
+        matches!(inspect(&set, &TypeRegistry::default(), Writable::Yes, &ValueLimits { max_depth: 8, max_elements: 2, ..Default::default() }).kind, Kind::Set { members, truncated: 1 } if members.len() == 2)
     );
     assert!(
-        matches!(inspect(&vec![1, 2, 3], &TypeRegistry::default(), Writable::Yes, &ValueLimits { max_depth: 8, max_elements: 1 }).kind, Kind::List { items, truncated: 2 } if items.len() == 1)
+        matches!(inspect(&vec![1, 2, 3], &TypeRegistry::default(), Writable::Yes, &ValueLimits { max_depth: 8, max_elements: 1, ..Default::default() }).kind, Kind::List { items, truncated: 2 } if items.len() == 1)
     );
     assert!(matches!(
         inspect(
@@ -266,7 +517,8 @@ fn maps_sets_and_truncation() {
             Writable::Yes,
             &ValueLimits {
                 max_depth: 0,
-                max_elements: 8
+                max_elements: 8,
+                ..Default::default()
             }
         )
         .kind,
@@ -899,6 +1151,7 @@ fn set_members_and_nested_depth_marker_are_explicit() {
         &ValueLimits {
             max_depth: 8,
             max_elements: 2,
+            ..Default::default()
         },
     );
     let Kind::Set { members, truncated } = value.kind else {
@@ -923,6 +1176,7 @@ fn set_members_and_nested_depth_marker_are_explicit() {
         &ValueLimits {
             max_depth: 1,
             max_elements: 8,
+            ..Default::default()
         },
     );
     assert!(
@@ -1051,6 +1305,7 @@ fn reflected_resources_reuse_component_reads_edits_and_exact_integers() {
         &ValueLimits {
             max_depth: 2,
             max_elements: 1,
+            ..Default::default()
         },
     )
     .unwrap();
@@ -1069,7 +1324,8 @@ fn reflected_resources_reuse_component_reads_edits_and_exact_integers() {
             &Edit::Scalar(Scalar::Integer(9)),
             &ValueLimits {
                 max_depth: 1,
-                max_elements: 1
+                max_elements: 1,
+                ..Default::default()
             }
         )
         .unwrap_err()

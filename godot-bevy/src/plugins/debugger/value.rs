@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use bevy_asset::ReflectHandle;
 use bevy_ecs::entity::Entity;
 use bevy_reflect::{
@@ -54,6 +56,7 @@ pub enum Kind {
     Opaque(String),
     Unsupported(String),
     DepthLimit,
+    ValueLimit,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -97,6 +100,7 @@ pub enum ReadOnlyReason {
     Reference,
     Relationship,
     DepthLimit,
+    ValueLimit,
     InspectorReadOnly,
     StateTransitionRequired,
     StateValue,
@@ -113,6 +117,7 @@ impl ReadOnlyReason {
             Self::Reference => "reference is read-only",
             Self::Relationship => "relationship is read-only",
             Self::DepthLimit => "maximum depth reached",
+            Self::ValueLimit => "maximum value count reached",
             Self::InspectorReadOnly => "field is marked InspectorReadOnly",
             Self::StateTransitionRequired => "state wrapper requires a transition request",
             Self::StateValue => "state values are read-only",
@@ -170,6 +175,8 @@ pub(crate) fn field_attributes(
 pub struct ValueLimits {
     pub max_depth: usize,
     pub max_elements: usize,
+    /// Total values per inspection, including containers and limit notices. Zero uses one.
+    pub max_values: usize,
 }
 
 impl Default for ValueLimits {
@@ -177,6 +184,7 @@ impl Default for ValueLimits {
         Self {
             max_depth: 16,
             max_elements: 128,
+            max_values: 16_384,
         }
     }
 }
@@ -192,6 +200,30 @@ impl Value {
     }
 }
 
+struct Traversal<'a> {
+    limits: &'a ValueLimits,
+    remaining: Cell<usize>,
+}
+
+impl Traversal<'_> {
+    fn reserve_fields(&self, count: usize) -> bool {
+        let Some(remaining) = self.remaining.get().checked_sub(count) else {
+            return false;
+        };
+        self.remaining.set(remaining);
+        true
+    }
+
+    fn elements(&self, len: usize, values_per_element: usize) -> usize {
+        let remaining = self.remaining.get();
+        let count = len
+            .min(self.limits.max_elements)
+            .min(remaining / values_per_element);
+        self.remaining.set(remaining - count * values_per_element);
+        count
+    }
+}
+
 /// Inspects a reflected value, inheriting the supplied writability and enforcing traversal limits.
 pub fn inspect(
     value: &dyn PartialReflect,
@@ -199,16 +231,21 @@ pub fn inspect(
     writable: Writable,
     limits: &ValueLimits,
 ) -> Value {
-    inspect_at(value, registry, writable, limits, 0)
+    let traversal = Traversal {
+        limits,
+        remaining: Cell::new(limits.max_values.saturating_sub(1)),
+    };
+    inspect_at(value, registry, writable, &traversal, 0)
 }
 
 fn inspect_at(
     value: &dyn PartialReflect,
     registry: &TypeRegistry,
     writable: Writable,
-    limits: &ValueLimits,
+    traversal: &Traversal<'_>,
     depth: usize,
 ) -> Value {
+    let limits = traversal.limits;
     let type_path = value.reflect_type_path().to_string();
     let make = |kind, writable| Value {
         type_path: type_path.clone(),
@@ -250,15 +287,30 @@ fn inspect_at(
             writable.restrict(ReadOnlyReason::DepthLimit),
         );
     }
+    let reflected = value.reflect_ref();
+    let field_count = match &reflected {
+        ReflectRef::Struct(value) => value.field_len(),
+        ReflectRef::TupleStruct(value) => value.field_len(),
+        ReflectRef::Tuple(value) => value.field_len(),
+        ReflectRef::Enum(value) => value.field_len(),
+        _ => 0,
+    };
+    // Reserve sibling slots before descending so even limit notices stay within the budget.
+    if !traversal.reserve_fields(field_count) {
+        return make(
+            Kind::ValueLimit,
+            writable.restrict(ReadOnlyReason::ValueLimit),
+        );
+    }
     let child = |value: &dyn PartialReflect| {
-        inspect_at(value, registry, writable.clone(), limits, depth + 1)
+        inspect_at(value, registry, writable.clone(), traversal, depth + 1)
     };
     let readonly_child = |value: &dyn PartialReflect| {
         inspect_at(
             value,
             registry,
             writable.restrict(ReadOnlyReason::KindNotEditable),
-            limits,
+            traversal,
             depth + 1,
         )
     };
@@ -270,13 +322,13 @@ fn inspect_at(
             } else {
                 writable.clone()
             };
-        let mut result = inspect_at(child, registry, writable, limits, depth + 1);
+        let mut result = inspect_at(child, registry, writable, traversal, depth + 1);
         result.range = attributes
             .and_then(|attributes| attributes.get::<InspectorRange>())
             .copied();
         result
     };
-    let kind = match value.reflect_ref() {
+    let kind = match reflected {
         ReflectRef::Struct(value) => Kind::Struct(
             (0..value.field_len())
                 .filter_map(|i| {
@@ -301,30 +353,38 @@ fn inspect_at(
                 .map(|(i, value)| field(value, None, i))
                 .collect(),
         ),
-        ReflectRef::List(value) => Kind::List {
-            items: value.iter().take(limits.max_elements).map(child).collect(),
-            truncated: value.len().saturating_sub(limits.max_elements),
-        },
-        ReflectRef::Array(value) => Kind::Array {
-            items: value.iter().take(limits.max_elements).map(child).collect(),
-            truncated: value.len().saturating_sub(limits.max_elements),
-        },
-        ReflectRef::Map(value) => Kind::Map {
-            entries: value
-                .iter()
-                .take(limits.max_elements)
-                .map(|(key, value)| (readonly_child(key), readonly_child(value)))
-                .collect(),
-            truncated: value.len().saturating_sub(limits.max_elements),
-        },
-        ReflectRef::Set(value) => Kind::Set {
-            members: value
-                .iter()
-                .take(limits.max_elements)
-                .map(readonly_child)
-                .collect(),
-            truncated: value.len().saturating_sub(limits.max_elements),
-        },
+        ReflectRef::List(value) => {
+            let count = traversal.elements(value.len(), 1);
+            Kind::List {
+                items: value.iter().take(count).map(child).collect(),
+                truncated: value.len() - count,
+            }
+        }
+        ReflectRef::Array(value) => {
+            let count = traversal.elements(value.len(), 1);
+            Kind::Array {
+                items: value.iter().take(count).map(child).collect(),
+                truncated: value.len() - count,
+            }
+        }
+        ReflectRef::Map(value) => {
+            let count = traversal.elements(value.len(), 2);
+            Kind::Map {
+                entries: value
+                    .iter()
+                    .take(count)
+                    .map(|(key, value)| (readonly_child(key), readonly_child(value)))
+                    .collect(),
+                truncated: value.len() - count,
+            }
+        }
+        ReflectRef::Set(value) => {
+            let count = traversal.elements(value.len(), 1);
+            Kind::Set {
+                members: value.iter().take(count).map(readonly_child).collect(),
+                truncated: value.len() - count,
+            }
+        }
         ReflectRef::Enum(value) => {
             let unit_variants: Vec<String> = match value.get_represented_type_info() {
                 Some(TypeInfo::Enum(info)) => info

@@ -67,7 +67,7 @@ func configure(target, property: String) -> void:
 			elif current.valid:
 				proxy.node_link.emit(current.instance_id))
 		input = link
-	elif entry.role != "value" or model.kind in ["unsupported", "depth_limit"]:
+	elif entry.role != "value" or model.kind in ["unsupported", "depth_limit", "value_limit"]:
 		var text := Label.new()
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL

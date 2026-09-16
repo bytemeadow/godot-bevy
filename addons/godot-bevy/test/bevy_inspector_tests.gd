@@ -417,7 +417,7 @@ func _removed_entity_proxies(host: Node) -> void:
 
 func _values(host: Node) -> void:
 	var scalar_kinds := ["integer", "float", "bool", "string", "char", "enum", "entity", "node",
-		"asset", "opaque", "unsupported", "depth_limit"]
+		"asset", "opaque", "unsupported", "depth_limit", "value_limit"]
 	for kind in Fixtures.values():
 		var fake = FakeClient.new()
 		var control = ValueEditor.new()
@@ -463,6 +463,8 @@ func _values(host: Node) -> void:
 			check(links == [value.entity if kind == "entity" else value.instance_id], kind + " link preserves exact reference")
 		elif kind in ["map", "set"]:
 			check(not control.children_editors[0].model.writable.allowed and fake.frames.is_empty(), kind + " is read-only")
+		elif kind in ["unsupported", "depth_limit", "value_limit"]:
+			check(control.editor is Label and control.editor.text == value.reason and fake.frames.is_empty(), kind + " displays a non-editable notice with its reason")
 		control.free()
 	var wide = Fixtures.scalar("integer", "340282366920938463463374607431768211455")
 	wide.type_path = "u128"
@@ -1016,12 +1018,13 @@ func _proxy_mapping() -> void:
 	var types := {"bool": TYPE_BOOL, "integer": TYPE_INT, "float": TYPE_FLOAT,
 		"string": TYPE_STRING, "char": TYPE_STRING, "enum": TYPE_STRING,
 		"entity": TYPE_STRING, "node": TYPE_STRING, "asset": TYPE_STRING,
-		"opaque": TYPE_STRING, "unsupported": TYPE_STRING, "depth_limit": TYPE_STRING}
+		"opaque": TYPE_STRING, "unsupported": TYPE_STRING, "depth_limit": TYPE_STRING, "value_limit": TYPE_STRING}
 	for kind in types:
 		var entry: Dictionary = proxy.lookup[_property(proxy, kind, [])]
 		check(entry.property.type == types[kind], kind + " maps to its specified Variant type")
-		if kind in ["unsupported", "depth_limit"]:
+		if kind in ["unsupported", "depth_limit", "value_limit"]:
 			check(proxy.get(entry.property.name) == Fixtures.values()[kind].reason, kind + " displays its supplied reason")
+			check(entry.property.usage & PROPERTY_USAGE_READ_ONLY, kind + " cannot be edited")
 	for kind in ["struct", "tuple_struct", "tuple", "list", "array"]:
 		var path: Array = [{"field": "speed"}] if kind == "struct" else [{"index": 0}]
 		var property := _property(proxy, kind, path)

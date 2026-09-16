@@ -71,7 +71,7 @@ func _sync() -> void:
 	var state: Dictionary = proxy.states[property_name]
 	row.set_read_only(proxy.detached or state.pending or bool(entry.property.usage & PROPERTY_USAGE_READ_ONLY))
 	explanation.text = entry.reason
-	explanation.visible = not entry.reason.is_empty() and not entry.model.kind in ["unsupported", "depth_limit"]
+	explanation.visible = not entry.reason.is_empty() and not entry.model.kind in ["unsupported", "depth_limit", "value_limit"]
 	status.text = state.status
 	status.visible = not state.status.is_empty()
 	warning.visible = state.rejected
