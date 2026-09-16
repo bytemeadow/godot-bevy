@@ -188,6 +188,7 @@ jobs:
               - 'Cargo.lock'
             itest:
               - 'itest/**'
+              - 'addons/**'
               - 'examples/platformer-2d/**'
               - 'examples/dodge-the-creeps-2d/**'
               - '.github/workflows/ci.yml'
@@ -286,6 +287,15 @@ jobs:
         env:
           GODOT4_BIN: godot
         run: ./run-tests.sh ${{ matrix.profile == 'release' && '--release' || '' }} --json ../target/itest-${{ matrix.profile }}.json
+
+      - name: Run inspector GDScript tests
+        if: matrix.profile == 'debug'
+        timeout-minutes: 10
+        env:
+          GODOT4_BIN: godot
+        run: |
+          "$GODOT4_BIN" --headless --path itest/godot \
+            --scene res://addons/godot-bevy/test/TestRunner.tscn -- --bevy-inspector-tests
 
       - name: Run platformer integration tests
         env:

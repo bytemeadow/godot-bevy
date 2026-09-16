@@ -1,21 +1,16 @@
 @tool
 extends EditorDebuggerPlugin
-## This plugin captures debug messages from the running game and forwards
-## entity/component data to the Bevy Inspector Panel.
 
-var inspector_panel = null
+var client = preload("res://addons/godot-bevy/bevy_rpc_client.gd").new()
 
 func _has_capture(prefix: String) -> bool:
 	return prefix == "bevy"
 
-func _capture(message: String, data: Array, session_id: int) -> bool:
-	match message:
-		"bevy:entities":
-			if inspector_panel and inspector_panel.has_method("update_entities"):
-				inspector_panel.update_entities(data)
-			return true
-		_:
-			return false
+func _setup_session(session_id: int) -> void:
+	client.setup_session(session_id, get_session(session_id))
 
-func _setup_session(_session_id: int) -> void:
-	pass
+func _capture(message: String, data: Array, session_id: int) -> bool:
+	return client._capture(message, data, session_id)
+
+func shutdown() -> void:
+	client.shutdown()
