@@ -178,7 +178,7 @@ where
 pub(super) struct GodotNodeUnmirroring;
 
 fn on_godot_node_handle_removed(
-    trigger: On<Remove, GodotNodeHandle>,
+    trigger: On<Remove<GodotNodeHandle>>,
     query: Query<&GodotNodeHandle, Without<GodotNodeUnmirroring>>,
     mut godot: GodotAccess,
 ) {

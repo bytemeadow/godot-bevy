@@ -9,5 +9,5 @@ publish = false
 [dependencies]
 godot-bevy = { path = "../godot-bevy" }
 godot-bevy-test = { path = "../godot-bevy-test" }
-bevy = { version = "0.19", default-features = false }
+bevy = { version = "0.20", default-features = false }
 godot = { workspace = true }

@@ -24,7 +24,7 @@ profile-tracy = [
 godot = { workspace = true, features = ["__itest"] }
 godot-bevy = { workspace = true }
 godot-bevy-test-macros = { workspace = true }
-bevy = { version = "0.19", default-features = false, features = [
+bevy = { version = "0.20", default-features = false, features = [
     "bevy_asset",
     "multi_threaded",
 ] }
