@@ -1,5 +1,8 @@
 //! These benchmarks test the actual godot-bevy systems rather than raw FFI overhead.
 
+// gdext 0.5.5's `#[class(init)]` expands to `base: base`; fixed upstream in godot-rust/gdext#1706, remove once on a gdext release that includes it.
+#![allow(clippy::redundant_field_names)]
+
 use bevy::prelude::{Event, On, ResMut, Resource};
 use crossbeam_channel as mpsc;
 use godot::builtin::StringName;
