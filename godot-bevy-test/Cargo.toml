@@ -3,6 +3,7 @@ name = "godot-bevy-test"
 description = "Integration testing framework for godot-bevy projects"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 repository.workspace = true
 keywords.workspace = true
