@@ -80,6 +80,29 @@ fn test_node_added_creates_entity(ctx: &TestContext) -> godot::task::TaskHandle 
     })
 }
 
+/// Scene-tree messages must be written before they are read so new nodes are
+/// mirrored in the first frame after insertion.
+#[itest(async)]
+fn test_node_added_creates_entity_in_one_frame(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+
+    godot::task::spawn(async move {
+        let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
+        let node = Node::new_alloc();
+        ctx_clone.scene_tree.clone().add_child(&node);
+
+        app.update().await;
+
+        assert!(
+            app.has_entity_for_node(node.instance_id()),
+            "node must be mirrored after one frame"
+        );
+
+        app.cleanup().await;
+        node.free();
+    })
+}
+
 /// `_bevy_exclude` is subtree-wide: neither the marked node nor its descendants are
 /// mirrored, while unmarked siblings still are. Exercises the runtime NodeAdded path's
 /// ancestor walk (the child's parent carries the meta, not the child itself).

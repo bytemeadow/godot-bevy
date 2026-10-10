@@ -1,4 +1,5 @@
 use crate::app::BevyApp;
+use crate::plugins::scene_tree::plugin::SceneTreeIngestion;
 use crate::plugins::signals::{SignalDispatch, SignalEnvelope};
 use bevy_app::{App, First};
 use bevy_ecs::event::Event;
@@ -10,7 +11,8 @@ use godot::prelude::{FromGodot, Variant};
 use parking_lot::Mutex;
 use std::collections::HashMap;
 
-/// The event drain runs in this set, in `First`. Order a system around delivery
+/// The event drain runs in this set, after scene-tree mirroring and the time
+/// update in `First`. Order a system around delivery
 /// with `.after(EventBridgeSet::Drain)`; observers themselves fire inside it.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EventBridgeSet {
@@ -59,7 +61,10 @@ pub(crate) fn ensure_event_channel(app: &mut App) {
         .insert_resource(GodotEventReceiver(Mutex::new(rx)));
     app.add_systems(
         First,
-        drain_and_trigger_events.in_set(EventBridgeSet::Drain),
+        drain_and_trigger_events
+            .in_set(EventBridgeSet::Drain)
+            .after(SceneTreeIngestion)
+            .after(bevy_time::TimeSystems),
     );
 }
 

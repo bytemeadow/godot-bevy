@@ -20,7 +20,7 @@ use bevy_ecs::{
     message::{Message, MessageReader, MessageWriter, message_update_system},
     prelude::{Name, ReflectComponent, ReflectResource, Resource},
     query::Has,
-    schedule::IntoScheduleConfigs,
+    schedule::{IntoScheduleConfigs, SystemSet},
     system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam},
     world::DeferredWorld,
 };
@@ -165,6 +165,9 @@ pub struct SceneTreeConfig {
     pub auto_despawn_children: bool,
 }
 
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct SceneTreeIngestion;
+
 impl Plugin for GodotSceneTreePlugin {
     fn build(&self, app: &mut App) {
         super::autosync::register_all_autosync_bundles(app);
@@ -185,8 +188,12 @@ impl Plugin for GodotSceneTreePlugin {
             .add_systems(
                 First,
                 (
-                    write_scene_tree_messages.before(message_update_system),
-                    read_scene_tree_messages.before(message_update_system),
+                    write_scene_tree_messages
+                        .before(read_scene_tree_messages)
+                        .before(message_update_system),
+                    read_scene_tree_messages
+                        .in_set(SceneTreeIngestion)
+                        .before(message_update_system),
                     mirror_tree_pause_to_virtual.before(TimeSystems),
                 ),
             );
