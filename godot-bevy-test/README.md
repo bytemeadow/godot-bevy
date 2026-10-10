@@ -82,6 +82,7 @@ Godot can crash on exit after a headless import once a GDExtension is loaded ([g
 | --- | --- |
 | `ITEST_FILTER` | Comma-separated, case-sensitive name substrings |
 | `ITEST_REPEAT` | Positive attempt count per selected test; default `1` |
+| `ITEST_SCHEDULE_SEED` | Optional decimal `u64` base seed (`--schedule-seed <u64>` in the workspace runner); shuffles each test's schedules using a seed derived from the base seed and test name. Runs single-threaded so a failing seed reproduces; repeats reuse the same seed. |
 | `ITEST_TIMEOUT_FRAMES` | Positive frame limit per attempt; default `600` |
 | `ITEST_JSON_PATH` | Optional path for the v1 JSON report |
 | `ITEST_DENY_FOCUS` | `1`/`true` rejects focused runs; default false |

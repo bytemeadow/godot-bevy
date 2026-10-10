@@ -67,6 +67,7 @@ mod tests {
         assert_eq!(value["$schema"], SCHEMA_NAME);
         assert_eq!(value["schema_version"], 1);
         assert_eq!(value["runner_version"], env!("CARGO_PKG_VERSION"));
+        assert_eq!(value.get("schedule_seed"), Some(&Value::Null));
         assert_eq!(value["complete"], true);
         assert_eq!(value["outcome"], "pass");
         assert_eq!(value["tests"][0]["id"], "src/contract.rs::contract_test");
@@ -81,6 +82,15 @@ mod tests {
             schema["$id"],
             "https://github.com/bytemeadow/godot-bevy/itest-report-v1.schema.json"
         );
+    }
+
+    #[test]
+    fn report_records_the_base_schedule_seed() {
+        let mut config = TestConfig::fallback();
+        config.schedule_seed = Some(u64::MAX);
+        let report = TestReport::new(&config, report().selection, "4.6.2.stable".to_string());
+        let value = serde_json::to_value(report).unwrap();
+        assert_eq!(value["schedule_seed"].as_u64(), Some(u64::MAX));
     }
 
     #[test]

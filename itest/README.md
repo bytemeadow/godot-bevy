@@ -90,6 +90,7 @@ node.queue_free();
 ./itest/run-tests.sh
 ./itest/run-tests.sh --filter test_exactly_one_clear
 ./itest/run-tests.sh --filter transform_,scene_tree_ --repeat 3
+./itest/run-tests.sh --schedule-seed 42
 ./itest/run-tests.sh --timeout-frames 600 --json target/itest.json
 ```
 
@@ -101,6 +102,10 @@ before execution.
 `--repeat` runs every selected test in test-major order and reports a mix of passing and
 failing attempts as `flaky`. `--timeout-frames` defaults to 600 per attempt. Failed,
 flaky, and timed-out tests exit 1; configuration and harness failures exit 2.
+
+`--schedule-seed <u64>` / `ITEST_SCHEDULE_SEED` shuffles each test's schedules using
+a seed derived from the base seed and test name. Shuffled schedules run
+single-threaded so a failing seed reproduces; repeats reuse the same seed.
 
 `--json` writes the versioned report atomically and checkpoints it after each
 logical test. The same final JSON appears between `===ITEST_JSON_START===` and

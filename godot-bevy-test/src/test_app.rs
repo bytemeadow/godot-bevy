@@ -19,6 +19,7 @@
 use bevy::prelude::*;
 use godot::obj::{Gd, NewAlloc};
 
+use crate::schedule_shuffle::{ACTIVE_SCHEDULE_SEED, ScheduleShufflePlugin};
 use crate::{TestContext, await_frame};
 
 /// A test app that provides Bevy-style API while running in Godot runtime
@@ -92,12 +93,16 @@ impl TestApp {
             .expect("BevyAppSingleton autoload not found. Enable the godot-bevy plugin in Project Settings > Plugins, or add BevyAppSingleton as an autoload.");
 
         let setup_mutex = Mutex::new(Some(setup));
+        let schedule_seed = *ACTIVE_SCHEDULE_SEED.lock().unwrap();
 
         bevy_app
             .bind_mut()
             .set_instance_init_func(Box::new(move |app: &mut App| {
                 if let Some(setup_fn) = setup_mutex.lock().unwrap().take() {
                     setup_fn(app);
+                    if let Some(seed) = schedule_seed {
+                        app.add_plugins(ScheduleShufflePlugin(seed));
+                    }
                 }
             }));
 

@@ -33,6 +33,7 @@
     "environment": { "$ref": "#/$defs/environment" },
     "selection": { "$ref": "#/$defs/selection" },
     "repeat": { "type": "integer", "minimum": 1 },
+    "schedule_seed": { "type": ["integer", "null"], "minimum": 0, "maximum": 18446744073709551615 },
     "timeout_frames": { "type": "integer", "minimum": 1 },
     "summary": { "$ref": "#/$defs/summary" },
     "tests": {

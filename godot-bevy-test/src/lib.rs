@@ -58,6 +58,7 @@ pub mod exit_code;
 pub mod profiling;
 mod report;
 pub mod runner;
+mod schedule_shuffle;
 mod selection;
 pub mod test_app;
 pub mod test_helpers;

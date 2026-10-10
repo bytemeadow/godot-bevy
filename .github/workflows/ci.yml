@@ -287,6 +287,16 @@ jobs:
           GODOT4_BIN: godot
         run: ./run-tests.sh ${{ matrix.profile == 'release' && '--release' || '' }} --json ../target/itest-${{ matrix.profile }}.json
 
+      - name: Run shuffled integration tests
+        if: matrix.profile == 'debug'
+        working-directory: itest
+        env:
+          GODOT4_BIN: godot
+        run: |
+          seed=$(od -An -N8 -tu8 /dev/urandom | tr -d ' ')
+          echo "Schedule seed: $seed"
+          ./run-tests.sh --schedule-seed "$seed" --json ../target/itest-shuffled.json
+
       - name: Run platformer integration tests
         env:
           GODOT4_BIN: godot
@@ -312,5 +322,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: itest-report-${{ matrix.profile }}
-          path: target/itest-${{ matrix.profile }}.json
+          path: |
+            target/itest-${{ matrix.profile }}.json
+            target/itest-shuffled.json
           if-no-files-found: warn

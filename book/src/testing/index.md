@@ -79,6 +79,8 @@ Godot can crash on exit after a headless import once a GDExtension is loaded ([g
 
 `ITEST_FILTER` selects comma-separated, case-sensitive name substrings. `ITEST_REPEAT` repeats selected tests. `ITEST_JSON_PATH` writes a report. `#[itest(skip)]` reports a skipped test, while `#[itest(focus)]` selects focused tests; set `ITEST_DENY_FOCUS=1` in CI to reject focus mode. The full configuration table is in the [godot-bevy-test README](https://github.com/bytemeadow/godot-bevy/tree/main/godot-bevy-test#runner-configuration).
 
+`ITEST_SCHEDULE_SEED` (`--schedule-seed <u64>` in the workspace runner) shuffles each test's schedules using a seed derived from the base seed and test name. Shuffled schedules run single-threaded so a failing seed reproduces; repeats reuse the same seed.
+
 ## Troubleshooting
 
 ### BevyApp defined multiple times
