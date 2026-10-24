@@ -187,7 +187,7 @@ fn schedule_seed_from_env() -> Result<Option<u64>, String> {
 
 fn parse_schedule_seed(value: &str) -> Result<u64, String> {
     let error = || "ITEST_SCHEDULE_SEED must be an unsigned 64-bit decimal integer".to_string();
-    if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+    if !value.bytes().all(|byte| byte.is_ascii_digit()) {
         return Err(error());
     }
     value.parse().map_err(|_| error())

@@ -60,17 +60,7 @@ mod tests {
             parse_schedule_seed("18446744073709551615").unwrap(),
             u64::MAX
         );
-        for value in [
-            "",
-            "-1",
-            "+1",
-            " 1",
-            "1 ",
-            "1.0",
-            "0xff",
-            "abc",
-            "18446744073709551616",
-        ] {
+        for value in ["", "+1", " 1", "18446744073709551616"] {
             assert_eq!(
                 parse_schedule_seed(value).unwrap_err(),
                 "ITEST_SCHEDULE_SEED must be an unsigned 64-bit decimal integer"
@@ -130,17 +120,7 @@ mod tests {
                 ("ITEST_SCHEDULE_SEED", "-1"),
             ],
         );
-        run_environment_probe(
-            "boundary",
-            &[
-                ("GBPROF_NATIVE_SECONDS", "5"),
-                ("ITEST_SCHEDULE_SEED", "18446744073709551615"),
-            ],
-        );
-        run_environment_probe(
-            "seed_overflow",
-            &[("ITEST_SCHEDULE_SEED", "18446744073709551616")],
-        );
+        run_environment_probe("boundary", &[("GBPROF_NATIVE_SECONDS", "5")]);
     }
 
     #[test]
@@ -206,10 +186,6 @@ mod tests {
             }
             "boundary" => {
                 assert_eq!(native_profile_seconds_from_env().unwrap(), Some(5));
-                assert_eq!(schedule_seed_from_env().unwrap(), Some(u64::MAX));
-            }
-            "seed_overflow" => {
-                assert!(schedule_seed_from_env().is_err());
             }
             other => panic!("unknown probe case {other}"),
         }

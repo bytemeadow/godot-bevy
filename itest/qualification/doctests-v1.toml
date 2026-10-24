@@ -1,6 +1,6 @@
 version = 1
 scaffold_path = "book-tests/src/doctest_scaffolds.rs"
-scaffold_sha256 = "sha256:23a5a172d5ca81516fcb9da189f864d10d0099449f6639cb60beefae68b34ffc"
+scaffold_sha256 = "sha256:04e59920be247b6c1a3083b2247669f2bec44fe175be2b256865d01a8d087c7c"
 
 [[fences]]
 source = "godot-bevy-macros/src/lib.rs"

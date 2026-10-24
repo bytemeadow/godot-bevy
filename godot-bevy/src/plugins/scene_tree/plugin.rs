@@ -188,9 +188,7 @@ impl Plugin for GodotSceneTreePlugin {
             .add_systems(
                 First,
                 (
-                    write_scene_tree_messages
-                        .before(read_scene_tree_messages)
-                        .before(message_update_system),
+                    write_scene_tree_messages.before(read_scene_tree_messages),
                     read_scene_tree_messages
                         .in_set(SceneTreeIngestion)
                         .before(message_update_system),

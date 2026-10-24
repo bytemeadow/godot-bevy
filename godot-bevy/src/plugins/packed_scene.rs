@@ -18,12 +18,9 @@ use bevy_ecs::{
     system::{Commands, Query},
 };
 use bevy_transform::components::Transform;
+use godot::classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader};
 use godot::obj::Gd;
 use godot::prelude::Variant;
-use godot::{
-    builtin::GString,
-    classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader},
-};
 use std::collections::HashMap;
 use tracing::error;
 
@@ -185,7 +182,7 @@ fn spawn_scene(
                 } else {
                     let resource = godot
                         .singleton::<ResourceLoader>()
-                        .load(&GString::from(path.as_str()))
+                        .load(path.as_str())
                         .with_context(|| {
                             format!("failed to load packed scene {path:?} for entity {ent}")
                         })?;

@@ -30,13 +30,7 @@ impl<'w> GodotAccess<'w> {
 
     #[track_caller]
     pub fn get<T: Inherits<Node>>(&mut self, handle: GodotNodeHandle) -> Gd<T> {
-        let Some(node) = self.try_get(handle) else {
-            panic!(
-                "failed to get godot node handle as {}",
-                std::any::type_name::<T>()
-            );
-        };
-        node
+        self.get_instance_id(handle.instance_id())
     }
 
     pub fn try_get_instance_id<T: Inherits<Node>>(

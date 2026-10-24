@@ -720,7 +720,6 @@ fn print_test_summary(report: &TestReport, elapsed: Duration) {
     println!();
     println!("{FMT_CYAN_BOLD}Test result:{FMT_END}");
     if let Some(seed) = report.schedule_seed {
-        println!("  Schedule seed: {seed}");
         println!("  Rerun with --schedule-seed {seed}");
     }
     println!(

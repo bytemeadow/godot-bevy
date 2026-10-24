@@ -1,4 +1,4 @@
-// gdext 0.5.5's `#[class(init)]` expands to `base: base`; fixed upstream in godot-rust/gdext#1706, remove once on a gdext release that includes it.
+// Remove when gdext includes godot-rust/gdext#1706; #[class(init)] emits base: base.
 #![allow(clippy::redundant_field_names)]
 
 use bevy::prelude::*;

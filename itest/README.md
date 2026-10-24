@@ -103,9 +103,7 @@ before execution.
 failing attempts as `flaky`. `--timeout-frames` defaults to 600 per attempt. Failed,
 flaky, and timed-out tests exit 1; configuration and harness failures exit 2.
 
-`--schedule-seed <u64>` / `ITEST_SCHEDULE_SEED` shuffles each test's schedules using
-a seed derived from the base seed and test name. Shuffled schedules run
-single-threaded so a failing seed reproduces; repeats reuse the same seed.
+For schedule shuffling with `--schedule-seed <u64>`, see [runner configuration](../godot-bevy-test/README.md#runner-configuration).
 
 `--json` writes the versioned report atomically and checkpoints it after each
 logical test. The same final JSON appears between `===ITEST_JSON_START===` and

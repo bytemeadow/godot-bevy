@@ -77,7 +77,7 @@ Where things live:
 - Tests live in `itest/rust/src/*_tests.rs` using `TestApp` + `#[itest]`/`#[itest(async)]`; add new files as `mod` in `itest/rust/src/lib.rs`. Read `itest/README.md` before writing one.
 - Select tests without editing source: `devenv shell -- itest --filter test_name`. Filters are comma-separated, case-sensitive substrings. A filter matching no tests is an error.
 - Repeat and retain evidence: `devenv shell -- itest --filter test_name --repeat 3 --timeout-frames 600 --json ../target/itest.json`. Exit 0 means pass, 1 means a failed/flaky/timeout result, and 2 means a configuration or harness error.
-- `--schedule-seed <u64>` / `ITEST_SCHEDULE_SEED` shuffles each test's schedules using a seed derived from the base seed and test name. Shuffled schedules run single-threaded so a failing seed reproduces; repeats reuse the same seed.
+- For schedule shuffling with `--schedule-seed <u64>`, see [runner configuration](godot-bevy-test/README.md#runner-configuration).
 - `#[itest(focus)]` intersects with filters. CI sets `ITEST_DENY_FOCUS=1`, so committed focus markers fail before any test executes. `#[itest(skip)]` reports a selected test as skipped.
 - In async tests, `app.physics_update().await` guarantees a physics tick. Don't write exact single-frame assertions -- frame boundaries have ±1-frame slop.
 - For a change designers see in the editor (a new `GodotClass`, exported fields, Inspector hints), run the `editor-probe` skill (`.claude/skills/editor-probe`): it scripts a real editor session, saves and reloads a scene with the class, and captures the Inspector.
