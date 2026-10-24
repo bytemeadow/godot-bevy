@@ -238,6 +238,7 @@ pub struct GodotResource {
 
 impl GodotResource {
     /// Get the raw Godot resource - you'll need to cast it to the specific type you need
+    #[track_caller]
     pub fn get(&mut self) -> Gd<GodotBaseResource> {
         self.handle.get()
     }
@@ -248,6 +249,7 @@ impl GodotResource {
     }
 
     /// Try to cast to a specific Godot resource type
+    #[track_caller]
     pub fn try_cast<T>(&mut self) -> Option<Gd<T>>
     where
         T: godot::obj::GodotClass + godot::obj::Inherits<GodotBaseResource>,

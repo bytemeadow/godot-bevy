@@ -19,6 +19,7 @@ pub struct GodotResourceHandle {
 }
 
 impl GodotResourceHandle {
+    #[track_caller]
     pub fn get(&mut self) -> Gd<Resource> {
         self.try_get()
             .expect("Godot resource was freed unexpectedly")
