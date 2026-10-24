@@ -27,12 +27,10 @@ struct RatioProbe {
     frames: u32,
 }
 
-/// Accumulate per-frame Virtual/Real deltas, skipping frames near the Time<Virtual>
-/// max_delta clamp (0.25s) that would distort the ratio. Below the clamp Virtual.delta ==
-/// Real.delta * relative_speed, so the ratio of sums is the scale despite wall-clock jitter.
+/// Skip zero and clamped frames so the Virtual/Real ratio measures the requested scale.
 fn sample_ratio(virt: Res<Time<Virtual>>, real: Res<Time<Real>>, mut probe: ResMut<RatioProbe>) {
     let r = real.delta_secs_f64();
-    if r > 0.0 && r < 0.1 {
+    if r > 0.0 && virt.effective_speed_f64() == virt.relative_speed_f64() {
         probe.real_sum += r;
         probe.virt_sum += virt.delta_secs_f64();
         probe.frames += 1;
