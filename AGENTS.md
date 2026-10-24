@@ -44,7 +44,7 @@ Never use `--all-features`: the `api-4-2`..`api-4-6` features are mutually exclu
 | `examples/` | example games, each `rust/` crate + `godot/` project; the `BevyAppSingleton` autoload is the ECS entry point |
 | `book/` | mdbook docs, published per-version by `book.yml` |
 
-Versions: workspace 0.12.0, Bevy 0.19 (the lib depends on `bevy_*` sub-crates; examples and itest use the umbrella crate), gdext (`godot`) 0.5.
+Versions: workspace 0.12.0, Bevy 0.20 (the lib depends on `bevy_*` sub-crates; examples and itest use the umbrella crate), gdext (`godot`) 0.5.
 
 ## Architecture
 
@@ -103,7 +103,7 @@ cd itest
 
 Never compare two standalone runs -- process-to-process noise often exceeds 10% at µs scale. `compare-benches.sh` interleaves runs against a base branch and reports each benchmark's own noise; only trust deltas above the `Noise` column. CI runs the same comparison on every PR.
 
-Benchmark real godot-bevy systems, not raw FFI (that just measures gdext). Run the schedules the plugin actually registers into -- transform sync is `FixedFirst`/`FixedLast` -- and give hand-built `App`s `app.insert_non_send_resource(GodotMainThread)`. Full recipe and suite: `itest/BENCHMARKING.md`. Size-suffixed variants (`_5000`) exist to catch super-linear scaling -- compare against the default size.
+Benchmark real godot-bevy systems, not raw FFI (that just measures gdext). Run the schedules the plugin actually registers into -- transform sync is `FixedFirst`/`FixedLast` -- and give hand-built `App`s `app.insert_non_send(GodotMainThread)`. Full recipe and suite: `itest/BENCHMARKING.md`. Size-suffixed variants (`_5000`) exist to catch super-linear scaling -- compare against the default size.
 
 Tier-2 profiling is diagnostic-only and uses the optimized, symbolized `profiling`
 Cargo profile:

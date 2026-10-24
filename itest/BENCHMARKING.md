@@ -222,7 +222,7 @@ fn my_new_benchmark() -> i32 {
 - Clean up nodes with `node.free()`, not `queue_free()` — benchmarks run
   synchronously within one frame, so deferred frees accumulate in the scene
   tree across iterations and skew later benchmarks
-- Hand-built bench `App`s need `app.insert_non_send_resource(GodotMainThread)`
+- Hand-built bench `App`s need `app.insert_non_send(GodotMainThread)`
   before running plugin systems — every existing benchmark does this
 - Initialize and run the schedules the plugin actually registers into — check
   its `Plugin::build`. Transform sync reads in `FixedFirst` and writes in

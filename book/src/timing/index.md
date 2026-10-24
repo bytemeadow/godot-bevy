@@ -89,6 +89,8 @@ godot-bevy runs the whole `RunFixedMainLoop` schedule once per physics step, so 
 
 A `GodotActions` read inside either anchor sees the **process-clock** snapshot: the active clock is flipped to physics only around `FixedMain` itself. Read actions in `FixedUpdate` (physics snapshot) or `Update` (process snapshot), not in the anchors.
 
+Bevy caps the scaled `Time<Virtual>` delta at `max_delta` (250 ms by default), so `Engine.time_scale` above roughly 15× at 60 fps hits that cap; raise `max_delta` to fast-forward further. `FixedUpdate` uses Godot's physics delta and is unaffected by this cap.
+
 ## Frame Rate Relationships
 
 | Schedule | Rate | Use case |
