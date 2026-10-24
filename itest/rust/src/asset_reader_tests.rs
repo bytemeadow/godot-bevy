@@ -120,10 +120,10 @@ fn test_godot_resource_tscn_does_not_regress(ctx: &TestContext) -> godot::task::
             "GodotResource .tscn should reach Loaded within budget"
         );
 
-        let is_scene = app.with_world_mut(|w| {
-            w.resource_mut::<Assets<GodotResource>>()
-                .get_mut(&handle)
-                .and_then(|mut res| res.try_cast::<PackedScene>())
+        let is_scene = app.with_world(|w| {
+            w.resource::<Assets<GodotResource>>()
+                .get(&handle)
+                .and_then(|res| res.try_cast::<PackedScene>())
                 .is_some()
         });
         assert!(

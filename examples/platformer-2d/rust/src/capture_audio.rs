@@ -112,9 +112,9 @@ fn is_settled(world: &mut World, _: &CaptureManifest) -> Result<bool, String> {
         return Ok(false);
     };
     let handles = [audio.jump_sound.clone(), audio.gem_sound.clone()];
-    let mut assets = world.resource_mut::<Assets<GodotResource>>();
+    let assets = world.resource::<Assets<GodotResource>>();
     for handle in handles {
-        let Some(mut asset) = assets.get_mut(&handle) else {
+        let Some(asset) = assets.get(&handle) else {
             return Ok(false);
         };
         if !asset

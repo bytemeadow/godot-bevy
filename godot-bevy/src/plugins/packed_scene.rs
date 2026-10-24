@@ -15,7 +15,7 @@ use bevy_ecs::{
     component::Component,
     entity::Entity,
     query::Without,
-    system::{Commands, Query, ResMut},
+    system::{Commands, Query},
 };
 use bevy_transform::components::Transform;
 use godot::obj::Gd;
@@ -150,7 +150,7 @@ fn spawn_scene(
     mut commands: Commands,
     mut new_scenes: Query<(&mut GodotScene, Entity, Option<&Transform>), Without<GodotNodeHandle>>,
     mut scene_tree: SceneTreeRef,
-    mut assets: ResMut<Assets<GodotResource>>,
+    assets: Res<Assets<GodotResource>>,
     signal_sender: Option<Res<SignalSender>>,
     mut godot: GodotAccess,
 ) -> bevy_ecs::error::Result {
@@ -162,7 +162,7 @@ fn spawn_scene(
         let packed_scene: Gd<PackedScene> = match &scene.resource {
             GodotSceneResource::Handle(handle) => {
                 let resource = assets
-                    .get_mut(handle)
+                    .get(handle)
                     .with_context(|| {
                         format!("failed to find packed scene {handle:?} in assets for entity {ent}")
                     })?

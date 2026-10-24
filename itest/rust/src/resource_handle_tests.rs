@@ -8,7 +8,7 @@ fn test_resource_handle_keeps_resource_alive(_: &TestContext) {
     let id = resource.instance_id();
     assert_eq!(resource.get_reference_count(), 1);
 
-    let mut handle = GodotResourceHandle::new(resource);
+    let handle = GodotResourceHandle::new(resource);
     assert!(id.lookup_validity());
 
     let resource = handle.get();
@@ -29,7 +29,7 @@ fn test_resource_handle_clone_owns_one_reference(_: &TestContext) {
     assert_eq!(resource.get_reference_count(), 2);
     assert_ne!(handle, GodotResourceHandle::new(Resource::new_gd()));
 
-    let mut cloned = handle.clone();
+    let cloned = handle.clone();
     assert_eq!(handle, cloned);
     assert_eq!(resource.get_reference_count(), 3);
 
@@ -57,7 +57,7 @@ fn test_resource_handle_drop_on_another_thread(_: &TestContext) {
     let handle = GodotResourceHandle::new(resource);
 
     std::thread::spawn(move || {
-        let mut cloned = handle.clone();
+        let cloned = handle.clone();
         assert_eq!(handle, cloned);
         assert_eq!(cloned.get().get_reference_count(), 3);
 
@@ -179,7 +179,7 @@ mod shutdown {
             drop_result.is_ok(),
             "dropping an expired handle must not panic"
         );
-        let mut cloned = clone_result.expect("cloning an expired handle must not panic");
+        let cloned = clone_result.expect("cloning an expired handle must not panic");
         assert!(cloned.try_get().is_none());
         assert!(std::panic::catch_unwind(move || cloned.get()).is_err());
     }

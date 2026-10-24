@@ -151,10 +151,10 @@ fn handle_level_scene_change(
     mut loading_state: ResMut<LevelLoadingState>,
     mut pending_level: ResMut<PendingLevel>,
     mut scene_events: MessageWriter<SceneOperationMessage>,
-    mut assets: ResMut<Assets<GodotResource>>,
+    assets: Res<Assets<GodotResource>>,
 ) {
     if let (Some(level_id), Some(handle)) = (current_level.level_id, &loading_state.loading_handle)
-        && assets.get_mut(handle).is_some()
+        && assets.get(handle).is_some()
     {
         info!("Requesting level scene change: {:?}", level_id);
 
