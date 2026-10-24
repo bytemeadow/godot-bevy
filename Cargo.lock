@@ -790,21 +790,22 @@ dependencies = [
 
 [[package]]
 name = "bevy_enhanced_input"
-version = "0.26.0"
-source = "git+https://github.com/projectharmonia/bevy_enhanced_input#b72891d3b45f43e14ff7eaf71773853003805824"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b73cd17d91a012b24e3985fd3af736f61c3ad4919b542e40be5cfecd6333d6c"
 dependencies = [
  "bevy",
  "bevy_enhanced_input_macros",
  "bitflags 2.11.0",
- "log",
  "smallvec",
  "variadics_please",
 ]
 
 [[package]]
 name = "bevy_enhanced_input_macros"
-version = "0.26.0"
-source = "git+https://github.com/projectharmonia/bevy_enhanced_input#b72891d3b45f43e14ff7eaf71773853003805824"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b328604b1e3330b1798d82eeeabfefdf490c2c78d53ffc5d0961fd147b953126"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -947,6 +948,7 @@ dependencies = [
  "bevy_ptr",
  "bevy_reflect",
  "bevy_render",
+ "bevy_scene",
  "bevy_shape",
  "bevy_state",
  "bevy_tasks",
@@ -1255,6 +1257,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "119ca6d445eba5c9976c658f29bac854094b27c27624aa92c4d9668c319618d0"
 dependencies = [
  "bevy_extract_macros",
+ "bevy_macro_utils",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "bevy_scene"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98c4b1677c948e4c1453883f4441136003c53fd9caa44e0f7d78b37618bdb9ad"
+dependencies = [
+ "bevy_app",
+ "bevy_asset",
+ "bevy_derive",
+ "bevy_ecs",
+ "bevy_log",
+ "bevy_platform",
+ "bevy_reflect",
+ "bevy_scene_macros",
+ "bevy_utils",
+ "smallvec",
+ "thiserror 2.0.18",
+ "tracing",
+ "variadics_please",
+]
+
+[[package]]
+name = "bevy_scene_macros"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4da846d8418ca6e38943707c88075a4a0b8f6eea0fd286d33a024d0257439d0"
+dependencies = [
+ "bevy_ecs_macro_logic",
  "bevy_macro_utils",
  "proc-macro2",
  "quote",
@@ -3322,8 +3358,9 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "leafwing-input-manager"
-version = "0.21.0"
-source = "git+https://github.com/Leafwing-Studios/leafwing-input-manager#afae710d2766aad32635954406a852b8c56a8071"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0db2d4413e11aa9c33a84d4431841748529a77077871994f93fdbc17c7bd52cf"
 dependencies = [
  "bevy",
  "dyn-clone",
@@ -3338,7 +3375,8 @@ dependencies = [
 [[package]]
 name = "leafwing_input_manager_macros"
 version = "0.17.0"
-source = "git+https://github.com/Leafwing-Studios/leafwing-input-manager#afae710d2766aad32635954406a852b8c56a8071"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2226cb83129176a6c634f2ce0828c2c29896ea0898fc198636f98696b8056890"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",

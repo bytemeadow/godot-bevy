@@ -214,7 +214,10 @@ fn test_enhanced_input_observer_fires(ctx: &TestContext) -> godot::task::TaskHan
         app.with_world_mut(|w| {
             w.spawn((
                 Player,
-                actions!(Player[(Action::<Jump>::new(), bindings![KeyCode::Space])]),
+                related!(Actions<Player>[(
+                    Action::<Jump>::new(),
+                    related!(Bindings[Binding::from(KeyCode::Space)]),
+                )]),
             ));
         });
         app.updates(2).await;
