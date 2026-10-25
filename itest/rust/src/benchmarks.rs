@@ -789,7 +789,6 @@ macro_rules! property_benchmark_class {
     };
 }
 
-property_benchmark_class!(BenchOutbound1, BenchOutboundNode1, run_property_outbound_1, to_godot; a);
 property_benchmark_class!(BenchOutbound8, BenchOutboundNode8, run_property_outbound_8, to_godot; a, b, c, d, e, f, g, h);
 property_benchmark_class!(BenchTwoWay1, BenchTwoWayNode1, run_property_two_way_1, two_way; a);
 property_benchmark_class!(BenchTwoWay8, BenchTwoWayNode8, run_property_two_way_8, two_way; a, b, c, d, e, f, g, h);
@@ -811,80 +810,52 @@ macro_rules! property_benchmark_n_to_one_class {
     };
 }
 
-property_benchmark_n_to_one_class!(BenchNToOne1, BenchNToOneNode1, run_property_n_to_one_1; a);
 property_benchmark_n_to_one_class!(BenchNToOne8, BenchNToOneNode8, run_property_n_to_one_8; a, b, c, d, e, f, g, h);
 
-macro_rules! property_benchmarks {
-    ($runner:ident, $case:ident; $($name:ident => $count:literal),+ $(,)?) => {
-        $(
-            #[bench(repeat = 1)]
-            fn $name() -> i32 {
-                $runner($count, PropertyBenchCase::$case)
-            }
-        )+
-    };
+#[bench(repeat = 1)]
+fn property_sync_outbound_idle_m8_1000() -> i32 {
+    run_property_outbound_8(1000, PropertyBenchCase::Idle)
 }
 
-property_benchmarks!(run_property_outbound_1, Idle;
-    property_sync_outbound_idle_m1_100 => 100,
-    property_sync_outbound_idle_m1_1000 => 1000,
-    property_sync_outbound_idle_m1_5000 => 5000,
-);
-property_benchmarks!(run_property_outbound_8, Idle;
-    property_sync_outbound_idle_m8_100 => 100,
-    property_sync_outbound_idle_m8_1000 => 1000,
-    property_sync_outbound_idle_m8_5000 => 5000,
-);
-property_benchmarks!(run_property_outbound_1, BevySparse;
-    property_sync_outbound_sparse_m1_100 => 100,
-    property_sync_outbound_sparse_m1_1000 => 1000,
-    property_sync_outbound_sparse_m1_5000 => 5000,
-);
-property_benchmarks!(run_property_outbound_8, BevySparse;
-    property_sync_outbound_sparse_m8_100 => 100,
-    property_sync_outbound_sparse_m8_1000 => 1000,
-    property_sync_outbound_sparse_m8_5000 => 5000,
-);
-property_benchmarks!(run_property_two_way_1, Idle;
-    property_sync_two_way_idle_m1_100 => 100,
-    property_sync_two_way_idle_m1_1000 => 1000,
-    property_sync_two_way_idle_m1_5000 => 5000,
-);
-property_benchmarks!(run_property_two_way_8, Idle;
-    property_sync_two_way_idle_m8_100 => 100,
-    property_sync_two_way_idle_m8_1000 => 1000,
-    property_sync_two_way_idle_m8_5000 => 5000,
-);
-property_benchmarks!(run_property_two_way_1, GodotSparse;
-    property_sync_two_way_godot_sparse_m1_100 => 100,
-    property_sync_two_way_godot_sparse_m1_1000 => 1000,
-    property_sync_two_way_godot_sparse_m1_5000 => 5000,
-);
-property_benchmarks!(run_property_two_way_8, GodotSparse;
-    property_sync_two_way_godot_sparse_m8_100 => 100,
-    property_sync_two_way_godot_sparse_m8_1000 => 1000,
-    property_sync_two_way_godot_sparse_m8_5000 => 5000,
-);
-property_benchmarks!(run_property_two_way_1, Conflict;
-    property_sync_two_way_conflict_m1_100 => 100,
-    property_sync_two_way_conflict_m1_1000 => 1000,
-    property_sync_two_way_conflict_m1_5000 => 5000,
-);
-property_benchmarks!(run_property_two_way_8, Conflict;
-    property_sync_two_way_conflict_m8_100 => 100,
-    property_sync_two_way_conflict_m8_1000 => 1000,
-    property_sync_two_way_conflict_m8_5000 => 5000,
-);
-property_benchmarks!(run_property_n_to_one_1, GodotSparse;
-    property_sync_n_to_one_godot_sparse_m1_100 => 100,
-    property_sync_n_to_one_godot_sparse_m1_1000 => 1000,
-    property_sync_n_to_one_godot_sparse_m1_5000 => 5000,
-);
-property_benchmarks!(run_property_n_to_one_8, GodotSparse;
-    property_sync_n_to_one_godot_sparse_m8_100 => 100,
-    property_sync_n_to_one_godot_sparse_m8_1000 => 1000,
-    property_sync_n_to_one_godot_sparse_m8_5000 => 5000,
-);
+#[bench(repeat = 1)]
+fn property_sync_outbound_idle_m8_5000() -> i32 {
+    run_property_outbound_8(5000, PropertyBenchCase::Idle)
+}
+
+#[bench(repeat = 1)]
+fn property_sync_outbound_sparse_m8_1000() -> i32 {
+    run_property_outbound_8(1000, PropertyBenchCase::BevySparse)
+}
+
+#[bench(repeat = 1)]
+fn property_sync_two_way_idle_m1_1000() -> i32 {
+    run_property_two_way_1(1000, PropertyBenchCase::Idle)
+}
+
+#[bench(repeat = 1)]
+fn property_sync_two_way_idle_m8_1000() -> i32 {
+    run_property_two_way_8(1000, PropertyBenchCase::Idle)
+}
+
+#[bench(repeat = 1)]
+fn property_sync_two_way_idle_m8_5000() -> i32 {
+    run_property_two_way_8(5000, PropertyBenchCase::Idle)
+}
+
+#[bench(repeat = 1)]
+fn property_sync_two_way_godot_sparse_m8_1000() -> i32 {
+    run_property_two_way_8(1000, PropertyBenchCase::GodotSparse)
+}
+
+#[bench(repeat = 1)]
+fn property_sync_two_way_conflict_m8_1000() -> i32 {
+    run_property_two_way_8(1000, PropertyBenchCase::Conflict)
+}
+
+#[bench(repeat = 1)]
+fn property_sync_n_to_one_godot_sparse_m8_1000() -> i32 {
+    run_property_n_to_one_8(1000, PropertyBenchCase::GodotSparse)
+}
 
 const COLLISION_BODY_COUNT: usize = 100;
 
