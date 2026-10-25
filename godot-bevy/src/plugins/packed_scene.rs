@@ -7,7 +7,7 @@ use crate::plugins::signals::{
 use crate::plugins::transforms::IntoGodotTransform;
 use crate::plugins::transforms::IntoGodotTransform2D;
 use bevy_app::{App, Plugin, PostUpdate};
-use bevy_asset::{Assets, Handle};
+use bevy_asset::{AssetServer, Assets, Handle, LoadState};
 use bevy_ecs::error::ContextExt;
 use bevy_ecs::event::Event;
 use bevy_ecs::prelude::Res;
@@ -19,7 +19,7 @@ use bevy_ecs::{
 };
 use bevy_transform::components::Transform;
 use godot::classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader};
-use godot::obj::Gd;
+use godot::obj::{Gd, GodotClass, Inherits};
 use godot::prelude::Variant;
 use std::collections::HashMap;
 use tracing::error;
@@ -37,13 +37,31 @@ impl Plugin for GodotPackedScenePlugin {
 /// A to-be-instanced-and-spawned Godot scene.
 ///
 /// [`GodotScene`]s that are spawned/inserted into the bevy world will be instanced from the provided
-/// handle/path and the instance will be added as an [`GodotNodeHandle`] in the next PostUpdateFlush set.
+/// handle/path once the asset is loaded. The instance is added as a [`GodotNodeHandle`]
+/// during [`PostUpdate`].
 /// (see [`spawn_scene`])
-#[derive(Debug, Component)]
+#[derive(Component)]
 pub struct GodotScene {
     resource: GodotSceneResource,
     parent: Option<GodotNodeHandle>,
     deferred_signal_connections: Vec<Box<dyn DeferredSignalConnectionTrait>>,
+    deferred_setups: Vec<Box<SceneSetup>>,
+}
+
+type SceneSetup = dyn FnOnce(&Gd<Node>) -> bevy_ecs::error::Result + Send + Sync;
+
+impl std::fmt::Debug for GodotScene {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GodotScene")
+            .field("resource", &self.resource)
+            .field("parent", &self.parent)
+            .field(
+                "deferred_signal_connections",
+                &self.deferred_signal_connections,
+            )
+            .field("deferred_setups", &self.deferred_setups.len())
+            .finish()
+    }
 }
 
 #[derive(Debug)]
@@ -55,11 +73,13 @@ enum GodotSceneResource {
 impl GodotScene {
     /// Instantiate the godot scene from a Bevy `Handle<GodotResource>` and add it to the
     /// scene tree root. This is the preferred method when using Bevy's asset system.
+    /// If the handle is still loading, spawning waits until the asset is available.
     pub fn from_handle(handle: Handle<GodotResource>) -> Self {
         Self {
             resource: GodotSceneResource::Handle(handle),
             parent: None,
             deferred_signal_connections: Vec::new(),
+            deferred_setups: Vec::new(),
         }
     }
 
@@ -73,12 +93,51 @@ impl GodotScene {
             resource: GodotSceneResource::Path(path.to_string()),
             parent: None,
             deferred_signal_connections: Vec::new(),
+            deferred_setups: Vec::new(),
         }
     }
 
     /// Set the parent node for this scene when spawned.
     pub fn with_parent(mut self, parent: GodotNodeHandle) -> Self {
         self.parent = Some(parent);
+        self
+    }
+
+    /// Configure the scene root before it enters the scene tree and runs `_ready`.
+    /// Setups run once, in the order added, after the entity's `Transform` is applied.
+    /// If the root cannot be cast to `T`,
+    /// spawning returns an error with the scene, entity, and class names, and
+    /// removes the `GodotScene` component to cancel the spawn.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use bevy_ecs::prelude::World;
+    /// # use godot::classes::Area2D;
+    /// # use godot_bevy::prelude::*;
+    /// # let mut world = World::new();
+    /// world.spawn(
+    ///     GodotScene::from_path("res://scenes/bullet.tscn")
+    ///         .with_setup::<Area2D, _>(|root| {
+    ///             root.set_collision_mask(4);
+    ///         }),
+    /// );
+    /// ```
+    pub fn with_setup<T, F>(mut self, setup: F) -> Self
+    where
+        T: GodotClass + Inherits<Node>,
+        F: FnOnce(&mut Gd<T>) + Send + Sync + 'static,
+    {
+        self.deferred_setups.push(Box::new(move |root| {
+            let mut root = root.clone().try_cast::<T>().map_err(|root| {
+                format!(
+                    "expected root class {}, actual class {}",
+                    T::class_id(),
+                    root.get_class()
+                )
+            })?;
+            setup(&mut root);
+            Ok(())
+        }));
         self
     }
 
@@ -148,6 +207,7 @@ fn spawn_scene(
     mut new_scenes: Query<(&mut GodotScene, Entity, Option<&Transform>), Without<GodotNodeHandle>>,
     mut scene_tree: SceneTreeRef,
     assets: Res<Assets<GodotResource>>,
+    asset_server: Option<Res<AssetServer>>,
     signal_sender: Option<Res<SignalSender>>,
     mut godot: GodotAccess,
 ) -> bevy_ecs::error::Result {
@@ -158,13 +218,27 @@ fn spawn_scene(
     for (mut scene, ent, transform) in new_scenes.iter_mut() {
         let packed_scene: Gd<PackedScene> = match &scene.resource {
             GodotSceneResource::Handle(handle) => {
-                let resource = assets
-                    .get(handle)
-                    .with_context(|| {
-                        format!("failed to find packed scene {handle:?} in assets for entity {ent}")
-                    })?
-                    .get()
-                    .clone();
+                let Some(resource) = assets.get(handle) else {
+                    match asset_server
+                        .as_ref()
+                        .and_then(|server| server.get_load_state(handle))
+                    {
+                        Some(LoadState::Loading) => continue,
+                        Some(LoadState::Failed(error)) => {
+                            return Err(format!(
+                                "failed to load packed scene {handle:?} for entity {ent}: {error}"
+                            )
+                            .into());
+                        }
+                        _ => {
+                            return Err(format!(
+                                "failed to find packed scene {handle:?} in assets for entity {ent}"
+                            )
+                            .into());
+                        }
+                    }
+                };
+                let resource = resource.get().clone();
                 match resource.try_cast::<PackedScene>() {
                     Ok(ps) => ps,
                     Err(resource) => {
@@ -225,6 +299,19 @@ fn spawn_scene(
                     "failed to set transform on scene {:?} for entity {ent}: root is neither Node2D nor Node3D",
                     scene.resource
                 )
+            }
+        }
+
+        for setup in std::mem::take(&mut scene.deferred_setups) {
+            if let Err(error) = setup(&instance).with_context(|| {
+                format!(
+                    "failed to set up scene {:?} for entity {ent}",
+                    scene.resource
+                )
+            }) {
+                instance.free();
+                commands.entity(ent).remove::<GodotScene>();
+                return Err(error);
             }
         }
 

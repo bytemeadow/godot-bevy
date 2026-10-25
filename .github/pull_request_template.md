@@ -8,7 +8,7 @@
 - [x] Create awesomeness!
 - [ ] Update book (if needed)
   - [ ] Update migration guide (if breaking change)
-  - [ ] Run `mdbook test` (if book was updated)
+  - [ ] Run `cargo check -p book-tests --all-targets`, `./itest/verify-qualification.sh doctests`, and `mdbook build book` from the repository root (if book was updated)
 - [ ] Add/update tests (if needed)
 - [ ] Update examples (if needed)
 - [ ] Run examples

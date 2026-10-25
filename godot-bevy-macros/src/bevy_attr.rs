@@ -538,7 +538,10 @@ fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
     Ok(out)
 }
 
-fn collect_field_bindings(input: &DeriveInput) -> syn::Result<Vec<ComponentPlan>> {
+fn collect_field_bindings(
+    input: &DeriveInput,
+    companions: &mut [ComponentPlan],
+) -> syn::Result<Vec<ComponentPlan>> {
     if matches!(&input.data, Data::Struct(s) if matches!(s.fields, Fields::Unnamed(_))) {
         return Err(Error::new_spanned(
             input,
@@ -580,7 +583,19 @@ fn collect_field_bindings(input: &DeriveInput) -> syn::Result<Vec<ComponentPlan>
                 "`description`, `hint`, and `hint_string` are only valid on generated component-first exports",
             ));
         }
+        let mut bound = false;
+        for companion in companions.iter_mut() {
+            if let ComponentInit::Fields(mappings) = &mut companion.init {
+                for mapping in mappings.iter_mut().filter(|m| m.godot_prop == name) {
+                    mapping.with = d.with.clone();
+                    bound = true;
+                }
+            }
+        }
         let Some(component) = d.component else {
+            if bound && d.with.is_some() {
+                continue;
+            }
             return Err(Error::new_spanned(
                 attr,
                 "a Godot-first field binding requires `component = <Component>`",
@@ -686,7 +701,8 @@ pub fn parse_godot_first(input: &DeriveInput) -> syn::Result<ClassPlan> {
         .map(gf_companion)
         .collect::<syn::Result<Vec<_>>>()?;
     // field-existence validation is deferred to the compiler
-    companions.extend(collect_field_bindings(input)?);
+    let field_bindings = collect_field_bindings(input, &mut companions)?;
+    companions.extend(field_bindings);
 
     Ok(ClassPlan {
         godot_class: input.ident.clone(),

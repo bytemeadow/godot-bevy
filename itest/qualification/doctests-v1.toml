@@ -244,6 +244,13 @@ scaffold = ""
 source = "godot-bevy/src/plugins/packed_scene.rs"
 ordinal = 1
 category = "compiled_no_run"
+fingerprint = "sha256:7b82f547bb45cfdb89ef162d46a9c9dd8e25ca7e844fd3e02b3f40ea63fbc9d7"
+scaffold = ""
+
+[[fences]]
+source = "godot-bevy/src/plugins/packed_scene.rs"
+ordinal = 2
+category = "compiled_no_run"
 fingerprint = "sha256:e0e46fd6f286a43e0d5dd768d8c1c1e64c50f1b914f4f0228b1e3d5e2ddd7a32"
 scaffold = ""
 

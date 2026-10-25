@@ -34,6 +34,10 @@ pub use crate::plugins::{
         DisableGodotTransformRead, GodotTransformConfig, GodotTransformSyncPlugin,
         GodotTransformSyncPluginExt, NO_TRANSFORM_READ_GROUP, TransformSyncMetadata,
         TransformSyncMode, add_transform_sync_systems,
+        conversions::{
+            IntoBevyTransform, IntoGodotTransform, IntoGodotTransform2D, IntoQuat, IntoQuaternion,
+            IntoVec3, IntoVector3,
+        },
     },
 };
 pub use bevy_ecs::prelude as bevy_ecs_prelude;

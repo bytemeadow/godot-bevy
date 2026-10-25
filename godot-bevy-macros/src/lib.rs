@@ -170,7 +170,7 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// A field binding requires `component = Comp`. Optional `with = fn` converts the
+/// A newtype field binding requires `component = Comp`. Optional `with = fn` converts the
 /// Godot value before passing it to the component constructor. Use gdext's native
 /// `#[export]`, `#[var(hint = ..., hint_string = ...)]`, and `#[init(val = ...)]`
 /// attributes for property metadata and defaults. `as`, `default`, `description`,
@@ -199,6 +199,11 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
 /// |------|---------|
 /// | `require(Marker)` | Insert `Marker::default()` — a pure marker component. |
 /// | `require(Comp { bevy_field: godot_field, … })` | Build `Comp` from existing Godot exports, mapping each Bevy field name to a Godot property name. |
+///
+/// For an N→1 binding, add `#[gdbevy(with = converter)]` to a source field without
+/// a `component` key. The converter receives a cloned Godot value and is applied
+/// to every mapped component field that reads it, so `with = String::from` can
+/// convert an exported `GString` into a component's `String` field.
 ///
 /// `base`, `class_name`, and generated-export forms (`require(prop: Comp, …)`) are
 /// **not** valid here — those are component-first (`GodotNode`) only.

@@ -618,6 +618,328 @@ fn test_packed_scene_spawn_reconciles_to_single_entity(
     })
 }
 
+#[itest]
+async fn test_packed_scene_waits_for_loading_handle(ctx: TestContext) {
+    use bevy::asset::LoadState;
+    use bevy::prelude::{Add, AssetServer, Assets, On, PostUpdate};
+    use std::sync::{Arc, Mutex};
+
+    let mut app = TestApp::new(&ctx, |app| {
+        app.add_plugins((GodotAssetsPlugin, GodotPackedScenePlugin));
+    })
+    .await;
+    let setups = Arc::new(Mutex::new(0));
+    let setup_calls = setups.clone();
+    let additions = Arc::new(Mutex::new(0));
+    let handle_additions = additions.clone();
+    let (entity, handle) = app.with_world_mut(|world| {
+        let handle = world
+            .resource::<AssetServer>()
+            .load("res://test_spawn_scene.tscn");
+        let entity = world
+            .spawn(
+                GodotScene::from_handle(handle.clone()).with_setup::<Node3D, _>(move |_| {
+                    *setup_calls.lock().unwrap() += 1;
+                }),
+            )
+            .id();
+        world.add_observer(move |event: On<Add<GodotNodeHandle>>| {
+            if event.entity == entity {
+                *handle_additions.lock().unwrap() += 1;
+            }
+        });
+        for _ in 0..2 {
+            world.run_schedule(PostUpdate);
+            assert!(matches!(
+                world.resource::<AssetServer>().get_load_state(&handle),
+                Some(LoadState::Loading)
+            ));
+            assert!(
+                world
+                    .resource::<Assets<GodotResource>>()
+                    .get(&handle)
+                    .is_none()
+            );
+            assert!(world.get::<GodotNodeHandle>(entity).is_none());
+            assert_eq!(*setups.lock().unwrap(), 0);
+            assert_eq!(*additions.lock().unwrap(), 0);
+        }
+        (entity, handle)
+    });
+
+    for _ in 0..120 {
+        app.update().await;
+        if app.with_world(|world| world.get::<GodotNodeHandle>(entity).is_some()) {
+            break;
+        }
+    }
+    let node_handle = app.with_world(|world| {
+        assert!(matches!(
+            world.resource::<AssetServer>().get_load_state(&handle),
+            Some(LoadState::Loaded)
+        ));
+        *world
+            .get::<GodotNodeHandle>(entity)
+            .expect("loaded scene must spawn")
+    });
+    app.updates(5).await;
+    assert_eq!(*setups.lock().unwrap(), 1);
+    assert_eq!(*additions.lock().unwrap(), 1);
+    app.with_world(|world| {
+        assert_eq!(world.get::<GodotNodeHandle>(entity), Some(&node_handle));
+    });
+
+    Gd::<Node>::from_instance_id(node_handle.instance_id()).queue_free();
+    app.updates(2).await;
+    app.cleanup().await;
+}
+
+#[itest]
+async fn test_packed_scene_failed_handle_returns_context(ctx: TestContext) {
+    use bevy::asset::LoadState;
+    use bevy::ecs::error::FallbackErrorHandler;
+    use bevy::prelude::{AssetServer, Handle, PostUpdate};
+    use std::sync::Mutex;
+
+    static ERRORS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+    let mut app = TestApp::new(&ctx, |app| {
+        app.add_plugins((GodotAssetsPlugin, GodotPackedScenePlugin));
+        app.insert_resource(FallbackErrorHandler(|error, _| {
+            ERRORS.lock().unwrap().push(error.to_string());
+        }));
+    })
+    .await;
+    let handle: Handle<GodotResource> = app.with_world(|world| {
+        world
+            .resource::<AssetServer>()
+            .load("res://missing_packed_scene.tscn")
+    });
+    for _ in 0..120 {
+        app.update().await;
+        if app.with_world(|world| {
+            matches!(
+                world.resource::<AssetServer>().get_load_state(&handle),
+                Some(LoadState::Failed(_))
+            )
+        }) {
+            break;
+        }
+    }
+    app.with_world_mut(|world| {
+        let Some(LoadState::Failed(cause)) =
+            world.resource::<AssetServer>().get_load_state(&handle)
+        else {
+            panic!("missing scene must fail to load");
+        };
+        let entity = world.spawn(GodotScene::from_handle(handle.clone())).id();
+        world.run_schedule(PostUpdate);
+        assert!(world.get::<GodotNodeHandle>(entity).is_none());
+        let errors = std::mem::take(&mut *ERRORS.lock().unwrap());
+        assert_eq!(errors.len(), 1);
+        for context in [
+            "failed to load packed scene",
+            &format!("{handle:?}"),
+            &entity.to_string(),
+            &cause.to_string(),
+        ] {
+            assert!(
+                errors[0].contains(context),
+                "missing {context}: {}",
+                errors[0]
+            );
+        }
+        world.despawn(entity);
+    });
+    app.cleanup().await;
+}
+
+#[itest]
+async fn test_packed_scene_unknown_handle_returns_context(ctx: TestContext) {
+    use bevy::ecs::error::FallbackErrorHandler;
+    use bevy::prelude::{AssetServer, Handle, PostUpdate};
+    use std::sync::Mutex;
+
+    static ERRORS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+    let mut app = TestApp::new(&ctx, |app| {
+        app.add_plugins((GodotAssetsPlugin, GodotPackedScenePlugin));
+        app.insert_resource(FallbackErrorHandler(|error, _| {
+            ERRORS.lock().unwrap().push(error.to_string());
+        }));
+    })
+    .await;
+    app.with_world_mut(|world| {
+        let handle = Handle::<GodotResource>::default();
+        assert!(
+            world
+                .resource::<AssetServer>()
+                .get_load_state(&handle)
+                .is_none()
+        );
+        let entity = world.spawn(GodotScene::from_handle(handle.clone())).id();
+        world.run_schedule(PostUpdate);
+        assert!(world.get::<GodotNodeHandle>(entity).is_none());
+        let errors = std::mem::take(&mut *ERRORS.lock().unwrap());
+        assert_eq!(errors.len(), 1);
+        for context in [
+            "failed to find packed scene",
+            &format!("{handle:?}"),
+            &entity.to_string(),
+        ] {
+            assert!(
+                errors[0].contains(context),
+                "missing {context}: {}",
+                errors[0]
+            );
+        }
+        world.despawn(entity);
+    });
+    app.cleanup().await;
+}
+
+#[itest]
+async fn test_packed_scene_setup_sets_root_property(ctx: TestContext) {
+    use bevy::prelude::Transform;
+
+    let mut app = TestApp::new(&ctx, |app| {
+        app.add_plugins((GodotAssetsPlugin, GodotPackedScenePlugin));
+    })
+    .await;
+    let entity = app.with_world_mut(|world| {
+        world
+            .spawn((
+                GodotScene::from_path("res://test_spawn_scene.tscn").with_setup::<Node3D, _>(
+                    |root| {
+                        root.set_position(Vector3::new(1.0, 2.0, 3.0));
+                    },
+                ),
+                Transform::from_xyz(4.0, 5.0, 6.0),
+            ))
+            .id()
+    });
+    app.update().await;
+
+    let handle = app.with_world(|world| *world.get::<GodotNodeHandle>(entity).unwrap());
+    let mut root = Gd::<Node3D>::from_instance_id(handle.instance_id());
+    assert_eq!(root.get_position(), Vector3::new(1.0, 2.0, 3.0));
+
+    root.queue_free();
+    app.updates(2).await;
+    app.cleanup().await;
+}
+
+#[itest]
+async fn test_packed_scene_setups_run_once_in_order_before_tree_entry(ctx: TestContext) {
+    use std::sync::{Arc, Mutex};
+
+    let mut app = TestApp::new(&ctx, |app| {
+        app.add_plugins((GodotAssetsPlugin, GodotPackedScenePlugin));
+    })
+    .await;
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let first_calls = calls.clone();
+    let second_calls = calls.clone();
+    let name = String::from("ConfiguredRoot");
+    let entity = app.with_world_mut(|world| {
+        world
+            .spawn(
+                GodotScene::from_path("res://test_spawn_scene.tscn")
+                    .with_setup::<Node, _>(move |root| {
+                        first_calls.lock().unwrap().push((1, root.is_inside_tree()));
+                        root.set_meta("setup_order", &1.to_variant());
+                        root.set_name(&name);
+                        drop(name);
+                    })
+                    .with_setup::<Node3D, _>(move |root| {
+                        second_calls
+                            .lock()
+                            .unwrap()
+                            .push((2, root.is_inside_tree()));
+                        let order = root.get_meta("setup_order").to::<i32>();
+                        root.set_meta("setup_order", &(order * 10 + 2).to_variant());
+                    }),
+            )
+            .id()
+    });
+    app.updates(3).await;
+
+    let handle = app.with_world(|world| *world.get::<GodotNodeHandle>(entity).unwrap());
+    let mut root = Gd::<Node3D>::from_instance_id(handle.instance_id());
+    assert_eq!(*calls.lock().unwrap(), vec![(1, false), (2, false)]);
+    assert_eq!(root.get_meta("setup_order").to::<i32>(), 12);
+    assert_eq!(root.get_name().to_string(), "ConfiguredRoot");
+    assert!(root.is_inside_tree());
+    app.with_world(|world| {
+        assert_eq!(
+            world.get::<Name>(entity).unwrap().as_str(),
+            "ConfiguredRoot"
+        );
+    });
+
+    root.queue_free();
+    app.updates(2).await;
+    app.cleanup().await;
+}
+
+#[itest]
+async fn test_packed_scene_setup_wrong_class_returns_context(ctx: TestContext) {
+    use bevy::ecs::error::FallbackErrorHandler;
+    use bevy::prelude::PostUpdate;
+    use std::sync::{Arc, Mutex};
+
+    static ERRORS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+    let mut app = TestApp::new(&ctx, |app| {
+        app.add_plugins((GodotAssetsPlugin, GodotPackedScenePlugin));
+        app.insert_resource(FallbackErrorHandler(|error, _| {
+            ERRORS.lock().unwrap().push(error.to_string());
+        }));
+    })
+    .await;
+    let instance = Arc::new(Mutex::new(None));
+    let captured_instance = instance.clone();
+    let entity = app.with_world_mut(|world| {
+        let entity = world
+            .spawn(
+                GodotScene::from_path("res://test_spawn_scene.tscn")
+                    .with_setup::<Node, _>(move |root| {
+                        *captured_instance.lock().unwrap() = Some(root.instance_id());
+                    })
+                    .with_setup::<godot::classes::Area2D, _>(|_| {
+                        panic!("wrong-class setup must not run");
+                    }),
+            )
+            .id();
+        world.run_schedule(PostUpdate);
+        assert!(world.get::<GodotNodeHandle>(entity).is_none());
+        entity
+    });
+    app.updates(2).await;
+    app.with_world_mut(|world| {
+        assert!(world.get::<GodotNodeHandle>(entity).is_none());
+        assert!(world.get::<GodotScene>(entity).is_none());
+        world.despawn(entity);
+    });
+
+    let errors = std::mem::take(&mut *ERRORS.lock().unwrap());
+    assert_eq!(errors.len(), 1);
+    for context in [
+        "res://test_spawn_scene.tscn",
+        &entity.to_string(),
+        "Area2D",
+        "Node3D",
+    ] {
+        assert!(
+            errors[0].contains(context),
+            "missing {context}: {}",
+            errors[0]
+        );
+    }
+    assert!(!instance.lock().unwrap().unwrap().lookup_validity());
+    app.cleanup().await;
+}
+
 #[itest(async)]
 fn test_protected_detach_preserves_node(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();

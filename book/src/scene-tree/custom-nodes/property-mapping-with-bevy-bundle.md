@@ -144,7 +144,7 @@ pub struct EnemyNode {
 }
 ```
 
-`component = Comp` is required. `with = fn` is optional. `as` and `default` are **not** allowed — gdext's `#[init(val = …)]` owns defaults on this path.
+`component = Comp` is required for a newtype binding. `with = fn` is optional. `as` and `default` are **not** allowed — gdext's `#[init(val = …)]` owns defaults on this path.
 
 ### Marker at the struct level
 
@@ -173,13 +173,22 @@ pub struct PlayerNode {
 }
 ```
 
+Add `#[gdbevy(with = converter)]` to a source field to convert its value before
+assigning it to each N→1 component field that reads it. No `component` key is
+needed on that field; for example, exported `GString` paths can populate `String`
+fields:
+
+```rust
+{{#include ../../../../book-tests/src/n_to_one_conversions.rs}}
+```
+
 ### All Godot-first keys
 
 | Placement | Key | Required? | Meaning |
 |-----------|-----|-----------|---------|
 | struct | `require(Marker)` | no | Insert `Marker::default()` |
 | struct | `require(Comp { bevy_field: godot_field, … })` | no | Build struct component from existing exports |
-| field | `component = Comp` | **yes** | Bevy component type (`Comp(value)`) |
+| field | `component = Comp` | for newtype bindings | Bevy component type (`Comp(value)`) |
 | field | `with = fn` | no | Godot-value → component-value conversion |
 
 Godot-first classes own their gdext declaration, so use gdext's native

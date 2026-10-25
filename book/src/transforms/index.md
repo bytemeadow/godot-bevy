@@ -38,6 +38,18 @@ fn move_character(query: Query<&GodotNodeHandle>, mut godot: GodotAccess) {
 
 Allows for modifying transforms both from Godot's side and from ECS side. Useful during migration from a GDScript project to godot-bevy or when you're using Godot's physics methods but still want transforms to be updated for reading on the ECS side.
 
+## Converting math types
+
+The prelude exports `IntoVector3` and `IntoVec3` for converting between Bevy's
+`Vec3` and Godot's `Vector3`:
+
+```rust
+{{#include ../../../book-tests/src/conversions.rs}}
+```
+
+It also exports `IntoQuaternion` / `IntoQuat` for rotations and
+`IntoGodotTransform`, `IntoGodotTransform2D`, and `IntoBevyTransform` for transforms.
+
 ## Default Behavior
 
 By default, godot-bevy operates in **one-way sync mode**:
