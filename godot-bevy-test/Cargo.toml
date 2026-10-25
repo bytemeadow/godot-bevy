@@ -3,6 +3,7 @@ name = "godot-bevy-test"
 description = "Integration testing framework for godot-bevy projects"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 repository.workspace = true
 keywords.workspace = true
@@ -24,8 +25,9 @@ profile-tracy = [
 godot = { workspace = true, features = ["__itest"] }
 godot-bevy = { workspace = true }
 godot-bevy-test-macros = { workspace = true }
-bevy = { version = "0.19", default-features = false, features = [
+bevy = { version = "0.20", default-features = false, features = [
     "bevy_asset",
+    "debug",
     "multi_threaded",
 ] }
 serde_json = "1.0"

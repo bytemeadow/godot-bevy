@@ -36,6 +36,7 @@ impl BenchmarkSelector {
 pub(crate) struct TestConfig {
     pub(crate) filter: Option<Filter>,
     pub(crate) repeat: u32,
+    pub(crate) schedule_seed: Option<u64>,
     pub(crate) timeout_frames: u32,
     pub(crate) json_path: Option<PathBuf>,
     pub(crate) deny_focus: bool,
@@ -47,6 +48,7 @@ impl TestConfig {
         Ok(Self {
             filter: filter_from_env("ITEST_FILTER")?,
             repeat: positive_u32_from_env("ITEST_REPEAT", DEFAULT_REPEAT)?,
+            schedule_seed: schedule_seed_from_env()?,
             timeout_frames: positive_u32_from_env("ITEST_TIMEOUT_FRAMES", DEFAULT_TIMEOUT_FRAMES)?,
             json_path: report_path_from_env()?,
             deny_focus: boolean_from_env("ITEST_DENY_FOCUS", false)?,
@@ -58,6 +60,7 @@ impl TestConfig {
         Self {
             filter: None,
             repeat: DEFAULT_REPEAT,
+            schedule_seed: None,
             timeout_frames: DEFAULT_TIMEOUT_FRAMES,
             json_path: None,
             deny_focus: false,
@@ -170,6 +173,24 @@ fn parse_positive_u32(name: &str, value: &str) -> Result<u32, String> {
         return Err(format!("{name} must be a positive integer"));
     }
     Ok(parsed)
+}
+
+fn schedule_seed_from_env() -> Result<Option<u64>, String> {
+    match std::env::var("ITEST_SCHEDULE_SEED") {
+        Ok(value) => parse_schedule_seed(&value).map(Some),
+        Err(VarError::NotPresent) => Ok(None),
+        Err(VarError::NotUnicode(_)) => {
+            Err("ITEST_SCHEDULE_SEED must be valid Unicode".to_string())
+        }
+    }
+}
+
+fn parse_schedule_seed(value: &str) -> Result<u64, String> {
+    let error = || "ITEST_SCHEDULE_SEED must be an unsigned 64-bit decimal integer".to_string();
+    if !value.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(error());
+    }
+    value.parse().map_err(|_| error())
 }
 
 fn boolean_from_env(name: &str, default: bool) -> Result<bool, String> {

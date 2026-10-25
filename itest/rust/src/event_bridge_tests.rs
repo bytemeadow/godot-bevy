@@ -56,6 +56,44 @@ fn test_send_event_rust_node_scoped(ctx: &TestContext) -> godot::task::TaskHandl
     })
 }
 
+/// The event drain must follow scene-tree mirroring so observers can resolve
+/// nodes added in the same frame gap as the event.
+#[itest(async)]
+fn test_send_event_observer_sees_new_node(ctx: &TestContext) -> godot::task::TaskHandle {
+    let ctx_clone = ctx.clone();
+    godot::task::spawn(async move {
+        #[derive(Event, Debug, Clone)]
+        struct NodeAdded(godot::obj::InstanceId);
+
+        #[derive(Resource, Default)]
+        struct Received(bool);
+
+        let mut app = TestApp::new(&ctx_clone, |app| {
+            app.init_resource::<Received>();
+            app.add_observer(
+                |t: On<NodeAdded>, index: Res<NodeEntityIndex>, mut r: ResMut<Received>| {
+                    r.0 = index.get(t.event().0).is_some();
+                },
+            );
+        })
+        .await;
+
+        let node = godot::classes::Node::new_alloc();
+        ctx_clone.scene_tree.clone().add_child(&node);
+        godot_bevy::send_event(&singleton_node(&ctx_clone), NodeAdded(node.instance_id()));
+
+        app.update().await;
+
+        assert!(
+            app.with_world(|w| w.resource::<Received>().0),
+            "event observer must find the node mirrored in the same frame"
+        );
+
+        app.cleanup().await;
+        node.free();
+    })
+}
+
 #[itest(async)]
 fn test_send_event_delivers_exactly_once(ctx: &TestContext) -> godot::task::TaskHandle {
     let ctx_clone = ctx.clone();

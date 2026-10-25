@@ -52,10 +52,10 @@ use crate::interop::GodotResourceHandle;
 /// }
 ///
 /// fn use_loaded_assets(
-///     mut assets: ResMut<Assets<GodotResource>>,
+///     assets: Res<Assets<GodotResource>>,
 ///     my_assets: Res<MyAssets>,
 /// ) {
-///     if let Some(mut asset) = assets.get_mut(&my_assets.scene) {
+///     if let Some(asset) = assets.get(&my_assets.scene) {
 ///         if let Some(scene) = asset.try_cast::<PackedScene>() {
 ///         }
 ///     }
@@ -238,7 +238,8 @@ pub struct GodotResource {
 
 impl GodotResource {
     /// Get the raw Godot resource - you'll need to cast it to the specific type you need
-    pub fn get(&mut self) -> Gd<GodotBaseResource> {
+    #[track_caller]
+    pub fn get(&self) -> Gd<GodotBaseResource> {
         self.handle.get()
     }
 
@@ -248,7 +249,8 @@ impl GodotResource {
     }
 
     /// Try to cast to a specific Godot resource type
-    pub fn try_cast<T>(&mut self) -> Option<Gd<T>>
+    #[track_caller]
+    pub fn try_cast<T>(&self) -> Option<Gd<T>>
     where
         T: godot::obj::GodotClass + godot::obj::Inherits<GodotBaseResource>,
     {

@@ -115,6 +115,11 @@ destructor panics are also caught and reported. Other cleanup systems may not
 finish after a panic. Hard termination and aborting or double panics cannot
 provide this cleanup guarantee. Bevy `AppExit` messages do not quit Godot.
 
+godot-bevy tears the app down on an unhandled panic. An application can call
+`App::set_error_handler(bevy::ecs::error::warn)` during setup to log system
+errors and panics and keep running, but a panicking system may leave state
+half-updated.
+
 The extension's `on_stage_deinit` hook is a separate process-level lifecycle event;
 it shuts down extension-wide services such as profiling and is not a replacement for
 per-`BevyApp` shutdown.

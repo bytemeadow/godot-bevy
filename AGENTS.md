@@ -44,7 +44,7 @@ Never use `--all-features`: the `api-4-2`..`api-4-6` features are mutually exclu
 | `examples/` | example games, each `rust/` crate + `godot/` project; the `BevyAppSingleton` autoload is the ECS entry point |
 | `book/` | mdbook docs, published per-version by `book.yml` |
 
-Versions: workspace 0.12.0, Bevy 0.19 (the lib depends on `bevy_*` sub-crates; examples and itest use the umbrella crate), gdext (`godot`) 0.5.
+Versions: workspace 0.12.0, Bevy 0.20 (the lib depends on `bevy_*` sub-crates; examples and itest use the umbrella crate), gdext (`godot`) 0.5.
 
 ## Architecture
 
@@ -77,6 +77,7 @@ Where things live:
 - Tests live in `itest/rust/src/*_tests.rs` using `TestApp` + `#[itest]`/`#[itest(async)]`; add new files as `mod` in `itest/rust/src/lib.rs`. Read `itest/README.md` before writing one.
 - Select tests without editing source: `devenv shell -- itest --filter test_name`. Filters are comma-separated, case-sensitive substrings. A filter matching no tests is an error.
 - Repeat and retain evidence: `devenv shell -- itest --filter test_name --repeat 3 --timeout-frames 600 --json ../target/itest.json`. Exit 0 means pass, 1 means a failed/flaky/timeout result, and 2 means a configuration or harness error.
+- For schedule shuffling with `--schedule-seed <u64>`, see [runner configuration](godot-bevy-test/README.md#runner-configuration).
 - `#[itest(focus)]` intersects with filters. CI sets `ITEST_DENY_FOCUS=1`, so committed focus markers fail before any test executes. `#[itest(skip)]` reports a selected test as skipped.
 - In async tests, `app.physics_update().await` guarantees a physics tick. Don't write exact single-frame assertions -- frame boundaries have ±1-frame slop.
 - For a change designers see in the editor (a new `GodotClass`, exported fields, Inspector hints), run the `editor-probe` skill (`.claude/skills/editor-probe`): it scripts a real editor session, saves and reloads a scene with the class, and captures the Inspector.
@@ -102,7 +103,7 @@ cd itest
 
 Never compare two standalone runs -- process-to-process noise often exceeds 10% at µs scale. `compare-benches.sh` interleaves runs against a base branch and reports each benchmark's own noise; only trust deltas above the `Noise` column. CI runs the same comparison on every PR.
 
-Benchmark real godot-bevy systems, not raw FFI (that just measures gdext). Run the schedules the plugin actually registers into -- transform sync is `FixedFirst`/`FixedLast` -- and give hand-built `App`s `app.insert_non_send_resource(GodotMainThread)`. Full recipe and suite: `itest/BENCHMARKING.md`. Size-suffixed variants (`_5000`) exist to catch super-linear scaling -- compare against the default size.
+Benchmark real godot-bevy systems, not raw FFI (that just measures gdext). Run the schedules the plugin actually registers into -- transform sync is `FixedFirst`/`FixedLast` -- and give hand-built `App`s `app.insert_non_send(GodotMainThread)`. Full recipe and suite: `itest/BENCHMARKING.md`. Size-suffixed variants (`_5000`) exist to catch super-linear scaling -- compare against the default size.
 
 Tier-2 profiling is diagnostic-only and uses the optimized, symbolized `profiling`
 Cargo profile:

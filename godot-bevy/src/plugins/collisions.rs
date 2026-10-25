@@ -540,7 +540,7 @@ fn trigger_collision_observers(
 /// reparent. Emitted through the message tier so `trigger_collision_observers` re-pumps
 /// it to observers, matching `process_godot_collisions`.
 fn purge_collisions_on_node_removed(
-    trigger: On<Remove, GodotNodeHandle>,
+    trigger: On<Remove<GodotNodeHandle>>,
     mut state: ResMut<CollisionState>,
     mut ended: MessageWriter<CollisionEnded>,
 ) {

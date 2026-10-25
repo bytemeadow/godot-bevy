@@ -24,6 +24,7 @@ use crate::report::{
     Attempt, AttemptOutcome, Failure, LogicalTest, ReportWriter, RunOutcome, Selection,
     TestOutcome, TestReport, test_id,
 };
+use crate::schedule_shuffle::{ACTIVE_SCHEDULE_SEED, test_schedule_seed};
 use crate::selection::{CollectedTests, RegisteredTest, TestFunction, select_registered_tests};
 
 godot::sys::shard_registry!(pub __GODOT_ITEST: RustTestCase);
@@ -163,6 +164,7 @@ impl TestRunnerImpl {
     }
 
     pub fn run_all_benchmarks(&mut self, _scene_tree: Gd<Node>) -> i32 {
+        *ACTIVE_SCHEDULE_SEED.lock().unwrap() = None;
         println!("\n\n{FMT_CYAN_BOLD}Run{FMT_END} godot-bevy benchmarks...");
 
         let rust_debug = cfg!(debug_assertions);
@@ -442,6 +444,9 @@ fn print_test_configuration(config: &TestConfig, tests: &CollectedTests) {
         println!("  Filter: {}", filter.normalized);
     }
     println!("  Repeat: {}", config.repeat);
+    if let Some(seed) = config.schedule_seed {
+        println!("  Schedule seed: {seed}");
+    }
     println!("  Timeout: {} frames", config.timeout_frames);
     println!(
         "  Found {} selected tests in {} files ({} registered).",
@@ -529,6 +534,11 @@ fn run_attempt(
     ctx: TestContext,
 ) {
     begin_attempt_capture();
+    *ACTIVE_SCHEDULE_SEED.lock().unwrap() = state
+        .borrow()
+        .config
+        .schedule_seed
+        .map(|seed| test_schedule_seed(seed, &test_id(test.file, test.name)));
     if repeat == 1 {
         print!("  {} ... ", test.name);
     } else {
@@ -634,6 +644,7 @@ fn finish_attempt(
     duration: Duration,
     failures: Vec<Failure>,
 ) {
+    *ACTIVE_SCHEDULE_SEED.lock().unwrap() = None;
     let attempt = Attempt::new(
         &test_id(test.file, test.name),
         attempt_index,
@@ -708,6 +719,9 @@ fn finish_test_run(state: Rc<RefCell<TestRunState>>) {
 fn print_test_summary(report: &TestReport, elapsed: Duration) {
     println!();
     println!("{FMT_CYAN_BOLD}Test result:{FMT_END}");
+    if let Some(seed) = report.schedule_seed {
+        println!("  Rerun with --schedule-seed {seed}");
+    }
     println!(
         "  {} passed, {} failed, {} flaky, {} skipped in {:.2}s",
         report.summary.passed,

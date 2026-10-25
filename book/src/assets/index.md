@@ -10,7 +10,7 @@ godot-bevy loads assets through Bevy's `AssetServer`, but Godot owns the filesys
 let scene: Handle<GodotResource> = asset_server.load("res://player.tscn");
 
 // later, once loaded
-if let Some(res) = assets.get_mut(&scene) {
+if let Some(res) = assets.get(&scene) {
     if let Some(packed) = res.try_cast::<PackedScene>() {
         // use the PackedScene
     }

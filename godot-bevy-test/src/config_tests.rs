@@ -13,6 +13,7 @@ mod tests {
         "GBV_BOOLEAN_FALSE",
         "GBV_BOOLEAN_TRUE",
         "ITEST_BUILD_PROFILE",
+        "ITEST_SCHEDULE_SEED",
     ];
 
     fn run_environment_probe(case: &str, values: &[(&str, &str)]) {
@@ -52,6 +53,23 @@ mod tests {
     }
 
     #[test]
+    fn schedule_seeds_are_decimal_u64_values() {
+        assert_eq!(parse_schedule_seed("0").unwrap(), 0);
+        assert_eq!(parse_schedule_seed("00042").unwrap(), 42);
+        assert_eq!(
+            parse_schedule_seed("18446744073709551615").unwrap(),
+            u64::MAX
+        );
+        for value in ["", "+1", " 1", "18446744073709551616"] {
+            assert_eq!(
+                parse_schedule_seed(value).unwrap_err(),
+                "ITEST_SCHEDULE_SEED must be an unsigned 64-bit decimal integer"
+            );
+        }
+        assert_eq!(TestConfig::fallback().schedule_seed, None);
+    }
+
+    #[test]
     fn benchmark_selectors_match_exactly_or_by_substring() {
         let exact = BenchmarkSelector::Exact("alpha".to_string());
         assert!(exact.matches("alpha"));
@@ -84,6 +102,7 @@ mod tests {
                 ("GBV_BOOLEAN_FALSE", "false"),
                 ("GBV_BOOLEAN_TRUE", "1"),
                 ("ITEST_BUILD_PROFILE", "release"),
+                ("ITEST_SCHEDULE_SEED", "42"),
             ],
         );
         run_environment_probe("missing", &[]);
@@ -98,6 +117,7 @@ mod tests {
                 ("GBV_POSITIVE", "-1"),
                 ("GBV_BOOLEAN_FALSE", "yes"),
                 ("ITEST_BUILD_PROFILE", "other"),
+                ("ITEST_SCHEDULE_SEED", "-1"),
             ],
         );
         run_environment_probe("boundary", &[("GBPROF_NATIVE_SECONDS", "5")]);
@@ -134,9 +154,11 @@ mod tests {
                 assert!(!boolean_from_env("GBV_BOOLEAN_FALSE", true).unwrap());
                 assert!(boolean_from_env("GBV_BOOLEAN_TRUE", false).unwrap());
                 assert_eq!(build_profile_from_env().unwrap(), "release");
+                assert_eq!(schedule_seed_from_env().unwrap(), Some(42));
             }
             "missing" => {
                 assert_eq!(filter_from_env("GBV_FILTER").unwrap(), None);
+                assert_eq!(schedule_seed_from_env().unwrap(), None);
                 assert_eq!(native_profile_seconds_from_env().unwrap(), None);
                 assert!(required_nonempty_from_env("GBV_REQUIRED").is_err());
                 assert_eq!(optional_nonempty_from_env("GBV_OPTIONAL").unwrap(), None);
@@ -153,6 +175,7 @@ mod tests {
             }
             "invalid" => {
                 assert!(filter_from_env("GBV_FILTER").is_err());
+                assert!(schedule_seed_from_env().is_err());
                 assert!(native_profile_seconds_from_env().is_err());
                 assert!(required_nonempty_from_env("GBV_REQUIRED").is_err());
                 assert!(optional_nonempty_from_env("GBV_OPTIONAL").is_err());

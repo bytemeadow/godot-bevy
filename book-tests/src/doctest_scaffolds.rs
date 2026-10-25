@@ -1,4 +1,6 @@
 #![allow(dead_code, unused_variables)]
+// Remove when gdext includes godot-rust/gdext#1706; #[class(init)] emits base: base.
+#![allow(clippy::redundant_field_names)]
 
 mod node_tree_view {
     use godot_bevy::prelude::{GodotNodeHandle, NodeTreeView};

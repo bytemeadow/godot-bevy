@@ -131,12 +131,11 @@ jobs:
         with:
           workspaces: . -> target
 
-      - name: Cache and install Linux dependencies
+      - name: Install Linux dependencies
         if: runner.os == 'linux'
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libasound2-dev libudev-dev pkg-config
-          version: 1.0
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
       - name: Build example library
         run: cargo build --release --manifest-path examples/${{ matrix.example }}/rust/Cargo.toml
@@ -271,11 +270,10 @@ jobs:
         with:
           workspaces: . -> target
 
-      - name: Cache and install Linux dependencies
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libasound2-dev libudev-dev pkg-config
-          version: 1.0
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
       - name: Install Godot
         uses: bytemeadow/gdenv@v0.2.2

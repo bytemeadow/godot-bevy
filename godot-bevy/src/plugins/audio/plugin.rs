@@ -102,7 +102,7 @@ struct PendingSoundOps {
 fn audio_main_thread(
     mut audio_channels: ResMut<GodotAudioChannels>,
     mut audio_output: ResMut<AudioOutput>,
-    mut assets: ResMut<Assets<GodotResource>>,
+    assets: Res<Assets<GodotResource>>,
     mut scene_tree: SceneTreeRef,
     time: Res<Time>,
     mut godot: GodotAccess,
@@ -115,7 +115,7 @@ fn audio_main_thread(
             AudioCommand::Play(play_cmd) => {
                 if process_play_command(
                     &play_cmd,
-                    &mut assets,
+                    &assets,
                     &mut scene_tree,
                     &mut audio_output,
                     &mut godot,
@@ -339,12 +339,12 @@ fn apply_pending_ops(player: &mut AudioPlayer, ops: &PendingSoundOps) {
 
 fn process_play_command(
     play_cmd: &PlayCommand,
-    assets: &mut Assets<GodotResource>,
+    assets: &Assets<GodotResource>,
     scene_tree: &mut SceneTreeRef,
     output: &mut AudioOutput,
     godot: &mut GodotAccess,
 ) -> Option<SoundId> {
-    let audio_stream = if let Some(mut asset) = assets.get_mut(&play_cmd.handle) {
+    let audio_stream = if let Some(asset) = assets.get(&play_cmd.handle) {
         asset.try_cast::<AudioStream>()
     } else {
         warn!("Audio asset not ready: {:?}", play_cmd.handle);

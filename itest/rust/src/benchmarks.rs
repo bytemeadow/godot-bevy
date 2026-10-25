@@ -1,5 +1,8 @@
 //! These benchmarks test the actual godot-bevy systems rather than raw FFI overhead.
 
+// Remove when gdext includes godot-rust/gdext#1706; #[class(init)] emits base: base.
+#![allow(clippy::redundant_field_names)]
+
 use bevy::prelude::{Event, On, ResMut, Resource};
 use crossbeam_channel as mpsc;
 use godot::builtin::StringName;

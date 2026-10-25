@@ -1,3 +1,6 @@
+// Remove when gdext includes godot-rust/gdext#1706; #[class(init)] emits base: base.
+#![allow(clippy::redundant_field_names)]
+
 use bevy::prelude::*;
 use godot::prelude::*;
 use godot_bevy::interop::{CanvasItemMarker, Node2DMarker, NodeMarker};

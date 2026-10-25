@@ -1,10 +1,12 @@
 use crate::interop::{GodotAccess, GodotNodeHandle};
+use crate::plugins::scene_tree::plugin::SceneTreeIngestion;
 use bevy_app::{App, First, Last, Plugin};
 use bevy_ecs::{
     component::Component,
     entity::Entity,
     event::Event,
     prelude::Resource,
+    schedule::IntoScheduleConfigs,
     system::{Commands, Query, Res, SystemParam},
 };
 use crossbeam_channel::Sender;
@@ -188,7 +190,13 @@ where
             app.world_mut()
                 .insert_resource(SignalReceiver::new(receiver));
 
-            app.add_systems(First, drain_and_trigger_signals);
+            // Observers need this frame's mirrored entities and updated time.
+            app.add_systems(
+                First,
+                drain_and_trigger_signals
+                    .after(SceneTreeIngestion)
+                    .after(bevy_time::TimeSystems),
+            );
         }
 
         app.add_systems(First, process_deferred_signal_connections::<T>);

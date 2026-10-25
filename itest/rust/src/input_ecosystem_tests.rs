@@ -209,12 +209,15 @@ fn test_enhanced_input_observer_fires(ctx: &TestContext) -> godot::task::TaskHan
         // Spawn the context entity after do_initialize -> app.finish(), which
         // installs enhanced_input's per-context systems and the
         // ContextInstances<PreUpdate> resource that the registration observer
-        // (On<Insert, ContextPriority<Player>>) reads. Spawning inside the setup
+        // (On<Insert<ContextPriority<Player>>>) reads. Spawning inside the setup
         // closure would fire that observer before finish() creates the resource.
         app.with_world_mut(|w| {
             w.spawn((
                 Player,
-                actions!(Player[(Action::<Jump>::new(), bindings![KeyCode::Space])]),
+                related!(Actions<Player>[(
+                    Action::<Jump>::new(),
+                    related!(Bindings[Binding::from(KeyCode::Space)]),
+                )]),
             ));
         });
         app.updates(2).await;

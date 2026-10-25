@@ -28,13 +28,9 @@ impl<'w> GodotAccess<'w> {
         Gd::try_from_instance_id(handle.instance_id()).ok()
     }
 
+    #[track_caller]
     pub fn get<T: Inherits<Node>>(&mut self, handle: GodotNodeHandle) -> Gd<T> {
-        self.try_get(handle).unwrap_or_else(|| {
-            panic!(
-                "failed to get godot node handle as {}",
-                std::any::type_name::<T>()
-            )
-        })
+        self.get_instance_id(handle.instance_id())
     }
 
     pub fn try_get_instance_id<T: Inherits<Node>>(
@@ -44,13 +40,15 @@ impl<'w> GodotAccess<'w> {
         Gd::try_from_instance_id(instance_id).ok()
     }
 
+    #[track_caller]
     pub fn get_instance_id<T: Inherits<Node>>(&mut self, instance_id: InstanceId) -> Gd<T> {
-        self.try_get_instance_id(instance_id).unwrap_or_else(|| {
+        let Some(node) = self.try_get_instance_id(instance_id) else {
             panic!(
                 "failed to get godot node handle as {}",
                 std::any::type_name::<T>()
-            )
-        })
+            );
+        };
+        node
     }
 
     /// Access a Godot singleton. Requires main-thread access.
@@ -86,6 +84,7 @@ impl<'a, 'w> GodotNode<'a, 'w> {
         self.godot.try_get(self.handle)
     }
 
+    #[track_caller]
     pub fn get<T: Inherits<Node>>(&mut self) -> Gd<T> {
         self.godot.get(self.handle)
     }

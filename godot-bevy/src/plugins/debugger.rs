@@ -154,7 +154,7 @@ fn debugger_exclusive_system(world: &mut World) {
                     && let Ok(ptr) = entity_ref.get_by_id(*component_id)
                 {
                     // SAFETY: ptr is valid and type matches registration
-                    let reflected = unsafe { reflect_from_ptr.as_reflect(ptr) };
+                    let reflected = unsafe { reflect_from_ptr.ptr_as_reflect(ptr) };
                     let value_dict = reflect_to_dict(reflected);
                     component_dict.set("value", &value_dict);
                 }

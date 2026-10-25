@@ -51,11 +51,10 @@ jobs:
         with:
           workspaces: . -> target
 
-      - name: Cache and install Linux dependencies
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libasound2-dev libudev-dev pkg-config
-          version: 1.0
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -110,12 +109,11 @@ jobs:
         with:
           workspaces: . -> target
 
-      - name: Cache and install Linux dependencies
+      - name: Install Linux dependencies
         if: runner.os == 'linux'
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libasound2-dev libudev-dev pkg-config
-          version: 1.0
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
       - name: Run unit tests
         run: |
@@ -145,11 +143,10 @@ jobs:
           key: ${{ matrix.api }}-${{ matrix.feature-flags }}
           workspaces: . -> target
 
-      - name: Cache and install Linux dependencies
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libasound2-dev libudev-dev pkg-config
-          version: 1.0
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
       - name: Check API level
         run: cargo check -p godot-bevy ${{ matrix.feature-flags }} --features ${{ matrix.api }}
@@ -287,6 +284,16 @@ jobs:
           GODOT4_BIN: godot
         run: ./run-tests.sh ${{ matrix.profile == 'release' && '--release' || '' }} --json ../target/itest-${{ matrix.profile }}.json
 
+      - name: Run shuffled integration tests
+        if: matrix.profile == 'debug'
+        working-directory: itest
+        env:
+          GODOT4_BIN: godot
+        run: |
+          seed=$(od -An -N8 -tu8 /dev/urandom | tr -d ' ')
+          echo "Schedule seed: $seed"
+          ./run-tests.sh --schedule-seed "$seed" --json ../target/itest-shuffled.json
+
       - name: Run platformer integration tests
         env:
           GODOT4_BIN: godot
@@ -312,5 +319,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: itest-report-${{ matrix.profile }}
-          path: target/itest-${{ matrix.profile }}.json
+          path: |
+            target/itest-${{ matrix.profile }}.json
+            target/itest-shuffled.json
           if-no-files-found: warn

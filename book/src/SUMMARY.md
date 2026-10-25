@@ -72,6 +72,7 @@
 ---
 
 - [Migration Guides](./migration/index.md)
+  - [v0.12 to v0.13](./migration/v0.12-to-v0.13.md)
   - [v0.11 to v0.12](./migration/v0.11-to-v0.12.md)
   - [v0.10 to v0.11](./migration/v0.10-to-v0.11.md)
   - [v0.9 to v0.10](./migration/v0.9-to-v0.10.md)

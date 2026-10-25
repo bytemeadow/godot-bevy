@@ -34,6 +34,23 @@ is_positive_u32() {
     return 0
 }
 
+is_u64() {
+    local value=$1
+    [[ $value =~ ^[0-9]+$ ]] || return 1
+
+    while [[ ${#value} -gt 1 && ${value:0:1} == 0 ]]; do
+        value=${value:1}
+    done
+
+    if [[ ${#value} -gt 20 ]]; then
+        return 1
+    fi
+    if [[ ${#value} -eq 20 && $value > 18446744073709551615 ]]; then
+        return 1
+    fi
+    return 0
+}
+
 CALLER_DIR=$PWD
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GODOT_PROJECT_DIR="$SCRIPT_DIR/godot"
@@ -52,7 +69,7 @@ INDEX=0
 while [[ $INDEX -lt ${#ARGS[@]} ]]; do
     NEXT_INDEX=$((INDEX + 1))
     case ${ARGS[$INDEX]} in
-        --filter|--repeat|--timeout-frames)
+        --filter|--repeat|--timeout-frames|--schedule-seed)
             if [[ $NEXT_INDEX -lt ${#ARGS[@]} ]] && [[ ${ARGS[$NEXT_INDEX]} != --* ]]; then
                 INDEX=$((INDEX + 2))
             else
@@ -107,6 +124,12 @@ while [[ $# -gt 0 ]]; do
             export ITEST_TIMEOUT_FRAMES=$2
             shift 2
             ;;
+        --schedule-seed)
+            require_value "$@"
+            is_u64 "$2" || fail_config "--schedule-seed must be an unsigned 64-bit decimal integer"
+            export ITEST_SCHEDULE_SEED=$2
+            shift 2
+            ;;
         --json)
             require_value "$@"
             shift 2
@@ -135,6 +158,10 @@ if [[ ${ITEST_TIMEOUT_FRAMES+x} ]]; then
     is_positive_u32 "$ITEST_TIMEOUT_FRAMES" || fail_config "ITEST_TIMEOUT_FRAMES must be a positive 32-bit integer"
 else
     export ITEST_TIMEOUT_FRAMES=600
+fi
+
+if [[ ${ITEST_SCHEDULE_SEED+x} ]]; then
+    is_u64 "$ITEST_SCHEDULE_SEED" || fail_config "ITEST_SCHEDULE_SEED must be an unsigned 64-bit decimal integer"
 fi
 
 export ITEST_BUILD_PROFILE=$BUILD_TYPE

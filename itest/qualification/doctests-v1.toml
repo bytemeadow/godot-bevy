@@ -1,6 +1,6 @@
 version = 1
 scaffold_path = "book-tests/src/doctest_scaffolds.rs"
-scaffold_sha256 = "sha256:df53f4a5524d94ee5dbda4eacbeaef3142ecb72eef99e27f576acdd90220e78f"
+scaffold_sha256 = "sha256:04e59920be247b6c1a3083b2247669f2bec44fe175be2b256865d01a8d087c7c"
 
 [[fences]]
 source = "godot-bevy-macros/src/lib.rs"
@@ -174,7 +174,7 @@ scaffold = ""
 source = "godot-bevy/src/plugins/assets.rs"
 ordinal = 1
 category = "compiled_no_run"
-fingerprint = "sha256:4ca566096f114ca3afe91dbbc6fdaf900177fec443f9ee96d128f8da89fd4e0f"
+fingerprint = "sha256:f0f85370ba24fd8bbb5cbdf755396cdffcc9e06697f76fae35734ce3608e3920"
 scaffold = ""
 
 [[fences]]

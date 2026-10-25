@@ -3,6 +3,7 @@ name = "godot-bevy-test-macros"
 description = "Procedural macros for godot-bevy integration testing"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 repository.workspace = true
 keywords.workspace = true

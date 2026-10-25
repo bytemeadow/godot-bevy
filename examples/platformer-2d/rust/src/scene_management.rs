@@ -31,7 +31,7 @@ impl Plugin for SceneManagementPlugin {
 fn process_scene_operations(
     mut scene_tree: SceneTreeRef,
     mut operation_events: MessageReader<SceneOperationMessage>,
-    mut assets: ResMut<Assets<GodotResource>>,
+    assets: Res<Assets<GodotResource>>,
 ) {
     for event in operation_events.read() {
         match event {
@@ -46,7 +46,7 @@ fn process_scene_operations(
             }
 
             SceneOperationMessage::ChangeToPacked { scene } => {
-                if let Some(mut godot_resource) = assets.get_mut(scene) {
+                if let Some(godot_resource) = assets.get(scene) {
                     if let Some(packed_scene) =
                         godot_resource.try_cast::<godot::classes::PackedScene>()
                     {

@@ -8,23 +8,20 @@ use crate::plugins::transforms::IntoGodotTransform;
 use crate::plugins::transforms::IntoGodotTransform2D;
 use bevy_app::{App, Plugin, PostUpdate};
 use bevy_asset::{Assets, Handle};
+use bevy_ecs::error::ContextExt;
 use bevy_ecs::event::Event;
 use bevy_ecs::prelude::Res;
 use bevy_ecs::{
     component::Component,
     entity::Entity,
     query::Without,
-    system::{Commands, Query, ResMut},
+    system::{Commands, Query},
 };
 use bevy_transform::components::Transform;
+use godot::classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader};
 use godot::obj::Gd;
 use godot::prelude::Variant;
-use godot::{
-    builtin::GString,
-    classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader},
-};
 use std::collections::HashMap;
-use std::str::FromStr;
 use tracing::error;
 
 #[derive(Default)]
@@ -150,10 +147,10 @@ fn spawn_scene(
     mut commands: Commands,
     mut new_scenes: Query<(&mut GodotScene, Entity, Option<&Transform>), Without<GodotNodeHandle>>,
     mut scene_tree: SceneTreeRef,
-    mut assets: ResMut<Assets<GodotResource>>,
+    assets: Res<Assets<GodotResource>>,
     signal_sender: Option<Res<SignalSender>>,
     mut godot: GodotAccess,
-) {
+) -> bevy_ecs::error::Result {
     // This avoids repeated ResourceLoader.load() calls when spawning multiple
     // instances of the same scene in a single frame (~22x faster).
     let mut local_cache: HashMap<String, Gd<PackedScene>> = HashMap::new();
@@ -162,14 +159,19 @@ fn spawn_scene(
         let packed_scene: Gd<PackedScene> = match &scene.resource {
             GodotSceneResource::Handle(handle) => {
                 let resource = assets
-                    .get_mut(handle)
-                    .expect("packed scene to exist in assets")
+                    .get(handle)
+                    .with_context(|| {
+                        format!("failed to find packed scene {handle:?} in assets for entity {ent}")
+                    })?
                     .get()
                     .clone();
                 match resource.try_cast::<PackedScene>() {
                     Ok(ps) => ps,
                     Err(resource) => {
-                        error!("Resource is not a PackedScene: {:?}", resource);
+                        error!(
+                            "failed to cast scene {:?} for entity {ent} to PackedScene: {resource:?}",
+                            scene.resource
+                        );
                         continue;
                     }
                 }
@@ -180,10 +182,10 @@ fn spawn_scene(
                 } else {
                     let resource = godot
                         .singleton::<ResourceLoader>()
-                        .load(
-                            &GString::from_str(path.as_str()).expect("path to be a valid GString"),
-                        )
-                        .expect("packed scene to load");
+                        .load(path.as_str())
+                        .with_context(|| {
+                            format!("failed to load packed scene {path:?} for entity {ent}")
+                        })?;
 
                     match resource.try_cast::<PackedScene>() {
                         Ok(ps) => {
@@ -191,7 +193,10 @@ fn spawn_scene(
                             ps
                         }
                         Err(resource) => {
-                            error!("Resource is not a PackedScene: {:?}", resource);
+                            error!(
+                                "failed to cast scene {:?} for entity {ent} to PackedScene: {resource:?}",
+                                scene.resource
+                            );
                             continue;
                         }
                     }
@@ -202,7 +207,10 @@ fn spawn_scene(
         let instance = match packed_scene.instantiate() {
             Some(instance) => instance,
             None => {
-                error!("Failed to instantiate PackedScene");
+                error!(
+                    "failed to instantiate packed scene {:?} for entity {ent}",
+                    scene.resource
+                );
                 continue;
             }
         };
@@ -214,7 +222,8 @@ fn spawn_scene(
                 node.set_global_transform(transform.to_godot_transform_2d());
             } else {
                 error!(
-                    "attempted to spawn a scene with a transform on Node that did not inherit from Node, the transform was not set"
+                    "failed to set transform on scene {:?} for entity {ent}: root is neither Node2D nor Node3D",
+                    scene.resource
                 )
             }
         }
@@ -226,8 +235,9 @@ fn spawn_scene(
                 }
             } else {
                 error!(
-                    "GodotScene has signal connections but GodotSignalsPlugin is not added. \
-                     Add GodotSignalsPlugin<YourEventType> to enable signal connections."
+                    "failed to connect signals for scene {:?} on entity {ent}: GodotSignalsPlugin is not added. \
+                     Add GodotSignalsPlugin<YourEventType> to enable signal connections.",
+                    scene.resource
                 );
                 scene.deferred_signal_connections.clear();
             }
@@ -235,14 +245,29 @@ fn spawn_scene(
 
         match scene.parent {
             Some(parent_id) => {
-                let mut parent = godot.get::<Node>(parent_id);
+                let mut parent = godot.try_get::<Node>(parent_id).with_context(|| {
+                    format!(
+                        "failed to find parent {parent_id:?} for scene {:?} on entity {ent}",
+                        scene.resource
+                    )
+                })?;
                 parent.add_child(&instance);
             }
             None => {
-                scene_tree.get().get_root().unwrap().add_child(&instance);
+                scene_tree
+                    .get()
+                    .get_root()
+                    .with_context(|| {
+                        format!(
+                            "failed to find scene tree root for scene {:?} on entity {ent}",
+                            scene.resource
+                        )
+                    })?
+                    .add_child(&instance);
             }
         }
 
         commands.entity(ent).insert(GodotNodeHandle::new(instance));
     }
+    Ok(())
 }
