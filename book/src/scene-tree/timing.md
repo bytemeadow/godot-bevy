@@ -81,6 +81,15 @@ fn setup_player(mut query: Query<(Entity, &Health, &Velocity)>) {
 }
 ```
 
+## Live property timing
+
+Opted-in [live properties](custom-nodes/live-property-sync.md) read in
+`PreUpdate` (`PropertySyncSet::Read`) and write in `PostUpdate`
+(`PropertySyncSet::Write`), once per render frame. Creation seeds their snapshots
+before `Startup`, so a `Startup` edit takes priority over a conflicting Godot
+value at the first read. Later node ingestion in `First` uses the same rule.
+Order `PreUpdate` consumers after `Read` and `PostUpdate` authors before `Write`.
+
 ## Best Practices
 
 1. **Use `Startup` for initialization** - Scene entities are guaranteed to be ready

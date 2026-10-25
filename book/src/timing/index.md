@@ -52,6 +52,21 @@ The **suffix** of the main schedule runs here, then `clear_trackers` fires once 
 
 On a render frame with no physics step, the prefix runs in `_process` before the suffix, so a frame is never skipped.
 
+## Live property synchronization
+
+[Live mapped properties](../scene-tree/custom-nodes/live-property-sync.md) use
+`PropertySyncSet::Read` in `PreUpdate` and `PropertySyncSet::Write` in
+`PostUpdate`. Both run once per render frame, including zero-physics-step frames
+and paused Bevy virtual time. `BevyApp` must still receive its Godot callbacks.
+Property synchronization does not use the transform system's fixed-rate slots.
+
+A Godot edit made before `Read` reaches that frame's `FixedUpdate` and `Update`
+consumers unless Bevy has a pending edit to the same field. Godot edits after
+`Read` wait until the next read; a pending Bevy value can overwrite them at
+`Write`. An idle animation or script can run after the prefix, so its effect
+may first appear in Bevy on the next render frame. Use the ordering examples in
+the live-sync page for `PreUpdate` consumers and `PostUpdate` authors.
+
 ## Schedule Execution Order
 
 ### Physics Frame (`_physics_process`)

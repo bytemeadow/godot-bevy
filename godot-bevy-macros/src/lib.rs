@@ -206,6 +206,28 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
 /// to every mapped component field that reads it, so `with = String::from` can
 /// convert an exported `GString` into a component's `String` field.
 ///
+/// ## Live property sync
+///
+/// Put `sync = two_way` or `sync = to_godot` on a source field alongside its
+/// `component` binding, or on a field used by a struct-level N→1 binding.
+/// `two_way` imports Godot changes in `PreUpdate` and publishes Bevy changes in
+/// `PostUpdate`; `to_godot` imports only at creation. Order systems against
+/// `PropertySyncSet::Read` and `PropertySyncSet::Write`. Pending Bevy edits win
+/// per-field conflicts. Godot edits after the read wait until the next read unless
+/// a pending Bevy edit overwrites them at publication.
+///
+/// Live sources require plain stored `#[export]` or `#[var]` fields without custom
+/// getters or setters. Each live source must map to one destination, and a live
+/// Bevy target cannot overlap another mapping. Creation-only fan-out is unchanged.
+/// Add `into = path` for Bevy-to-Godot conversion; it requires `sync` and is mandatory
+/// when a live mapping uses `with`. Both converters take owned values.
+/// Plain values require `Clone + PartialEq + Send + Sync + 'static`; Godot `GString`
+/// and `StringName` use owned `String` snapshots. `f32` and `f64` compare by bits.
+/// Arrays, dictionaries, `Variant`, and objects are unsupported on either side,
+/// even with converters.
+/// Immutable components support only `to_godot`. See [`GodotNode`] for shared
+/// scheduling and lifecycle rules.
+///
 /// `base`, `class_name`, and generated-export forms (`require(prop: Comp, …)`) are
 /// **not** valid here — those are component-first (`GodotNode`) only.
 #[proc_macro_derive(BevyComponents, attributes(gdbevy))]
@@ -340,10 +362,30 @@ pub fn derive_bevy_components_entry(item: TokenStream) -> TokenStream {
 /// Export types must implement gdext's `Export` trait. For Rust `String` fields,
 /// export a `GString` and convert it with `with`, as in the `Door` example.
 ///
-/// ## Reserved keys
+/// ## Live property sync
 ///
-/// `into` and `sync` are reserved for the deferred component-sync feature and will produce
-/// a compile error if used.
+/// Add `sync = two_way` or `sync = to_godot` to a primary field, newtype companion,
+/// or individual struct companion field. Unannotated mappings stay creation-only.
+/// Both modes initialize Bevy from Godot. `two_way` imports later Godot edits;
+/// `to_godot` only publishes Bevy edits. An immutable component supports `to_godot` only.
+///
+/// `with = path` converts an owned Godot value into the Bevy field value.
+/// `into = path` converts an owned Bevy field value into the Godot value. `into`
+/// requires `sync`; a live mapping with `with` must also supply `into`.
+///
+/// Reads run in `PreUpdate` in `PropertySyncSet::Read`; writes run in `PostUpdate`
+/// in `PropertySyncSet::Write`, once per render frame, including paused virtual time.
+/// Pending Bevy edits win conflicts per field. Godot edits after the read wait for
+/// the next read unless a Bevy publication overwrites them first.
+///
+/// Plain live values require `Clone + PartialEq + Send + Sync + 'static` on both
+/// sides. Godot `GString` and `StringName` use owned `String` snapshots; `f32` and
+/// `f64` compare by bits. The component itself needs neither `Clone` nor `Reflect`.
+/// Arrays, dictionaries, `Variant`, and objects are unsupported on either side,
+/// even with converters. Expose a separate plain stored property for the value.
+/// Removing a mapped component suspends its fields; reinsertion publishes Bevy first.
+/// Pure Bevy entities do not acquire a binding. Native Godot properties and
+/// `AttachableComponent` carriers are outside live property sync.
 #[proc_macro_derive(GodotNode, attributes(gdbevy))]
 pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
     let parsed: DeriveInput = parse_macro_input!(input as DeriveInput);
@@ -363,7 +405,8 @@ pub fn component_as_godot_node(input: TokenStream) -> TokenStream {
 /// parent. The component is inserted on that parent's entity and the carrier is
 /// queued for deletion. The carrier never gets its own entity.
 ///
-/// This is one-shot configuration. Carrier nodes and their paths disappear.
+/// This is one-shot configuration; `sync` and `into` are not supported.
+/// Carrier nodes and their paths disappear.
 /// Removing and re-adding the surviving parent does not restore the component.
 /// Instantiate the saved scene again to get fresh carriers. Use `BevyComponents`
 /// when the authored node should survive and receive components on its own entity.

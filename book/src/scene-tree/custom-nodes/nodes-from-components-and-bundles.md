@@ -5,7 +5,7 @@ godot-bevy bridges Godot nodes and Bevy entities through two derive macros that 
 - **`GodotNode`** (component-first) — you write a Bevy `Component`; the macro generates the Godot class.
 - **`BevyComponents`** (Godot-first) — you write the `GodotClass` yourself; the macro wires its `#[export]` fields into Bevy components.
 
-Pick whichever fits your workflow. Both produce the same result at runtime: a Godot scene node whose editor-set values become Bevy components on the entity.
+Pick whichever fits your workflow. Both produce a Godot scene node whose editor-set values become Bevy components on the entity. Add `sync = two_way` or `sync = to_godot` to individual mappings for [live property sync](live-property-sync.md). Unannotated mappings remain creation-only.
 
 ## Component-first: `GodotNode`
 
@@ -44,6 +44,8 @@ Available keys on a field-level `#[gdbevy(...)]`:
 | `as = T` | Godot export type (defaults to the field's Rust type). |
 | `default = expr` | Editor default value (via `#[init(val = …)]`). A pure-Bevy `spawn(T)` uses the struct's own `Default` — make them agree if you rely on `spawn(T)`. |
 | `with = fn` | Converts the Godot value before assigning to the field. |
+| `sync = two_way` or `sync = to_godot` | Keeps the mapped field connected after creation. |
+| `into = fn` | Converts Bevy to Godot; requires `sync`, and is mandatory for a live mapping with `with`. |
 
 ### Companion components
 
