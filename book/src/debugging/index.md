@@ -65,16 +65,10 @@ built-in `ChildOf`/`Children`. If an entity appears at the wrong level:
 
 ### Inspecting live properties
 
-The Godot remote Inspector edits the node's property. For a
-[`two_way` mapping](../scene-tree/custom-nodes/live-property-sync.md), that value
-imports at the next `PropertySyncSet::Read`, unless Bevy has a pending edit to
-the same field. A `to_godot` mapping never imports runtime Inspector edits.
-
-An ECS inspector that edits a Bevy component is an ordinary Bevy author. It
-needs no separate property-write route: the changed field publishes at
-`PropertySyncSet::Write`. The internal snapshot component is not registered for
-reflection. Inspector refresh intervals can delay the displayed result without
-changing when synchronization runs.
+The remote Inspector authors Godot properties; an ECS inspector authors Bevy fields.
+[Live property sync](../scene-tree/custom-nodes/live-property-sync.md) applies its usual
+read/write and conflict rules. Internal snapshots are not registered for reflection.
+Inspector refresh intervals can delay display without changing synchronization timing.
 
 ### Performance Considerations
 

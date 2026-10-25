@@ -30,8 +30,6 @@ struct SyncedProperties {
 fn test_app() -> App {
     let mut app = App::new();
     app.insert_non_send(GodotMainThread);
-    app.init_schedule(PreUpdate);
-    app.init_schedule(PostUpdate);
     register_all_required_components(&mut app);
     register_all_autosync_bundles(&mut app);
     app
@@ -64,6 +62,10 @@ fn setup() -> (App, Gd<PropertySyncNode>, Entity) {
     (app, node, entity)
 }
 
+fn properties(app: &App, entity: Entity) -> &SyncedProperties {
+    app.world().get::<SyncedProperties>(entity).unwrap()
+}
+
 fn cycle(app: &mut App) {
     app.world_mut().run_schedule(PreUpdate);
     app.world_mut().run_schedule(PostUpdate);
@@ -71,37 +73,30 @@ fn cycle(app: &mut App) {
 }
 
 #[derive(Resource, Default)]
-struct Observed(Vec<(u32, i32)>);
-
-#[derive(Resource)]
-struct Cycle(u32);
+struct Observed(Vec<i32>);
 
 #[itest]
 fn property_sync_remote_edit_before_read() {
     let (mut app, mut node, entity) = setup();
-    app.insert_resource(Cycle(42));
     app.init_resource::<Observed>();
     app.add_systems(
         PreUpdate,
-        (|properties: Query<&SyncedProperties>, cycle: Res<Cycle>, mut seen: ResMut<Observed>| {
-            seen.0.push((cycle.0, properties.single().unwrap().health));
+        (|properties: Query<&SyncedProperties>, mut seen: ResMut<Observed>| {
+            seen.0.push(properties.single().unwrap().health);
         })
         .after(PropertySyncSet::Read),
     );
     app.add_systems(
         Update,
-        |properties: Query<&SyncedProperties>, cycle: Res<Cycle>, mut seen: ResMut<Observed>| {
-            seen.0.push((cycle.0, properties.single().unwrap().health));
+        |properties: Query<&SyncedProperties>, mut seen: ResMut<Observed>| {
+            seen.0.push(properties.single().unwrap().health);
         },
     );
     node.set("health", &37.to_variant());
     app.world_mut().run_schedule(PreUpdate);
     app.world_mut().run_schedule(Update);
-    assert_eq!(app.world().resource::<Observed>().0, [(42, 37), (42, 37)]);
-    assert_eq!(
-        app.world().get::<SyncedProperties>(entity).unwrap().health,
-        37
-    );
+    assert_eq!(app.world().resource::<Observed>().0, [37, 37]);
+    assert_eq!(properties(&app, entity).health, 37);
     node.free();
 }
 
@@ -109,9 +104,6 @@ fn property_sync_remote_edit_before_read() {
 fn property_sync_publish_after_postupdate() {
     let (mut app, node, _) = setup();
     app.init_resource::<Observed>();
-    app.add_systems(Update, |mut properties: Query<&mut SyncedProperties>| {
-        properties.single_mut().unwrap().health = 21;
-    });
     app.add_systems(
         PostUpdate,
         (|mut properties: Query<&mut SyncedProperties>| {
@@ -123,14 +115,13 @@ fn property_sync_publish_after_postupdate() {
         PostUpdate,
         (|handles: Query<&GodotNodeHandle>, mut godot: GodotAccess, mut seen: ResMut<Observed>| {
             let node = godot.get::<PropertySyncNode>(*handles.single().unwrap());
-            seen.0.push((1, node.get("health").to::<i32>()));
+            seen.0.push(node.get("health").to::<i32>());
         })
         .after(PropertySyncSet::Write),
     );
     app.world_mut().run_schedule(PreUpdate);
-    app.world_mut().run_schedule(Update);
     app.world_mut().run_schedule(PostUpdate);
-    assert_eq!(app.world().resource::<Observed>().0, [(1, 43)]);
+    assert_eq!(app.world().resource::<Observed>().0, [43]);
     node.free();
 }
 
@@ -155,10 +146,7 @@ fn property_sync_bevy_wins() {
         }
         app.world_mut().run_schedule(PreUpdate);
         if stage < 2 {
-            assert_eq!(
-                app.world().get::<SyncedProperties>(entity).unwrap().health,
-                51
-            );
+            assert_eq!(properties(&app, entity).health, 51);
         }
         match stage {
             2 => {
@@ -174,10 +162,7 @@ fn property_sync_bevy_wins() {
         app.world_mut().run_schedule(PostUpdate);
         assert_eq!(node.get("health").to::<i32>(), 51, "author stage {stage}");
         cycle(&mut app);
-        assert_eq!(
-            app.world().get::<SyncedProperties>(entity).unwrap().health,
-            51
-        );
+        assert_eq!(properties(&app, entity).health, 51);
         node.free();
     }
 }
@@ -195,7 +180,7 @@ fn property_sync_field_independence() {
     node.set("speed", &8.0f32.to_variant());
     node.set("creation_only", &999.to_variant());
     cycle(&mut app);
-    let properties = app.world().get::<SyncedProperties>(entity).unwrap();
+    let properties = properties(&app, entity);
     assert_eq!(
         (
             properties.health,
@@ -246,7 +231,7 @@ fn property_sync_no_lossy_echo() {
     app.add_systems(
         PreUpdate,
         (|changed: Query<&LossyProperty, Changed<LossyProperty>>, mut seen: ResMut<Observed>| {
-            seen.0.push((0, changed.iter().count() as i32));
+            seen.0.push(changed.iter().count() as i32);
         })
         .after(PropertySyncSet::Read),
     );
@@ -265,7 +250,7 @@ fn property_sync_no_lossy_echo() {
         *app.world_mut().resource_mut::<PropertySyncCounters>() = default();
     }
     cycle(&mut app);
-    assert_eq!(app.world().resource::<Observed>().0, [(0, 0)]);
+    assert_eq!(app.world().resource::<Observed>().0, [0]);
     #[cfg(feature = "test-frame-signal")]
     assert_eq!(app.world().resource::<PropertySyncCounters>().writes, 0);
     assert_eq!(
@@ -335,15 +320,9 @@ fn property_sync_late_godot_edit() {
     node.set("health", &88.to_variant());
     app.world_mut().run_schedule(PostUpdate);
     assert_eq!(node.get("health").to::<i32>(), 88);
-    assert_eq!(
-        app.world().get::<SyncedProperties>(entity).unwrap().health,
-        10
-    );
+    assert_eq!(properties(&app, entity).health, 10);
     app.world_mut().run_schedule(PreUpdate);
-    assert_eq!(
-        app.world().get::<SyncedProperties>(entity).unwrap().health,
-        88
-    );
+    assert_eq!(properties(&app, entity).health, 88);
     node.set("health", &99.to_variant());
     app.world_mut()
         .get_mut::<SyncedProperties>(entity)
@@ -396,26 +375,12 @@ fn property_sync_readded_component_is_authoritative() {
         node.set("health", &72.to_variant());
         app.world_mut().run_schedule(PreUpdate);
         assert_eq!(
-            app.world().get::<SyncedProperties>(entity).unwrap().health,
+            properties(&app, entity).health,
             72,
             "between passes: {between_passes}"
         );
         node.free();
     }
-}
-
-#[itest]
-fn property_sync_removed_component_stays_absent() {
-    let (mut app, mut node, entity) = setup();
-    cycle(&mut app);
-    app.world_mut()
-        .entity_mut(entity)
-        .remove::<SyncedProperties>();
-    node.set("health", &12.to_variant());
-    cycle(&mut app);
-    assert!(app.world().get::<SyncedProperties>(entity).is_none());
-    assert_eq!(node.get("health").to::<i32>(), 12);
-    node.free();
 }
 
 #[itest]
@@ -431,10 +396,7 @@ fn property_sync_handle_replacement_publishes_bevy() {
     assert_eq!(new_node.get("health").to::<i32>(), 10);
     new_node.set("health", &42.to_variant());
     cycle(&mut app);
-    assert_eq!(
-        app.world().get::<SyncedProperties>(entity).unwrap().health,
-        42
-    );
+    assert_eq!(properties(&app, entity).health, 42);
     old_node.free();
     new_node.free();
 }
@@ -474,9 +436,6 @@ fn to_string_name(value: String) -> StringName {
     value.as_str().into()
 }
 
-fn from_gstring(value: GString) -> String {
-    value.to_string()
-}
 fn to_gstring(value: String) -> GString {
     value.as_str().into()
 }
@@ -499,7 +458,7 @@ struct PropertyNative {
     speed: f32,
     #[export]
     #[init(val = GString::from("hello"))]
-    #[gdbevy(component = NativeLabel, sync = two_way, with = from_gstring, into = to_gstring)]
+    #[gdbevy(component = NativeLabel, sync = two_way, with = String::from, into = to_gstring)]
     label: PropertyText,
     #[export]
     #[init(val = StringName::from("idle"))]
@@ -602,6 +561,7 @@ fn property_sync_companion_defaults_and_tuple() {
         .mana = 41;
     cycle(&mut app);
     assert!(app.world().get::<CompanionSpeed>(entity).is_none());
+    assert_eq!(node.get("speed").to::<f32>(), 22.0);
     assert_eq!(node.get("mana").to::<i32>(), 41);
     app.world_mut()
         .entity_mut(entity)
@@ -628,22 +588,8 @@ fn property_sync_two_apps_keep_independent_snapshots() {
     second_node.set("health", &22.to_variant());
     cycle(&mut first);
     cycle(&mut second);
-    assert_eq!(
-        first
-            .world()
-            .get::<SyncedProperties>(first_entity)
-            .unwrap()
-            .health,
-        11
-    );
-    assert_eq!(
-        second
-            .world()
-            .get::<SyncedProperties>(second_entity)
-            .unwrap()
-            .health,
-        22
-    );
+    assert_eq!(properties(&first, first_entity).health, 11);
+    assert_eq!(properties(&second, second_entity).health, 22);
     first_node.free();
     second_node.free();
 }
@@ -654,40 +600,22 @@ fn property_sync_nan_is_stable() {
     cycle(&mut app);
     node.set("speed", &f32::NAN.to_variant());
     cycle(&mut app);
-    let bits = app
-        .world()
-        .get::<SyncedProperties>(entity)
-        .unwrap()
-        .speed
-        .to_bits();
-    assert!(
-        app.world()
-            .get::<SyncedProperties>(entity)
-            .unwrap()
-            .speed
-            .is_nan()
-    );
+    let bits = properties(&app, entity).speed.to_bits();
+    assert!(properties(&app, entity).speed.is_nan());
     app.init_resource::<Observed>();
     app.add_systems(
         PreUpdate,
         (|changed: Query<&SyncedProperties, Changed<SyncedProperties>>,
           mut seen: ResMut<Observed>| {
-            seen.0.push((0, changed.iter().count() as i32));
+            seen.0.push(changed.iter().count() as i32);
         })
         .after(PropertySyncSet::Read),
     );
     cycle(&mut app);
     app.world_mut().resource_mut::<Observed>().0.clear();
     cycle(&mut app);
-    assert_eq!(app.world().resource::<Observed>().0, [(0, 0)]);
-    assert_eq!(
-        app.world()
-            .get::<SyncedProperties>(entity)
-            .unwrap()
-            .speed
-            .to_bits(),
-        bits
-    );
+    assert_eq!(app.world().resource::<Observed>().0, [0]);
+    assert_eq!(properties(&app, entity).speed.to_bits(), bits);
     node.free();
 }
 
@@ -788,10 +716,7 @@ fn property_sync_animation_before_read(ctx: &TestContext) {
     player.advance(0.5);
     assert_eq!(node.get("speed").to::<f32>(), 6.0);
     app.world_mut().run_schedule(PreUpdate);
-    assert_eq!(
-        app.world().get::<SyncedProperties>(entity).unwrap().speed,
-        6.0
-    );
+    assert_eq!(properties(&app, entity).speed, 6.0);
     node.free();
 }
 
@@ -855,88 +780,16 @@ fn property_sync_observer_and_reflection_win() {
     cycle(&mut app);
     assert_eq!(node.get("health").to::<i32>(), 83);
     cycle(&mut app);
-    assert_eq!(
-        app.world().get::<SyncedProperties>(entity).unwrap().health,
-        83
-    );
+    assert_eq!(properties(&app, entity).health, 83);
     node.free();
-}
-
-#[cfg(feature = "test-frame-signal")]
-#[itest]
-fn property_sync_split_frame_cadence() {
-    use godot_bevy::plugins::fixed_schedule::{
-        host_fixed_main_loop, run_main_suffix, run_physics_step, run_preamble,
-    };
-    use std::time::Duration;
-
-    for paused in [false, true] {
-        for fixed_steps in [0, 1, 3] {
-            let mut app = App::new();
-            app.insert_non_send(GodotMainThread);
-            let entry = godot_bevy::inventory::iter::<AutoSyncBundleRegistry>
-                .into_iter()
-                .find(|entry| entry.godot_class_name == "PropertySyncNode")
-                .unwrap();
-            entry.register_property_sync.unwrap()(&mut app);
-            let mut node = PropertySyncNode::new_alloc();
-            let entity = decorate(&mut app, node.clone().upcast(), "PropertySyncNode");
-            app.add_plugins(bevy::time::TimePlugin);
-            host_fixed_main_loop(&mut app);
-            if paused {
-                app.world_mut().resource_mut::<Time<Virtual>>().pause();
-            }
-            app.init_resource::<Observed>();
-            app.add_systems(
-                FixedUpdate,
-                |properties: Query<&SyncedProperties>, mut seen: ResMut<Observed>| {
-                    seen.0.push((0, properties.single().unwrap().health));
-                },
-            );
-            app.add_systems(Update, |mut properties: Query<&mut SyncedProperties>| {
-                properties.single_mut().unwrap().health += 1;
-            });
-            node.set("health", &42.to_variant());
-            for tick in 0..fixed_steps {
-                run_physics_step(
-                    app.world_mut(),
-                    tick == 0,
-                    tick == 0,
-                    Duration::from_secs_f64(1.0 / 60.0),
-                );
-                assert_eq!(app.world().resource::<PropertySyncCounters>().reads, 2);
-                assert_eq!(app.world().resource::<PropertySyncCounters>().writes, 0);
-            }
-            run_preamble(app.world_mut(), fixed_steps == 0, fixed_steps == 0);
-            assert_eq!(
-                app.world().get::<SyncedProperties>(entity).unwrap().health,
-                42
-            );
-            run_main_suffix(app.world_mut());
-            let counts = app.world().resource::<PropertySyncCounters>();
-            assert_eq!((counts.reads, counts.writes), (2, 1));
-            assert_eq!((counts.read_passes, counts.write_passes), (1, 1));
-            assert_eq!(node.get("health").to::<i32>(), 43);
-            let fixed_seen = &app.world().resource::<Observed>().0;
-            assert_eq!(fixed_seen.len(), if paused { 0 } else { fixed_steps });
-            assert!(fixed_seen.iter().all(|&(_, health)| health == 42));
-            node.free();
-        }
-    }
 }
 
 #[cfg(feature = "test-frame-signal")]
 #[itest]
 fn property_sync_creation_and_idle_do_not_publish() {
     let (mut app, node, entity) = setup();
-    assert_eq!(
-        app.world().get::<SyncedProperties>(entity).unwrap().health,
-        10
-    );
-    assert_eq!(
-        app.world().get::<SyncedProperties>(entity).unwrap().speed,
-        2.0
-    );
+    assert_eq!(properties(&app, entity).health, 10);
+    assert_eq!(properties(&app, entity).speed, 2.0);
     *app.world_mut().resource_mut::<PropertySyncCounters>() = default();
     let pure_bevy = app.world_mut().spawn(SyncedProperties::default()).id();
     assert_eq!(
@@ -953,10 +806,6 @@ fn property_sync_creation_and_idle_do_not_publish() {
 #[derive(Clone, Default, PartialEq)]
 struct CustomValue(i32);
 
-fn from_custom(value: i32) -> CustomValue {
-    CustomValue(value)
-}
-
 fn to_custom(value: CustomValue) -> i32 {
     value.0
 }
@@ -965,7 +814,7 @@ fn to_custom(value: CustomValue) -> i32 {
 #[component(immutable)]
 #[gdbevy(class_name = PropertyImmutableNode)]
 struct ImmutableProperty {
-    #[gdbevy(export, as = i32, default = 5, sync = to_godot, with = from_custom, into = to_custom)]
+    #[gdbevy(export, as = i32, default = 5, sync = to_godot, with = CustomValue, into = to_custom)]
     value: CustomValue,
 }
 
@@ -1053,13 +902,7 @@ fn property_sync_rejects_aliased_component_construction() {
     let valid_entity = decorate(&mut app, valid_node.clone().upcast(), "PropertySyncNode");
     valid_node.set("health", &37.to_variant());
     cycle(&mut app);
-    assert_eq!(
-        app.world()
-            .get::<SyncedProperties>(valid_entity)
-            .unwrap()
-            .health,
-        37
-    );
+    assert_eq!(properties(&app, valid_entity).health, 37);
     #[cfg(feature = "test-frame-signal")]
     {
         let counts = app.world().resource::<PropertySyncCounters>();

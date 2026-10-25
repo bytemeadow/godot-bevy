@@ -1,4 +1,4 @@
-use crate::bevy_attr::{ClassPlan, ComponentInit, Mapping, SyncMode};
+use crate::bevy_attr::{ClassPlan, Mapping, SyncMode, component_mappings};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{Data, DeriveInput, Ident, Member, Path, Type};
@@ -36,13 +36,8 @@ impl<'a> PropertySync<'a> {
                     let Data::Struct(data) = &input.data else {
                         unreachable!()
                     };
-                    let field = if plan.emit_node_class {
-                        match &member {
-                            Member::Named(name) => {
-                                data.fields.iter().find(|f| f.ident.as_ref() == Some(name))
-                            }
-                            Member::Unnamed(index) => data.fields.iter().nth(index.index as usize),
-                        }
+                    let field = if let Some(index) = mapping.tuple_index {
+                        data.fields.iter().nth(index)
                     } else {
                         data.fields
                             .iter()
@@ -62,12 +57,7 @@ impl<'a> PropertySync<'a> {
             add(&plan.primary.path, &plan.primary.fields);
         }
         for component in &plan.companions {
-            let mappings = match &component.init {
-                ComponentInit::Marker => &[][..],
-                ComponentInit::Newtype(mapping) => std::slice::from_ref(mapping),
-                ComponentInit::Fields(mappings) => mappings.as_slice(),
-            };
-            add(&component.path, mappings);
+            add(&component.path, component_mappings(&component.init));
         }
         if fields.is_empty() {
             return None;

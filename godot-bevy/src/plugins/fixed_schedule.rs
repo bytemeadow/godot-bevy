@@ -46,8 +46,7 @@ pub fn prefix_ran_in_process_fallback(
 /// physics clock instead of Bevy's in-`_process` accumulator.
 ///
 /// Must run after `TimePlugin::build` (which registers `run_fixed_main_schedule`).
-#[doc(hidden)]
-pub fn host_fixed_main_loop(app: &mut App) {
+pub(crate) fn host_fixed_main_loop(app: &mut App) {
     // Stop `app.update()` from running the fixed loop -- we drive it from physics.
     // Replace it with an unregistered marker; split_idx() reads its position to
     // divide the label list into prefix (before) and suffix (after) each frame.
@@ -163,8 +162,7 @@ pub(crate) fn run_main_prefix(world: &mut World) {
 }
 
 /// Never calls `clear_trackers` -- the caller does that after this returns.
-#[doc(hidden)]
-pub fn run_main_suffix(world: &mut World) {
+pub(crate) fn run_main_suffix(world: &mut World) {
     world.resource_scope(|world, order: bevy_ecs::world::Mut<MainScheduleOrder>| {
         let i = split_idx(&order);
         for &label in &order.labels[i + 1..] {
@@ -176,8 +174,7 @@ pub fn run_main_suffix(world: &mut World) {
 /// Per-frame preamble shared by `_process` and `_physics_process`: startup
 /// (once ever) then the Main prefix. Idempotency for both flags is the caller's
 /// responsibility (the `started`/`prefix_done_this_frame` flags in `app.rs`).
-#[doc(hidden)]
-pub fn run_preamble(world: &mut World, need_startup: bool, need_prefix: bool) {
+pub(crate) fn run_preamble(world: &mut World, need_startup: bool, need_prefix: bool) {
     if need_startup {
         run_startup(world);
     }
@@ -189,8 +186,12 @@ pub fn run_preamble(world: &mut World, need_startup: bool, need_prefix: bool) {
 /// One physics step of the hosted fixed loop, shared by `BevyApp::physics_process`
 /// and the deterministic multi-step tests so the `ProcessFallbackPrefix` publish
 /// can't drift between production and the test driver.
-#[doc(hidden)]
-pub fn run_physics_step(world: &mut World, need_startup: bool, need_prefix: bool, delta: Duration) {
+pub(crate) fn run_physics_step(
+    world: &mut World,
+    need_startup: bool,
+    need_prefix: bool,
+    delta: Duration,
+) {
     // A physics step's prefix is never the process fallback, so the PreUpdate
     // read stays gated off this step (the FixedFirst read covers it). Published
     // before run_preamble because the flag gates the read inside the prefix.

@@ -215,13 +215,6 @@ on these placements:
 | `BevyComponents` newtype source | `#[gdbevy(component = Speed, sync = two_way)]` |
 | `BevyComponents` N→1 source | `#[gdbevy(sync = two_way)]` on the field named by `require(...)` |
 
-| Directive | Meaning |
-| --- | --- |
-| `sync = two_way` | Read Godot in `PreUpdate`, write Bevy in `PostUpdate`; a pending Bevy edit wins on that field |
-| `sync = to_godot` | Keep the creation-time import, then publish only Bevy edits |
-| `with = path` | Convert an owned Godot value into the Bevy field value |
-| `into = path` | Convert an owned Bevy field value into the Godot value; valid only with `sync` |
-
 Both converter values are Rust paths, not strings or closures. A live mapping
 with `with` requires `into`. Without converters the value types must agree.
 `into` may also be supplied without `with` when no inbound conversion is needed.
@@ -233,12 +226,8 @@ with `with` requires `into`. Without converters the value types must agree.
 Here `LevelView.value0` maps to `Level.0`. The `ActorView` properties `speed`,
 `health`, and `mana` map to their companion fields independently.
 
-For an N→1 binding, put `sync`, `with`, and `into` on the existing Godot source
-field. Other source fields can remain creation-only:
-
-```rust
-{{#include ../../../../book-tests/src/live_property_sync.rs:tuning}}
-```
+See the [Godot-first tuning example](live-property-sync.md#tune-a-field-from-godot)
+for an N→1 binding with live and creation-only fields.
 
 Each live source must feed exactly one destination. Two live mappings cannot
 write the same Bevy field; a live target cannot overlap a creation-only target

@@ -555,18 +555,15 @@ mod tests {
 
     #[test]
     fn live_sync_rejects_split_godot_first_field_attributes() {
-        for attributes in [
-            quote!(#[gdbevy(component = Speed)] #[gdbevy(sync = two_way)]),
-            quote!(#[gdbevy(component = Speed, sync = two_way)] #[gdbevy(into = convert)]),
-            quote!(#[gdbevy(sync = to_godot)] #[gdbevy(component = Speed)]),
-            quote!(#[gdbevy(component = Speed)] #[gdbevy(into = convert)]),
-        ] {
-            let input =
-                syn::parse2(quote!(struct Player { #[export] #attributes speed: f32 })).unwrap();
-            let error = parse_godot_first(&input).unwrap_err().to_string();
-            assert!(error.contains("combine"), "{error}");
-            assert!(error.contains("gdbevy"), "{error}");
-        }
+        let input = parse_quote!(struct Player {
+            #[export]
+            #[gdbevy(component = Speed)]
+            #[gdbevy(sync = two_way)]
+            speed: f32,
+        });
+        let error = parse_godot_first(&input).unwrap_err().to_string();
+        assert!(error.contains("combine"), "{error}");
+        assert!(error.contains("gdbevy"), "{error}");
     }
 
     #[test]

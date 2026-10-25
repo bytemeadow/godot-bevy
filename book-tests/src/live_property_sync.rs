@@ -109,12 +109,8 @@ pub mod strings {
     pub struct CaptionView {
         #[export]
         #[gdbevy(component = Caption, sync = two_way,
-                 with = from_godot, into = to_godot)]
+                 with = String::from, into = to_godot)]
         pub caption: GString,
-    }
-
-    fn from_godot(value: GString) -> String {
-        value.to_string()
     }
 
     fn to_godot(value: String) -> GString {

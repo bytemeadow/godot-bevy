@@ -706,8 +706,6 @@ enum PropertyBenchCase {
 fn setup_property_benchmark_app(nodes: &[Gd<Node>], class_name: &str) -> (App, Vec<Entity>) {
     let mut app = App::new();
     app.insert_non_send(GodotMainThread);
-    app.init_schedule(PreUpdate);
-    app.init_schedule(PostUpdate);
     let entry = godot_bevy::inventory::iter::<AutoSyncBundleRegistry>
         .into_iter()
         .find(|entry| (entry.godot_class_id_fn)().to_string() == class_name)

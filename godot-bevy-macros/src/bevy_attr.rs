@@ -771,7 +771,7 @@ fn check_live_property(field: &Field) -> syn::Result<()> {
     Ok(())
 }
 
-fn component_mappings(init: &ComponentInit) -> &[Mapping] {
+pub(crate) fn component_mappings(init: &ComponentInit) -> &[Mapping] {
     match init {
         ComponentInit::Marker => &[],
         ComponentInit::Newtype(mapping) => std::slice::from_ref(mapping),

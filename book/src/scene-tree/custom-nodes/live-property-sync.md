@@ -119,11 +119,8 @@ recurring Godot reads. Arrays, dictionaries, `Variant`, and objects are unsuppor
 on either side, even with converters. Expose a separate plain stored property
 for the value you want to synchronize.
 
-Generated named fields, tuple fields, newtype companions, and struct companions
-all accept `sync`. For Godot-first classes, annotate the source field of either
-a newtype binding or an N→1 binding. A live source must have exactly one Bevy
-destination, and live mappings cannot overlap on a Bevy target. Creation-only
-fan-out remains supported. See the [grammar reference](property-mapping-with-bevy-bundle.md#live-mapping-grammar).
+See the [mapping grammar](property-mapping-with-bevy-bundle.md#live-mapping-grammar)
+for supported placements and restrictions on overlapping mappings and fan-out.
 
 Godot-first live sources must be plain stored `#[export]` or `#[var]` fields.
 Custom getters and setters are unsupported. Immutable Bevy components support

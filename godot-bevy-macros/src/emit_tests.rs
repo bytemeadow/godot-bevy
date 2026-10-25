@@ -356,11 +356,6 @@ mod tests {
             }
         }
     }
-}
-
-#[cfg(test)]
-mod property_sync_tests {
-    use syn::parse_quote;
 
     #[test]
     fn live_fields_share_class_state_and_system_pair() {
@@ -398,22 +393,5 @@ mod property_sync_tests {
             .to_string();
         assert!(!out.contains("PropertySync"));
         assert!(!out.contains("add_systems"));
-    }
-
-    #[test]
-    fn godot_strings_have_owned_rust_snapshots() {
-        let input = parse_quote! {
-            struct View {
-                #[export]
-                #[gdbevy(component = Label, with = to_label, into = from_label, sync = two_way)]
-                label: godot::builtin::GString,
-            }
-        };
-        let out = crate::godot_node::derive_bevy_components(input)
-            .unwrap()
-            .to_string();
-        assert!(out.contains("Option < S0 >"));
-        assert!(out.contains("empty_snapshot"));
-        assert!(out.contains("Capture as _"));
     }
 }

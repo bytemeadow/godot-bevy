@@ -210,23 +210,11 @@ pub fn derive_node_tree_view(item: TokenStream) -> TokenStream {
 ///
 /// Put `sync = two_way` or `sync = to_godot` on a source field alongside its
 /// `component` binding, or on a field used by a struct-level N→1 binding.
-/// `two_way` imports Godot changes in `PreUpdate` and publishes Bevy changes in
-/// `PostUpdate`; `to_godot` imports only at creation. Order systems against
-/// `PropertySyncSet::Read` and `PropertySyncSet::Write`. Pending Bevy edits win
-/// per-field conflicts. Godot edits after the read wait until the next read unless
-/// a pending Bevy edit overwrites them at publication.
-///
 /// Live sources require plain stored `#[export]` or `#[var]` fields without custom
 /// getters or setters. Each live source must map to one destination, and a live
 /// Bevy target cannot overlap another mapping. Creation-only fan-out is unchanged.
-/// Add `into = path` for Bevy-to-Godot conversion; it requires `sync` and is mandatory
-/// when a live mapping uses `with`. Both converters take owned values.
-/// Plain values require `Clone + PartialEq + Send + Sync + 'static`; Godot `GString`
-/// and `StringName` use owned `String` snapshots. `f32` and `f64` compare by bits.
-/// Arrays, dictionaries, `Variant`, and objects are unsupported on either side,
-/// even with converters.
-/// Immutable components support only `to_godot`. See [`GodotNode`] for shared
-/// scheduling and lifecycle rules.
+/// See [`GodotNode`] for the shared scheduling, conversion, value, and lifecycle
+/// contract.
 ///
 /// `base`, `class_name`, and generated-export forms (`require(prop: Comp, …)`) are
 /// **not** valid here — those are component-first (`GodotNode`) only.
