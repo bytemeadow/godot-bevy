@@ -204,6 +204,54 @@ mod tests {
     }
 
     #[test]
+    fn gf_n_to_one_conversions_follow_source_fields() {
+        let di: syn::DeriveInput = parse_quote! {
+            #[gdbevy(require(Paths { back: path, accept: path, count: count }))]
+            #[gdbevy(require(OtherPaths { back: path }))]
+            struct Menu {
+                #[gdbevy(with = String::from)]
+                path: GString,
+                count: i32,
+            }
+        };
+        let plan = parse_godot_first(&di).unwrap();
+        assert_eq!(plan.companions.len(), 2);
+        for companion in &plan.companions {
+            let ComponentInit::Fields(mappings) = &companion.init else {
+                panic!("expected field mappings");
+            };
+            for mapping in mappings {
+                if mapping.godot_prop == "path" {
+                    let converter = mapping.with.as_ref().unwrap();
+                    assert_eq!(quote!(#converter).to_string(), "String :: from");
+                } else {
+                    assert!(mapping.with.is_none());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn gf_n_to_one_rejects_invalid_field_directives() {
+        for directives in [
+            quote!(),
+            quote!(with = convert, as = GString),
+            quote!(with = convert, default = 0),
+            quote!(with = convert, export),
+            quote!(with = convert, description = "Path"),
+        ] {
+            let di = syn::parse2(quote! {
+                #[gdbevy(require(Paths { back: path }))]
+                struct Menu {
+                    #[gdbevy(#directives)]
+                    path: GString,
+                }
+            }).unwrap();
+            assert!(parse_godot_first(&di).is_err());
+        }
+    }
+
+    #[test]
     fn gf_tuple_struct_is_rejected() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(GodotClass, BevyComponents)]

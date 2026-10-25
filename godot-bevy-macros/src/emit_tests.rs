@@ -53,6 +53,24 @@ mod tests {
     }
 
     #[test]
+    fn gf_n_to_one_emits_converted_and_unconverted_fields() {
+        let di: syn::DeriveInput = parse_quote! {
+            #[gdbevy(require(Paths { back: path, accept: path, count: count }))]
+            struct Menu {
+                #[gdbevy(with = String::from)]
+                path: GString,
+                count: i32,
+            }
+        };
+        let out = crate::godot_node::derive_bevy_components(di)
+            .unwrap()
+            .to_string();
+        assert!(out.contains("back : String :: from (node . bind () . path . clone ())"));
+        assert!(out.contains("accept : String :: from (node . bind () . path . clone ())"));
+        assert!(out.contains("count : node . bind () . count . clone ()"));
+    }
+
+    #[test]
     fn cf_skips_companion_already_in_sibling_require() {
         let di: syn::DeriveInput = parse_quote! {
             #[derive(Component, GodotNode, Default)]
