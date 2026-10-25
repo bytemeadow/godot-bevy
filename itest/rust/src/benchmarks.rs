@@ -3,7 +3,8 @@
 // Remove when gdext includes godot-rust/gdext#1706; #[class(init)] emits base: base.
 #![allow(clippy::redundant_field_names)]
 
-use bevy::prelude::{Event, On, ResMut, Resource};
+use bevy::ecs::system::RunSystemOnce;
+use bevy::prelude::{Commands, Entity, Event, On, ResMut, Resource};
 use crossbeam_channel as mpsc;
 use godot::builtin::StringName;
 use godot::classes::{Area3D, Engine, InputEventKey, InputMap, Node, Node2D, Node3D, SceneTree};
@@ -15,7 +16,9 @@ use godot_bevy::bevy_app::{
 };
 use godot_bevy::bevy_math::Vec3;
 use godot_bevy::bevy_transform::components::Transform as BevyTransform;
-use godot_bevy::interop::{GodotMainThread, GodotNodeHandle, Node2DMarker, Node3DMarker};
+use godot_bevy::interop::{
+    GodotAccess, GodotMainThread, GodotNodeHandle, Node2DMarker, Node3DMarker,
+};
 use godot_bevy::plugins::collisions::{
     CollisionMessageReader, CollisionMessageType, CollisionState, GodotCollisionsPlugin,
     RawCollisionMessage,
@@ -23,6 +26,7 @@ use godot_bevy::plugins::collisions::{
 use godot_bevy::plugins::core::SceneTreeComponentRegistry;
 use godot_bevy::plugins::input::{GodotInputEventPlugin, InputEventReader, InputEventType};
 use godot_bevy::plugins::packed_scene::{GodotPackedScenePlugin, GodotScene};
+use godot_bevy::plugins::scene_tree::autosync::AutoSyncBundleRegistry;
 use godot_bevy::plugins::scene_tree::{
     GodotSceneTreePlugin, NodeEntityIndex, SceneTreeMessage, SceneTreeMessageReader,
     SceneTreeMessageType,
@@ -31,7 +35,7 @@ use godot_bevy::plugins::signals::{GodotSignals, GodotSignalsPlugin};
 use godot_bevy::plugins::transforms::{
     GodotTransformSyncPlugin, GodotTransformSyncPluginExt, TransformSyncMetadata, TransformSyncMode,
 };
-use godot_bevy::prelude::BevyComponents;
+use godot_bevy::prelude::{BevyComponents, GodotNode};
 use godot_bevy::watchers::collision_watcher::CollisionWatcher;
 use godot_bevy_test::{bench, measured};
 
@@ -690,6 +694,199 @@ fn scene_tree_node_added_autosync_unmatched() -> i32 {
 fn scene_tree_node_added_autosync_matched() -> i32 {
     run_autosync_node_added(SCENE_TREE_NODE_COUNT, true)
 }
+
+#[derive(Clone, Copy)]
+enum PropertyBenchCase {
+    Idle,
+    BevySparse,
+    GodotSparse,
+    Conflict,
+}
+
+fn setup_property_benchmark_app(nodes: &[Gd<Node>], class_name: &str) -> (App, Vec<Entity>) {
+    let mut app = App::new();
+    app.insert_non_send(GodotMainThread);
+    app.init_schedule(PreUpdate);
+    app.init_schedule(PostUpdate);
+    let entry = godot_bevy::inventory::iter::<AutoSyncBundleRegistry>
+        .into_iter()
+        .find(|entry| (entry.godot_class_id_fn)().to_string() == class_name)
+        .expect("registered benchmark class");
+    entry
+        .register_property_sync
+        .expect("live property registration")(&mut app);
+    let bindings: Vec<_> = nodes
+        .iter()
+        .map(|node| {
+            let handle = GodotNodeHandle::new(node.clone());
+            (app.world_mut().spawn(handle).id(), handle)
+        })
+        .collect();
+    let entities = bindings.iter().map(|(entity, _)| *entity).collect();
+    app.world_mut()
+        .run_system_once(move |mut commands: Commands, mut godot: GodotAccess| {
+            for (entity, handle) in &bindings {
+                assert!((entry.create_bundle_fn)(
+                    &mut commands,
+                    *entity,
+                    &mut godot,
+                    *handle
+                ));
+            }
+        })
+        .unwrap();
+    app.world_mut().run_schedule(PreUpdate);
+    app.world_mut().run_schedule(PostUpdate);
+    app.world_mut().clear_trackers();
+    (app, entities)
+}
+
+macro_rules! property_benchmark_runner {
+    ($runner:ident, $component:ident, $node:ident; $($field:ident),+ $(,)?) => {
+        fn $runner(node_count: usize, case: PropertyBenchCase) -> i32 {
+            let nodes: Vec<_> = (0..node_count).map(|_| $node::new_alloc()).collect();
+            let handles: Vec<_> = nodes.iter().map(|node| node.clone().upcast()).collect();
+            let (mut app, entities) = setup_property_benchmark_app(&handles, stringify!($node));
+            for index in (0..node_count).step_by(100) {
+                if matches!(case, PropertyBenchCase::BevySparse | PropertyBenchCase::Conflict) {
+                    let mut component = app.world_mut().get_mut::<$component>(entities[index]).unwrap();
+                    $(component.$field = 1.0;)+
+                }
+                if matches!(case, PropertyBenchCase::GodotSparse | PropertyBenchCase::Conflict) {
+                    let mut node = nodes[index].clone();
+                    let mut value = node.bind_mut();
+                    $(value.$field = 2.0;)+
+                }
+            }
+            measured(|| {
+                app.world_mut().run_schedule(PreUpdate);
+                app.world_mut().run_schedule(PostUpdate);
+            });
+            let expected = match case {
+                PropertyBenchCase::Idle => 0.0,
+                PropertyBenchCase::GodotSparse => 2.0,
+                PropertyBenchCase::BevySparse | PropertyBenchCase::Conflict => 1.0,
+            };
+            {
+                let component = app.world().get::<$component>(entities[0]).unwrap();
+                let node = nodes[0].bind();
+                $(assert_eq!(component.$field, expected); assert_eq!(node.$field, expected);)+
+            }
+            for node in nodes {
+                node.free();
+            }
+            node_count as i32
+        }
+    };
+}
+
+macro_rules! property_benchmark_class {
+    ($component:ident, $node:ident, $runner:ident, $mode:ident; $($field:ident),+ $(,)?) => {
+        #[derive(bevy::prelude::Component, Default, GodotNode)]
+        #[gdbevy(class_name = $node)]
+        struct $component {
+            $(#[gdbevy(export, sync = $mode)] $field: f32,)+
+        }
+        property_benchmark_runner!($runner, $component, $node; $($field),+);
+    };
+}
+
+property_benchmark_class!(BenchOutbound1, BenchOutboundNode1, run_property_outbound_1, to_godot; a);
+property_benchmark_class!(BenchOutbound8, BenchOutboundNode8, run_property_outbound_8, to_godot; a, b, c, d, e, f, g, h);
+property_benchmark_class!(BenchTwoWay1, BenchTwoWayNode1, run_property_two_way_1, two_way; a);
+property_benchmark_class!(BenchTwoWay8, BenchTwoWayNode8, run_property_two_way_8, two_way; a, b, c, d, e, f, g, h);
+
+macro_rules! property_benchmark_n_to_one_class {
+    ($component:ident, $node:ident, $runner:ident; $($field:ident),+ $(,)?) => {
+        #[derive(bevy::prelude::Component, Default)]
+        struct $component {
+            $($field: f32,)+
+        }
+        #[derive(GodotClass, BevyComponents)]
+        #[class(init, base = Node)]
+        #[gdbevy(require($component { $($field: $field),+ }))]
+        struct $node {
+            base: Base<Node>,
+            $(#[export] #[gdbevy(sync = two_way)] $field: f32,)+
+        }
+        property_benchmark_runner!($runner, $component, $node; $($field),+);
+    };
+}
+
+property_benchmark_n_to_one_class!(BenchNToOne1, BenchNToOneNode1, run_property_n_to_one_1; a);
+property_benchmark_n_to_one_class!(BenchNToOne8, BenchNToOneNode8, run_property_n_to_one_8; a, b, c, d, e, f, g, h);
+
+macro_rules! property_benchmarks {
+    ($runner:ident, $case:ident; $($name:ident => $count:literal),+ $(,)?) => {
+        $(
+            #[bench(repeat = 1)]
+            fn $name() -> i32 {
+                $runner($count, PropertyBenchCase::$case)
+            }
+        )+
+    };
+}
+
+property_benchmarks!(run_property_outbound_1, Idle;
+    property_sync_outbound_idle_m1_100 => 100,
+    property_sync_outbound_idle_m1_1000 => 1000,
+    property_sync_outbound_idle_m1_5000 => 5000,
+);
+property_benchmarks!(run_property_outbound_8, Idle;
+    property_sync_outbound_idle_m8_100 => 100,
+    property_sync_outbound_idle_m8_1000 => 1000,
+    property_sync_outbound_idle_m8_5000 => 5000,
+);
+property_benchmarks!(run_property_outbound_1, BevySparse;
+    property_sync_outbound_sparse_m1_100 => 100,
+    property_sync_outbound_sparse_m1_1000 => 1000,
+    property_sync_outbound_sparse_m1_5000 => 5000,
+);
+property_benchmarks!(run_property_outbound_8, BevySparse;
+    property_sync_outbound_sparse_m8_100 => 100,
+    property_sync_outbound_sparse_m8_1000 => 1000,
+    property_sync_outbound_sparse_m8_5000 => 5000,
+);
+property_benchmarks!(run_property_two_way_1, Idle;
+    property_sync_two_way_idle_m1_100 => 100,
+    property_sync_two_way_idle_m1_1000 => 1000,
+    property_sync_two_way_idle_m1_5000 => 5000,
+);
+property_benchmarks!(run_property_two_way_8, Idle;
+    property_sync_two_way_idle_m8_100 => 100,
+    property_sync_two_way_idle_m8_1000 => 1000,
+    property_sync_two_way_idle_m8_5000 => 5000,
+);
+property_benchmarks!(run_property_two_way_1, GodotSparse;
+    property_sync_two_way_godot_sparse_m1_100 => 100,
+    property_sync_two_way_godot_sparse_m1_1000 => 1000,
+    property_sync_two_way_godot_sparse_m1_5000 => 5000,
+);
+property_benchmarks!(run_property_two_way_8, GodotSparse;
+    property_sync_two_way_godot_sparse_m8_100 => 100,
+    property_sync_two_way_godot_sparse_m8_1000 => 1000,
+    property_sync_two_way_godot_sparse_m8_5000 => 5000,
+);
+property_benchmarks!(run_property_two_way_1, Conflict;
+    property_sync_two_way_conflict_m1_100 => 100,
+    property_sync_two_way_conflict_m1_1000 => 1000,
+    property_sync_two_way_conflict_m1_5000 => 5000,
+);
+property_benchmarks!(run_property_two_way_8, Conflict;
+    property_sync_two_way_conflict_m8_100 => 100,
+    property_sync_two_way_conflict_m8_1000 => 1000,
+    property_sync_two_way_conflict_m8_5000 => 5000,
+);
+property_benchmarks!(run_property_n_to_one_1, GodotSparse;
+    property_sync_n_to_one_godot_sparse_m1_100 => 100,
+    property_sync_n_to_one_godot_sparse_m1_1000 => 1000,
+    property_sync_n_to_one_godot_sparse_m1_5000 => 5000,
+);
+property_benchmarks!(run_property_n_to_one_8, GodotSparse;
+    property_sync_n_to_one_godot_sparse_m8_100 => 100,
+    property_sync_n_to_one_godot_sparse_m8_1000 => 1000,
+    property_sync_n_to_one_godot_sparse_m8_5000 => 5000,
+);
 
 const COLLISION_BODY_COUNT: usize = 100;
 
