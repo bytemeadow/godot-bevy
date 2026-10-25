@@ -75,22 +75,38 @@ Scene instantiation happens later in `PostUpdate`, once the asset is loaded.
 `GodotNodeHandle` is added to the entity after instantiation, so trying to modify
 it immediately after `commands.spawn(...)` will find no handle.
 
-### Configure a node after spawning
+### Configure the scene root with `with_setup`
 
-Observe `Add<GodotNodeHandle>` to configure the node when its handle becomes
-available. With `GodotAssetsPlugin` and `GodotPackedScenePlugin` enabled, register
-this plugin on your app; it spawns a scene whose root is an `Area2D` and sets its
-collision mask to layer 3 (`4`):
+Use `with_setup` to configure the root before it enters the scene tree. With
+`GodotAssetsPlugin` and `GodotPackedScenePlugin` enabled, register this plugin
+on your app; it spawns a scene whose root is an `Area2D` and sets its collision
+mask to layer 3 (`4`):
 
 ```rust
 {{#include ../../../book-tests/src/spawned_scene.rs}}
 ```
 
-The `Bullet` query filter limits the observer to entities spawned with that
-marker. `GodotAccess` resolves the handle to the scene's root node; use
-`NodeTreeView` below if the property belongs to a child instead.
+The closure runs once after the entity's `Transform` is applied and before the
+root enters the tree via `add_child`, so `_ready` and scene-tree mirroring see
+the configured values. Chained setups run in the order added. The root must
+inherit the class you specify; a mismatch returns a spawn error naming the
+scene, entity, expected class, and actual class, and removes
+`GodotScene` to cancel the spawn.
 
+### Configure nodes with ECS data
 
+Use an `On<Add<GodotNodeHandle>>` observer when setup needs ECS queries or
+resources, or when configuring nodes other than the root. The observer runs
+after the root has entered the tree and `_ready` has run. This example reads
+the collision mask from a component:
+
+```rust
+{{#include ../../../book-tests/src/spawned_scene_observer.rs}}
+```
+
+The `Bullet` query limits the observer to entities with that component.
+`GodotAccess` resolves the handle to the scene's root node; use `NodeTreeView`
+below to reach its children.
 
 
 ## 2. Access scene children with `NodeTreeView`

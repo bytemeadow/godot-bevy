@@ -173,7 +173,7 @@ def verify_doctests() -> None:
     actual = rustdoc_fences()
     expected = ledger["fences"]
     require(isinstance(expected, list), "doctest fence ledger must be an array")
-    require(len(actual) == len(expected) == 42, "doctest fence census")
+    require(len(actual) == len(expected) == 43, "doctest fence census")
     actual_by_key = {(item["source"], item["ordinal"]): item for item in actual}
     require(len(actual_by_key) == len(actual), "duplicate doctest fence identity")
     expected_keys = [(item.get("source"), item.get("ordinal")) for item in expected]

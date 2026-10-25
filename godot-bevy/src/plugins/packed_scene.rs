@@ -19,7 +19,7 @@ use bevy_ecs::{
 };
 use bevy_transform::components::Transform;
 use godot::classes::{Node, Node2D, Node3D, PackedScene, ResourceLoader};
-use godot::obj::Gd;
+use godot::obj::{Gd, GodotClass, Inherits};
 use godot::prelude::Variant;
 use std::collections::HashMap;
 use tracing::error;
@@ -39,11 +39,28 @@ impl Plugin for GodotPackedScenePlugin {
 /// [`GodotScene`]s that are spawned/inserted into the bevy world will be instanced from the provided
 /// handle/path and the instance will be added as an [`GodotNodeHandle`] in the next PostUpdateFlush set.
 /// (see [`spawn_scene`])
-#[derive(Debug, Component)]
+#[derive(Component)]
 pub struct GodotScene {
     resource: GodotSceneResource,
     parent: Option<GodotNodeHandle>,
     deferred_signal_connections: Vec<Box<dyn DeferredSignalConnectionTrait>>,
+    deferred_setups: Vec<Box<SceneSetup>>,
+}
+
+type SceneSetup = dyn FnOnce(&Gd<Node>) -> bevy_ecs::error::Result + Send + Sync;
+
+impl std::fmt::Debug for GodotScene {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GodotScene")
+            .field("resource", &self.resource)
+            .field("parent", &self.parent)
+            .field(
+                "deferred_signal_connections",
+                &self.deferred_signal_connections,
+            )
+            .field("deferred_setups", &self.deferred_setups.len())
+            .finish()
+    }
 }
 
 #[derive(Debug)]
@@ -60,6 +77,7 @@ impl GodotScene {
             resource: GodotSceneResource::Handle(handle),
             parent: None,
             deferred_signal_connections: Vec::new(),
+            deferred_setups: Vec::new(),
         }
     }
 
@@ -73,12 +91,51 @@ impl GodotScene {
             resource: GodotSceneResource::Path(path.to_string()),
             parent: None,
             deferred_signal_connections: Vec::new(),
+            deferred_setups: Vec::new(),
         }
     }
 
     /// Set the parent node for this scene when spawned.
     pub fn with_parent(mut self, parent: GodotNodeHandle) -> Self {
         self.parent = Some(parent);
+        self
+    }
+
+    /// Configure the scene root before it enters the scene tree and runs `_ready`.
+    /// Setups run once, in the order added, after the entity's `Transform` is applied.
+    /// If the root cannot be cast to `T`,
+    /// spawning returns an error with the scene, entity, and class names, and
+    /// removes the `GodotScene` component to cancel the spawn.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # use bevy_ecs::prelude::World;
+    /// # use godot::classes::Area2D;
+    /// # use godot_bevy::prelude::*;
+    /// # let mut world = World::new();
+    /// world.spawn(
+    ///     GodotScene::from_path("res://scenes/bullet.tscn")
+    ///         .with_setup::<Area2D, _>(|root| {
+    ///             root.set_collision_mask(4);
+    ///         }),
+    /// );
+    /// ```
+    pub fn with_setup<T, F>(mut self, setup: F) -> Self
+    where
+        T: GodotClass + Inherits<Node>,
+        F: FnOnce(&mut Gd<T>) + Send + Sync + 'static,
+    {
+        self.deferred_setups.push(Box::new(move |root| {
+            let mut root = root.clone().try_cast::<T>().map_err(|root| {
+                format!(
+                    "expected root class {}, actual class {}",
+                    T::class_id(),
+                    root.get_class()
+                )
+            })?;
+            setup(&mut root);
+            Ok(())
+        }));
         self
     }
 
@@ -225,6 +282,19 @@ fn spawn_scene(
                     "failed to set transform on scene {:?} for entity {ent}: root is neither Node2D nor Node3D",
                     scene.resource
                 )
+            }
+        }
+
+        for setup in std::mem::take(&mut scene.deferred_setups) {
+            if let Err(error) = setup(&instance).with_context(|| {
+                format!(
+                    "failed to set up scene {:?} for entity {ent}",
+                    scene.resource
+                )
+            }) {
+                instance.free();
+                commands.entity(ent).remove::<GodotScene>();
+                return Err(error);
             }
         }
 
