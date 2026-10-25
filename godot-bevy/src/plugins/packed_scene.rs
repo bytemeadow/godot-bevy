@@ -7,7 +7,7 @@ use crate::plugins::signals::{
 use crate::plugins::transforms::IntoGodotTransform;
 use crate::plugins::transforms::IntoGodotTransform2D;
 use bevy_app::{App, Plugin, PostUpdate};
-use bevy_asset::{Assets, Handle};
+use bevy_asset::{AssetServer, Assets, Handle, LoadState};
 use bevy_ecs::error::ContextExt;
 use bevy_ecs::event::Event;
 use bevy_ecs::prelude::Res;
@@ -37,7 +37,8 @@ impl Plugin for GodotPackedScenePlugin {
 /// A to-be-instanced-and-spawned Godot scene.
 ///
 /// [`GodotScene`]s that are spawned/inserted into the bevy world will be instanced from the provided
-/// handle/path and the instance will be added as an [`GodotNodeHandle`] in the next PostUpdateFlush set.
+/// handle/path once the asset is loaded. The instance is added as a [`GodotNodeHandle`]
+/// during [`PostUpdate`].
 /// (see [`spawn_scene`])
 #[derive(Component)]
 pub struct GodotScene {
@@ -72,6 +73,7 @@ enum GodotSceneResource {
 impl GodotScene {
     /// Instantiate the godot scene from a Bevy `Handle<GodotResource>` and add it to the
     /// scene tree root. This is the preferred method when using Bevy's asset system.
+    /// If the handle is still loading, spawning waits until the asset is available.
     pub fn from_handle(handle: Handle<GodotResource>) -> Self {
         Self {
             resource: GodotSceneResource::Handle(handle),
@@ -205,6 +207,7 @@ fn spawn_scene(
     mut new_scenes: Query<(&mut GodotScene, Entity, Option<&Transform>), Without<GodotNodeHandle>>,
     mut scene_tree: SceneTreeRef,
     assets: Res<Assets<GodotResource>>,
+    asset_server: Option<Res<AssetServer>>,
     signal_sender: Option<Res<SignalSender>>,
     mut godot: GodotAccess,
 ) -> bevy_ecs::error::Result {
@@ -215,13 +218,27 @@ fn spawn_scene(
     for (mut scene, ent, transform) in new_scenes.iter_mut() {
         let packed_scene: Gd<PackedScene> = match &scene.resource {
             GodotSceneResource::Handle(handle) => {
-                let resource = assets
-                    .get(handle)
-                    .with_context(|| {
-                        format!("failed to find packed scene {handle:?} in assets for entity {ent}")
-                    })?
-                    .get()
-                    .clone();
+                let Some(resource) = assets.get(handle) else {
+                    match asset_server
+                        .as_ref()
+                        .and_then(|server| server.get_load_state(handle))
+                    {
+                        Some(LoadState::Loading) => continue,
+                        Some(LoadState::Failed(error)) => {
+                            return Err(format!(
+                                "failed to load packed scene {handle:?} for entity {ent}: {error}"
+                            )
+                            .into());
+                        }
+                        _ => {
+                            return Err(format!(
+                                "failed to find packed scene {handle:?} in assets for entity {ent}"
+                            )
+                            .into());
+                        }
+                    }
+                };
+                let resource = resource.get().clone();
                 match resource.try_cast::<PackedScene>() {
                     Ok(ps) => ps,
                     Err(resource) => {

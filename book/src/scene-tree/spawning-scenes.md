@@ -72,6 +72,8 @@ fn spawn_character(mut commands: Commands, assets: Res<CharacterAssets>) {
 ```
 
 Scene instantiation happens later in `PostUpdate`, once the asset is loaded.
+`from_handle` retries each frame while the handle is loading, preserving setups
+and signal connections until then. Failed loads and missing assets return a spawn error.
 `GodotNodeHandle` is added to the entity after instantiation, so trying to modify
 it immediately after `commands.spawn(...)` will find no handle.
 
