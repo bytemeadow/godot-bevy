@@ -96,7 +96,7 @@ func _on_node_removed(node: Node):
     # This is called immediately (not deferred) so the node should still be valid
     rust_watcher.scene_tree_event(node, "NodeRemoved")
 
-func _on_node_renamed(node: Node):
+func _on_node_renamed(node):
     if not rust_watcher:
         return
 
