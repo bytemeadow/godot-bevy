@@ -94,6 +94,26 @@ struct Directives {
 }
 
 fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
+    let d = parse_directive_values(input)?;
+    if d.hint_string.is_some() && d.hint.is_none() {
+        return Err(Error::new(
+            input.span(),
+            "`hint_string` requires `hint` to also be provided",
+        ));
+    }
+    if d.into.is_some() && d.sync.is_none() {
+        return Err(Error::new(input.span(), "`into` requires `sync`"));
+    }
+    if d.sync.is_some() && d.with.is_some() && d.into.is_none() {
+        return Err(Error::new(
+            input.span(),
+            "a live mapping with `with` requires `into`",
+        ));
+    }
+    Ok(d)
+}
+
+fn parse_directive_values(input: ParseStream) -> syn::Result<Directives> {
     let mut d = Directives::default();
     while !input.is_empty() {
         if input.peek(Token![as]) {
@@ -194,21 +214,6 @@ fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
         } else {
             break;
         }
-    }
-    if d.hint_string.is_some() && d.hint.is_none() {
-        return Err(Error::new(
-            input.span(),
-            "`hint_string` requires `hint` to also be provided",
-        ));
-    }
-    if d.into.is_some() && d.sync.is_none() {
-        return Err(Error::new(input.span(), "`into` requires `sync`"));
-    }
-    if d.sync.is_some() && d.with.is_some() && d.into.is_none() {
-        return Err(Error::new(
-            input.span(),
-            "a live mapping with `with` requires `into`",
-        ));
     }
     Ok(d)
 }
@@ -393,8 +398,23 @@ fn struct_fields(input: &DeriveInput) -> syn::Result<Vec<&Field>> {
     }
 }
 
-fn find_bevy_attr(field: &Field) -> Option<&Attribute> {
-    field.attrs.iter().find(|a| a.path().is_ident("gdbevy"))
+fn find_bevy_attr(field: &Field) -> syn::Result<Option<&Attribute>> {
+    let mut attrs = field.attrs.iter().filter(|a| a.path().is_ident("gdbevy"));
+    let first = attrs.next();
+    if attrs.next().is_some() {
+        for attr in field.attrs.iter().filter(|a| a.path().is_ident("gdbevy")) {
+            if matches!(attr.meta, Meta::List(_)) {
+                let directives = attr.parse_args_with(parse_directive_values)?;
+                if directives.sync.is_some() || directives.into.is_some() {
+                    return Err(Error::new_spanned(
+                        attr,
+                        "combine this field's directives into one `#[gdbevy(...)]` attribute when using `sync` or `into`",
+                    ));
+                }
+            }
+        }
+    }
+    Ok(first)
 }
 
 fn parse_field_directives(attr: &Attribute) -> syn::Result<Directives> {
@@ -550,7 +570,7 @@ fn gf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
 fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
     let mut out = Vec::new();
     for (i, field) in struct_fields(input)?.into_iter().enumerate() {
-        let Some(attr) = find_bevy_attr(field) else {
+        let Some(attr) = find_bevy_attr(field)? else {
             continue;
         };
         let (godot_prop, bevy_field, tuple_index) = match &field.ident {
@@ -607,7 +627,7 @@ fn collect_field_bindings(
 
     let mut out = Vec::new();
     for field in struct_fields(input)? {
-        let Some(attr) = find_bevy_attr(field) else {
+        let Some(attr) = find_bevy_attr(field)? else {
             continue;
         };
         let name = field
@@ -963,7 +983,7 @@ pub fn parse_godot_first(input: &DeriveInput) -> syn::Result<ClassPlan> {
 pub fn parse_attachable_component(input: &DeriveInput) -> syn::Result<TokenStream> {
     let class = &input.ident;
     for field in struct_fields(input)? {
-        if let Some(attr) = find_bevy_attr(field) {
+        if let Some(attr) = find_bevy_attr(field)? {
             let directives = parse_field_directives(attr)?;
             if directives.sync.is_some() {
                 return Err(Error::new_spanned(

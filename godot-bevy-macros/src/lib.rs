@@ -2,6 +2,7 @@ mod bevy_attr;
 mod emit;
 mod godot_node;
 mod node_tree_view;
+mod property_sync;
 
 use crate::godot_node::{
     derive_attachable_component, derive_bevy_components, derive_godot_node_component,

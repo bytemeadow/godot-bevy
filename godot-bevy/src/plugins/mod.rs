@@ -13,6 +13,7 @@ pub mod fixed_schedule;
 pub mod godot_bevy_logger;
 pub mod input;
 pub mod packed_scene;
+pub mod property_sync;
 pub mod scene_tree;
 pub mod signals;
 pub mod transforms;

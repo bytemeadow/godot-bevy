@@ -357,3 +357,63 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod property_sync_tests {
+    use syn::parse_quote;
+
+    #[test]
+    fn live_fields_share_class_state_and_system_pair() {
+        let input = parse_quote! {
+            #[gdbevy(class_name = View)]
+            struct Stats {
+                #[gdbevy(export, sync = two_way)]
+                health: i32,
+                #[gdbevy(export, sync = to_godot)]
+                speed: f32,
+            }
+        };
+        let out = crate::godot_node::derive_godot_node_component(input)
+            .unwrap()
+            .to_string();
+        assert!(out.contains("__ViewPropertySync"));
+        assert_eq!(out.matches("PropertySyncSet :: Read").count(), 1);
+        assert_eq!(out.matches("PropertySyncSet :: Write").count(), 1);
+        assert_eq!(out.matches("bind_mut ()").count(), 1);
+        assert!(out.contains("register_property_sync : Some"));
+        assert!(!out.contains("Reflect"));
+        assert!(!out.contains("NonSend"));
+    }
+
+    #[test]
+    fn unsynced_class_has_no_property_state_or_systems() {
+        let input = parse_quote! {
+            struct Stats {
+                #[gdbevy(export)]
+                health: i32,
+            }
+        };
+        let out = crate::godot_node::derive_godot_node_component(input)
+            .unwrap()
+            .to_string();
+        assert!(!out.contains("PropertySync"));
+        assert!(!out.contains("add_systems"));
+    }
+
+    #[test]
+    fn godot_strings_have_owned_rust_snapshots() {
+        let input = parse_quote! {
+            struct View {
+                #[export]
+                #[gdbevy(component = Label, with = to_label, into = from_label, sync = two_way)]
+                label: godot::builtin::GString,
+            }
+        };
+        let out = crate::godot_node::derive_bevy_components(input)
+            .unwrap()
+            .to_string();
+        assert!(out.contains("Option < S0 >"));
+        assert!(out.contains("empty_snapshot"));
+        assert!(out.contains("Capture as _"));
+    }
+}

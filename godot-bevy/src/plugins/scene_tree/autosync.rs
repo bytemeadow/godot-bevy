@@ -30,6 +30,7 @@ pub struct AutoSyncBundleRegistry {
     pub godot_class_id_fn: fn() -> ClassId,
     /// Function to create and add the bundle to an entity
     pub create_bundle_fn: BundleCreatorFn,
+    pub register_property_sync: Option<fn(&mut App)>,
 }
 
 crate::inventory::collect!(AutoSyncBundleRegistry);
@@ -88,7 +89,12 @@ static ATTACH_COMPONENT_REGISTRY: OnceLock<HashMap<String, &'static AttachCompon
     OnceLock::new();
 
 /// Initialize the global bundle registry, keyed by Godot class name.
-pub fn register_all_autosync_bundles(_app: &mut App) {
+pub fn register_all_autosync_bundles(app: &mut App) {
+    for entry in crate::inventory::iter::<AutoSyncBundleRegistry> {
+        if let Some(register) = entry.register_property_sync {
+            register(app);
+        }
+    }
     BUNDLE_REGISTRY.get_or_init(|| {
         let mut map: HashMap<String, Vec<&'static AutoSyncBundleRegistry>> = HashMap::new();
         for entry in crate::inventory::iter::<AutoSyncBundleRegistry> {

@@ -539,6 +539,78 @@ mod tests {
     }
 
     #[test]
+    fn live_sync_rejects_split_component_first_field_attributes() {
+        for attributes in [
+            quote!(#[gdbevy(export)] #[gdbevy(sync = two_way)]),
+            quote!(#[gdbevy(export, sync = two_way)] #[gdbevy(into = convert)]),
+            quote!(#[gdbevy(sync = to_godot)] #[gdbevy(export)]),
+            quote!(#[gdbevy(export)] #[gdbevy(into = convert)]),
+        ] {
+            let input = syn::parse2(quote!(struct Player { #attributes speed: f32 })).unwrap();
+            let error = parse_component_first(&input).unwrap_err().to_string();
+            assert!(error.contains("combine"), "{error}");
+            assert!(error.contains("gdbevy"), "{error}");
+        }
+    }
+
+    #[test]
+    fn live_sync_rejects_split_godot_first_field_attributes() {
+        for attributes in [
+            quote!(#[gdbevy(component = Speed)] #[gdbevy(sync = two_way)]),
+            quote!(#[gdbevy(component = Speed, sync = two_way)] #[gdbevy(into = convert)]),
+            quote!(#[gdbevy(sync = to_godot)] #[gdbevy(component = Speed)]),
+            quote!(#[gdbevy(component = Speed)] #[gdbevy(into = convert)]),
+        ] {
+            let input =
+                syn::parse2(quote!(struct Player { #[export] #attributes speed: f32 })).unwrap();
+            let error = parse_godot_first(&input).unwrap_err().to_string();
+            assert!(error.contains("combine"), "{error}");
+            assert!(error.contains("gdbevy"), "{error}");
+        }
+    }
+
+    #[test]
+    fn attachable_rejects_split_live_field_attributes() {
+        let input = parse_quote!(
+            #[gdbevy(target = Speed)]
+            struct Carrier {
+                #[gdbevy]
+                #[gdbevy(sync = two_way)]
+                speed: f32,
+            }
+        );
+        let error = parse_attachable_component(&input).unwrap_err().to_string();
+        assert!(error.contains("combine"), "{error}");
+        assert!(error.contains("gdbevy"), "{error}");
+    }
+
+    #[test]
+    fn repeated_creation_only_field_attributes_keep_first_mapping() {
+        let input = parse_quote!(
+            struct Player {
+                #[gdbevy(export)]
+                #[gdbevy(default = 10.0)]
+                speed: f32,
+            }
+        );
+        let plan = parse_component_first(&input).unwrap();
+        assert!(plan.primary.fields[0].default.is_none());
+        assert!(plan.primary.fields[0].sync.is_none());
+
+        let input = parse_quote!(
+            struct Player {
+                #[export]
+                #[gdbevy(component = Speed)]
+                #[gdbevy(component = Other)]
+                speed: f32,
+            }
+        );
+        let plan = parse_godot_first(&input).unwrap();
+        assert_eq!(plan.companions.len(), 1);
+        assert!(plan.companions[0].path.is_ident("Speed"));
+    }
+
+    #[test]
     fn live_sync_rejects_nonmapping_placements() {
         for definition in [
             quote!(
