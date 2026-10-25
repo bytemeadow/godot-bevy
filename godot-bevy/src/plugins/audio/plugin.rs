@@ -481,6 +481,8 @@ fn configure_looping(
         return audio_stream;
     }
 
+    let audio_stream = audio_stream.duplicate_resource();
+
     if let Ok(mut ogg_stream) = audio_stream
         .clone()
         .try_cast::<godot::classes::AudioStreamOggVorbis>()

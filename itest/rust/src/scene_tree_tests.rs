@@ -254,20 +254,24 @@ fn test_node_renamed_event(ctx: &TestContext) -> godot::task::TaskHandle {
     godot::task::spawn(async move {
         let mut app = TestApp::new(&ctx_clone, |_app| {}).await;
 
-        let (mut node, _entity) = app.add_node::<godot::classes::Node2D>("OriginalName").await;
+        let (mut node, entity) = app.add_node::<godot::classes::Node2D>("OriginalName").await;
 
         let node_id = node.instance_id();
 
         node.set_name("RenamedNode");
         app.updates(2).await;
 
-        assert!(
-            app.has_entity_for_node(node_id),
-            "Entity should still exist after rename"
-        );
+        assert_eq!(app.entity_for_node(node_id), Some(entity));
+        app.with_world(|world| {
+            assert_eq!(world.get::<Name>(entity).unwrap().as_str(), "RenamedNode");
+        });
+
+        node.set_name("FreedBeforeDeferredRename");
+        node.free();
+        app.updates(2).await;
+        assert!(!app.has_entity_for_node(node_id));
 
         app.cleanup().await;
-        node.free();
     })
 }
 
