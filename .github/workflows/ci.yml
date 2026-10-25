@@ -51,11 +51,10 @@ jobs:
         with:
           workspaces: . -> target
 
-      - name: Cache and install Linux dependencies
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libasound2-dev libudev-dev pkg-config
-          version: 1.0
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -110,12 +109,11 @@ jobs:
         with:
           workspaces: . -> target
 
-      - name: Cache and install Linux dependencies
+      - name: Install Linux dependencies
         if: runner.os == 'linux'
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libasound2-dev libudev-dev pkg-config
-          version: 1.0
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
       - name: Run unit tests
         run: |
@@ -145,11 +143,10 @@ jobs:
           key: ${{ matrix.api }}-${{ matrix.feature-flags }}
           workspaces: . -> target
 
-      - name: Cache and install Linux dependencies
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: libasound2-dev libudev-dev pkg-config
-          version: 1.0
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
       - name: Check API level
         run: cargo check -p godot-bevy ${{ matrix.feature-flags }} --features ${{ matrix.api }}
