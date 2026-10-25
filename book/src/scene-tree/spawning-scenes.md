@@ -71,8 +71,24 @@ fn spawn_character(mut commands: Commands, assets: Res<CharacterAssets>) {
 }
 ```
 
-At this point, the Bevy entity is linked to the Godot scene instance.  
-Now we would like to access nodes inside that scene.
+Scene instantiation happens later in `PostUpdate`, once the asset is loaded.
+`GodotNodeHandle` is added to the entity after instantiation, so trying to modify
+it immediately after `commands.spawn(...)` will find no handle.
+
+### Configure a node after spawning
+
+Observe `Add<GodotNodeHandle>` to configure the node when its handle becomes
+available. With `GodotAssetsPlugin` and `GodotPackedScenePlugin` enabled, register
+this plugin on your app; it spawns a scene whose root is an `Area2D` and sets its
+collision mask to layer 3 (`4`):
+
+```rust
+{{#include ../../../book-tests/src/spawned_scene.rs}}
+```
+
+The `Bullet` query filter limits the observer to entities spawned with that
+marker. `GodotAccess` resolves the handle to the scene's root node; use
+`NodeTreeView` below if the property belongs to a child instead.
 
 
 
