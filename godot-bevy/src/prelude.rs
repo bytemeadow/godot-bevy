@@ -24,6 +24,7 @@ pub use crate::plugins::{
         GodotMouseMotion,
     },
     packed_scene::{GodotPackedScenePlugin, GodotScene},
+    property_sync::PropertySyncSet,
     scene_tree::{
         AttachComponentRegistry, AutoSyncBundleRegistry, GodotChildOf, GodotChildren,
         GodotRequiredComponents, GodotSceneTreePlugin, Groups, NodeEntityIndex, SceneTreeConfig,

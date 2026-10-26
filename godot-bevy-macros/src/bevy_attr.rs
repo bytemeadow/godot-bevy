@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{ToTokens, format_ident, quote};
 use std::collections::HashSet;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
@@ -41,6 +41,12 @@ pub enum ComponentInit {
     Fields(Vec<Mapping>),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SyncMode {
+    TwoWay,
+    ToGodot,
+}
+
 pub struct Mapping {
     pub godot_prop: syn::Ident,
     pub bevy_field: Option<syn::Ident>,
@@ -48,6 +54,8 @@ pub struct Mapping {
     pub as_type: Option<syn::Type>,
     pub default: Option<syn::Expr>,
     pub with: Option<syn::Path>,
+    pub sync: Option<SyncMode>,
+    pub into: Option<syn::Path>,
     pub docs: Vec<Attribute>,
     pub description: Option<LitStr>,
     pub hint: Option<Ident>,
@@ -76,6 +84,8 @@ struct Directives {
     as_type: Option<Type>,
     default: Option<Expr>,
     with: Option<Path>,
+    sync: Option<SyncMode>,
+    into: Option<Path>,
     component: Option<Path>,
     export: bool,
     description: Option<LitStr>,
@@ -84,6 +94,26 @@ struct Directives {
 }
 
 fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
+    let d = parse_directive_values(input)?;
+    if d.hint_string.is_some() && d.hint.is_none() {
+        return Err(Error::new(
+            input.span(),
+            "`hint_string` requires `hint` to also be provided",
+        ));
+    }
+    if d.into.is_some() && d.sync.is_none() {
+        return Err(Error::new(input.span(), "`into` requires `sync`"));
+    }
+    if d.sync.is_some() && d.with.is_some() && d.into.is_none() {
+        return Err(Error::new(
+            input.span(),
+            "a live mapping with `with` requires `into`",
+        ));
+    }
+    Ok(d)
+}
+
+fn parse_directive_values(input: ParseStream) -> syn::Result<Directives> {
     let mut d = Directives::default();
     while !input.is_empty() {
         if input.peek(Token![as]) {
@@ -97,12 +127,29 @@ fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
             let key: Ident = input.parse()?;
             let name = key.to_string();
             match name.as_str() {
-                // Reserved for the deferred sync minor; reject explicitly.
-                "sync" | "into" => {
-                    return Err(Error::new(
-                        key.span(),
-                        format!("`{name}` is reserved and not yet available"),
-                    ));
+                "sync" => {
+                    input.parse::<Token![=]>()?;
+                    if d.sync.is_some() {
+                        return Err(Error::new(key.span(), "duplicate `sync`"));
+                    }
+                    let mode: Ident = input.parse()?;
+                    d.sync = Some(match mode.to_string().as_str() {
+                        "two_way" => SyncMode::TwoWay,
+                        "to_godot" => SyncMode::ToGodot,
+                        _ => {
+                            return Err(Error::new(
+                                mode.span(),
+                                "expected `two_way` or `to_godot`",
+                            ));
+                        }
+                    });
+                }
+                "into" => {
+                    input.parse::<Token![=]>()?;
+                    if d.into.is_some() {
+                        return Err(Error::new(key.span(), "duplicate `into`"));
+                    }
+                    d.into = Some(input.parse()?);
                 }
                 "default" => {
                     input.parse::<Token![=]>()?;
@@ -156,7 +203,7 @@ fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
                     return Err(Error::new(
                         key.span(),
                         format!(
-                            "unknown key `{name}`; expected `as`, `default`, `with`, `description`, `hint`, `hint_string`, `component`, or `export`"
+                            "unknown key `{name}`; expected `as`, `default`, `with`, `sync`, `into`, `description`, `hint`, `hint_string`, `component`, or `export`"
                         ),
                     ));
                 }
@@ -167,12 +214,6 @@ fn parse_directives(input: ParseStream) -> syn::Result<Directives> {
         } else {
             break;
         }
-    }
-    if d.hint_string.is_some() && d.hint.is_none() {
-        return Err(Error::new(
-            input.span(),
-            "`hint_string` requires `hint` to also be provided",
-        ));
     }
     Ok(d)
 }
@@ -357,8 +398,23 @@ fn struct_fields(input: &DeriveInput) -> syn::Result<Vec<&Field>> {
     }
 }
 
-fn find_bevy_attr(field: &Field) -> Option<&Attribute> {
-    field.attrs.iter().find(|a| a.path().is_ident("gdbevy"))
+fn find_bevy_attr(field: &Field) -> syn::Result<Option<&Attribute>> {
+    let mut attrs = field.attrs.iter().filter(|a| a.path().is_ident("gdbevy"));
+    let first = attrs.next();
+    if attrs.next().is_some() {
+        for attr in field.attrs.iter().filter(|a| a.path().is_ident("gdbevy")) {
+            if matches!(attr.meta, Meta::List(_)) {
+                let directives = attr.parse_args_with(parse_directive_values)?;
+                if directives.sync.is_some() || directives.into.is_some() {
+                    return Err(Error::new_spanned(
+                        attr,
+                        "combine this field's directives into one `#[gdbevy(...)]` attribute when using `sync` or `into`",
+                    ));
+                }
+            }
+        }
+    }
+    Ok(first)
 }
 
 fn parse_field_directives(attr: &Attribute) -> syn::Result<Directives> {
@@ -401,6 +457,9 @@ fn cf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
                     format!("generated export `{prop}` requires `as = <Type>`"),
                 ));
             };
+            if cfg.sync.is_some() {
+                check_live_value_type(&as_type)?;
+            }
             Ok(ComponentPlan {
                 path: component,
                 generated_exports: true,
@@ -411,6 +470,8 @@ fn cf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
                     as_type: Some(as_type),
                     default: cfg.default,
                     with: cfg.with,
+                    sync: cfg.sync,
+                    into: cfg.into,
                     docs: Vec::new(),
                     description: cfg.description,
                     hint: cfg.hint,
@@ -433,6 +494,9 @@ fn cf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
                         format!("generated export `{fname}` requires `as = <Type>`"),
                     ));
                 };
+                if cfg.sync.is_some() {
+                    check_live_value_type(&as_type)?;
+                }
                 mappings.push(Mapping {
                     godot_prop: fname.clone(),
                     bevy_field: Some(fname),
@@ -440,6 +504,8 @@ fn cf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
                     as_type: Some(as_type),
                     default: cfg.default,
                     with: cfg.with,
+                    sync: cfg.sync,
+                    into: cfg.into,
                     docs: Vec::new(),
                     description: cfg.description,
                     hint: cfg.hint,
@@ -484,6 +550,8 @@ fn gf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
                     as_type: None,
                     default: None,
                     with: None,
+                    sync: None,
+                    into: None,
                     docs: Vec::new(),
                     description: None,
                     hint: None,
@@ -502,7 +570,7 @@ fn gf_companion(raw: RawRequire) -> syn::Result<ComponentPlan> {
 fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
     let mut out = Vec::new();
     for (i, field) in struct_fields(input)?.into_iter().enumerate() {
-        let Some(attr) = find_bevy_attr(field) else {
+        let Some(attr) = find_bevy_attr(field)? else {
             continue;
         };
         let (godot_prop, bevy_field, tuple_index) = match &field.ident {
@@ -522,6 +590,12 @@ fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
                 "component-first field attributes require `export`, e.g. `#[gdbevy(export)]`",
             ));
         }
+        if d.sync.is_some() {
+            check_live_value_type(&field.ty)?;
+            if let Some(ty) = &d.as_type {
+                check_live_value_type(ty)?;
+            }
+        }
         out.push(Mapping {
             godot_prop,
             bevy_field,
@@ -529,6 +603,8 @@ fn collect_primary_fields(input: &DeriveInput) -> syn::Result<Vec<Mapping>> {
             as_type: d.as_type,
             default: d.default,
             with: d.with,
+            sync: d.sync,
+            into: d.into,
             docs: doc_attributes(field),
             description: d.description,
             hint: d.hint,
@@ -551,7 +627,7 @@ fn collect_field_bindings(
 
     let mut out = Vec::new();
     for field in struct_fields(input)? {
-        let Some(attr) = find_bevy_attr(field) else {
+        let Some(attr) = find_bevy_attr(field)? else {
             continue;
         };
         let name = field
@@ -583,17 +659,23 @@ fn collect_field_bindings(
                 "`description`, `hint`, and `hint_string` are only valid on generated component-first exports",
             ));
         }
+        if d.sync.is_some() {
+            check_live_value_type(&field.ty)?;
+            check_live_property(field)?;
+        }
         let mut bound = false;
         for companion in companions.iter_mut() {
             if let ComponentInit::Fields(mappings) = &mut companion.init {
                 for mapping in mappings.iter_mut().filter(|m| m.godot_prop == name) {
                     mapping.with = d.with.clone();
+                    mapping.sync = d.sync;
+                    mapping.into = d.into.clone();
                     bound = true;
                 }
             }
         }
         let Some(component) = d.component else {
-            if bound && d.with.is_some() {
+            if bound && (d.with.is_some() || d.sync.is_some()) {
                 continue;
             }
             return Err(Error::new_spanned(
@@ -611,6 +693,8 @@ fn collect_field_bindings(
                 as_type: None,
                 default: None,
                 with: d.with,
+                sync: d.sync,
+                into: d.into,
                 docs: Vec::new(),
                 description: None,
                 hint: None,
@@ -619,6 +703,153 @@ fn collect_field_bindings(
         });
     }
     Ok(out)
+}
+
+fn check_live_value_type(ty: &Type) -> syn::Result<()> {
+    match ty {
+        Type::Path(path) => {
+            for segment in &path.path.segments {
+                let name = segment.ident.to_string();
+                if matches!(
+                    name.as_str(),
+                    "Array" | "Dictionary" | "Variant" | "Gd" | "PhantomVar"
+                ) || (name.starts_with("Packed") && name.ends_with("Array"))
+                {
+                    return Err(Error::new_spanned(
+                        ty,
+                        "live property sync requires a plain value; containers, Variants and objects are unsupported",
+                    ));
+                }
+                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                    for arg in &args.args {
+                        if let syn::GenericArgument::Type(ty) = arg {
+                            check_live_value_type(ty)?;
+                        }
+                    }
+                }
+            }
+        }
+        Type::Tuple(tuple) => {
+            for ty in &tuple.elems {
+                check_live_value_type(ty)?;
+            }
+        }
+        Type::Paren(paren) => check_live_value_type(&paren.elem)?,
+        Type::Group(group) => check_live_value_type(&group.elem)?,
+        _ => {}
+    }
+    Ok(())
+}
+
+fn check_live_property(field: &Field) -> syn::Result<()> {
+    let mut stored = false;
+    for attr in &field.attrs {
+        if attr.path().is_ident("export") || attr.path().is_ident("var") {
+            stored = true;
+        }
+        if attr.path().is_ident("var") && matches!(&attr.meta, Meta::List(_)) {
+            let options = attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
+            for option in options {
+                if ["get", "set", "no_get", "no_set"]
+                    .iter()
+                    .any(|name| option.path().is_ident(name))
+                {
+                    return Err(Error::new_spanned(
+                        option,
+                        "live property sync does not support custom or disabled accessors",
+                    ));
+                }
+            }
+        }
+    }
+    if !stored {
+        return Err(Error::new_spanned(
+            field,
+            "live property sync requires an ordinary `#[export]` or `#[var]` property",
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn component_mappings(init: &ComponentInit) -> &[Mapping] {
+    match init {
+        ComponentInit::Marker => &[],
+        ComponentInit::Newtype(mapping) => std::slice::from_ref(mapping),
+        ComponentInit::Fields(mappings) => mappings,
+    }
+}
+
+fn check_live_mappings(primary: &PrimaryPlan, companions: &[ComponentPlan]) -> syn::Result<()> {
+    let components: Vec<_> = std::iter::once((&primary.path, primary.fields.as_slice()))
+        .filter(|(path, _)| !path.segments.is_empty())
+        .chain(
+            companions
+                .iter()
+                .map(|c| (&c.path, component_mappings(&c.init))),
+        )
+        .collect();
+    if !components
+        .iter()
+        .any(|(_, mappings)| mappings.iter().any(|m| m.sync.is_some()))
+    {
+        return Ok(());
+    }
+    let mut seen_components = HashSet::new();
+    for (component, mappings) in &components {
+        let name = component.to_token_stream().to_string();
+        if !seen_components.insert(name) {
+            return Err(Error::new_spanned(
+                component,
+                "a component is constructed more than once in a class with live mappings; combine its fields in one `require(...)`",
+            ));
+        }
+        for mapping in *mappings {
+            if mapping.sync.is_none() {
+                continue;
+            }
+            let targets: Vec<_> = components
+                .iter()
+                .flat_map(|(path, fields)| {
+                    fields
+                        .iter()
+                        .filter(|m| m.godot_prop == mapping.godot_prop)
+                        .map(|m| {
+                            let field = m
+                                .bevy_field
+                                .as_ref()
+                                .map(ToString::to_string)
+                                .unwrap_or_else(|| m.tuple_index.unwrap_or(0).to_string());
+                            format!("{}.{}", path.to_token_stream(), field)
+                        })
+                })
+                .collect();
+            if targets.len() > 1 {
+                return Err(Error::new(
+                    mapping.godot_prop.span(),
+                    format!(
+                        "live source `{}` has multiple Bevy destinations: {}",
+                        mapping.godot_prop,
+                        targets.join(", ")
+                    ),
+                ));
+            }
+            if mappings
+                .iter()
+                .filter(|other| {
+                    other.bevy_field == mapping.bevy_field
+                        && other.tuple_index == mapping.tuple_index
+                })
+                .count()
+                > 1
+            {
+                return Err(Error::new(
+                    mapping.godot_prop.span(),
+                    "overlapping live target fields are unsupported",
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn check_duplicate_props(primary: &PrimaryPlan, companions: &[ComponentPlan]) -> syn::Result<()> {
@@ -669,6 +900,26 @@ pub fn parse_component_first(input: &DeriveInput) -> syn::Result<ClassPlan> {
         fields: collect_primary_fields(input)?,
     };
     check_duplicate_props(&primary, &companions)?;
+    check_live_mappings(&primary, &companions)?;
+    if primary
+        .fields
+        .iter()
+        .any(|m| m.sync == Some(SyncMode::TwoWay))
+    {
+        for attr in input
+            .attrs
+            .iter()
+            .filter(|attr| attr.path().is_ident("component"))
+        {
+            let metas = attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
+            if metas.iter().any(|meta| meta.path().is_ident("immutable")) {
+                return Err(Error::new_spanned(
+                    attr,
+                    "immutable components support only `sync = to_godot`",
+                ));
+            }
+        }
+    }
 
     Ok(ClassPlan {
         godot_class,
@@ -703,6 +954,13 @@ pub fn parse_godot_first(input: &DeriveInput) -> syn::Result<ClassPlan> {
     // field-existence validation is deferred to the compiler
     let field_bindings = collect_field_bindings(input, &mut companions)?;
     companions.extend(field_bindings);
+    check_live_mappings(
+        &PrimaryPlan {
+            path: empty_path(),
+            fields: Vec::new(),
+        },
+        &companions,
+    )?;
 
     Ok(ClassPlan {
         godot_class: input.ident.clone(),
@@ -724,6 +982,17 @@ pub fn parse_godot_first(input: &DeriveInput) -> syn::Result<ClassPlan> {
 /// registering it with the `AttachComponentRegistry` via `inventory::submit!`.
 pub fn parse_attachable_component(input: &DeriveInput) -> syn::Result<TokenStream> {
     let class = &input.ident;
+    for field in struct_fields(input)? {
+        if let Some(attr) = find_bevy_attr(field)? {
+            let directives = parse_field_directives(attr)?;
+            if directives.sync.is_some() {
+                return Err(Error::new_spanned(
+                    attr,
+                    "AttachableComponent does not support live property sync",
+                ));
+            }
+        }
+    }
 
     let mut target_type: Option<Path> = None;
 

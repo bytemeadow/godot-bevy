@@ -81,6 +81,11 @@ fn setup_player(mut query: Query<(Entity, &Health, &Velocity)>) {
 }
 ```
 
+## Live property timing
+
+[Live property snapshots](custom-nodes/live-property-sync.md) are seeded before `Startup`,
+so its edits win conflicts at the first read. Later ingestion in `First` follows the same rule.
+
 ## Best Practices
 
 1. **Use `Startup` for initialization** - Scene entities are guaranteed to be ready

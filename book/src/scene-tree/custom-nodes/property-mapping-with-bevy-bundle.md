@@ -117,6 +117,8 @@ pub struct Velocity(
 | `require(prop: Comp, …)` | `as = T` | **yes** | Export type for the generated property |
 | `require(prop: Comp, …)` | `default = expr` | no | Export default |
 | `require(prop: Comp, …)` | `with = fn` | no | Conversion before constructing the component |
+| generated primary or companion field | `sync = two_way` or `sync = to_godot` | no | Opt into live synchronization |
+| generated primary or companion field | `into = fn` | with live `with` | Bevy-value → Godot-value conversion; requires `sync` |
 | generated primary or companion field | `description = "..."` | no | Property docs, registered with `register-docs` |
 | generated primary or companion field | `hint = NAME` | no | Bare Godot `PropertyHint` variant |
 | generated primary or companion field | `hint_string = expr` | no | Hint string, requires `hint` |
@@ -190,6 +192,8 @@ fields:
 | struct | `require(Comp { bevy_field: godot_field, … })` | no | Build struct component from existing exports |
 | field | `component = Comp` | for newtype bindings | Bevy component type (`Comp(value)`) |
 | field | `with = fn` | no | Godot-value → component-value conversion |
+| field | `sync = two_way` or `sync = to_godot` | no | Opt into live synchronization |
+| field | `into = fn` | with live `with` | Bevy-value → Godot-value conversion; requires `sync` |
 
 Godot-first classes own their gdext declaration, so use gdext's native
 `#[var(hint = ..., hint_string = ...)]` and Rust documentation attributes for
@@ -198,6 +202,42 @@ Inspector metadata on those fields.
 Native property descriptions also require `godot-bevy/register-docs` and Godot
 API 4.3 or later. Keep metadata on the native attributes, outside `gdbevy`.
 
-## Reserved keys
+## Live mapping grammar
 
-`into` and `sync` are reserved for the upcoming component-sync feature and will produce a compile error if used. Use only the keys documented above.
+Mappings are creation-only unless they opt into `sync`. The same directives work
+on these placements:
+
+| Placement | Example |
+| --- | --- |
+| `GodotNode` named or tuple field | `#[gdbevy(export, sync = two_way)]` |
+| Generated newtype companion | `require(speed: Speed, as = f32, sync = two_way)` |
+| Generated struct companion field | `require(stats: Stats { health(as = i32, sync = to_godot) })` |
+| `BevyComponents` newtype source | `#[gdbevy(component = Speed, sync = two_way)]` |
+| `BevyComponents` N→1 source | `#[gdbevy(sync = two_way)]` on the field named by `require(...)` |
+
+Both converter values are Rust paths, not strings or closures. A live mapping
+with `with` requires `into`. Without converters the value types must agree.
+`into` may also be supplied without `with` when no inbound conversion is needed.
+
+```rust
+{{#include ../../../../book-tests/src/live_property_sync.rs:companion}}
+```
+
+Here `LevelView.value0` maps to `Level.0`. The `ActorView` properties `speed`,
+`health`, and `mana` map to their companion fields independently.
+
+See the [Godot-first tuning example](live-property-sync.md#tune-a-field-from-godot)
+for an N→1 binding with live and creation-only fields.
+
+Each live source must feed exactly one destination. Two live mappings cannot
+write the same Bevy field; a live target cannot overlap a creation-only target
+either. Creation-only sources can still populate several destinations. Marker
+companions, unmapped fields, and `AttachableComponent` carriers cannot use
+`sync` or `into`.
+
+Godot-first live sources require a plain stored `#[export]` or `#[var]` with no
+custom getter or setter. Arrays, dictionaries, `Variant`, and objects are
+unsupported on either side, even with converters. Immutable components accept
+only `to_godot`. See
+[live property sync](live-property-sync.md) for value bounds, conversion examples,
+conflict rules, and lifecycle behavior.

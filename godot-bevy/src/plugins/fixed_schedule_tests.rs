@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_app::{App, FixedUpdate, PostStartup, PreStartup, PreUpdate, Startup, Update};
+    use bevy_app::{App, FixedUpdate, PostStartup, PostUpdate, PreStartup, PreUpdate, Startup, Update};
     use bevy_ecs::prelude::*;
     use bevy_time::TimePlugin;
 
@@ -267,6 +267,59 @@ mod tests {
         run_main_suffix(app.world_mut());
 
         assert_eq!(app.world().resource::<MarkerRuns>().0, 0);
+    }
+
+    #[test]
+    fn property_sync_split_frame_cadence() {
+        use crate::plugins::property_sync::PropertySyncSet;
+
+        #[derive(Resource, Default)]
+        struct Runs {
+            reads: usize,
+            writes: usize,
+            fixed: usize,
+        }
+
+        for paused in [false, true] {
+            let mut app = hosted_app();
+            app.init_resource::<Runs>();
+            app.add_systems(
+                PreUpdate,
+                (|mut runs: ResMut<Runs>| runs.reads += 1).in_set(PropertySyncSet::Read),
+            );
+            app.add_systems(
+                PostUpdate,
+                (|mut runs: ResMut<Runs>| runs.writes += 1).in_set(PropertySyncSet::Write),
+            );
+            app.add_systems(FixedUpdate, |mut runs: ResMut<Runs>| runs.fixed += 1);
+            if paused {
+                app.world_mut().resource_mut::<Time<Virtual>>().pause();
+            }
+            let mut started = false;
+            for fixed_steps in [0, 1, 3] {
+                *app.world_mut().resource_mut::<Runs>() = Runs::default();
+                for tick in 0..fixed_steps {
+                    run_physics_step(
+                        app.world_mut(),
+                        !started,
+                        tick == 0,
+                        Duration::from_secs_f64(1.0 / 60.0),
+                    );
+                    started = true;
+                    let runs = app.world().resource::<Runs>();
+                    assert_eq!((runs.reads, runs.writes), (1, 0));
+                }
+                run_preamble(app.world_mut(), !started, fixed_steps == 0);
+                started = true;
+                let runs = app.world().resource::<Runs>();
+                assert_eq!((runs.reads, runs.writes), (1, 0));
+                run_main_suffix(app.world_mut());
+                let runs = app.world().resource::<Runs>();
+                assert_eq!((runs.reads, runs.writes), (1, 1));
+                assert_eq!(runs.fixed, if paused { 0 } else { fixed_steps });
+                app.world_mut().clear_trackers();
+            }
+        }
     }
 
     #[test]

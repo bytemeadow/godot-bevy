@@ -63,6 +63,13 @@ built-in `ChildOf`/`Children`. If an entity appears at the wrong level:
 1. Verify the Godot node was in the scene tree when the entity was created
 2. If you reparent nodes, wait a frame for the hierarchy update to process
 
+### Inspecting live properties
+
+The remote Inspector authors Godot properties; an ECS inspector authors Bevy fields.
+[Live property sync](../scene-tree/custom-nodes/live-property-sync.md) applies its usual
+read/write and conflict rules. Internal snapshots are not registered for reflection.
+Inspector refresh intervals can delay display without changing synchronization timing.
+
 ### Performance Considerations
 
 The inspector sends data every 0.5 seconds by default. For games with thousands of entities, you may want to increase the interval or disable it in release builds:

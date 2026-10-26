@@ -14,7 +14,11 @@ pub fn emit(plan: &ClassPlan, input: &DeriveInput) -> TokenStream2 {
     if plan.emit_node_class {
         out.extend(emit_node_class(plan, input));
     }
-    out.extend(emit_autosync(plan));
+    let sync = crate::property_sync::PropertySync::new(plan, input);
+    out.extend(emit_autosync(plan, sync.as_ref()));
+    if let Some(sync) = &sync {
+        out.extend(sync.emit(&plan.godot_class));
+    }
     if let Some(trigger) = &plan.trigger {
         let sibling = collect_require_idents(&input.attrs);
         out.extend(emit_required_registration(plan, trigger, &sibling));
@@ -85,7 +89,10 @@ fn export_field(m: &Mapping, ty: Option<Type>) -> TokenStream2 {
     }
 }
 
-fn emit_autosync(plan: &ClassPlan) -> TokenStream2 {
+fn emit_autosync(
+    plan: &ClassPlan,
+    sync: Option<&crate::property_sync::PropertySync>,
+) -> TokenStream2 {
     let class = &plan.godot_class;
     let fn_name = format_ident!("__create_{}_bundle", class.to_string().to_lowercase());
 
@@ -97,6 +104,12 @@ fn emit_autosync(plan: &ClassPlan) -> TokenStream2 {
         values.push(companion_value(c));
     }
 
+    let insert = sync.map_or_else(
+        || quote!(commands.entity(entity).insert(( #(#values,)* ));),
+        |sync| sync.seed(&values),
+    );
+    let registration = sync.map_or_else(|| quote!(None), |sync| sync.registration());
+
     quote! {
         #[allow(clippy::needless_update)]
         fn #fn_name(
@@ -106,7 +119,7 @@ fn emit_autosync(plan: &ClassPlan) -> TokenStream2 {
             handle: godot_bevy::interop::GodotNodeHandle,
         ) -> bool {
             if let Some(node) = godot.try_get::<#class>(handle) {
-                commands.entity(entity).insert(( #(#values,)* ));
+                #insert
                 return true;
             }
             false
@@ -117,6 +130,7 @@ fn emit_autosync(plan: &ClassPlan) -> TokenStream2 {
                 godot_class_name: stringify!(#class),
                 godot_class_id_fn: || <#class as godot::prelude::GodotClass>::class_id(),
                 create_bundle_fn: #fn_name,
+                register_property_sync: #registration,
             }
         }
     }

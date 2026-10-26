@@ -22,6 +22,8 @@ mod input_tests;
 #[cfg(feature = "autosync-tests")]
 mod macro_redesign_tests;
 mod pause_tests;
+#[cfg(feature = "autosync-tests")]
+mod property_sync_tests;
 mod real_frame_tests;
 mod resource_handle_tests;
 mod scene_tree_tests;

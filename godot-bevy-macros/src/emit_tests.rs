@@ -97,6 +97,8 @@ mod tests {
             as_type: None,
             default: None,
             with: None,
+            sync: None,
+            into: None,
             docs: Vec::new(),
             description: None,
             hint: None,
@@ -141,6 +143,8 @@ mod tests {
             as_type: Some(parse_quote!(f32)),
             default: Some(parse_quote!(2.5)),
             with: Some(parse_quote!(to_speed)),
+            sync: None,
+            into: None,
             docs: Vec::new(),
             description: None,
             hint: None,
@@ -156,6 +160,28 @@ mod tests {
     }
 
     #[test]
+    fn live_mapping_creation_uses_only_inbound_conversion() {
+        let input = parse_quote!(
+            #[gdbevy(require(speed: Speed, as = f32, default = 2.5,
+                with = from_speed, into = to_speed, sync = to_godot))]
+            struct Player;
+        );
+        let plan = crate::bevy_attr::parse_component_first(&input).unwrap();
+        let companion = &plan.companions[0];
+        let ComponentInit::Newtype(mapping) = &companion.init else {
+            panic!("expected newtype mapping");
+        };
+        assert_eq!(
+            companion_value(companion).to_string(),
+            "Speed (from_speed (node . bind () . speed . clone ()))"
+        );
+        assert_eq!(
+            companion_default_value(mapping).to_string(),
+            "from_speed (2.5)"
+        );
+    }
+
+    #[test]
     fn primary_field_type_selects_only_the_named_field() {
         let input: DeriveInput = parse_quote! {
             struct Source { speed: f32, count: usize }
@@ -167,6 +193,8 @@ mod tests {
             as_type: None,
             default: None,
             with: None,
+            sync: None,
+            into: None,
             docs: Vec::new(),
             description: None,
             hint: None,
@@ -181,6 +209,8 @@ mod tests {
             as_type: None,
             default: None,
             with: None,
+            sync: None,
+            into: None,
             docs: Vec::new(),
             description: None,
             hint: None,
@@ -200,6 +230,8 @@ mod tests {
                 as_type: None,
                 default: None,
                 with: Some(parse_quote!(to_velocity)),
+                sync: None,
+                into: None,
                 docs: Vec::new(),
                 description: None,
                 hint: None,
@@ -323,5 +355,43 @@ mod tests {
                 assert!(!output.contains("value0"));
             }
         }
+    }
+
+    #[test]
+    fn live_fields_share_class_state_and_system_pair() {
+        let input = parse_quote! {
+            #[gdbevy(class_name = View)]
+            struct Stats {
+                #[gdbevy(export, sync = two_way)]
+                health: i32,
+                #[gdbevy(export, sync = to_godot)]
+                speed: f32,
+            }
+        };
+        let out = crate::godot_node::derive_godot_node_component(input)
+            .unwrap()
+            .to_string();
+        assert!(out.contains("__ViewPropertySync"));
+        assert_eq!(out.matches("PropertySyncSet :: Read").count(), 1);
+        assert_eq!(out.matches("PropertySyncSet :: Write").count(), 1);
+        assert_eq!(out.matches("bind_mut ()").count(), 1);
+        assert!(out.contains("register_property_sync : Some"));
+        assert!(!out.contains("Reflect"));
+        assert!(!out.contains("NonSend"));
+    }
+
+    #[test]
+    fn unsynced_class_has_no_property_state_or_systems() {
+        let input = parse_quote! {
+            struct Stats {
+                #[gdbevy(export)]
+                health: i32,
+            }
+        };
+        let out = crate::godot_node::derive_godot_node_component(input)
+            .unwrap()
+            .to_string();
+        assert!(!out.contains("PropertySync"));
+        assert!(!out.contains("add_systems"));
     }
 }

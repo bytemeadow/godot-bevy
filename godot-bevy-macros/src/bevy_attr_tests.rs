@@ -246,7 +246,8 @@ mod tests {
                     #[gdbevy(#directives)]
                     path: GString,
                 }
-            }).unwrap();
+            })
+            .unwrap();
             assert!(parse_godot_first(&di).is_err());
         }
     }
@@ -425,32 +426,372 @@ mod tests {
     }
 
     #[test]
-    fn sync_key_is_reserved() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode)]
-            #[gdbevy(require(speed: Speed, as = f32, sync = two_way))]
-            struct Player;
-        };
+    fn live_sync_accepts_generated_mapping_placements() {
+        for definition in [
+            quote!(
+                struct Player {
+                    #[gdbevy(export, sync = two_way)]
+                    speed: f32,
+                }
+            ),
+            quote!(
+                struct Player(#[gdbevy(export, sync = to_godot)] f32);
+            ),
+            quote!(
+                #[gdbevy(require(speed: Speed, as = f32, sync = two_way))]
+                struct Player;
+            ),
+            quote!(
+                #[gdbevy(require(stats: Stats { speed(as = f32, sync = to_godot) }))]
+                struct Player;
+            ),
+            quote!(
+                struct Player {
+                    #[gdbevy(export, sync = two_way, with = from_speed, into = conversions::to_speed)]
+                    speed: f32,
+                }
+            ),
+            quote!(
+                struct Player {
+                    #[gdbevy(export, sync = to_godot, into = to_speed)]
+                    speed: f32,
+                }
+            ),
+        ] {
+            let input = syn::parse2(definition).unwrap();
+            let plan = parse_component_first(&input).unwrap();
+            let mapping = plan
+                .primary
+                .fields
+                .first()
+                .unwrap_or_else(|| &component_mappings(&plan.companions[0].init)[0]);
+            assert!(mapping.sync.is_some());
+            if let Some(with) = &mapping.with {
+                assert!(with.is_ident("from_speed"));
+                let into = mapping.into.as_ref().unwrap();
+                assert_eq!(quote!(#into).to_string(), "conversions :: to_speed");
+            }
+        }
+    }
+
+    #[test]
+    fn live_sync_accepts_godot_first_newtype_and_n_to_one() {
+        for definition in [
+            quote!(
+                struct Player {
+                    #[export]
+                    #[gdbevy(component = Speed, sync = two_way)]
+                    speed: f32,
+                }
+            ),
+            quote!(
+                #[gdbevy(require(Stats { speed: speed, health: health }))]
+                struct Player {
+                    #[var(rename = velocity)]
+                    #[gdbevy(sync = two_way, with = from_speed, into = to_speed)]
+                    speed: f32,
+                    #[export(range = (0.0, 100.0))]
+                    #[gdbevy(sync = to_godot)]
+                    health: i32,
+                }
+            ),
+        ] {
+            let input = syn::parse2(definition).unwrap();
+            let plan = parse_godot_first(&input).unwrap();
+            let mappings = component_mappings(&plan.companions[0].init);
+            assert_eq!(mappings[0].sync, Some(SyncMode::TwoWay));
+            if mappings.len() == 2 {
+                assert!(mappings[0].with.as_ref().unwrap().is_ident("from_speed"));
+                assert!(mappings[0].into.as_ref().unwrap().is_ident("to_speed"));
+                assert_eq!(mappings[1].sync, Some(SyncMode::ToGodot));
+                assert!(mappings[1].with.is_none());
+                assert!(mappings[1].into.is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn live_sync_rejects_invalid_directives() {
+        for (directives, expected) in [
+            (
+                quote!(sync = from_godot),
+                "expected `two_way` or `to_godot`",
+            ),
+            (quote!(sync = two_way, sync = to_godot), "duplicate `sync`"),
+            (
+                quote!(sync = two_way, into = first, into = second),
+                "duplicate `into`",
+            ),
+            (quote!(into = convert), "`into` requires `sync`"),
+            (quote!(sync = two_way, with = convert), "requires `into`"),
+            (quote!(sync = to_godot, with = convert), "requires `into`"),
+        ] {
+            let input = syn::parse2(quote!(
+                struct Player {
+                    #[gdbevy(export, #directives)]
+                    speed: f32,
+                }
+            ))
+            .unwrap();
+            let error = parse_component_first(&input).unwrap_err().to_string();
+            assert!(error.contains(expected), "{error}");
+        }
+    }
+
+    #[test]
+    fn live_sync_rejects_split_component_first_field_attributes() {
+        for attributes in [
+            quote!(#[gdbevy(export)] #[gdbevy(sync = two_way)]),
+            quote!(#[gdbevy(export, sync = two_way)] #[gdbevy(into = convert)]),
+            quote!(#[gdbevy(sync = to_godot)] #[gdbevy(export)]),
+            quote!(#[gdbevy(export)] #[gdbevy(into = convert)]),
+        ] {
+            let input = syn::parse2(quote!(struct Player { #attributes speed: f32 })).unwrap();
+            let error = parse_component_first(&input).unwrap_err().to_string();
+            assert!(error.contains("combine"), "{error}");
+            assert!(error.contains("gdbevy"), "{error}");
+        }
+    }
+
+    #[test]
+    fn live_sync_rejects_split_godot_first_field_attributes() {
+        let input = parse_quote!(struct Player {
+            #[export]
+            #[gdbevy(component = Speed)]
+            #[gdbevy(sync = two_way)]
+            speed: f32,
+        });
+        let error = parse_godot_first(&input).unwrap_err().to_string();
+        assert!(error.contains("combine"), "{error}");
+        assert!(error.contains("gdbevy"), "{error}");
+    }
+
+    #[test]
+    fn attachable_rejects_split_live_field_attributes() {
+        let input = parse_quote!(
+            #[gdbevy(target = Speed)]
+            struct Carrier {
+                #[gdbevy]
+                #[gdbevy(sync = two_way)]
+                speed: f32,
+            }
+        );
+        let error = parse_attachable_component(&input).unwrap_err().to_string();
+        assert!(error.contains("combine"), "{error}");
+        assert!(error.contains("gdbevy"), "{error}");
+    }
+
+    #[test]
+    fn repeated_creation_only_field_attributes_keep_first_mapping() {
+        let input = parse_quote!(
+            struct Player {
+                #[gdbevy(export)]
+                #[gdbevy(default = 10.0)]
+                speed: f32,
+            }
+        );
+        let plan = parse_component_first(&input).unwrap();
+        assert!(plan.primary.fields[0].default.is_none());
+        assert!(plan.primary.fields[0].sync.is_none());
+
+        let input = parse_quote!(
+            struct Player {
+                #[export]
+                #[gdbevy(component = Speed)]
+                #[gdbevy(component = Other)]
+                speed: f32,
+            }
+        );
+        let plan = parse_godot_first(&input).unwrap();
+        assert_eq!(plan.companions.len(), 1);
+        assert!(plan.companions[0].path.is_ident("Speed"));
+    }
+
+    #[test]
+    fn live_sync_rejects_nonmapping_placements() {
+        for definition in [
+            quote!(
+                #[gdbevy(sync = two_way)]
+                struct Player;
+            ),
+            quote!(
+                #[gdbevy(require(Marker, sync = two_way))]
+                struct Player;
+            ),
+            quote!(
+                struct Player {
+                    #[gdbevy(export, sync)]
+                    speed: f32,
+                }
+            ),
+            quote!(
+                struct Player {
+                    #[gdbevy(sync = two_way)]
+                    speed: f32,
+                }
+            ),
+            quote!(
+                struct Player {
+                    #[gdbevy(export, sync = two_way, into = convert())]
+                    speed: f32,
+                }
+            ),
+        ] {
+            let input = syn::parse2(definition).unwrap();
+            assert!(parse_component_first(&input).is_err());
+        }
+        let input = parse_quote!(
+            struct Player {
+                #[export]
+                #[gdbevy(sync = two_way)]
+                speed: f32,
+            }
+        );
         assert!(
-            parse_component_first(&di)
+            parse_godot_first(&input)
                 .unwrap_err()
                 .to_string()
-                .contains("not yet available")
+                .contains("component")
         );
     }
 
     #[test]
-    fn into_key_is_reserved() {
-        let di: syn::DeriveInput = parse_quote! {
-            #[derive(Component, GodotNode)]
-            #[gdbevy(require(speed: Speed, as = f32, into = Foo))]
-            struct Player;
-        };
+    fn live_sync_rejects_nonstored_or_custom_godot_properties() {
+        for attributes in [
+            quote!(),
+            quote!(#[var(get = get_speed)]),
+            quote!(#[var(set = set_speed)]),
+            quote!(#[var(no_get)]),
+            quote!(#[var(no_set)]),
+            quote!(#[var(get)]),
+            quote!(#[var(set)]),
+        ] {
+            let input = syn::parse2(quote!(struct Player {
+                #attributes #[gdbevy(component = Speed, sync = two_way)] speed: f32,
+            }))
+            .unwrap();
+            let error = parse_godot_first(&input).unwrap_err().to_string();
+            assert!(
+                error.contains("ordinary") || error.contains("custom"),
+                "{error}"
+            );
+        }
+    }
+
+    #[test]
+    fn live_sync_rejects_reference_values() {
+        for ty in [
+            quote!(Array<i32>),
+            quote!(Dictionary),
+            quote!(Variant),
+            quote!(Gd<Node>),
+            quote!(PhantomVar<f32>),
+            quote!(PackedFloat32Array),
+        ] {
+            let input =
+                syn::parse2(quote!(struct Player { #[gdbevy(export, sync = two_way)] value: #ty }))
+                    .unwrap();
+            let error = parse_component_first(&input).unwrap_err().to_string();
+            assert!(error.contains("plain value"), "{error}");
+            let input = syn::parse2(quote!(struct Player { #[export] #[gdbevy(component = Value, sync = two_way)] value: #ty })).unwrap();
+            assert!(
+                parse_godot_first(&input)
+                    .unwrap_err()
+                    .to_string()
+                    .contains("plain value")
+            );
+        }
+    }
+
+    #[test]
+    fn live_sync_rejects_source_fanout() {
+        let input = parse_quote!(
+            #[gdbevy(require(Stats { speed: value, health: value }))]
+            struct Player {
+                #[export]
+                #[gdbevy(sync = two_way)]
+                value: f32,
+            }
+        );
+        let error = parse_godot_first(&input).unwrap_err().to_string();
+        assert!(error.contains("multiple Bevy destinations"), "{error}");
         assert!(
-            parse_component_first(&di)
+            error.contains("speed") && error.contains("health"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn live_sync_rejects_overlapping_targets_and_duplicate_components() {
+        for definition in [
+            quote!(
+                #[gdbevy(require(Stats { speed: a, speed: b }))]
+                struct Player {
+                    #[export]
+                    #[gdbevy(sync = two_way)]
+                    a: f32,
+                    #[export]
+                    b: f32,
+                }
+            ),
+            quote!(
+                #[gdbevy(require(Stats { speed: b }))]
+                struct Player {
+                    #[export]
+                    #[gdbevy(component = Stats, sync = two_way)]
+                    a: f32,
+                    b: f32,
+                }
+            ),
+        ] {
+            let input = syn::parse2(definition).unwrap();
+            let error = parse_godot_first(&input).unwrap_err().to_string();
+            assert!(
+                error.contains("overlapping") || error.contains("constructed more than once"),
+                "{error}"
+            );
+        }
+    }
+
+    #[test]
+    fn live_sync_immutable_primary_only_allows_to_godot() {
+        let input = parse_quote!(
+            #[component(immutable)]
+            struct Player {
+                #[gdbevy(export, sync = two_way)]
+                speed: f32,
+            }
+        );
+        assert!(
+            parse_component_first(&input)
                 .unwrap_err()
                 .to_string()
-                .contains("not yet available")
+                .contains("immutable")
+        );
+        let input = parse_quote!(
+            #[component(immutable)]
+            struct Player {
+                #[gdbevy(export, sync = to_godot)]
+                speed: f32,
+            }
+        );
+        parse_component_first(&input).unwrap();
+    }
+
+    #[test]
+    fn attachable_rejects_live_field_declarations() {
+        let input = parse_quote!(
+            #[gdbevy(target = Speed)]
+            struct Carrier {
+                #[gdbevy(sync = two_way)]
+                speed: f32,
+            }
+        );
+        assert!(
+            parse_attachable_component(&input)
+                .unwrap_err()
+                .to_string()
+                .contains("AttachableComponent")
         );
     }
 
