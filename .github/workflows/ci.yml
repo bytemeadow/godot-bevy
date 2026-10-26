@@ -301,7 +301,7 @@ jobs:
         env:
           GODOT4_BIN: godot
         run: |
-          "$GODOT4_BIN" --headless --path itest/godot \
+          python3 itest/run-godot.py "$GODOT4_BIN" --headless --path itest/godot \
             --scene res://addons/godot-bevy/test/TestRunner.tscn -- --bevy-inspector-tests
 
       - name: Run platformer integration tests

@@ -105,6 +105,10 @@ flaky, and timed-out tests exit 1; configuration and harness failures exit 2.
 
 For schedule shuffling with `--schedule-seed <u64>`, see [runner configuration](../godot-bevy-test/README.md#runner-configuration).
 
+Each Godot process has a 300-second wall-clock timeout, configurable with
+`GODOT_TIMEOUT_SECONDS`. Script and load errors fail the runner even when Godot
+exits successfully. `CARGO_TARGET_DIR` also controls the generated extension paths.
+
 `--json` writes the versioned report atomically and checkpoints it after each
 logical test. The same final JSON appears between `===ITEST_JSON_START===` and
 `===ITEST_JSON_END===` in stdout. A checkpoint left by a watchdog has

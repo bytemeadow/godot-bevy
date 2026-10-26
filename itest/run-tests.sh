@@ -171,6 +171,13 @@ if [[ -n $HARNESS_FEATURE ]]; then
     FEATURES="$FEATURES,$HARNESS_FEATURE"
 fi
 
+TARGET_DIR=${CARGO_TARGET_DIR:-$SCRIPT_DIR/../target}
+if [[ $TARGET_DIR != /* ]]; then
+    TARGET_DIR="$CALLER_DIR/$TARGET_DIR"
+fi
+
+export CARGO_TARGET_DIR="$TARGET_DIR"
+
 echo -e "${CYAN}Building godot-bevy-itest ($BUILD_TYPE)...${NC}"
 cd "$SCRIPT_DIR/rust"
 cargo build ${RELEASE_FLAG[@]+"${RELEASE_FLAG[@]}"} --features "$FEATURES"
@@ -182,14 +189,14 @@ entry_symbol = "godot_bevy_itest"
 compatibility_minimum = 4.2
 
 [libraries]
-linux.debug.x86_64 = "res://../../target/${BUILD_TYPE}/libgodot_bevy_itest.so"
-linux.release.x86_64 = "res://../../target/${BUILD_TYPE}/libgodot_bevy_itest.so"
-windows.debug.x86_64 = "res://../../target/${BUILD_TYPE}/godot_bevy_itest.dll"
-windows.release.x86_64 = "res://../../target/${BUILD_TYPE}/godot_bevy_itest.dll"
-macos.debug = "res://../../target/${BUILD_TYPE}/libgodot_bevy_itest.dylib"
-macos.release = "res://../../target/${BUILD_TYPE}/libgodot_bevy_itest.dylib"
-macos.debug.arm64 = "res://../../target/${BUILD_TYPE}/libgodot_bevy_itest.dylib"
-macos.release.arm64 = "res://../../target/${BUILD_TYPE}/libgodot_bevy_itest.dylib"
+linux.debug.x86_64 = "${TARGET_DIR}/${BUILD_TYPE}/libgodot_bevy_itest.so"
+linux.release.x86_64 = "${TARGET_DIR}/${BUILD_TYPE}/libgodot_bevy_itest.so"
+windows.debug.x86_64 = "${TARGET_DIR}/${BUILD_TYPE}/godot_bevy_itest.dll"
+windows.release.x86_64 = "${TARGET_DIR}/${BUILD_TYPE}/godot_bevy_itest.dll"
+macos.debug = "${TARGET_DIR}/${BUILD_TYPE}/libgodot_bevy_itest.dylib"
+macos.release = "${TARGET_DIR}/${BUILD_TYPE}/libgodot_bevy_itest.dylib"
+macos.debug.arm64 = "${TARGET_DIR}/${BUILD_TYPE}/libgodot_bevy_itest.dylib"
+macos.release.arm64 = "${TARGET_DIR}/${BUILD_TYPE}/libgodot_bevy_itest.dylib"
 EOF
 
 echo -e "${CYAN}Generated itest.gdextension for ${BUILD_TYPE} build${NC}"
@@ -214,7 +221,7 @@ mkdir -p "$GODOT_PROJECT_DIR/.godot"
 echo "res://itest.gdextension" > "$GODOT_PROJECT_DIR/.godot/extension_list.cfg"
 
 echo -e "${CYAN}Importing Godot project...${NC}"
-"$GODOT4_BIN" --headless --path "$GODOT_PROJECT_DIR" --import --quit || true
+python3 "$SCRIPT_DIR/run-godot.py" "$GODOT4_BIN" --headless --path "$GODOT_PROJECT_DIR" --import --quit
 
 if [[ -n ${GODOT_TEST_EXIT_CODE_PATH:-} ]]; then
     EXIT_CODE_FILE=$GODOT_TEST_EXIT_CODE_PATH
@@ -239,7 +246,7 @@ rm -f -- "$EXIT_CODE_FILE" || fail_config "could not remove stale exit file: $EX
 QUIT_AFTER=$((5000 * 10#$ITEST_REPEAT))
 echo -e "${CYAN}Running integration tests...${NC}"
 set +e
-"$GODOT4_BIN" --headless --fixed-fps 60 --path "$GODOT_PROJECT_DIR" --quit-after "$QUIT_AFTER"
+python3 "$SCRIPT_DIR/run-godot.py" "$GODOT4_BIN" --headless --fixed-fps 60 --path "$GODOT_PROJECT_DIR" --quit-after "$QUIT_AFTER"
 GODOT_STATUS=$?
 set -e
 

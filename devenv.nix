@@ -120,7 +120,7 @@ in
     '';
 
     inspector-tests.exec = ''
-      exec "''${GODOT4_BIN:-godot}" --headless --path itest/godot \
+      exec python3 itest/run-godot.py "''${GODOT4_BIN:-godot}" --headless --path itest/godot \
         --scene res://addons/godot-bevy/test/TestRunner.tscn -- --bevy-inspector-tests
     '';
 

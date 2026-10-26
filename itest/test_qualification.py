@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import platform
 import re
 import shutil
@@ -24,13 +25,14 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 SCHEMA = REPOSITORY / "itest" / "schema" / "qualification-v1.schema.json"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "qualification"
 TERMINAL_FIXTURES = FIXTURES / "terminal"
+TARGET_DIR = Path(os.environ.get("CARGO_TARGET_DIR", REPOSITORY / "target"))
 DOCTEST_LEDGER = REPOSITORY / "itest" / "qualification" / "doctests-v1.toml"
 DOCTEST_ARTIFACT = (
-    REPOSITORY / "target" / "qualification" / "latest-doctests" / "qualification-v1.json"
+    TARGET_DIR / "qualification" / "latest-doctests" / "qualification-v1.json"
 )
 ASSERTION_LEDGER = REPOSITORY / "itest" / "qualification" / "assertions-v1.toml"
 ASSERTION_ARTIFACT = (
-    REPOSITORY / "target" / "qualification" / "latest-assertions" / "qualification-v1.json"
+    TARGET_DIR / "qualification" / "latest-assertions" / "qualification-v1.json"
 )
 
 
