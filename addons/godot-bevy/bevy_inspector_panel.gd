@@ -1,344 +1,958 @@
 @tool
 extends Panel
-## Displays Bevy entities and their components in the editor when the game is running.
 
+const Proxy = preload("res://addons/godot-bevy/bevy_entity_proxy.gd")
+
+signal entity_selected(reference)
+
+var client
+var remote
 var entity_tree: Tree
 var status_label: Label
-
-# Track expanded state by entity_bits (persists across refreshes)
-var _expanded_entities: Dictionary = {}
-
-var _icon_entity: Texture2D
-var _icon_entity_godot: Texture2D
-var _icon_component: Texture2D
-
-var _icon_cache: Dictionary = {}
+var hidden_label: Label
+var remote_status: Label
+var session_selector: OptionButton
+var view_selector: OptionButton
+var search_box: LineEdit
+var show_internal: CheckBox
+var rows: Dictionary = {}
+var items: Dictionary = {}
+var hidden_count := 0
+var selected_entity: Dictionary = {}
+var selected_resource: Dictionary = {}
+var selected_state := ""
+var state_rows: Dictionary = {}
+var state_items: Dictionary = {}
+var _state_reason := ""
+var _state_read_id := -1
+var _state_serial := 0
+var _state_elapsed := 0.0
+var _view := 0
+var _entity_expansion: Dictionary = {}
+var _component_groups: Dictionary = {}
+var _component_items: Dictionary = {}
+var _component_expansion: Dictionary = {}
+var _root: TreeItem
+var _subscribed_session := -1
+var _subscription_ready := false
+var _subscription_serial := 0
+var _search_expansion: Dictionary = {}
+var _search_component_expansion: Dictionary = {}
+var _searching := false
+var _candidates: OptionButton
+var _search_serial := 0
+var _search_matches: Dictionary = {}
+var _query_ids: Array = []
+var _selection_serial := 0
+var _selecting := false
+var _proxy: RefCounted
+var proxies: Dictionary = {}
+var _remote_selection_echoes: Dictionary = {}
+var _snapshot_rows: Dictionary = {}
+var _snapshot_deltas: Array = []
+var _snapshot_index := 0
+var _pending_selection: Dictionary = {}
 
 func _ready() -> void:
-	_load_icons()
-	_setup_ui()
-
-func _load_icons() -> void:
-	var theme := EditorInterface.get_editor_theme()
-	if theme:
-		_icon_entity = theme.get_icon(&"Node", &"EditorIcons")
-		_icon_entity_godot = theme.get_icon(&"Godot", &"EditorIcons")
-		_icon_component = theme.get_icon(&"Object", &"EditorIcons")
-
-func _setup_ui() -> void:
-	name = "Bevy"
-	custom_minimum_size = Vector2(200, 200)
-
-	var main_vbox := VBoxContainer.new()
-	main_vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
-	main_vbox.add_theme_constant_override("separation", 4)
-	add_child(main_vbox)
-
-	var header := HBoxContainer.new()
-	var title := Label.new()
-	title.text = "Bevy Entities"
-	header.add_child(title)
-
-	header.add_spacer(false)
-
+	custom_minimum_size = Vector2(240, 220)
+	var box := VBoxContainer.new()
+	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(box)
+	session_selector = OptionButton.new()
+	session_selector.item_selected.connect(_choose_session)
+	box.add_child(session_selector)
+	view_selector = OptionButton.new()
+	view_selector.add_item("Entities")
+	view_selector.add_item("Resources")
+	view_selector.add_item("States")
+	view_selector.item_selected.connect(_choose_view)
+	box.add_child(view_selector)
 	status_label = Label.new()
-	status_label.text = "Waiting..."
-	status_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-	header.add_child(status_label)
-
-	main_vbox.add_child(header)
-
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status_label.text = "no running session"
+	box.add_child(status_label)
+	_candidates = OptionButton.new()
+	_candidates.hide()
+	_candidates.item_selected.connect(func(index): select_entity(_candidates.get_item_metadata(index)))
+	box.add_child(_candidates)
+	search_box = LineEdit.new()
+	search_box.placeholder_text = "Filter entities"
+	search_box.tooltip_text = "Search names, decimal entity IDs, component type paths or exact runtime node paths"
+	search_box.clear_button_enabled = true
+	if Engine.is_editor_hint():
+		search_box.right_icon = EditorInterface.get_editor_theme().get_icon("Search", "EditorIcons")
+	search_box.text_changed.connect(_search)
+	box.add_child(search_box)
+	var filters := HBoxContainer.new()
+	box.add_child(filters)
+	hidden_label = Label.new()
+	filters.add_child(hidden_label)
+	show_internal = CheckBox.new()
+	show_internal.text = "Show internal"
+	show_internal.toggled.connect(func(_value): _filter())
+	filters.add_child(show_internal)
 	entity_tree = Tree.new()
-	entity_tree.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	entity_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	entity_tree.hide_root = true
-	entity_tree.item_collapsed.connect(_on_item_collapsed)
-	main_vbox.add_child(entity_tree)
+	entity_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	entity_tree.item_selected.connect(_on_selected)
+	box.add_child(entity_tree)
+	_root = entity_tree.create_item()
+	remote_status = Label.new()
+	remote_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(remote_status)
+	visibility_changed.connect(_subscription_visibility)
+	_filter()
 
-func _on_item_collapsed(item: TreeItem) -> void:
-	var entity_bits = item.get_metadata(0)
-	if entity_bits != null:
-		_expanded_entities[entity_bits] = not item.collapsed
+func setup(debugger, adapter) -> void:
+	client = debugger
+	remote = adapter
+	client.sessions_changed.connect(_sessions_changed)
+	client.active_session_changed.connect(_session_changed)
+	client.summary_received.connect(_summary)
+	client.interval_changed.connect(_interval_changed)
+	client.connection_error.connect(func(reason): status_label.text = reason)
+	remote.selection_changed.connect(_remote_selected)
+	remote.availability_changed.connect(func(reason): remote_status.text = reason)
+	remote_status.text = remote.reason
+	_sessions_changed()
+	_session_changed(client.active_session_id)
 
-func update_entities(data: Array) -> void:
-	if not entity_tree:
+func _sessions_changed() -> void:
+	for key in proxies.keys():
+		if not proxies[key].valid_target():
+			proxies[key].invalidate()
+			proxies.erase(key)
+	session_selector.clear()
+	for id in client.sessions:
+		if client.is_session_active(id):
+			session_selector.add_item("Session %d" % (id + 1), id)
+			if id == client.active_session_id:
+				session_selector.select(session_selector.item_count - 1)
+	session_selector.disabled = session_selector.item_count == 0
+	if session_selector.disabled:
+		session_selector.add_item("no running session", -1)
+
+func _choose_session(index: int) -> void:
+	client.select_session(session_selector.get_item_id(index))
+
+func _choose_view(index: int) -> void:
+	if index == _view:
 		return
+	cancel_inspection()
+	_cancel_state_read()
+	if _view == 0:
+		for bits in items:
+			_entity_expansion[bits] = items[bits].collapsed
+		for bits in _component_groups:
+			_component_expansion[bits] = _search_component_expansion.get(bits, _component_groups[bits].collapsed)
+	_view = index
+	view_selector.select(index)
+	show_internal.visible = index == 0
+	hidden_label.visible = index == 0
+	_candidates.hide()
+	search_box.placeholder_text = ["Filter entities", "Filter resources", "Filter states"][index]
+	search_box.tooltip_text = ["Search names, decimal entity IDs, component type paths or exact runtime node paths", "Search resource type paths or decimal entity IDs", "Search state type paths"][index]
+	_sync_items()
+	if index == 0:
+		for bits in _entity_expansion:
+			if items.has(bits):
+				items[bits].collapsed = _entity_expansion[bits]
+	_search(search_box.text)
+	_update_count()
+	if index == 2:
+		_request_states()
 
-	status_label.text = "%d entities" % data.size()
-	status_label.add_theme_color_override("font_color", Color(0.5, 0.9, 0.5))
+func _session_changed(_id: int) -> void:
+	_unsubscribe()
+	_selection_serial += 1
+	_cancel_queries()
+	selected_entity = {}
+	selected_resource = {}
+	selected_state = ""
+	state_rows.clear()
+	_state_reason = ""
+	_entity_expansion.clear()
+	_component_expansion.clear()
+	_remote_selection_echoes.clear()
+	_clear_proxy()
+	_clear_proxies()
+	_search_expansion.clear()
+	_search_component_expansion.clear()
+	_search_matches.clear()
+	_searching = false
+	_candidates.hide()
+	rows.clear()
+	_sync_items()
+	if remote.last_session != _id:
+		remote.clear_selection()
+	_sessions_changed()
+	_subscription_visibility()
 
-	entity_tree.clear()
-	var tree_root: TreeItem = entity_tree.create_item()
+func _unsubscribe() -> void:
+	_cancel_state_read()
+	_subscription_ready = false
+	_subscription_serial += 1
+	if client != null and _subscribed_session != -1 and client.is_session_active(_subscribed_session):
+		client.request("godot.unsubscribe", {}, Callable(), _subscribed_session)
+	_subscribed_session = -1
+	_reset_snapshot()
 
-	# Data format: [entity_bits, name, has_godot_node, parent_bits, components]
-	var entities_by_id: Dictionary = {}
-	var children_by_parent: Dictionary = {}
+func _interval_changed() -> void:
+	_unsubscribe()
+	_subscription_visibility()
 
-	for entity_data in data:
-		if not (entity_data is Array and entity_data.size() >= 5):
-			continue
-
-		var entity_bits: int = entity_data[0]
-		var entity_name: String = entity_data[1]
-		var has_godot_node: bool = entity_data[2]
-		var parent_bits: int = entity_data[3]
-		var components: Array = entity_data[4]
-
-		entities_by_id[entity_bits] = {
-			"name": entity_name,
-			"has_godot_node": has_godot_node,
-			"parent_bits": parent_bits,
-			"components": components
-		}
-
-		if parent_bits == -1:
-			if not children_by_parent.has(-1):
-				children_by_parent[-1] = []
-			children_by_parent[-1].append(entity_bits)
-		else:
-			if not children_by_parent.has(parent_bits):
-				children_by_parent[parent_bits] = []
-			children_by_parent[parent_bits].append(entity_bits)
-
-	var tree_items: Dictionary = {}
-	_build_entity_tree(tree_root, -1, entities_by_id, children_by_parent, tree_items)
-
-func _build_entity_tree(parent_item: TreeItem, parent_bits: int, entities_by_id: Dictionary, children_by_parent: Dictionary, tree_items: Dictionary) -> void:
-	if not children_by_parent.has(parent_bits):
+func _subscription_visibility() -> void:
+	if client == null:
 		return
-
-	for entity_bits in children_by_parent[parent_bits]:
-		var info: Dictionary = entities_by_id[entity_bits]
-		var entity_item: TreeItem = entity_tree.create_item(parent_item)
-
-		var display_name: String = info["name"] if info["name"] else "Entity %d" % (entity_bits & 0xFFFFFFFF)
-
-		entity_item.set_text(0, display_name)
-		entity_item.set_metadata(0, entity_bits)
-		tree_items[entity_bits] = entity_item
-
-		var entity_icon: Texture2D = _get_entity_icon(info["components"], info["has_godot_node"])
-		if entity_icon:
-			entity_item.set_icon(0, entity_icon)
-
-		for component in info["components"]:
-			# Skip hierarchy components - already shown visually in the tree
-			if component is Dictionary:
-				var comp_short_name: String = component.get("short_name", "")
-				var comp_full_name: String = component.get("name", "")
-				if comp_short_name in ["ChildOf", "Children"] or "::ChildOf" in comp_full_name or "::Children" in comp_full_name:
-					continue
-			_add_component_item(entity_item, component)
-
-		_build_entity_tree(entity_item, entity_bits, entities_by_id, children_by_parent, tree_items)
-
-		var has_children: bool = info["components"].size() > 0 or children_by_parent.has(entity_bits)
-		if has_children:
-			var is_expanded: bool = _expanded_entities.get(entity_bits, false)
-			entity_item.collapsed = not is_expanded
-
-func _add_component_item(parent_item: TreeItem, component) -> void:
-	var comp_item: TreeItem = entity_tree.create_item(parent_item)
-
-	# Handle both old format (string) and new format (dictionary)
-	var full_name: String
-	var short_name: String
-	var component_value = null
-
-	if component is Dictionary:
-		full_name = component.get("name", "Unknown")
-		short_name = component.get("short_name", "")
-		component_value = component.get("value", null)
-	else:
-		full_name = str(component)
-		short_name = ""
-
-	# Fallback: extract short name from full path if not provided
-	if short_name.is_empty():
-		var last_sep: int = full_name.rfind("::")
-		if last_sep >= 0:
-			short_name = full_name.substr(last_sep + 2)
+	if not is_visible_in_tree() or not client.is_session_active(client.active_session_id):
+		_unsubscribe()
+		if client.active_session_id == -1:
+			status_label.text = "no running session"
+		return
+	if not client.config_ready:
+		var reason: String = client.sessions[client.active_session_id].error
+		status_label.text = reason if not reason.is_empty() else "Connecting…"
+		return
+	if _subscribed_session == client.active_session_id:
+		return
+	_subscribed_session = client.active_session_id
+	var session := _subscribed_session
+	var serial := _subscription_serial
+	status_label.text = "Connecting…"
+	client.request("godot.subscribe", {"interval_s": client.update_interval}, func(frame):
+		if session != _subscribed_session or serial != _subscription_serial:
+			return
+		if frame.has("error"):
+			status_label.text = frame.error.message
+			_subscribed_session = -1
 		else:
-			short_name = full_name
+			_subscription_ready = true
+	, session)
+	if _view == 2:
+		_request_states()
 
-	var display_text: String = short_name
-	if component_value != null:
-		var value_str: String = _format_value(component_value)
-		if value_str:
-			display_text = "%s: %s" % [short_name, value_str]
+func _cancel_state_read() -> void:
+	_state_serial += 1
+	if client != null and _state_read_id != -1:
+		client.cancel_request(_state_read_id)
+	_state_read_id = -1
+	_state_elapsed = 0.0
 
-	comp_item.set_text(0, display_text)
-	comp_item.set_tooltip_text(0, full_name)
-	comp_item.set_custom_color(0, Color(0.6, 0.8, 1.0))
-
-	var icon: Texture2D = _get_component_icon(short_name)
-	if icon:
-		comp_item.set_icon(0, icon)
-
-	if component_value is Dictionary and component_value.has("fields"):
-		_add_fields(comp_item, component_value)
-
-func _get_icon(icon_name: String) -> Texture2D:
-	if _icon_cache.has(icon_name):
-		return _icon_cache[icon_name]
-
-	var theme := EditorInterface.get_editor_theme()
-	if theme:
-		var icon: Texture2D = theme.get_icon(icon_name, &"EditorIcons")
-		_icon_cache[icon_name] = icon
-		return icon
-
-	_icon_cache[icon_name] = null
-	return null
-
-func _get_entity_icon(components: Array, has_godot_node: bool) -> Texture2D:
-	# Look for the most specific marker component to determine the Godot node type
-	# (e.g., prefer Sprite2D over Node2D over CanvasItem over Node)
-	var best_node_type: StringName = &""
-
-	for component in components:
-		if not component is Dictionary:
-			continue
-
-		var short_name: String = component.get("short_name", "")
-
-		# Fallback: extract short name from full path if not provided
-		if short_name.is_empty():
-			var full_name: String = component.get("name", "")
-			var last_sep: int = full_name.rfind("::")
-			if last_sep >= 0:
-				short_name = full_name.substr(last_sep + 2)
+func _request_states() -> void:
+	if _state_read_id != -1 or _view != 2 or client == null or _subscribed_session == -1:
+		return
+	var session: int = client.active_session_id
+	var incarnation: int = client.sessions.get(session, {}).get("order", -1)
+	var serial := _state_serial
+	_state_read_id = client.request("godot.list_states", {}, func(frame):
+		if serial != _state_serial or session != client.active_session_id or incarnation != client.sessions.get(session, {}).get("order", -1):
+			return
+		_state_read_id = -1
+		if frame.has("error"):
+			_state_reason = frame.error.message
+			_update_count()
+			return
+		state_rows.clear()
+		for row in frame.result.states:
+			state_rows[row.type_path] = row
+		_state_reason = str(frame.result.reason) if frame.result.get("reason") != null else ""
+		for key in proxies.keys():
+			var proxy = proxies[key]
+			if proxy.target_kind != "state":
+				continue
+			var row: Dictionary = state_rows.get(proxy.target_type, {})
+			if row.is_empty() or row.state_entity != proxy.state_descriptor.state_entity or row.next_state_entity != proxy.state_descriptor.next_state_entity:
+				proxy.invalidate()
+				proxies.erase(key)
 			else:
-				short_name = full_name
+				proxy.configure_state(row)
+		_sync_items()
+		_update_count()
+	, session)
 
-		if short_name.ends_with("Marker"):
-			var node_type: StringName = StringName(short_name.substr(0, short_name.length() - 6))
+func _summary(session_id: int, params: Dictionary) -> void:
+	if session_id == _subscribed_session and _subscription_ready:
+		apply_summary(params)
 
-			if best_node_type.is_empty():
-				best_node_type = node_type
-			elif ClassDB.is_parent_class(node_type, best_node_type):
-				# node_type is more specific (node_type inherits from best_node_type)
-				best_node_type = node_type
-
-	if not best_node_type.is_empty():
-		var icon: Texture2D = _get_icon(best_node_type)
-		if icon:
-			return icon
-
-	if has_godot_node:
-		return _icon_entity_godot
-
-	return _icon_entity
-
-func _get_component_icon(short_name: String) -> Texture2D:
-	match short_name:
-		"Transform", "GlobalTransform", "Transform2D", "Transform3D":
-			return _get_icon("Transform3D")
-		"GodotNodeHandle":
-			return _icon_entity_godot
-		"Visibility", "InheritedVisibility", "ViewVisibility":
-			return _get_icon("GuiVisibilityVisible")
-		"Mesh", "Mesh2d", "Mesh3d", "Handle<Mesh>":
-			return _get_icon("MeshInstance3D")
-		"Camera", "Camera2d", "Camera3d":
-			return _get_icon("Camera3D")
-		"AudioPlayer", "AudioSink", "SpatialAudioSink":
-			return _get_icon("AudioStreamPlayer")
-		"Name":
-			return _get_icon("String")
-		"TransformSyncMetadata":
-			return _get_icon("VisualShaderNodeComment")
-		"Groups":
-			return _get_icon("Groups")
-		"TransformTreeChanged":
-			return _get_icon("StatusWarning")
-
-	if short_name.ends_with("Marker"):
-		var node_type: String = short_name.substr(0, short_name.length() - 6)
-		var icon: Texture2D = _get_icon(node_type)
-		if icon:
-			return icon
-
-	return _icon_component
-
-func _add_fields(parent_item: TreeItem, value_dict: Dictionary) -> void:
-	var fields = value_dict.get("fields")
-	if fields == null:
+func apply_summary(params: Dictionary) -> void:
+	if params.get("subscription_ended", false):
+		_subscribed_session = -1
+		_end_subscription(params.get("reason", "Subscription ended"))
 		return
+	var pending: Dictionary = {}
+	var removed: Array = params.get("removed", []).duplicate()
+	if params.get("snapshot", false):
+		var index: int = params.get("snapshot_index", 0)
+		if index == 0:
+			_reset_snapshot()
+			_cancel_queries()
+			if not params.get("snapshot_complete", true):
+				cancel_inspection()
+		if index != _snapshot_index:
+			_end_subscription("Snapshot interrupted: missing or out-of-order data")
+			return
+		for row in params.get("added", []):
+			_snapshot_rows[row.entity.bits] = row
+		_snapshot_index += 1
+		if not params.get("snapshot_complete", true):
+			status_label.text = "Loading snapshot (%d entities received)…" % _snapshot_rows.size()
+			return
+		for delta in _snapshot_deltas:
+			_apply_delta(_snapshot_rows, delta)
+			removed.append_array(delta.get("removed", []))
+		rows = _snapshot_rows
+		pending = _pending_selection
+		_reset_snapshot()
+	elif _snapshot_index > 0:
+		_snapshot_deltas.append(params)
+		return
+	else:
+		_apply_delta(rows, params)
+	_sync_resource_proxies()
+	_sync_items()
+	_search(search_box.text)
+	_update_count()
+	_sync_entity_proxies(removed)
+	if not pending.is_empty() and client != null and pending.session == client.active_session_id:
+		_ensure_selection(pending.reference, pending.session, pending.inspect)
 
-	if fields is Dictionary:
-		for field_name in fields:
-			var field_value = fields[field_name]
-			var field_item: TreeItem = entity_tree.create_item(parent_item)
-			var display: String = "%s: %s" % [field_name, _format_value(field_value)]
-			field_item.set_text(0, display)
-			field_item.set_custom_color(0, Color(0.8, 0.8, 0.6))
+func _update_count() -> void:
+	if _view == 0:
+		status_label.text = "%d entities" % rows.size()
+	elif _view == 2:
+		status_label.text = _state_reason if not _state_reason.is_empty() else "%d states" % state_rows.size()
+	else:
+		var count := 0
+		for row in rows.values():
+			if row.get("resource") is Dictionary:
+				count += 1
+		status_label.text = "%d resources" % count
 
-			if field_value is Dictionary and field_value.has("fields"):
-				_add_fields(field_item, field_value)
-	elif fields is Array:
-		for i in range(fields.size()):
-			var field_value = fields[i]
-			var field_item: TreeItem = entity_tree.create_item(parent_item)
-			var display: String = "[%d]: %s" % [i, _format_value(field_value)]
-			field_item.set_text(0, display)
-			field_item.set_custom_color(0, Color(0.8, 0.8, 0.6))
+func _sync_resource_proxies() -> void:
+	for key in proxies.keys():
+		var proxy = proxies[key]
+		if proxy.target_kind != "resource":
+			continue
+		var row: Dictionary = rows.get(proxy.entity.bits, {})
+		if row.get("entity") != proxy.entity or not row.get("resource") is Dictionary or row.resource.type_path != proxy.target_type:
+			proxy.invalidate()
+			proxies.erase(key)
+		else:
+			proxy.set_resource_present(row.resource.present, false)
 
-func _format_value(value) -> String:
-	if value == null:
+func _sync_entity_proxies(removed: Array) -> void:
+	for reference in removed:
+		for key in proxies.keys():
+			var proxy = proxies[key]
+			if proxy.target_kind == "entity" and proxy.entity.bits == reference.bits:
+				proxy.invalidate()
+				proxies.erase(key)
+				if _proxy == proxy:
+					_clear_proxy()
+		if selected_entity.get("bits") == reference.bits:
+			cancel_inspection()
+			selected_entity = {}
+			status_label.text = "Entity not available in this session"
+
+func _end_subscription(reason: String) -> void:
+	_unsubscribe()
+	cancel_inspection()
+	_search(search_box.text)
+	status_label.text = "%s. Reopen the pane to retry." % reason
+
+func _reset_snapshot() -> void:
+	_snapshot_rows = {}
+	_snapshot_deltas.clear()
+	_snapshot_index = 0
+	_pending_selection = {}
+
+func _apply_delta(target: Dictionary, params: Dictionary) -> void:
+	for reference in params.get("removed", []):
+		target.erase(reference.bits)
+	for row in params.get("added", []) + params.get("updated", []):
+		target[row.entity.bits] = row
+
+func _sync_items() -> void:
+	var scroll := entity_tree.get_scroll()
+	var selected = entity_tree.get_selected()
+	# Freeing and reparenting items makes the Tree emit item_selected on its own; that is not a
+	# user selection and must not overwrite selected_entity.
+	var was_selecting := _selecting
+	_selecting = true
+	var selected_bits = selected.get_metadata(0) if selected != null else null
+	var resource_labels: Dictionary = {}
+	for row in rows.values():
+		if row.get("resource") is Dictionary:
+			var label: String = Proxy.component_label(row.resource.type_path)
+			resource_labels[label] = resource_labels.get(label, 0) + 1
+	# Move surviving descendants before freeing a removed parent.
+	for bits in items.keys():
+		if not rows.has(bits):
+			for child in items[bits].get_children():
+				if child == _component_groups.get(bits):
+					continue
+				items[bits].remove_child(child)
+				_root.add_child(child)
+			_component_groups.erase(bits)
+			_component_items.erase(bits)
+			_component_expansion.erase(bits)
+			_search_component_expansion.erase(bits)
+			_search_expansion.erase(bits)
+			items[bits].free()
+			items.erase(bits)
+	for bits in rows:
+		if not items.has(bits):
+			items[bits] = entity_tree.create_item(_root)
+			items[bits].collapsed = true
+			if not search_box.text.is_empty():
+				_search_expansion[bits] = true
+		var item: TreeItem = items[bits]
+		var row: Dictionary = rows[bits]
+		item.set_metadata(0, bits)
+		item.set_text(0, row.name if not row.name.is_empty() else "Entity " + bits)
+		item.set_tooltip_text(0, bits + "\n" + "\n".join(row.components))
+		item.set_icon(0, _entity_icon(row))
+		_sync_component_items(bits, row)
+		if _view == 1 and row.get("resource") is Dictionary:
+			var label: String = Proxy.component_label(row.resource.type_path)
+			if resource_labels[label] > 1:
+				label = row.resource.type_path
+			item.set_text(0, label + ("" if row.resource.present else " (Absent)"))
+			item.set_tooltip_text(0, row.resource.type_path + "\nEntity " + bits)
+	var parents: Dictionary = {}
+	for bits in rows:
+		var parent = rows[bits].get("parent")
+		var parent_item = _root
+		if _view == 0 and parent is Dictionary and items.has(parent.bits) and not _has_cycle(bits):
+			parent_item = items[parent.bits]
+		parents[bits] = parent_item
+		var item: TreeItem = items[bits]
+		if item.get_parent() != parent_item and item.get_parent() != _root:
+			item.get_parent().remove_child(item)
+			_root.add_child(item)
+	for bits in items:
+		var item: TreeItem = items[bits]
+		if item.get_parent() != parents[bits]:
+			item.get_parent().remove_child(item)
+			parents[bits].add_child(item)
+	if selected_bits != null and items.has(selected_bits) and entity_tree.get_selected() != items[selected_bits]:
+		items[selected_bits].deselect(0)
+		items[selected_bits].select(0)
+	_selecting = was_selecting
+	_restore_scroll.call_deferred(scroll)
+	_sync_state_items()
+	_filter()
+
+func _sync_component_items(bits: String, row: Dictionary) -> void:
+	if _view != 0:
+		if _component_groups.has(bits):
+			_component_groups[bits].free()
+			_component_groups.erase(bits)
+			_component_items.erase(bits)
+		return
+	if not _component_groups.has(bits):
+		var new_group := entity_tree.create_item(items[bits], 0)
+		new_group.set_selectable(0, false)
+		new_group.collapsed = _component_expansion.get(bits, true)
+		_component_groups[bits] = new_group
+		_component_items[bits] = {}
+		if not search_box.text.is_empty() and not _search_component_expansion.has(bits):
+			_search_component_expansion[bits] = new_group.collapsed
+	var group: TreeItem = _component_groups[bits]
+	var components: Dictionary = _component_items[bits]
+	var types: Array = row.components.duplicate()
+	types.sort()
+	group.set_text(0, "Components (%d)" % types.size())
+	var labels: Dictionary = {}
+	for component in types:
+		var label: String = Proxy.component_label(component)
+		labels[label] = labels.get(label, 0) + 1
+	for component in components.keys():
+		if component not in types:
+			components[component].free()
+			components.erase(component)
+	for index in types.size():
+		var component: String = types[index]
+		if not components.has(component):
+			components[component] = entity_tree.create_item(group, index)
+		var item: TreeItem = components[component]
+		var label: String = Proxy.component_label(component)
+		item.set_text(0, (component if labels[label] > 1 else label).replace("/", "∕"))
+		item.set_metadata(0, bits)
+		var reason = row.get("unsupported_components", {}).get(component)
+		item.set_tooltip_text(0, component if reason == null else component + "\n" + str(reason))
+		item.set_icon(0, _component_icon(label))
+
+func _sync_state_items() -> void:
+	var was_selecting := _selecting
+	_selecting = true
+	for type_path in state_items.keys():
+		if not state_rows.has(type_path):
+			state_items[type_path].free()
+			state_items.erase(type_path)
+	var labels: Dictionary = {}
+	for type_path in state_rows:
+		var label: String = Proxy.component_label(type_path)
+		labels[label] = labels.get(label, 0) + 1
+	for type_path in state_rows:
+		if not state_items.has(type_path):
+			state_items[type_path] = entity_tree.create_item(_root)
+		var item: TreeItem = state_items[type_path]
+		var row: Dictionary = state_rows[type_path]
+		var label: String = Proxy.component_label(type_path)
+		item.set_metadata(0, type_path)
+		item.set_text(0, (type_path if labels[label] > 1 else label) + ("" if row.present else " (Absent)"))
+		item.set_tooltip_text(0, type_path if row.get("reason") == null else type_path + "\n" + str(row.reason))
+	_selecting = was_selecting
+
+func _restore_scroll(scroll: Vector2) -> void:
+	for child in entity_tree.get_children(true):
+		if child is VScrollBar:
+			child.value = scroll.y
+		elif child is HScrollBar:
+			child.value = scroll.x
+
+func _has_cycle(bits: String) -> bool:
+	var seen: Dictionary = {}
+	while rows.has(bits):
+		if seen.has(bits):
+			return true
+		seen[bits] = true
+		var parent = rows[bits].get("parent")
+		if not parent is Dictionary:
+			return false
+		bits = parent.bits
+	return false
+
+static func internal(row: Dictionary) -> bool:
+	if not row.get("name", "").is_empty() or row.get("has_node", false) or row.get("parent") != null:
+		return false
+	if "bevy_ecs::name::Name" in row.components:
+		return false
+	if "bevy_ecs::resource::IsResource" in row.components or "bevy_ecs::observer::Observer" in row.components:
+		return true
+	for component in row.components:
+		if not component.begins_with("bevy_ecs::"):
+			return false
+	return true
+
+func _entity_icon(row: Dictionary) -> Texture2D:
+	if not Engine.is_editor_hint():
+		return null
+	var theme := EditorInterface.get_editor_theme()
+	var icon := _entity_icon_name(row, theme)
+	return theme.get_icon(icon, "EditorIcons") if not icon.is_empty() else null
+
+func _entity_icon_name(row: Dictionary, theme: Theme) -> String:
+	if not row.has_node:
+		for icon in ["Object", "Resource", "Circle"]:
+			if theme.has_icon(icon, "EditorIcons"):
+				return icon
 		return ""
+	var best := ""
+	for component in row.components:
+		var short: String = component.get_slice("::", component.get_slice_count("::") - 1)
+		if short.ends_with("Marker"):
+			var type = short.trim_suffix("Marker")
+			if not ClassDB.class_exists(type) or not ClassDB.is_parent_class(type, "Node") or not theme.has_icon(type, "EditorIcons"):
+				continue
+			if best.is_empty() or ClassDB.is_parent_class(type, best):
+				best = type
+	if best.is_empty():
+		for icon in ["Node", "Godot"]:
+			if theme.has_icon(icon, "EditorIcons"):
+				return icon
+	return best
 
-	if value is bool:
-		return "true" if value else "false"
+func _component_icon(label: String) -> Texture2D:
+	if not Engine.is_editor_hint():
+		return null
+	var icon := "Object"
+	match label:
+		"Transform", "GlobalTransform", "Transform2D", "Transform3D":
+			icon = "Transform3D"
+		"GodotNodeHandle":
+			icon = "Godot"
+		"Visibility", "InheritedVisibility", "ViewVisibility":
+			icon = "GuiVisibilityVisible"
+		"Mesh", "Mesh2d", "Mesh3d", "Handle<Mesh>":
+			icon = "MeshInstance3D"
+		"Camera", "Camera2d", "Camera3d":
+			icon = "Camera3D"
+		"AudioPlayer", "AudioSink", "SpatialAudioSink":
+			icon = "AudioStreamPlayer"
+		"Name":
+			icon = "String"
+		"TransformSyncMetadata":
+			icon = "VisualShaderNodeComment"
+		"Groups":
+			icon = "Groups"
+		"TransformTreeChanged":
+			icon = "StatusWarning"
+		_:
+			if label.ends_with("Marker"):
+				icon = label.trim_suffix("Marker")
+	var theme := EditorInterface.get_editor_theme()
+	if not theme.has_icon(icon, "EditorIcons"):
+		icon = "Object"
+	return theme.get_icon(icon, "EditorIcons") if theme.has_icon(icon, "EditorIcons") else null
 
-	if value is int:
-		return str(value)
+func _cancel_queries() -> void:
+	_search_serial += 1
+	if client != null:
+		for id in _query_ids:
+			client.cancel_request(id)
+	_query_ids.clear()
 
-	if value is float:
-		# Format floats nicely - avoid excessive precision
-		if abs(value) < 0.0001 and value != 0.0:
-			return String.num(value, 6)
-		return "%.3f" % value if fmod(value, 1.0) != 0.0 else "%.1f" % value
+func _search(text: String) -> void:
+	if text.is_empty() and _searching:
+		for bits in _search_expansion:
+			if items.has(bits):
+				items[bits].collapsed = _search_expansion[bits]
+		for bits in _search_component_expansion:
+			if _component_groups.has(bits):
+				_component_groups[bits].collapsed = _search_component_expansion[bits]
+			_component_expansion[bits] = _search_component_expansion[bits]
+		_search_expansion.clear()
+		_search_component_expansion.clear()
+	elif not text.is_empty() and not _searching:
+		for bits in items:
+			if not _search_expansion.has(bits):
+				_search_expansion[bits] = items[bits].collapsed
+		for bits in _component_groups:
+			if not _search_component_expansion.has(bits):
+				_search_component_expansion[bits] = _component_groups[bits].collapsed
+	_searching = not text.is_empty()
+	_cancel_queries()
+	_search_matches.clear()
+	_filter()
+	if _view == 2 or text.is_empty() or _snapshot_index > 0 or client == null or client.active_session_id == -1:
+		return
+	var filters: Array = []
+	if _view == 1:
+		filters.append({"resource": true} if text.is_valid_int() else {"resource": true, "name_contains": text})
+	elif text.is_valid_int():
+		filters.append({})
+	elif text.contains("/"):
+		filters.append({"node_path": text})
+	else:
+		var types: Dictionary = {}
+		if text.contains("::"):
+			types[text] = true
+		for row in rows.values():
+			for component in row.components:
+				if component.to_lower().contains(text.to_lower()):
+					types[component] = true
+		for component in types:
+			filters.append({"component": component})
+	for params in filters:
+		_query_page(params, 0, _search_serial, text)
 
-	if value is String:
-		return '"%s"' % value
+func _query_page(filter: Dictionary, page: int, serial: int, text: String) -> void:
+	var params = filter.duplicate()
+	params.merge({"page": page, "page_size": 256})
+	var id = client.request("godot.query", params, func(frame):
+		if serial != _search_serial:
+			return
+		if frame.has("error"):
+			status_label.text = frame.error.message
+			return
+		for row in frame.result.entities:
+			if not text.is_valid_int() or row.entity.bits.contains(text):
+				_search_matches[row.entity.bits] = true
+		_filter()
+		if (page + 1) * 256 < frame.result.total:
+			_query_page(filter, page + 1, serial, text)
+	)
+	_query_ids.append(id)
 
-	if value is Dictionary:
-		var type_name: String = value.get("type", "")
+func _filter() -> void:
+	if entity_tree == null:
+		return
+	hidden_count = 0
+	var visible_bits: Dictionary = {}
+	var text := search_box.text.to_lower()
+	for type_path in state_items:
+		state_items[type_path].visible = _view == 2 and (text.is_empty() or type_path.to_lower().contains(text))
+	if _view == 2:
+		for item in items.values():
+			item.visible = false
+		if state_items.has(selected_state) and state_items[selected_state].visible:
+			_selecting = true
+			state_items[selected_state].select(0)
+			_selecting = false
+		return
+	for bits in rows:
+		var row: Dictionary = rows[bits]
+		if _view == 1:
+			var resource = row.get("resource")
+			if resource is Dictionary and (text.is_empty() or resource.type_path.to_lower().contains(text) or bits.contains(text) or _search_matches.has(bits)):
+				visible_bits[bits] = true
+			continue
+		var component_match := false
+		for component in _component_items[bits]:
+			var matches: bool = component.to_lower().contains(text)
+			_component_items[bits][component].visible = text.is_empty() or matches
+			component_match = component_match or matches
+		var group: TreeItem = _component_groups[bits]
+		group.visible = text.is_empty() or component_match
+		if not text.is_empty():
+			group.collapsed = false if component_match else _search_component_expansion.get(bits, true)
+		if internal(row) and not show_internal.button_pressed:
+			continue
+		if text.is_empty() or component_match or row.name.to_lower().contains(text) or _search_matches.has(bits):
+			if not text.is_empty() and component_match:
+				items[bits].collapsed = false
+			var current: String = bits
+			var seen: Dictionary = {}
+			while rows.has(current) and not seen.has(current):
+				seen[current] = true
+				visible_bits[current] = true
+				var parent = rows[current].get("parent")
+				if not parent is Dictionary:
+					break
+				current = parent.bits
+				if not text.is_empty() and items.has(current):
+					items[current].collapsed = false
+	for bits in items:
+		items[bits].visible = visible_bits.has(bits)
+		if internal(rows[bits]) and not items[bits].visible and not show_internal.button_pressed:
+			hidden_count += 1
+	hidden_label.text = "%d internal hidden" % (0 if show_internal.button_pressed else hidden_count)
+	# Hiding a selected TreeItem clears the Tree's selection; restore it once visible again.
+	var selection: Dictionary = selected_resource.get("entity", {}) if _view == 1 else selected_entity
+	var selected_bits: String = selection.get("bits", "")
+	if items.has(selected_bits) and items[selected_bits].visible and entity_tree.get_selected() != items[selected_bits]:
+		_selecting = true
+		items[selected_bits].deselect(0)
+		items[selected_bits].select(0)
+		_selecting = false
 
-		match type_name:
-			"struct":
-				var fields = value.get("fields", {})
-				if fields.size() <= 3:
-					var parts: Array = []
-					for key in fields:
-						parts.append("%s: %s" % [key, _format_value(fields[key])])
-					return "{ %s }" % ", ".join(parts)
-				return "{ %d fields }" % fields.size()
-			"tuple_struct", "tuple":
-				var fields = value.get("fields", [])
-				if fields.size() <= 3:
-					var parts: Array = []
-					for f in fields:
-						parts.append(_format_value(f))
-					return "(%s)" % ", ".join(parts)
-				return "(%d items)" % fields.size()
-			"enum":
-				var variant: String = value.get("variant", "?")
-				var fields = value.get("fields", {})
-				if fields.is_empty():
-					return variant
-				return "%s { ... }" % variant
-			"list", "array":
-				var items = value.get("items", [])
-				return "[%d items]" % items.size()
-			"map":
-				return "{%d entries}" % value.get("len", 0)
-			"set":
-				return "{%d items}" % value.get("len", 0)
-			"opaque":
-				return value.get("debug", "?")
+func _on_selected() -> void:
+	if _selecting or entity_tree.get_selected() == null:
+		return
+	var bits = entity_tree.get_selected().get_metadata(0)
+	if _view == 2:
+		select_state(bits)
+		return
+	if rows.has(bits):
+		if _view == 1:
+			select_resource(rows[bits].entity)
+		else:
+			select_entity(rows[bits].entity)
 
-		return str(value)
+func select_resource(reference: Dictionary) -> void:
+	cancel_inspection()
+	var row: Dictionary = rows.get(reference.bits, {})
+	if row.get("entity") != reference or not row.get("resource") is Dictionary:
+		status_label.text = "Resource not available in this session"
+		return
+	selected_resource = {"entity": reference.duplicate(), "type_path": row.resource.type_path}
+	_selecting = true
+	items[reference.bits].select(0)
+	_selecting = false
+	if client != null:
+		_inspect_proxy(reference, client.active_session_id, "resource", row.resource.type_path)
 
-	return str(value)
+func select_state(type_path: String) -> void:
+	cancel_inspection()
+	if not state_rows.has(type_path):
+		status_label.text = "State not available in this session"
+		return
+	selected_state = type_path
+	_selecting = true
+	state_items[type_path].select(0)
+	_selecting = false
+	var row: Dictionary = state_rows[type_path]
+	if client != null:
+		_inspect_proxy(row.state_entity if row.state_entity is Dictionary else {}, client.active_session_id, "state", type_path)
+
+func cancel_inspection() -> void:
+	_selection_serial += 1
+	_pending_selection = {}
+	if remote != null:
+		remote.cancel_selection()
+
+func select_entity(reference: Dictionary, inspect: bool = true) -> void:
+	cancel_inspection()
+	if _view != 0:
+		_choose_view(0)
+	var bits: String = reference.bits
+	if not rows.has(bits):
+		if client != null:
+			_ensure_selection(reference, client.active_session_id, inspect)
+		return
+	if rows[bits].entity != reference:
+		status_label.text = "Entity not available in this session"
+		return
+	if inspect or not items[bits].visible:
+		if internal(rows[bits]):
+			show_internal.button_pressed = true
+		if not items[bits].visible:
+			search_box.text = ""
+			_search("")
+		items[bits].uncollapse_tree()
+		entity_tree.scroll_to_item(items[bits])
+	selected_entity = reference.duplicate()
+	_selecting = true
+	var ancestor: TreeItem = items[bits].get_parent()
+	while ancestor != null and ancestor != _root:
+		ancestor.collapsed = false
+		ancestor = ancestor.get_parent()
+	items[bits].select(0)
+	_selecting = false
+	entity_selected.emit(reference)
+	if not inspect or client == null:
+		return
+	var serial := _selection_serial
+	var session: int = client.active_session_id
+	if rows[bits].has_node:
+		var components: Array = []
+		for component in rows[bits].components:
+			if component.ends_with("::GodotNodeHandle"):
+				components.append(component)
+		client.request("godot.get_components", {"entity": reference, "components": components}, func(frame):
+			if serial != _selection_serial or session != client.active_session_id:
+				return
+			if frame.has("error"):
+				status_label.text = frame.error.message
+				return
+			var handled := false
+			for value in frame.result.values():
+				if value.kind == "node" and value.valid:
+					handled = true
+					var key := "%d:%s" % [session, value.instance_id]
+					_remote_selection_echoes[key] = serial
+					var selected: bool = await remote.select_node(value.instance_id, session)
+					if selected:
+						# Godot 4.6 queues objects_selected from Tree.set_selected.
+						_forget_remote_echo.call_deferred(key, serial)
+					else:
+						_forget_remote_echo(key, serial)
+					if not selected and serial == _selection_serial and session == client.active_session_id:
+						_inspect_proxy(reference, session)
+			if not handled and serial == _selection_serial and session == client.active_session_id:
+				_inspect_proxy(reference, session)
+		)
+	else:
+		_inspect_proxy(reference, session)
+
+func _forget_remote_echo(key: String, serial: int) -> void:
+	if _remote_selection_echoes.get(key) == serial:
+		_remote_selection_echoes.erase(key)
+
+func _inspect_proxy(reference: Dictionary, session: int, kind: String = "entity", type_path: String = "") -> void:
+	_clear_proxy()
+	_proxy = proxy_for(reference, session, kind, type_path)
+	if Engine.is_editor_hint():
+		EditorInterface.inspect_object(_proxy)
+		_proxy.attach_inspector(EditorInterface.get_inspector())
+	_proxy.refresh()
+
+func proxy_for(reference: Dictionary, session: int, kind: String = "entity", type_path: String = ""):
+	var incarnation: int = client.sessions.get(session, {}).get("order", -1)
+	var next = state_rows.get(type_path, {}).get("next_state_entity") if kind == "state" else null
+	var key := JSON.stringify([session, incarnation, reference.get("bits"), reference.get("generation"), kind, type_path, next])
+	for cached in proxies.keys():
+		if not proxies[cached].valid_target():
+			proxies[cached].invalidate()
+			proxies.erase(cached)
+	if not proxies.has(key):
+		var proxy = Proxy.new(reference, session, kind, type_path)
+		proxy.configure(client)
+		if kind == "state":
+			proxy.configure_state(state_rows[type_path])
+		var resource = rows.get(reference.get("bits", ""), {}).get("resource")
+		if kind == "resource" and resource is Dictionary and resource.type_path == type_path:
+			proxy.set_resource_present(resource.present, false)
+		proxy.entity_link.connect(func(target): select_entity(target))
+		proxy.node_link.connect(func(id):
+			if remote != null:
+				remote.select_node(id, session))
+		proxies[key] = proxy
+	return proxies[key]
+
+func _process(delta: float) -> void:
+	for proxy in proxies.values():
+		proxy.advance(delta)
+	if _view == 2 and is_visible_in_tree() and client != null:
+		_state_elapsed += delta
+		if _state_elapsed >= client.update_interval:
+			_state_elapsed = 0.0
+			_request_states()
+
+func _clear_proxies() -> void:
+	for proxy in proxies.values():
+		proxy.invalidate()
+	proxies.clear()
+
+func _clear_proxy() -> void:
+	if _proxy != null and Engine.is_editor_hint() and EditorInterface.get_inspector().get_edited_object() == _proxy:
+		EditorInterface.inspect_object(null)
+	_proxy = null
+
+func _remote_selected(ids: Array, session: int) -> void:
+	if ids.size() != 1 or not client.is_session_active(session):
+		return
+	var key := "%d:%s" % [session, ids[0]]
+	if _remote_selection_echoes.has(key):
+		_remote_selection_echoes.erase(key)
+		return
+	client.select_session(session)
+	cancel_inspection()
+	var serial := _selection_serial
+	client.request("godot.entity_for_node", {"instance_id": ids[0]}, func(frame):
+		if session == client.active_session_id and serial == _selection_serial and not frame.has("error"):
+			_ensure_selection(frame.result, session, false)
+	, session)
+
+func shutdown() -> void:
+	_unsubscribe()
+	_cancel_queries()
+	_selection_serial += 1
+	_remote_selection_echoes.clear()
+	if remote != null:
+		remote.cancel_selection()
+	_clear_proxy()
+	_clear_proxies()
+	selected_entity = {}
+	selected_resource = {}
+	selected_state = ""
+	state_rows.clear()
+	rows.clear()
+	_sync_items()
+	status_label.text = "no running session"
+
+func show_candidates(candidates: Array) -> void:
+	_candidates.clear()
+	_candidates.visible = not candidates.is_empty()
+	status_label.text = "no entity" if candidates.is_empty() else "%d runtime candidates: choose an entity" % candidates.size()
+	for candidate in candidates:
+		var row = rows.get(candidate.bits, {})
+		_candidates.add_item("%s (%s)" % [row.get("name", "Entity"), candidate.bits])
+		_candidates.set_item_metadata(_candidates.item_count - 1, candidate)
+	_candidates.select(-1)
+
+func _ensure_selection(reference: Dictionary, session: int, inspect: bool) -> void:
+	if rows.has(reference.bits):
+		select_entity(reference, inspect)
+	elif _snapshot_index == 0:
+		_query_selection(reference, session, inspect, 0, _selection_serial)
+	else:
+		_pending_selection = {"reference": reference.duplicate(), "session": session, "inspect": inspect}
+
+func _query_selection(reference: Dictionary, session: int, inspect: bool, page: int, serial: int) -> void:
+	client.request("godot.query", {"page": page, "page_size": 256}, func(frame):
+		if session != client.active_session_id or serial != _selection_serial or frame.has("error"):
+			return
+		for row in frame.result.entities:
+			rows[row.entity.bits] = row
+		if (page + 1) * 256 < frame.result.total:
+			_query_selection(reference, session, inspect, page + 1, serial)
+		else:
+			_sync_items()
+			if rows.has(reference.bits):
+				select_entity(reference, inspect)
+			else:
+				status_label.text = "Entity not available in this session"
+	, session)

@@ -32,7 +32,10 @@ After the initial parse, the library continues to listen for scene tree changes 
 - **`write_scene_tree_messages`** - Receives events from Godot (via an mpsc channel) and writes them to Bevy's event system
 - **`read_scene_tree_messages`** - Processes those events to create/update/remove entities
 
-This separation allows other systems to also react to `SceneTreeEvent`s if needed.
+`write_scene_tree_messages` runs before the reader. The reader belongs to
+`SceneTreeSet::Apply`; order systems after that set to see its deferred entity changes.
+Event-bridge, signal, and inspector request drains run after `SceneTreeSet::Apply`
+and `TimeSystems`, so they observe the current scene tree and time.
 
 Detaching a node with `remove_child()` preserves the node and its descendants. Once
 removal messages are processed, ordinary mirror entities are despawned.

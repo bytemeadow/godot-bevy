@@ -92,3 +92,9 @@ selected scenario is its own, because the core rejects a run where an installed 
 not list the scenario. An adapter that sets a capability verdict (`audio`, `physical_input`,
 `synthetic_input`, `browser`) owns `itest/capture/<name>/` with `schema/extension.json`,
 `schema/validate.py`, `verdict.py` and its unit tests; CI runs those tests from the lint job.
+
+The entity viewer's platformer scenarios add `level-speed-control` and `level-speed-edit`
+(expected pass), plus `level-speed-edit-wrong-position` (expected failure on frame-30 player x).
+See `itest/capture/debugger/README.md` for the shared initial velocity, endpoint acknowledgement
+and predicted resting positions. Include all three in a run to compare the same motion with
+and without a speed edit.

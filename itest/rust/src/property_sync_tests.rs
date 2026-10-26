@@ -16,6 +16,7 @@ use godot_bevy_test::prelude::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Component, Default, Reflect, GodotNode)]
+#[reflect(Component)]
 #[gdbevy(class_name = PropertySyncNode)]
 struct SyncedProperties {
     #[gdbevy(export, default = 10, sync = two_way)]
@@ -165,6 +166,104 @@ fn property_sync_bevy_wins() {
         assert_eq!(properties(&app, entity).health, 51);
         node.free();
     }
+}
+
+#[cfg(feature = "test-frame-signal")]
+#[itest]
+fn property_sync_inspector_edit_wins_without_echo(ctx: &TestContext) {
+    use godot_bevy::plugins::debugger::{DebuggerEndpoint, DebuggerTransport, Wire};
+    use std::sync::mpsc::channel;
+
+    let (mut app, mut node, entity) = setup();
+    ctx.scene_tree
+        .get_tree()
+        .get_root()
+        .unwrap()
+        .add_child(&node);
+    let (tx, rx) = channel();
+    app.register_type::<SyncedProperties>()
+        .insert_resource(DebuggerTransport::new(move |frame| {
+            tx.send(frame).unwrap();
+        }))
+        .add_plugins(GodotDebuggerPlugin)
+        .init_resource::<Observed>()
+        .add_systems(
+            PreUpdate,
+            (|changed: Query<(), Changed<SyncedProperties>>, mut seen: ResMut<Observed>| {
+                seen.0.push(changed.iter().count() as i32);
+            })
+            .after(PropertySyncSet::Read),
+        );
+    cycle(&mut app);
+    app.world_mut().resource_mut::<Observed>().0.clear();
+    *app.world_mut().resource_mut::<PropertySyncCounters>() = default();
+    rx.try_iter().for_each(drop);
+
+    node.set("health", &99.to_variant());
+    let request = Wire::object([
+        ("jsonrpc", Wire::String("2.0".into())),
+        ("id", Wire::Integer(1)),
+        ("method", Wire::String("godot.mutate_leaf".into())),
+        (
+            "params",
+            Wire::object([
+                (
+                    "entity",
+                    Wire::object([
+                        ("bits", Wire::String(entity.to_bits().to_string())),
+                        (
+                            "generation",
+                            Wire::Integer(i64::from(entity.generation().to_bits())),
+                        ),
+                    ]),
+                ),
+                (
+                    "component",
+                    Wire::String(SyncedProperties::type_path().into()),
+                ),
+                (
+                    "path",
+                    Wire::Array(vec![Wire::object([(
+                        "field",
+                        Wire::String("health".into()),
+                    )])]),
+                ),
+                ("value", Wire::Integer(51)),
+            ]),
+        ),
+    ]);
+    assert!(
+        app.world()
+            .non_send::<DebuggerEndpoint>()
+            .submit(request.to_variant().to())
+    );
+    app.world_mut().run_schedule(First);
+    let replies = rx.try_iter().collect::<Vec<_>>();
+    assert_eq!(replies.len(), 1);
+    assert_eq!(replies[0].get("id"), Some(&Wire::Integer(1)));
+    assert!(replies[0].get("error").is_none(), "{:?}", replies[0]);
+    assert_eq!(
+        replies[0].get("result").unwrap().get("value"),
+        Some(&Wire::Integer(51))
+    );
+    assert_eq!(properties(&app, entity).health, 51);
+    assert_eq!(node.get("health").to::<i32>(), 99);
+    app.world_mut().run_schedule(PreUpdate);
+    assert_eq!(properties(&app, entity).health, 51);
+    assert_eq!(app.world().resource::<PropertySyncCounters>().writes, 0);
+    app.world_mut().run_schedule(PostUpdate);
+    assert_eq!(node.get("health").to::<i32>(), 51);
+    assert_eq!(app.world().resource::<PropertySyncCounters>().writes, 1);
+    app.world_mut().clear_trackers();
+
+    app.world_mut().run_schedule(First);
+    cycle(&mut app);
+    assert!(rx.try_recv().is_err());
+    assert_eq!(properties(&app, entity).health, 51);
+    assert_eq!(node.get("health").to::<i32>(), 51);
+    assert_eq!(app.world().resource::<PropertySyncCounters>().writes, 1);
+    assert_eq!(app.world().resource::<Observed>().0, [1, 0]);
+    node.free();
 }
 
 #[itest]

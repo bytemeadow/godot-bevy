@@ -1,5 +1,5 @@
 use crate::app::BevyApp;
-use crate::plugins::scene_tree::plugin::SceneTreeIngestion;
+use crate::plugins::scene_tree::SceneTreeSet;
 use crate::plugins::signals::{SignalDispatch, SignalEnvelope};
 use bevy_app::{App, First};
 use bevy_ecs::event::Event;
@@ -63,7 +63,7 @@ pub(crate) fn ensure_event_channel(app: &mut App) {
         First,
         drain_and_trigger_events
             .in_set(EventBridgeSet::Drain)
-            .after(SceneTreeIngestion)
+            .after(SceneTreeSet::Apply)
             .after(bevy_time::TimeSystems),
     );
 }

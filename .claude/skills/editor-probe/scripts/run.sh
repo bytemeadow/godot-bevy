@@ -54,14 +54,33 @@ def run_project(project, probes, log):
     project_file = project / "project.godot"
     imports = {path: path.read_bytes() if path.is_file() else None
                for path in import_status(project)}
+    # Playing a scene makes 4.6 re-save it with unique_id attributes; keep a copy of every
+    # tracked scene that was clean on entry so the run leaves no source churn behind.
+    scenes = {}
+    for path in project.rglob("*.tscn"):
+        status = subprocess.run(["git", "-C", str(repo), "status", "--porcelain=v1", "--", str(path)],
+                                capture_output=True, text=True).stdout
+        if not status.strip():
+            scenes[path] = path.read_bytes()
     editor = None
     with tempfile.TemporaryDirectory(prefix="editor-probe-") as temporary:
         backup = Path(temporary) / "project.godot"
         shutil.copy2(project_file, backup)
+        # Godot restores dock placement by name from this file, which would override the
+        # addon's chosen slot and make dock assertions depend on earlier runs.
+        layout = project / ".godot" / "editor" / "editor_layout.cfg"
+        layout_backup = Path(temporary) / "editor_layout.cfg"
+        if layout.is_file():
+            shutil.copy2(layout, layout_backup)
+            layout.unlink()
         try:
             addon.mkdir(parents=True)
             scene.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(here / "plugin.gd", addon / "plugin.gd")
+            debugger_mode = probes[0].get("mode") == "debugger"
+            script = "debugger_plugin.gd" if debugger_mode else "plugin.gd"
+            shutil.copy2(here / script, addon / "plugin.gd")
+            if debugger_mode:
+                shutil.copy2(here / "debugger_runtime.gd", addon / "runtime.gd")
             (addon / "probe.json").write_text(json.dumps(probes))
             (addon / "plugin.cfg").write_text(
                 '[plugin]\nname="editor_probe"\ndescription="temporary editor probe"\n'
@@ -83,6 +102,14 @@ def run_project(project, probes, log):
                 text = text[:section.start(1)] + settings + text[section.end(1):]
             else:
                 text += f"\n[editor_plugins]\n\nenabled=PackedStringArray({entry})\n"
+            if debugger_mode:
+                autoload = 'EntityViewerProbe="*res://addons/editor_probe/runtime.gd"\n'
+                if "EntityViewerProbe=" in text:
+                    raise ValueError("temporary EntityViewerProbe autoload already exists")
+                if "[autoload]" in text:
+                    text = text.replace("[autoload]", "[autoload]\n" + autoload, 1)
+                else:
+                    text += "\n[autoload]\n\n" + autoload
             project_file.write_text(text)
             offset = log.tell()
             print(f"editor-probe: project={project.relative_to(repo)} probes={len(probes)}", flush=True)
@@ -109,10 +136,26 @@ def run_project(project, probes, log):
             if timed_out or len(verdicts) != len(probes) or "EDITOR_PROBE complete" not in output:
                 print(f"editor-probe: {reason}", file=sys.stderr)
                 return 5
+            evidence_errors = []
+            if debugger_mode:
+                for checkpoint in probes[0].get("layout_checkpoints", []):
+                    path = Path(probes[0]["shots"]) / f"{checkpoint}.png"
+                    if f"EDITOR_PROBE checkpoint={checkpoint}\n" not in output:
+                        evidence_errors.append(f"missing checkpoint: {checkpoint}")
+                    if not path.is_file() or path.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
+                        evidence_errors.append(f"missing PNG: {path}")
+            if "SCRIPT ERROR:" in output or "Parse Error:" in output:
+                evidence_errors.append("editor reported a script or parse error")
+            if evidence_errors:
+                print(f"editor-probe: {json.dumps(evidence_errors)}", file=sys.stderr)
+                return max(4, *map(int, verdicts))
             return max(map(int, verdicts))
         finally:
             stop(editor)
             shutil.copy2(backup, project_file)
+            if layout_backup.is_file():
+                layout.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(layout_backup, layout)
             shutil.rmtree(addon, ignore_errors=True)
             scene.unlink(missing_ok=True)
             scene_uid.unlink(missing_ok=True)
@@ -124,6 +167,9 @@ def run_project(project, probes, log):
                 if data is None:
                     path.unlink(missing_ok=True)
                 else:
+                    path.write_bytes(data)
+            for path, data in scenes.items():
+                if path.is_file() and path.read_bytes() != data:
                     path.write_bytes(data)
 
 
@@ -144,11 +190,20 @@ def main():
     for probe in probes:
         if not isinstance(probe, dict):
             raise ValueError(f"probe must be a JSON object: {probe}")
+        if probe.get("mode", "class") not in ("class", "debugger"):
+            raise ValueError(f"unknown probe mode: {probe['mode']}")
+        if probe.get("mode") == "debugger":
+            probe = dict(probe, **{"class": "debugger", "property": "Entities", "value": None})
         for key in ("project", "class", "property", "shots"):
             if not isinstance(probe.get(key), str) or not probe[key]:
                 raise ValueError(f"probe requires a non-empty {key}: {probe}")
         if "value" not in probe or not isinstance(probe.get("expect", {}), dict):
             raise ValueError(f"probe requires value and expect must be an object: {probe}")
+        checkpoints = probe.get("layout_checkpoints", [])
+        if (not isinstance(checkpoints, list) or
+                any(not isinstance(name, str) or not re.fullmatch(r"[a-z0-9-]+", name)
+                    for name in checkpoints) or len(set(checkpoints)) != len(checkpoints)):
+            raise ValueError("layout_checkpoints must be unique screenshot names")
         if not Path(probe["shots"]).is_absolute():
             raise ValueError(f"shots must be an absolute path: {probe['shots']}")
         project = (repo / probe["project"]).resolve()
@@ -156,11 +211,14 @@ def main():
             raise ValueError(f"project must be relative to the repo root: {probe['project']}")
         if not (project / "project.godot").is_file():
             raise ValueError(f"missing project.godot: {project}")
-        projects.setdefault(project, []).append(probe)
+        key = (project, probe.get("mode", "class"))
+        if key[1] == "debugger" and key in projects:
+            raise ValueError("only one debugger probe per project is supported")
+        projects.setdefault(key, []).append(probe)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     result = 0
     with log_path.open("w+") as log:
-        for project, probes in projects.items():
+        for (project, _mode), probes in projects.items():
             result = max(result, run_project(project, probes, log))
     return result
 

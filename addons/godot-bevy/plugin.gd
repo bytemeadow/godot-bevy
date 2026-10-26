@@ -11,6 +11,9 @@ var wizard_dialog: Window
 var _should_restart_after_build: bool = false
 var _bevy_debugger: EditorDebuggerPlugin = null
 var _bevy_inspector: Control = null
+var _component_inspector: EditorInspectorPlugin
+var _remote_tree: Node
+var _local_selection_serial := 0
 
 func _enable_plugin():
 	add_autoload_singleton(AUTOLOAD_NAME, AUTOLOAD_PATH)
@@ -29,20 +32,24 @@ func _enter_tree():
 	var inspector_scene = load(BEVY_INSPECTOR_SCENE) as PackedScene
 	if inspector_scene:
 		_bevy_inspector = inspector_scene.instantiate()
-		add_control_to_dock(EditorPlugin.DOCK_SLOT_LEFT_UR, _bevy_inspector)
+		add_control_to_dock(EditorPlugin.DOCK_SLOT_LEFT_BL, _bevy_inspector)
 		print("godot-bevy: Bevy Inspector panel added to dock")
 	else:
 		push_error("godot-bevy: Failed to load Bevy Inspector scene")
+		return
 
-	var debugger_script = load(BEVY_DEBUGGER_SCRIPT)
-	if debugger_script:
-		_bevy_debugger = debugger_script.new()
-		if _bevy_inspector:
-			_bevy_debugger.inspector_panel = _bevy_inspector
-		add_debugger_plugin(_bevy_debugger)
-		print("godot-bevy: Bevy Debugger plugin registered")
-	else:
-		push_error("godot-bevy: Failed to load Bevy Debugger plugin")
+	_bevy_debugger = load(BEVY_DEBUGGER_SCRIPT).new()
+	_remote_tree = preload("res://addons/godot-bevy/bevy_remote_tree.gd").new()
+	add_child(_remote_tree)
+	_remote_tree.pane = _bevy_inspector
+	_bevy_inspector.setup(_bevy_debugger.client, _remote_tree)
+	_component_inspector = preload("res://addons/godot-bevy/bevy_inspector_plugin.gd").new()
+	_component_inspector.client = _bevy_debugger.client
+	_component_inspector.pane = _bevy_inspector
+	_component_inspector.remote = _remote_tree
+	add_inspector_plugin(_component_inspector)
+	add_debugger_plugin(_bevy_debugger)
+	EditorInterface.get_selection().selection_changed.connect(_local_selection_changed)
 
 	print("godot-bevy plugin activated!")
 
@@ -50,17 +57,56 @@ func _exit_tree():
 	remove_tool_menu_item("Setup godot-bevy Project")
 	remove_tool_menu_item("Build Rust Project")
 
+	var selection = EditorInterface.get_selection()
+	if selection.selection_changed.is_connected(_local_selection_changed):
+		selection.selection_changed.disconnect(_local_selection_changed)
+	if _component_inspector:
+		_component_inspector.shutdown()
+		remove_inspector_plugin(_component_inspector)
+		_component_inspector = null
+	if is_instance_valid(_bevy_inspector):
+		_bevy_inspector.shutdown()
+	if _bevy_debugger:
+		_bevy_debugger.shutdown()
+		remove_debugger_plugin(_bevy_debugger)
+		_bevy_debugger = null
+	if is_instance_valid(_remote_tree):
+		_remote_tree.free()
 	if is_instance_valid(_bevy_inspector):
 		remove_control_from_docks(_bevy_inspector)
 		_bevy_inspector.free()
 		_bevy_inspector = null
 
-	if _bevy_debugger:
-		remove_debugger_plugin(_bevy_debugger)
-		_bevy_debugger = null
-
 	if wizard_dialog:
 		wizard_dialog.queue_free()
+
+func _process(delta: float) -> void:
+	if _bevy_debugger != null:
+		_bevy_debugger.client.advance(delta)
+
+func _local_selection_changed() -> void:
+	_bevy_inspector.cancel_inspection()
+	_local_selection_serial += 1
+	var serial := _local_selection_serial
+	if _bevy_debugger.client.active_session_id == -1:
+		return
+	var selected = EditorInterface.get_selection().get_selected_nodes()
+	var root = EditorInterface.get_edited_scene_root()
+	if selected.size() != 1 or root == null or root.scene_file_path.is_empty():
+		return
+	var session: int = _bevy_debugger.client.active_session_id
+	_bevy_debugger.client.request("godot.resolve_node", {
+		"scene_path": String(root.scene_file_path), "node_path": String(root.get_path_to(selected[0]))
+	}, func(frame):
+		if serial != _local_selection_serial or session != _bevy_debugger.client.active_session_id:
+			return
+		if frame.has("error"):
+			_bevy_inspector.status_label.text = frame.error.message
+		elif frame.result.candidates.size() == 1:
+			_bevy_inspector.select_entity(frame.result.candidates[0], false)
+		else:
+			_bevy_inspector.show_candidates(frame.result.candidates)
+	, session)
 
 func _on_setup_project():
 	if not wizard_dialog:

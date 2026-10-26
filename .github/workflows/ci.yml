@@ -185,6 +185,7 @@ jobs:
               - 'Cargo.lock'
             itest:
               - 'itest/**'
+              - 'addons/**'
               - 'examples/platformer-2d/**'
               - 'examples/dodge-the-creeps-2d/**'
               - '.github/workflows/ci.yml'
@@ -293,6 +294,15 @@ jobs:
           seed=$(od -An -N8 -tu8 /dev/urandom | tr -d ' ')
           echo "Schedule seed: $seed"
           ./run-tests.sh --schedule-seed "$seed" --json ../target/itest-shuffled.json
+
+      - name: Run inspector GDScript tests
+        if: matrix.profile == 'debug'
+        timeout-minutes: 10
+        env:
+          GODOT4_BIN: godot
+        run: |
+          python3 itest/run-godot.py "$GODOT4_BIN" --headless --path itest/godot \
+            --scene res://addons/godot-bevy/test/TestRunner.tscn -- --bevy-inspector-tests
 
       - name: Run platformer integration tests
         env:
