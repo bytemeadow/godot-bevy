@@ -82,7 +82,9 @@ func configure(target, property: String) -> void:
 		add_focusable(line)
 		line.text_changed.connect(func(value):
 			if not _updating:
-				proxy.set_candidate(property_name, value, line.caret_column, line.get_selection_from_column(), line.get_selection_to_column()))
+				proxy.set_candidate(property_name, value, line.caret_column,
+					line.get_selection_from_column() if line.has_selection() else 0,
+					line.get_selection_to_column() if line.has_selection() else 0))
 		line.gui_input.connect(_text_input_event)
 		line.focus_entered.connect(func(): proxy.states[property_name].focused = true)
 		line.focus_exited.connect(func(): _focus_exited.call_deferred())
@@ -148,5 +150,5 @@ func _exit_tree() -> void:
 		var state: Dictionary = proxy.states[property_name]
 		if state.dirty:
 			state.caret = line.caret_column
-			state.selection_from = line.get_selection_from_column()
-			state.selection_to = line.get_selection_to_column()
+			state.selection_from = line.get_selection_from_column() if line.has_selection() else 0
+			state.selection_to = line.get_selection_to_column() if line.has_selection() else 0

@@ -5,6 +5,8 @@ var proxy
 var _column_reference: WeakRef
 
 func _ready() -> void:
+	add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	draw_focus_border = false
 	horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	proxy.sections_repaired.connect(_bind_columns)

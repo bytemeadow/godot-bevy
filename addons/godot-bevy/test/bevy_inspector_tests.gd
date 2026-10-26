@@ -1142,7 +1142,8 @@ func _proxy_edits() -> void:
 		check(proxy.get(number) == 0.125, "getter reads accepted cache")
 	check(fake.frames.is_empty(), "getter performs no RPC")
 	var states: Array = []
-	proxy.field_changed.connect(func(name): states.append([name, proxy.states[name].pending]))
+	var observe_pending := func(name): states.append([name, proxy.states[name].pending])
+	proxy.field_changed.connect(observe_pending)
 	check(proxy._set(number, 0.001), "set returns handled locally")
 	check(proxy.states[number].pending and states == [[number, true]] and proxy.get(number) == 0.125, "submission publishes pending in the same frame and preserves accepted cache")
 	check(fake.frames[0].params == {"entity": Fixtures.entity_ref("1"), "component": "game::Speed", "path": [], "value": 0.001}, "proxy sends exact unquantized mutation frame")
@@ -1171,6 +1172,7 @@ func _proxy_edits() -> void:
 	check(fake.frames.size() == sent and proxy.states[number].status == "InspectorReadOnly", "read-only attempts keep reason and send nothing")
 	proxy.invalidate()
 	check(fake.callbacks.is_empty(), "invalidating proxy cancels owned requests")
+	proxy.field_changed.disconnect(observe_pending)
 	completed.append("proxy edits")
 
 func _proxy_ownership(host: Node) -> void:
@@ -1366,9 +1368,10 @@ func _state_requests() -> void:
 	proxy.set("state@current", "Playing")
 	check(fake.frames.size() == sent, "Current cannot submit a transition")
 	var pending: Array = []
-	proxy.field_changed.connect(func(name):
+	var observe_pending := func(name):
 		if name == "state@request":
-			pending.append(proxy.states[name].pending))
+			pending.append(proxy.states[name].pending)
+	proxy.field_changed.connect(observe_pending)
 	proxy.set("state@request", "Playing")
 	var request: int = proxy.states["state@request"].request
 	check(proxy.states["state@request"].pending and pending[0] and proxy.get("state@current") == "Menu", "transition submission is pending immediately and leaves Current alone")
@@ -1396,6 +1399,7 @@ func _state_requests() -> void:
 	check(proxy.detached and proxy.get("state@current") == "Menu", "late transition acknowledgements cannot revive detached state proxies")
 	for frame in fake.frames:
 		check(frame.method != "godot.mutate_leaf", "state requests never use generic leaf mutation")
+	proxy.field_changed.disconnect(observe_pending)
 	completed.append("state requests")
 
 func _state_catalogue_cancellation(host: Node) -> void:

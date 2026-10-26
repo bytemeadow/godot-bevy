@@ -145,6 +145,7 @@ an absolute `shots` directory. Prepare the platformer's extension first, then ru
 devenv shell -- .claude/skills/editor-probe/scripts/run.sh --manifest .claude/skills/editor-probe/manifests/debugger.json
 ```
 
+The probe fixes the editor window at 1920 × 1080 so dock-resize checks have room to run.
 This mode launches the game through `EditorInterface.play_main_scene`, drives the real
 Entities pane, checks default filtering and search, selects MainMenu in Remote, checks the
 Bevy Inspector section, and edits Player's Speed through its numeric property editor. A stale path forces a

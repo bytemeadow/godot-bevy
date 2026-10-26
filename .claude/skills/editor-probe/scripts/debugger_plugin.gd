@@ -113,6 +113,8 @@ func _has_component(section, suffix: String) -> bool:
 	return false
 
 func _run() -> void:
+	get_window().mode = Window.MODE_WINDOWED
+	get_window().size = Vector2i(1920, 1080)
 	await get_tree().process_frame
 	for node in EditorInterface.get_base_control().find_children("Entities", "Panel", true, false):
 		if node.get_script() == load("res://addons/godot-bevy/bevy_inspector_panel.gd"):
@@ -553,6 +555,7 @@ func _layout_checkpoints(section) -> void:
 	var wide_offsets := offsets.duplicate()
 	wide_offsets[split.index] += split.direction * 180
 	split.control.set_split_offsets(wide_offsets)
+	split.control.clamp_split_offset(split.index)
 	for i in 4:
 		await get_tree().process_frame
 	_check(outer.size.x >= default_width + 100.0, "wide checkpoint actually widens the Inspector by at least 100 pixels")
