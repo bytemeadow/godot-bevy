@@ -1,5 +1,5 @@
 use crate::interop::{GodotAccess, GodotNodeHandle};
-use crate::plugins::scene_tree::plugin::SceneTreeIngestion;
+use crate::plugins::scene_tree::SceneTreeSet;
 use bevy_app::{App, First, Last, Plugin};
 use bevy_ecs::{
     component::Component,
@@ -194,7 +194,7 @@ where
             app.add_systems(
                 First,
                 drain_and_trigger_signals
-                    .after(SceneTreeIngestion)
+                    .after(SceneTreeSet::Apply)
                     .after(bevy_time::TimeSystems),
             );
         }

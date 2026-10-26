@@ -231,7 +231,7 @@ fn current_and_both_pending_forms_are_read_separately_without_a_schedule() {
     let row = catalogue(&mut app).remove(0);
     for next in [
         NextState::Pending(Mode::Playing),
-        NextState::PendingIfNeq(Mode::Playing),
+        NextState::PendingIfDifferent(Mode::Playing),
     ] {
         app.insert_resource(next);
         for _ in 0..3 {
@@ -379,7 +379,7 @@ fn requests_refuse_to_overwrite_the_game_queue() {
     let row = catalogue(&mut app).remove(0);
     for next in [
         NextState::Pending(Mode::Paused),
-        NextState::PendingIfNeq(Mode::Paused),
+        NextState::PendingIfDifferent(Mode::Paused),
     ] {
         app.insert_resource(next.clone());
         for variant in ["Playing", "Paused", "Menu"] {

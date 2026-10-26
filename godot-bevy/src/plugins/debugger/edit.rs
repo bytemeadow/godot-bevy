@@ -1,5 +1,5 @@
 use bevy_ecs::{
-    component::ComponentInfo,
+    component::{ComponentId, ComponentInfo},
     entity::Entity,
     reflect::{AppTypeRegistry, ReflectComponent},
     world::World,
@@ -36,7 +36,7 @@ fn component_info<'w>(
     world: &'w World,
     entity: Entity,
     type_path: &str,
-) -> Result<&'w ComponentInfo, InspectionError> {
+) -> Result<(ComponentId, &'w ComponentInfo), InspectionError> {
     let entity = world
         .get_entity(entity)
         .map_err(|_| InspectionError("stale entity"))?;
@@ -47,8 +47,8 @@ fn component_info<'w>(
         .archetype()
         .components()
         .iter()
-        .filter_map(|id| world.components().get_info(*id))
-        .find(|info| {
+        .filter_map(|id| world.components().get_info(*id).map(|info| (*id, info)))
+        .find(|(_, info)| {
             info.name().to_string() == type_path
                 || info
                     .type_id()
@@ -93,7 +93,7 @@ pub fn read_component(
     type_path: &str,
     limits: &ValueLimits,
 ) -> Result<Value, InspectionError> {
-    let info = component_info(world, entity, type_path)?;
+    let (component_id, info) = component_info(world, entity, type_path)?;
     let Some(registry) = world.get_resource::<AppTypeRegistry>() else {
         return Ok(Value::unsupported(
             type_path.into(),
@@ -115,10 +115,10 @@ pub fn read_component(
     };
     let entity = world.entity(entity);
     let ptr = entity
-        .get_by_id(info.id())
+        .get_by_id(component_id)
         .map_err(|_| InspectionError("component absent"))?;
     // SAFETY: registration and pointer come from the same component TypeId; the world is borrowed immutably.
-    let value = unsafe { from_ptr.as_reflect(ptr) };
+    let value = unsafe { from_ptr.ptr_as_reflect(ptr) };
     Ok(inspect(
         value.as_partial_reflect(),
         &registry,
@@ -139,7 +139,7 @@ pub fn mutate_component(
     if path.len() > limits.max_depth {
         return Err(InspectionError("maximum depth reached"));
     }
-    let info = component_info(world, entity, type_path)?;
+    let (_, info) = component_info(world, entity, type_path)?;
     let registry = world
         .get_resource::<AppTypeRegistry>()
         .cloned()

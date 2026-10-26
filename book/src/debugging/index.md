@@ -45,7 +45,7 @@ fn build_app(app: &mut App) {
 Enable automatic reflection registration on your Bevy dependency:
 
 ```toml
-bevy = { version = "0.19", default-features = false, features = ["reflect_auto_register"] }
+bevy = { version = "0.20", default-features = false, features = ["reflect_auto_register"] }
 ```
 
 Derive `Reflect` on components you want to inspect. Add `#[reflect(Component)]`
@@ -160,12 +160,15 @@ an unanswered endpoint in the pane. Entity summaries remain subscription-only.
 The remote Inspector authors Godot properties; the Bevy inspector authors ECS fields.
 [Live property sync](../scene-tree/custom-nodes/live-property-sync.md) applies its usual
 read/write and conflict rules. Internal snapshots are not registered for reflection.
+Inspector edits run in `First`, after `SceneTreeSet::Apply` and `TimeSystems`.
+A conflicting edit to a `sync = two_way` Godot property loses to the Bevy edit,
+which publishes once in `PostUpdate` without echoing on the next frame.
 Inspector refresh intervals can delay display without changing synchronization timing.
 
 ### Limitations
 
 Arbitrary not-yet-applied Bevy despawns cannot be observed through the public command queue,
 which holds private erased commands without target metadata
-([Bevy command queue source](https://docs.rs/bevy_ecs/0.19.0/src/bevy_ecs/world/command_queue.rs.html)).
+([Bevy command queue source](https://docs.rs/bevy_ecs/0.20.0/src/bevy_ecs/world/command_queue.rs.html)).
 Wide integers are edited as decimal text because a spin box value is a double and cannot
 represent every integer exactly.

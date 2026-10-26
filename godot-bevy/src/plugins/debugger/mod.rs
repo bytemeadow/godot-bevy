@@ -19,6 +19,7 @@ use bevy_ecs::{
     prelude::*,
     schedule::{IntoScheduleConfigs, SystemSet},
 };
+use bevy_time::TimeSystems;
 use godot::{
     classes::EngineDebugger,
     prelude::{VarDictionary as Dictionary, *},
@@ -183,6 +184,7 @@ impl Plugin for GodotDebuggerPlugin {
                 (service::track_summary_changes, drain)
                     .chain()
                     .after(SceneTreeSet::Apply)
+                    .after(TimeSystems)
                     .in_set(DebuggerSet::Drain),
             );
     }

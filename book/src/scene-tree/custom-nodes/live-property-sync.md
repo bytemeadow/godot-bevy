@@ -87,8 +87,9 @@ read. Order a consumer in `PreUpdate` after `Read`; order an author in
 Before importing each field, the bridge checks whether Bevy changed it since
 its last snapshot. A pending Bevy edit prevents an import and is published at
 `Write`. This includes edits in `Startup`, `First`, signal observers, and the
-ECS inspector, as well as gameplay systems. An edit later in `FixedUpdate` or
-`Update` also publishes at `Write`. Normal Bevy system ordering decides the
+ECS inspector, as well as gameplay systems. Inspector requests drain in `First`,
+after `SceneTreeSet::Apply` and `TimeSystems`, before the property read. An edit
+later in `FixedUpdate` or `Update` also publishes at `Write`. Normal Bevy system ordering decides the
 final value when several Bevy systems write the same field.
 
 Conflicts are per field. If Godot changes speed and Bevy changes health on the

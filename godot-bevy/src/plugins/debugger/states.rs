@@ -306,7 +306,7 @@ fn queued<'w>(
             };
             match next.variant_name() {
                 "Unchanged" => Ok(None),
-                "Pending" | "PendingIfNeq" => Ok(Some(
+                "Pending" | "PendingIfDifferent" => Ok(Some(
                     next.field_at(0)
                         .ok_or(InspectionError("unsupported NextState representation"))?,
                 )),
