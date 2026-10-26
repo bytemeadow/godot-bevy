@@ -635,6 +635,7 @@ bench_autosync_types!(
 /// (guards that the matched/hit path is not regressed).
 fn run_autosync_node_added(node_count: usize, matching: bool) -> i32 {
     let (mut app, sender) = setup_scene_tree_benchmark_app();
+    app.world_mut().run_schedule(First);
     let scene_tree = get_scene_tree();
     let root = scene_tree.get_root().expect("Root should exist");
 
